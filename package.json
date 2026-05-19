@@ -1,0 +1,19 @@
+{
+  "name": "san-group-system",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "server",
+    "client"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace=san-group-client",
+    "start": "npm run start --workspace=san-group-server",
+    "dev:all": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
+    "dev:server": "npm run dev --workspace=san-group-server",
+    "dev:client": "npm run dev --workspace=san-group-client"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}

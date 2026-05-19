@@ -1,0 +1,552 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================
+// ENUMS
+// ============================================================
+
+enum Role {
+  SUPER_ADMIN
+  ADMIN
+  BUILDING_MANAGER
+  TENANT_RELATIONS
+  ENGINEER
+  HRD
+  OPS
+  FINANCE
+  LEGAL
+  MARKOM
+  GA
+  PROJECT
+  STAFF
+  OWNER
+}
+
+enum Division {
+  HRD
+  OPS
+  FINANCE
+  LEGAL
+  MARKOM
+  GA
+  PROJECT
+  MANAGEMENT
+  ENGINEERING
+}
+
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  DONE
+}
+
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum TaskCategory {
+  MY_DAY
+  IMPORTANT
+  PLANNED
+  CUSTOM
+}
+
+enum BulletinCategory {
+  ANNOUNCEMENT
+  HOLIDAY
+  MAINTENANCE
+  EVENT
+  GENERAL
+}
+
+enum BulletinPriority {
+  NORMAL
+  IMPORTANT
+  URGENT
+}
+
+enum NotificationType {
+  TASK_ASSIGNED
+  TASK_COMPLETED
+  BULLETIN_NEW
+  BULLETIN_URGENT
+  SYSTEM
+}
+
+// ============================================================
+// PHASE 1 — ACTIVE TABLES
+// ============================================================
+
+// --- User & Auth ---
+
+model User {
+  id          String    @id @default(uuid())
+  email       String    @unique
+  username    String    @unique
+  password    String
+  fullName    String
+  phone       String?
+  avatar      String?
+  role        Role      @default(STAFF)
+  division    Division
+  isActive    Boolean   @default(true)
+  lastLoginAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // Relations
+  refreshTokens      RefreshToken[]
+  tasks              Task[]              @relation("TaskCreator")
+  assignedTasks      Task[]              @relation("TaskAssignee")
+  taskAttachments    TaskAttachment[]
+  stickyNotes        StickyNote[]
+  taskLists          TaskList[]
+  bulletins          Bulletin[]
+  bulletinReadStatus BulletinReadStatus[]
+  notifications      Notification[]      @relation("NotificationRecipient")
+  triggeredNotifs    Notification[]      @relation("NotificationActor")
+  databaseLinks      DatabaseLink[]
+
+  @@index([email])
+  @@index([username])
+  @@index([role])
+  @@index([division])
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([token])
+}
+
+// --- Tasks / To-Do ---
+
+model TaskList {
+  id        String   @id @default(uuid())
+  name      String
+  color     String   @default("#6366f1")
+  icon      String?
+  position  Int      @default(0)
+  createdAt DateTime @default(now())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tasks  Task[]
+
+  @@index([userId])
+}
+
+model Task {
+  id          String       @id @default(uuid())
+  title       String
+  description String?
+  status      TaskStatus   @default(TODO)
+  priority    TaskPriority @default(MEDIUM)
+  category    TaskCategory @default(MY_DAY)
+  dueDate     DateTime?
+  completedAt DateTime?
+  position    Int          @default(0)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  userId       String
+  creator      User   @relation("TaskCreator", fields: [userId], references: [id], onDelete: Cascade)
+
+  assignedToId String?
+  assignee     User?   @relation("TaskAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+
+  listId   String?
+  taskList TaskList? @relation(fields: [listId], references: [id], onDelete: SetNull)
+
+  // Self-referencing for sub-tasks
+  parentTaskId String?
+  parentTask   Task?   @relation("SubTasks", fields: [parentTaskId], references: [id], onDelete: Cascade)
+  subTasks     Task[]  @relation("SubTasks")
+
+  attachments TaskAttachment[]
+
+  @@index([userId])
+  @@index([assignedToId])
+  @@index([listId])
+  @@index([status])
+  @@index([priority])
+  @@index([dueDate])
+}
+
+model TaskAttachment {
+  id         String   @id @default(uuid())
+  fileName   String
+  filePath   String
+  fileSize   Int
+  mimeType   String
+  createdAt  DateTime @default(now())
+
+  taskId String
+  task   Task   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  uploadedById String
+  uploadedBy   User   @relation(fields: [uploadedById], references: [id], onDelete: Cascade)
+
+  @@index([taskId])
+  @@index([uploadedById])
+}
+
+// --- Sticky Notes ---
+
+model StickyNote {
+  id        String   @id @default(uuid())
+  title     String?
+  content   String
+  color     String   @default("yellow")
+  isPinned  Boolean  @default(false)
+  position  Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([isPinned])
+}
+
+// --- Bulletin Board ---
+
+model Bulletin {
+  id          String           @id @default(uuid())
+  title       String
+  content     String
+  category    BulletinCategory @default(GENERAL)
+  priority    BulletinPriority @default(NORMAL)
+  isPublished Boolean          @default(false)
+  publishedAt DateTime?
+  expiresAt   DateTime?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  authorId String
+  author   User   @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  attachments BulletinAttachment[]
+  readStatus  BulletinReadStatus[]
+
+  @@index([authorId])
+  @@index([category])
+  @@index([priority])
+  @@index([isPublished])
+  @@index([publishedAt])
+}
+
+model BulletinAttachment {
+  id        String   @id @default(uuid())
+  fileName  String
+  filePath  String
+  fileSize  Int
+  mimeType  String
+  createdAt DateTime @default(now())
+
+  bulletinId String
+  bulletin   Bulletin @relation(fields: [bulletinId], references: [id], onDelete: Cascade)
+
+  @@index([bulletinId])
+}
+
+model BulletinReadStatus {
+  id     String   @id @default(uuid())
+  readAt DateTime @default(now())
+
+  bulletinId String
+  bulletin   Bulletin @relation(fields: [bulletinId], references: [id], onDelete: Cascade)
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([bulletinId, userId])
+  @@index([bulletinId])
+  @@index([userId])
+}
+
+// --- Database Section (Link Management) ---
+
+model DatabaseLink {
+  id          String   @id @default(uuid())
+  title       String
+  description String?
+  url         String
+  category    String
+  division    Division
+  icon        String?
+  position    Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  createdById String
+  createdBy   User   @relation(fields: [createdById], references: [id], onDelete: Cascade)
+
+  @@index([createdById])
+  @@index([division])
+  @@index([category])
+}
+
+// --- Notifications ---
+
+model Notification {
+  id        String           @id @default(uuid())
+  type      NotificationType
+  title     String
+  message   String
+  link      String?
+  isRead    Boolean          @default(false)
+  createdAt DateTime         @default(now())
+
+  userId String
+  user   User   @relation("NotificationRecipient", fields: [userId], references: [id], onDelete: Cascade)
+
+  actorId String?
+  actor   User?   @relation("NotificationActor", fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([actorId])
+  @@index([isRead])
+  @@index([type])
+}
+
+// ============================================================
+// PHASE 2 — COMMENTED OUT (uncomment saat Phase 2 dimulai)
+// ============================================================
+
+// --- Work Order System ---
+// enum WorkOrderStatus { OPEN, ASSIGNED, IN_PROGRESS, PENDING_PARTS, DONE, CANCELLED }
+// enum WorkOrderPriority { LOW, MEDIUM, HIGH, URGENT }
+// enum WorkOrderCategory { ELECTRICAL, PLUMBING, HVAC, CIVIL, CLEANING, SECURITY, OTHER }
+//
+// model WorkOrder {
+//   id           String            @id @default(uuid())
+//   code         String            @unique
+//   title        String
+//   description  String
+//   category     WorkOrderCategory
+//   status       WorkOrderStatus   @default(OPEN)
+//   priority     WorkOrderPriority @default(MEDIUM)
+//   location     String?
+//   reportedById String
+//   assignedToId String?
+//   dueDate      DateTime?
+//   closedAt     DateTime?
+//   createdAt    DateTime          @default(now())
+//   updatedAt    DateTime          @updatedAt
+//   history      WorkOrderHistory[]
+//   attachments  WorkOrderAttachment[]
+// }
+//
+// model WorkOrderHistory {
+//   id          String   @id @default(uuid())
+//   workOrderId String
+//   changedById String
+//   fromStatus  String
+//   toStatus    String
+//   notes       String?
+//   createdAt   DateTime @default(now())
+// }
+//
+// model WorkOrderAttachment {
+//   id           String   @id @default(uuid())
+//   workOrderId  String
+//   fileName     String
+//   filePath     String
+//   fileSize     Int
+//   mimeType     String
+//   uploadedById String
+//   createdAt    DateTime @default(now())
+// }
+
+// --- HRIS ---
+// enum AttendanceType { CLOCK_IN, CLOCK_OUT }
+// enum LeaveStatus   { PENDING, APPROVED, REJECTED, CANCELLED }
+// enum LeaveType     { ANNUAL, SICK, PERSONAL, UNPAID }
+//
+// model Attendance {
+//   id        String         @id @default(uuid())
+//   userId    String
+//   type      AttendanceType
+//   timestamp DateTime
+//   latitude  Float?
+//   longitude Float?
+//   photo     String?
+//   notes     String?
+//   createdAt DateTime       @default(now())
+// }
+//
+// model Leave {
+//   id           String      @id @default(uuid())
+//   userId       String
+//   type         LeaveType
+//   status       LeaveStatus @default(PENDING)
+//   startDate    DateTime
+//   endDate      DateTime
+//   totalDays    Int
+//   reason       String
+//   approvedById String?
+//   approvedAt   DateTime?
+//   createdAt    DateTime    @default(now())
+//   updatedAt    DateTime    @updatedAt
+// }
+//
+// model LeaveBalance {
+//   id        String    @id @default(uuid())
+//   userId    String
+//   year      Int
+//   leaveType LeaveType
+//   total     Int
+//   used      Int       @default(0)
+//   remaining Int
+// }
+//
+// model Timetable {
+//   id        String   @id @default(uuid())
+//   userId    String
+//   date      DateTime
+//   shiftIn   String
+//   shiftOut  String
+//   notes     String?
+//   createdAt DateTime @default(now())
+// }
+
+// ============================================================
+// PHASE 3 — COMMENTED OUT (uncomment saat Phase 3 dimulai)
+// ============================================================
+
+// --- Inventory & Asset Management ---
+// enum AssetStatus    { ACTIVE, UNDER_MAINTENANCE, RETIRED, LOST }
+// enum AssetCondition { EXCELLENT, GOOD, FAIR, POOR }
+//
+// model AssetCategory {
+//   id     String  @id @default(uuid())
+//   name   String
+//   code   String  @unique
+//   assets Asset[]
+// }
+//
+// model Asset {
+//   id            String         @id @default(uuid())
+//   code          String         @unique
+//   name          String
+//   categoryId    String
+//   status        AssetStatus    @default(ACTIVE)
+//   condition     AssetCondition @default(GOOD)
+//   location      String?
+//   purchaseDate  DateTime?
+//   purchasePrice Decimal?
+//   assignedToId  String?
+//   notes         String?
+//   createdAt     DateTime       @default(now())
+//   updatedAt     DateTime       @updatedAt
+//   history       AssetHistory[]
+// }
+//
+// model AssetHistory {
+//   id          String   @id @default(uuid())
+//   assetId     String
+//   changedById String
+//   action      String
+//   notes       String?
+//   createdAt   DateTime @default(now())
+// }
+
+// --- Tenant Database ---
+// enum TenantStatus { ACTIVE, INACTIVE, PROSPECT }
+//
+// model Tenant {
+//   id            String       @id @default(uuid())
+//   companyName   String
+//   contactPerson String
+//   email         String
+//   phone         String
+//   floor         String?
+//   unit          String?
+//   status        TenantStatus @default(ACTIVE)
+//   leaseStart    DateTime?
+//   leaseEnd      DateTime?
+//   createdAt     DateTime     @default(now())
+//   updatedAt     DateTime     @updatedAt
+//   documents     TenantDocument[]
+//   reminders     TenantReminder[]
+// }
+//
+// model TenantDocument {
+//   id        String   @id @default(uuid())
+//   tenantId  String
+//   name      String
+//   filePath  String
+//   fileSize  Int
+//   mimeType  String
+//   createdAt DateTime @default(now())
+// }
+//
+// model TenantReminder {
+//   id          String   @id @default(uuid())
+//   tenantId    String
+//   title       String
+//   dueDate     DateTime
+//   isResolved  Boolean  @default(false)
+//   createdById String
+//   createdAt   DateTime @default(now())
+// }
+
+// --- Meeting Room Booking ---
+// enum BookingStatus { PENDING, CONFIRMED, CANCELLED }
+//
+// model MeetingRoom {
+//   id        String    @id @default(uuid())
+//   name      String
+//   capacity  Int
+//   floor     String?
+//   amenities String?
+//   isActive  Boolean   @default(true)
+//   bookings  Booking[]
+// }
+//
+// model Booking {
+//   id        String        @id @default(uuid())
+//   roomId    String
+//   userId    String
+//   title     String
+//   startTime DateTime
+//   endTime   DateTime
+//   status    BookingStatus @default(PENDING)
+//   notes     String?
+//   createdAt DateTime      @default(now())
+//   updatedAt DateTime      @updatedAt
+// }
+
+// --- Utility Tracking ---
+// enum UtilityType { ELECTRICITY, WATER, GAS, INTERNET }
+//
+// model UtilityRecord {
+//   id           String      @id @default(uuid())
+//   type         UtilityType
+//   month        Int
+//   year         Int
+//   reading      Decimal
+//   unit         String
+//   cost         Decimal?
+//   notes        String?
+//   recordedById String
+//   createdAt    DateTime    @default(now())
+// }
