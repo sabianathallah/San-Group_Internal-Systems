@@ -221,7 +221,7 @@ async function main() {
       id: 'seed-note-3',
       title: null,
       content: 'Jangan lupa perpanjang kontrak vendor security bulan depan!',
-      color: 'red',
+      color: 'pink',
       isPinned: false,
       position: 2,
       userId: admin.id,

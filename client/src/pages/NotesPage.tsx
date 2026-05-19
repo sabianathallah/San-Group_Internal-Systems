@@ -204,7 +204,7 @@ function NoteCard({
   onTogglePin: (note: Note) => void;
 }) {
   const [deleting, setDeleting] = useState(false);
-  const { bg, border } = COLOR_MAP[note.color];
+  const { bg, border } = COLOR_MAP[note.color] ?? COLOR_MAP.yellow;
 
   async function handleDelete(e: React.MouseEvent) {
     e.stopPropagation();
