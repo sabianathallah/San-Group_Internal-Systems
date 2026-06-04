@@ -43,7 +43,6 @@ function FolderModal({ folder, onClose, onSaved }: {
   folder?: DbFolder; onClose: () => void; onSaved: (f: DbFolder) => void;
 }) {
   const [name,  setName]  = useState(folder?.name  ?? '');
-  const [icon,  setIcon]  = useState(folder?.icon  ?? '');
   const [color, setColor] = useState(folder?.color ?? '#6366f1');
   const [desc,  setDesc]  = useState(folder?.description ?? '');
   const [saving, setSaving] = useState(false);
@@ -54,7 +53,7 @@ function FolderModal({ folder, onClose, onSaved }: {
     if (!name.trim()) { setError('Nama folder wajib diisi'); return; }
     setSaving(true); setError('');
     try {
-      const payload = { name: name.trim(), icon: icon.trim() || null, color, description: desc.trim() || null };
+      const payload = { name: name.trim(), icon: null, color, description: desc.trim() || null };
       const res = folder
         ? await api.patch(`/db-folders/${folder.id}`, payload)
         : await api.post('/db-folders', payload);
@@ -76,12 +75,6 @@ function FolderModal({ folder, onClose, onSaved }: {
             <label className="block text-xs text-gray-500 mb-1">Nama folder</label>
             <input autoFocus type="text" value={name} onChange={(e) => setName(e.target.value)}
               placeholder="contoh: Dokumen HRD"
-              className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-navy" />
-          </div>
-          <div>
-            <label className="block text-xs text-gray-500 mb-1">Emoji icon (opsional)</label>
-            <input type="text" value={icon} onChange={(e) => setIcon(e.target.value)}
-              placeholder="📁"
               className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-navy" />
           </div>
           <div>
@@ -303,10 +296,7 @@ export default function DatabasePage() {
                 >
                   <div className="w-14 h-14 rounded-xl flex items-center justify-center"
                     style={{ backgroundColor: `${folder.color}18` }}>
-                    {folder.icon
-                      ? <span className="text-3xl leading-none">{folder.icon}</span>
-                      : <Folder size={30} style={{ color: folder.color }} />
-                    }
+                    <Folder size={30} style={{ color: folder.color }} />
                   </div>
                   <div className="w-full text-center space-y-0.5">
                     <p className="text-sm font-medium text-gray-800 truncate">{folder.name}</p>
@@ -350,7 +340,6 @@ export default function DatabasePage() {
           </button>
           <ChevronRight size={13} className="text-gray-300 flex-shrink-0" />
           <div className="flex items-center gap-2">
-            {activeFolder.icon && <span className="text-base leading-none">{activeFolder.icon}</span>}
             <FolderOpen size={16} style={{ color: activeFolder.color }} />
             <span className="text-sm font-semibold text-gray-900">{activeFolder.name}</span>
           </div>
