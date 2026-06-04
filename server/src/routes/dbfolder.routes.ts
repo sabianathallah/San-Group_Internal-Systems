@@ -11,6 +11,6 @@ router.get('/',        listFolders);
 router.post('/',       createFolder);
 router.patch('/:id',   validate(uuidParamSchema, ['params']), updateFolder);
 router.delete('/:id',  validate(uuidParamSchema, ['params']), deleteFolder);
-router.get('/:id/links', validate(uuidParamSchema, ['params']), listFolderLinks);
+router.get('/:id/links', listFolderLinks);
 
 export default router;
