@@ -327,27 +327,27 @@ async function main() {
   const folderHR = await prisma.databaseFolder.upsert({
     where: { id: 'seed-folder-hr' },
     update: {},
-    create: { id: 'seed-folder-hr', name: 'HR & People', icon: '👥', color: '#ec4899', position: 0, createdById: admin.id },
+    create: { id: 'seed-folder-hr', name: 'HR & People', icon: null, color: '#ec4899', position: 0, createdById: admin.id },
   });
   const folderFinance = await prisma.databaseFolder.upsert({
     where: { id: 'seed-folder-finance' },
     update: {},
-    create: { id: 'seed-folder-finance', name: 'Finance', icon: '💰', color: '#10b981', position: 1, createdById: admin.id },
+    create: { id: 'seed-folder-finance', name: 'Finance', icon: null, color: '#10b981', position: 1, createdById: admin.id },
   });
   const folderProperty = await prisma.databaseFolder.upsert({
     where: { id: 'seed-folder-property' },
     update: {},
-    create: { id: 'seed-folder-property', name: 'Property & Operasional', icon: '🏢', color: '#3b82f6', position: 2, createdById: admin.id },
+    create: { id: 'seed-folder-property', name: 'Property & Operasional', icon: null, color: '#3b82f6', position: 2, createdById: admin.id },
   });
   const folderLegal = await prisma.databaseFolder.upsert({
     where: { id: 'seed-folder-legal' },
     update: {},
-    create: { id: 'seed-folder-legal', name: 'Legal & Perizinan', icon: '⚖️', color: '#8b5cf6', position: 3, createdById: admin.id },
+    create: { id: 'seed-folder-legal', name: 'Legal & Perizinan', icon: null, color: '#8b5cf6', position: 3, createdById: admin.id },
   });
   const folderMgmt = await prisma.databaseFolder.upsert({
     where: { id: 'seed-folder-mgmt' },
     update: {},
-    create: { id: 'seed-folder-mgmt', name: 'Manajemen', icon: '📊', color: '#6366f1', position: 4, createdById: admin.id },
+    create: { id: 'seed-folder-mgmt', name: 'Manajemen', icon: null, color: '#6366f1', position: 4, createdById: admin.id },
   });
 
   const dbLinks = [
