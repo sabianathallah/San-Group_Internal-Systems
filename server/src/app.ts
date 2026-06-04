@@ -14,6 +14,7 @@ import bulletinRoutes from '@/routes/bulletin.routes';
 import noteRoutes from '@/routes/note.routes';
 import dblinkRoutes from '@/routes/dblink.routes';
 import notificationRoutes from '@/routes/notification.routes';
+import taskListRoutes from '@/routes/task-list.routes';
 
 const app = express();
 
@@ -64,6 +65,7 @@ app.use('/api/bulletins', bulletinRoutes);
 app.use('/api/notes', noteRoutes);
 app.use('/api/db-links', dblinkRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/task-lists', taskListRoutes);
 
 // ── Error Handling ─────────────────────────────────────────
 app.use(notFound);

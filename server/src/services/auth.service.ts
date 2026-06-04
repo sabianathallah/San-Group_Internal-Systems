@@ -43,10 +43,11 @@ export async function loginService(identifier: string, password: string) {
   }
 
   const payload = {
-    userId: user.id,
-    email: user.email,
+    userId:   user.id,
+    email:    user.email,
     username: user.username,
-    role: user.role,
+    role:     user.role,
+    division: user.division,
   };
 
   const accessToken = generateAccessToken(payload);
@@ -59,7 +60,7 @@ export async function loginService(identifier: string, password: string) {
       data: {
         token: refreshToken,
         userId: user.id,
-        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
+        expiresAt: new Date(Date.now() + 12 * 60 * 60 * 1000), // 12 hours
       },
     }),
     prisma.user.update({
@@ -133,10 +134,11 @@ export async function refreshTokenService(token: string) {
   }
 
   const newPayload = {
-    userId: user.id,
-    email: user.email,
+    userId:   user.id,
+    email:    user.email,
     username: user.username,
-    role: user.role,
+    role:     user.role,
+    division: user.division,
   };
 
   const newAccessToken = generateAccessToken(newPayload);

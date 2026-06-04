@@ -9,8 +9,9 @@ import { cn } from '@/lib/cn';
 
 // ── Types ──────────────────────────────────────────────────
 type Division =
-  | 'HRD' | 'OPS' | 'FINANCE' | 'LEGAL' | 'MARKOM'
-  | 'GA' | 'PROJECT' | 'MANAGEMENT' | 'ENGINEERING';
+  | 'MANAGEMENT' | 'RETAIL' | 'HOTEL' | 'HOUSING' | 'FNB' | 'GENERAL'
+  | 'LEASING' | 'PROPERTY' | 'ENGINEERING'
+  | 'FINANCE' | 'LEGAL' | 'TAX' | 'HR' | 'GA';
 
 interface DbLink {
   id:          string;
@@ -27,32 +28,43 @@ interface DbLink {
 
 // ── Constants ──────────────────────────────────────────────
 const DIVISIONS: Division[] = [
-  'HRD', 'OPS', 'FINANCE', 'LEGAL', 'MARKOM',
-  'GA', 'PROJECT', 'MANAGEMENT', 'ENGINEERING',
+  'MANAGEMENT','RETAIL','HOTEL','HOUSING','FNB','GENERAL',
+  'LEASING','PROPERTY','ENGINEERING',
+  'FINANCE','LEGAL','TAX','HR','GA',
 ];
 
 const DIVISION_LABELS: Record<Division, string> = {
-  HRD:         'HRD',
-  OPS:         'Operasional',
-  FINANCE:     'Keuangan',
-  LEGAL:       'Legal',
-  MARKOM:      'Marketing & Komersil',
-  GA:          'General Affairs',
-  PROJECT:     'Project',
   MANAGEMENT:  'Manajemen',
+  RETAIL:      'Retail',
+  HOTEL:       'Hotel & Ballroom',
+  HOUSING:     'Housing',
+  FNB:         'F&B',
+  GENERAL:     'General',
+  LEASING:     'Leasing',
+  PROPERTY:    'Property',
   ENGINEERING: 'Engineering',
+  FINANCE:     'Finance',
+  LEGAL:       'Legal',
+  TAX:         'Tax',
+  HR:          'HR',
+  GA:          'General Affairs',
 };
 
 const DIVISION_COLORS: Record<Division, string> = {
-  HRD:         'bg-blue-100 text-blue-700',
-  OPS:         'bg-orange-100 text-orange-700',
+  MANAGEMENT:  'bg-navy/10 text-navy',
+  RETAIL:      'bg-teal-100 text-teal-700',
+  HOTEL:       'bg-violet-100 text-violet-700',
+  HOUSING:     'bg-sky-100 text-sky-700',
+  FNB:         'bg-rose-100 text-rose-700',
+  GENERAL:     'bg-gray-100 text-gray-600',
+  LEASING:     'bg-emerald-100 text-emerald-700',
+  PROPERTY:    'bg-cyan-100 text-cyan-700',
+  ENGINEERING: 'bg-orange-100 text-orange-700',
   FINANCE:     'bg-green-100 text-green-700',
   LEGAL:       'bg-purple-100 text-purple-700',
-  MARKOM:      'bg-pink-100 text-pink-700',
+  TAX:         'bg-indigo-100 text-indigo-700',
+  HR:          'bg-pink-100 text-pink-700',
   GA:          'bg-yellow-100 text-yellow-700',
-  PROJECT:     'bg-cyan-100 text-cyan-700',
-  MANAGEMENT:  'bg-navy/10 text-navy',
-  ENGINEERING: 'bg-red-100 text-red-700',
 };
 
 const SUGGESTED_CATEGORIES = [

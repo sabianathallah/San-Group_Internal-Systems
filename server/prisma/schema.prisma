@@ -14,30 +14,46 @@ datasource db {
 enum Role {
   SUPER_ADMIN
   ADMIN
-  BUILDING_MANAGER
-  TENANT_RELATIONS
-  ENGINEER
-  HRD
-  OPS
-  FINANCE
-  LEGAL
-  MARKOM
-  GA
-  PROJECT
-  STAFF
   OWNER
+  DIRECTOR
+  PROPERTY_MANAGER
+  LEASING_MANAGER
+  LEASING_ASSISTANT
+  LEASING_STAFF
+  TENANT_RELATIONS
+  FACILITY_MANAGER
+  CHIEF_ENGINEER
+  ENGINEER
+  FINANCE_MANAGER
+  ASST_FINANCE_MANAGER
+  ACCOUNTANT
+  LEGAL_HEAD
+  LEGAL_SPV
+  LEGAL_STAFF
+  TAX_STAFF
+  HR_MANAGER
+  HR_SPV
+  HR_STAFF
+  FNB_MANAGER
+  GA_MANAGER
+  STAFF
 }
 
 enum Division {
-  HRD
-  OPS
+  MANAGEMENT
+  RETAIL
+  HOTEL
+  HOUSING
+  FNB
+  GENERAL
+  LEASING
+  PROPERTY
+  ENGINEERING
   FINANCE
   LEGAL
-  MARKOM
+  TAX
+  HR
   GA
-  PROJECT
-  MANAGEMENT
-  ENGINEERING
 }
 
 enum TaskStatus {
@@ -58,6 +74,12 @@ enum TaskCategory {
   IMPORTANT
   PLANNED
   CUSTOM
+}
+
+enum AssignmentStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
 }
 
 enum BulletinCategory {
@@ -115,6 +137,7 @@ model User {
   notifications      Notification[]      @relation("NotificationRecipient")
   triggeredNotifs    Notification[]      @relation("NotificationActor")
   databaseLinks      DatabaseLink[]
+  taskComments       TaskComment[]
 
   @@index([email])
   @@index([username])
@@ -159,11 +182,14 @@ model Task {
   status      TaskStatus   @default(TODO)
   priority    TaskPriority @default(MEDIUM)
   category    TaskCategory @default(MY_DAY)
-  dueDate     DateTime?
-  completedAt DateTime?
-  position    Int          @default(0)
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
+  dueDate          DateTime?
+  completedAt      DateTime?
+  isPrivate        Boolean           @default(false)
+  assignmentStatus AssignmentStatus?
+  assignmentNote   String?
+  position         Int               @default(0)
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
 
   userId       String
   creator      User   @relation("TaskCreator", fields: [userId], references: [id], onDelete: Cascade)
@@ -180,6 +206,8 @@ model Task {
   subTasks     Task[]  @relation("SubTasks")
 
   attachments TaskAttachment[]
+  links       TaskLink[]
+  comments    TaskComment[]
 
   @@index([userId])
   @@index([assignedToId])
@@ -205,6 +233,31 @@ model TaskAttachment {
 
   @@index([taskId])
   @@index([uploadedById])
+}
+
+model TaskLink {
+  id        String   @id @default(uuid())
+  url       String
+  title     String?
+  taskId    String
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@index([taskId])
+}
+
+model TaskComment {
+  id        String   @id @default(uuid())
+  content   String
+  taskId    String
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([taskId])
+  @@index([userId])
 }
 
 // --- Sticky Notes ---

@@ -12,6 +12,7 @@ export const createTaskSchema = z.object({
     assignedToId: z.string().uuid().optional().nullable(),
     listId:       z.string().uuid().optional().nullable(),
     parentTaskId: z.string().uuid().optional().nullable(),
+    isPrivate:    z.boolean().optional(),
   }),
 });
 
@@ -26,12 +27,7 @@ export const updateTaskSchema = z.object({
     assignedToId: z.string().uuid().optional().nullable(),
     listId:       z.string().uuid().optional().nullable(),
     parentTaskId: z.string().uuid().optional().nullable(),
-  }),
-});
-
-export const updateTaskStatusSchema = z.object({
-  body: z.object({
-    status: z.nativeEnum(TaskStatus),
+    isPrivate:    z.boolean().optional(),
   }),
 });
 
@@ -42,8 +38,27 @@ export const taskFilterSchema = z.object({
     search:   z.string().optional(),
     status:   z.nativeEnum(TaskStatus).optional(),
     priority: z.nativeEnum(TaskPriority).optional(),
-    category: z.nativeEnum(TaskCategory).optional(),
-    // Admin: filter by specific user
+    view:     z.enum(['my_day', 'assigned', 'important', 'all', 'list']).optional(),
+    listId:   z.string().uuid().optional(),
     userId:   z.string().uuid().optional(),
+  }),
+});
+
+export const rejectTaskSchema = z.object({
+  body: z.object({
+    note: z.string().min(1, 'Catatan penolakan wajib diisi').max(500),
+  }),
+});
+
+export const addCommentSchema = z.object({
+  body: z.object({
+    content: z.string().min(1).max(2000),
+  }),
+});
+
+export const addLinkSchema = z.object({
+  body: z.object({
+    url:   z.string().url('URL tidak valid'),
+    title: z.string().max(200).optional(),
   }),
 });

@@ -2,10 +2,11 @@ import { Request } from 'express';
 import { Role } from '@prisma/client';
 
 export interface JwtPayload {
-  userId: string;
-  email: string;
+  userId:   string;
+  email:    string;
   username: string;
-  role: Role;
+  role:     Role;
+  division: string;
 }
 
 export interface AuthRequest extends Request {

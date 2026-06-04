@@ -10,13 +10,18 @@ import { cn } from '@/lib/cn';
 
 // ── Types ──────────────────────────────────────────────────
 type Role =
-  | 'SUPER_ADMIN' | 'ADMIN' | 'BUILDING_MANAGER' | 'TENANT_RELATIONS'
-  | 'ENGINEER' | 'HRD' | 'OPS' | 'FINANCE' | 'LEGAL' | 'MARKOM'
-  | 'GA' | 'PROJECT' | 'STAFF' | 'OWNER';
+  | 'SUPER_ADMIN' | 'ADMIN' | 'OWNER' | 'DIRECTOR'
+  | 'PROPERTY_MANAGER' | 'LEASING_MANAGER' | 'LEASING_ASSISTANT' | 'LEASING_STAFF'
+  | 'TENANT_RELATIONS' | 'FACILITY_MANAGER' | 'CHIEF_ENGINEER' | 'ENGINEER'
+  | 'FINANCE_MANAGER' | 'ASST_FINANCE_MANAGER' | 'ACCOUNTANT'
+  | 'LEGAL_HEAD' | 'LEGAL_SPV' | 'LEGAL_STAFF'
+  | 'TAX_STAFF' | 'HR_MANAGER' | 'HR_SPV' | 'HR_STAFF'
+  | 'FNB_MANAGER' | 'GA_MANAGER' | 'STAFF';
 
 type Division =
-  | 'HRD' | 'OPS' | 'FINANCE' | 'LEGAL' | 'MARKOM'
-  | 'GA' | 'PROJECT' | 'MANAGEMENT' | 'ENGINEERING';
+  | 'MANAGEMENT' | 'RETAIL' | 'HOTEL' | 'HOUSING' | 'FNB' | 'GENERAL'
+  | 'LEASING' | 'PROPERTY' | 'ENGINEERING'
+  | 'FINANCE' | 'LEGAL' | 'TAX' | 'HR' | 'GA';
 
 interface UserRow {
   id:          string;
@@ -36,43 +41,92 @@ interface Meta { total: number; page: number; limit: number; totalPages: number;
 
 // ── Constants ──────────────────────────────────────────────
 const ROLES: Role[] = [
-  'SUPER_ADMIN','ADMIN','BUILDING_MANAGER','TENANT_RELATIONS',
-  'ENGINEER','HRD','OPS','FINANCE','LEGAL','MARKOM','GA','PROJECT','STAFF','OWNER',
+  'SUPER_ADMIN','ADMIN','OWNER','DIRECTOR',
+  'PROPERTY_MANAGER','LEASING_MANAGER','LEASING_ASSISTANT','LEASING_STAFF',
+  'TENANT_RELATIONS','FACILITY_MANAGER','CHIEF_ENGINEER','ENGINEER',
+  'FINANCE_MANAGER','ASST_FINANCE_MANAGER','ACCOUNTANT',
+  'LEGAL_HEAD','LEGAL_SPV','LEGAL_STAFF',
+  'TAX_STAFF','HR_MANAGER','HR_SPV','HR_STAFF',
+  'FNB_MANAGER','GA_MANAGER','STAFF',
 ];
 
 const ROLE_LABELS: Record<Role, string> = {
-  SUPER_ADMIN: 'Super Admin', ADMIN: 'Admin',
-  BUILDING_MANAGER: 'Building Manager', TENANT_RELATIONS: 'Tenant Relations',
-  ENGINEER: 'Engineer', HRD: 'HRD', OPS: 'Operasional', FINANCE: 'Keuangan',
-  LEGAL: 'Legal', MARKOM: 'Marketing', GA: 'General Affairs',
-  PROJECT: 'Project', STAFF: 'Staff', OWNER: 'Owner',
+  SUPER_ADMIN:          'Super Admin',
+  ADMIN:                'Admin',
+  OWNER:                'Owner',
+  DIRECTOR:             'Director',
+  PROPERTY_MANAGER:     'Property Manager',
+  LEASING_MANAGER:      'Leasing Manager',
+  LEASING_ASSISTANT:    'Leasing Assistant',
+  LEASING_STAFF:        'Leasing Staff',
+  TENANT_RELATIONS:     'Tenant Relations',
+  FACILITY_MANAGER:     'Facility Manager',
+  CHIEF_ENGINEER:       'Chief Engineer',
+  ENGINEER:             'Engineer',
+  FINANCE_MANAGER:      'Finance Manager',
+  ASST_FINANCE_MANAGER: 'Asst. Finance Manager',
+  ACCOUNTANT:           'Accountant',
+  LEGAL_HEAD:           'Legal Head',
+  LEGAL_SPV:            'Legal SPV',
+  LEGAL_STAFF:          'Legal Staff',
+  TAX_STAFF:            'Tax Staff',
+  HR_MANAGER:           'HR Manager',
+  HR_SPV:               'HR SPV',
+  HR_STAFF:             'HR Staff',
+  FNB_MANAGER:          'F&B Manager',
+  GA_MANAGER:           'GA Manager',
+  STAFF:                'Staff',
 };
 
 const ROLE_COLORS: Record<Role, string> = {
-  SUPER_ADMIN:       'bg-navy text-white',
-  ADMIN:             'bg-blue-100 text-blue-700',
-  BUILDING_MANAGER:  'bg-cyan-100 text-cyan-700',
-  TENANT_RELATIONS:  'bg-teal-100 text-teal-700',
-  ENGINEER:          'bg-orange-100 text-orange-700',
-  HRD:               'bg-pink-100 text-pink-700',
-  OPS:               'bg-amber-100 text-amber-700',
-  FINANCE:           'bg-green-100 text-green-700',
-  LEGAL:             'bg-purple-100 text-purple-700',
-  MARKOM:            'bg-rose-100 text-rose-700',
-  GA:                'bg-yellow-100 text-yellow-700',
-  PROJECT:           'bg-indigo-100 text-indigo-700',
-  STAFF:             'bg-gray-100 text-gray-600',
-  OWNER:             'bg-gold/20 text-yellow-800',
+  SUPER_ADMIN:          'bg-navy text-white',
+  ADMIN:                'bg-blue-100 text-blue-700',
+  OWNER:                'bg-yellow-100 text-yellow-800',
+  DIRECTOR:             'bg-violet-100 text-violet-700',
+  PROPERTY_MANAGER:     'bg-cyan-100 text-cyan-700',
+  LEASING_MANAGER:      'bg-teal-100 text-teal-700',
+  LEASING_ASSISTANT:    'bg-teal-50 text-teal-600',
+  LEASING_STAFF:        'bg-gray-100 text-gray-600',
+  TENANT_RELATIONS:     'bg-emerald-100 text-emerald-700',
+  FACILITY_MANAGER:     'bg-sky-100 text-sky-700',
+  CHIEF_ENGINEER:       'bg-orange-100 text-orange-700',
+  ENGINEER:             'bg-amber-100 text-amber-700',
+  FINANCE_MANAGER:      'bg-green-100 text-green-700',
+  ASST_FINANCE_MANAGER: 'bg-green-50 text-green-600',
+  ACCOUNTANT:           'bg-lime-100 text-lime-700',
+  LEGAL_HEAD:           'bg-purple-100 text-purple-700',
+  LEGAL_SPV:            'bg-purple-50 text-purple-600',
+  LEGAL_STAFF:          'bg-gray-100 text-gray-600',
+  TAX_STAFF:            'bg-indigo-100 text-indigo-700',
+  HR_MANAGER:           'bg-pink-100 text-pink-700',
+  HR_SPV:               'bg-pink-50 text-pink-600',
+  HR_STAFF:             'bg-gray-100 text-gray-600',
+  FNB_MANAGER:          'bg-rose-100 text-rose-700',
+  GA_MANAGER:           'bg-yellow-100 text-yellow-700',
+  STAFF:                'bg-gray-100 text-gray-500',
 };
 
 const DIVISIONS: Division[] = [
-  'HRD','OPS','FINANCE','LEGAL','MARKOM','GA','PROJECT','MANAGEMENT','ENGINEERING',
+  'MANAGEMENT','RETAIL','HOTEL','HOUSING','FNB','GENERAL',
+  'LEASING','PROPERTY','ENGINEERING',
+  'FINANCE','LEGAL','TAX','HR','GA',
 ];
 
 const DIV_LABELS: Record<Division, string> = {
-  HRD: 'HRD', OPS: 'Operasional', FINANCE: 'Keuangan', LEGAL: 'Legal',
-  MARKOM: 'Marketing', GA: 'General Affairs', PROJECT: 'Project',
-  MANAGEMENT: 'Manajemen', ENGINEERING: 'Engineering',
+  MANAGEMENT:  'Manajemen',
+  RETAIL:      'Retail',
+  HOTEL:       'Hotel & Ballroom',
+  HOUSING:     'Housing',
+  FNB:         'F&B',
+  GENERAL:     'General',
+  LEASING:     'Leasing',
+  PROPERTY:    'Property',
+  ENGINEERING: 'Engineering',
+  FINANCE:     'Finance',
+  LEGAL:       'Legal',
+  TAX:         'Tax',
+  HR:          'HR',
+  GA:          'General Affairs',
 };
 
 // ── Helpers ────────────────────────────────────────────────

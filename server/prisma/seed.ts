@@ -26,46 +26,61 @@ async function main() {
     },
   });
 
-  const bm = await prisma.user.upsert({
-    where: { email: 'bm@sangroup.id' },
+  const director = await prisma.user.upsert({
+    where: { email: 'director.retail@sangroup.id' },
     update: {},
     create: {
-      email: 'bm@sangroup.id',
-      username: 'building.manager',
+      email: 'director.retail@sangroup.id',
+      username: 'director.retail',
       password: await hash('password123'),
       fullName: 'Andi Pratama',
       phone: '08111111111',
-      role: Role.BUILDING_MANAGER,
-      division: Division.OPS,
+      role: Role.DIRECTOR,
+      division: Division.RETAIL,
       isActive: true,
     },
   });
 
-  const hrd = await prisma.user.upsert({
-    where: { email: 'hrd@sangroup.id' },
+  const propertyManager = await prisma.user.upsert({
+    where: { email: 'pm@sangroup.id' },
     update: {},
     create: {
-      email: 'hrd@sangroup.id',
-      username: 'hrd.officer',
+      email: 'pm@sangroup.id',
+      username: 'property.manager',
+      password: await hash('password123'),
+      fullName: 'Dimas Wijaya',
+      phone: '08111222222',
+      role: Role.PROPERTY_MANAGER,
+      division: Division.PROPERTY,
+      isActive: true,
+    },
+  });
+
+  const hrManager = await prisma.user.upsert({
+    where: { email: 'hr@sangroup.id' },
+    update: {},
+    create: {
+      email: 'hr@sangroup.id',
+      username: 'hr.manager',
       password: await hash('password123'),
       fullName: 'Sari Dewi',
       phone: '08122222222',
-      role: Role.HRD,
-      division: Division.HRD,
+      role: Role.HR_MANAGER,
+      division: Division.HR,
       isActive: true,
     },
   });
 
-  const finance = await prisma.user.upsert({
+  const financeManager = await prisma.user.upsert({
     where: { email: 'finance@sangroup.id' },
     update: {},
     create: {
       email: 'finance@sangroup.id',
-      username: 'finance.officer',
+      username: 'finance.manager',
       password: await hash('password123'),
       fullName: 'Budi Santoso',
       phone: '08133333333',
-      role: Role.FINANCE,
+      role: Role.FINANCE_MANAGER,
       division: Division.FINANCE,
       isActive: true,
     },
@@ -76,15 +91,20 @@ async function main() {
     update: {},
     create: {
       email: 'engineer@sangroup.id',
-      username: 'engineer.ops',
+      username: 'chief.engineer',
       password: await hash('password123'),
       fullName: 'Reza Maulana',
       phone: '08144444444',
-      role: Role.ENGINEER,
+      role: Role.CHIEF_ENGINEER,
       division: Division.ENGINEERING,
       isActive: true,
     },
   });
+
+  // alias for seed references below
+  const bm = propertyManager;
+  const hrd = hrManager;
+  const finance = financeManager;
 
   console.log('✅ Users created');
 
@@ -308,11 +328,11 @@ async function main() {
     // HRD
     {
       id: 'seed-link-1',
-      title: 'Google Drive HRD',
-      description: 'Folder utama dokumen HRD: kontrak, SK, BPJS',
+      title: 'Google Drive HR',
+      description: 'Folder utama dokumen HR: kontrak, SK, BPJS',
       url: 'https://drive.google.com',
       category: 'Cloud Storage',
-      division: Division.HRD,
+      division: Division.HR,
       icon: '📁',
       position: 0,
       createdById: admin.id,
@@ -323,7 +343,7 @@ async function main() {
       description: 'Portal BPJS Ketenagakerjaan untuk klaim dan pengecekan',
       url: 'https://sso.bpjsketenagakerjaan.go.id',
       category: 'Government',
-      division: Division.HRD,
+      division: Division.HR,
       icon: '🏥',
       position: 1,
       createdById: admin.id,
@@ -351,14 +371,14 @@ async function main() {
       position: 1,
       createdById: admin.id,
     },
-    // OPS
+    // PROPERTY
     {
       id: 'seed-link-5',
       title: 'SOP Operasional Gedung',
       description: 'Kumpulan SOP teknis dan operasional gedung terbaru',
       url: 'https://drive.google.com',
       category: 'Documentation',
-      division: Division.OPS,
+      division: Division.PROPERTY,
       icon: '📋',
       position: 0,
       createdById: bm.id,
@@ -369,7 +389,7 @@ async function main() {
       description: 'Akses remote monitoring CCTV semua area gedung',
       url: 'http://192.168.1.100',
       category: 'Security',
-      division: Division.OPS,
+      division: Division.PROPERTY,
       icon: '📹',
       position: 1,
       createdById: bm.id,
@@ -398,14 +418,14 @@ async function main() {
       position: 0,
       createdById: engineer.id,
     },
-    // MARKOM
+    // RETAIL
     {
       id: 'seed-link-9',
       title: 'Canva Team SAN Group',
       description: 'Template desain marketing dan sosial media',
       url: 'https://canva.com',
       category: 'Design',
-      division: Division.MARKOM,
+      division: Division.RETAIL,
       icon: '🎨',
       position: 0,
       createdById: admin.id,
@@ -532,11 +552,12 @@ async function main() {
   console.log('\n🎉 Seeding selesai!');
   console.log('─────────────────────────────');
   console.log('Login credentials:');
-  console.log('  Super Admin : admin@sangroup.id / admin123');
-  console.log('  BM          : bm@sangroup.id / password123');
-  console.log('  HRD         : hrd@sangroup.id / password123');
-  console.log('  Finance     : finance@sangroup.id / password123');
-  console.log('  Engineer    : engineer@sangroup.id / password123');
+  console.log('  Super Admin      : admin@sangroup.id / admin123');
+  console.log('  Director Retail  : director.retail@sangroup.id / password123');
+  console.log('  Property Manager : pm@sangroup.id / password123');
+  console.log('  HR Manager       : hr@sangroup.id / password123');
+  console.log('  Finance Manager  : finance@sangroup.id / password123');
+  console.log('  Chief Engineer   : engineer@sangroup.id / password123');
   console.log('─────────────────────────────');
 }
 
