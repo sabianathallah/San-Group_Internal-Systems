@@ -331,22 +331,22 @@ async function main() {
   });
   const folderFinance = await prisma.databaseFolder.upsert({
     where: { id: 'seed-folder-finance' },
-    update: {},
+    update: { icon: null },
     create: { id: 'seed-folder-finance', name: 'Finance', icon: null, color: '#10b981', position: 1, createdById: admin.id },
   });
   const folderProperty = await prisma.databaseFolder.upsert({
     where: { id: 'seed-folder-property' },
-    update: {},
+    update: { icon: null },
     create: { id: 'seed-folder-property', name: 'Property & Operasional', icon: null, color: '#3b82f6', position: 2, createdById: admin.id },
   });
   const folderLegal = await prisma.databaseFolder.upsert({
     where: { id: 'seed-folder-legal' },
-    update: {},
+    update: { icon: null },
     create: { id: 'seed-folder-legal', name: 'Legal & Perizinan', icon: null, color: '#8b5cf6', position: 3, createdById: admin.id },
   });
   const folderMgmt = await prisma.databaseFolder.upsert({
     where: { id: 'seed-folder-mgmt' },
-    update: {},
+    update: { icon: null },
     create: { id: 'seed-folder-mgmt', name: 'Manajemen', icon: null, color: '#6366f1', position: 4, createdById: admin.id },
   });
 
