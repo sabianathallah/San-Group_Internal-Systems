@@ -137,6 +137,7 @@ model User {
   notifications      Notification[]      @relation("NotificationRecipient")
   triggeredNotifs    Notification[]      @relation("NotificationActor")
   databaseLinks      DatabaseLink[]
+  databaseFolders    DatabaseFolder[]
   taskComments       TaskComment[]
 
   @@index([email])
@@ -335,26 +336,42 @@ model BulletinReadStatus {
   @@index([userId])
 }
 
-// --- Database Section (Link Management) ---
+// --- Database Section (Folder & Link Management) ---
 
-model DatabaseLink {
+model DatabaseFolder {
   id          String   @id @default(uuid())
-  title       String
-  description String?
-  url         String
-  category    String
-  division    Division
+  name        String
   icon        String?
+  color       String   @default("#6366f1")
+  description String?
   position    Int      @default(0)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   createdById String
-  createdBy   User   @relation(fields: [createdById], references: [id], onDelete: Cascade)
+  createdBy   User          @relation(fields: [createdById], references: [id], onDelete: Cascade)
+  links       DatabaseLink[]
 
   @@index([createdById])
-  @@index([division])
-  @@index([category])
+}
+
+model DatabaseLink {
+  id          String   @id @default(uuid())
+  title       String
+  url         String
+  description String?
+  position    Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  folderId    String
+  folder      DatabaseFolder @relation(fields: [folderId], references: [id], onDelete: Cascade)
+
+  createdById String
+  createdBy   User   @relation(fields: [createdById], references: [id], onDelete: Cascade)
+
+  @@index([folderId])
+  @@index([createdById])
 }
 
 // --- Notifications ---

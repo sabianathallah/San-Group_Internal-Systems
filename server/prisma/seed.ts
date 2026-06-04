@@ -323,136 +323,51 @@ async function main() {
 
   console.log('✅ Bulletins created');
 
-  // ── Database Links ─────────────────────────────────────────
-  const links = [
-    // HRD
-    {
-      id: 'seed-link-1',
-      title: 'Google Drive HR',
-      description: 'Folder utama dokumen HR: kontrak, SK, BPJS',
-      url: 'https://drive.google.com',
-      category: 'Cloud Storage',
-      division: Division.HR,
-      icon: '📁',
-      position: 0,
-      createdById: admin.id,
-    },
-    {
-      id: 'seed-link-2',
-      title: 'BPJSKETENAGAKERJAAN Online',
-      description: 'Portal BPJS Ketenagakerjaan untuk klaim dan pengecekan',
-      url: 'https://sso.bpjsketenagakerjaan.go.id',
-      category: 'Government',
-      division: Division.HR,
-      icon: '🏥',
-      position: 1,
-      createdById: admin.id,
-    },
-    // Finance
-    {
-      id: 'seed-link-3',
-      title: 'Accurate Online',
-      description: 'Software akuntansi utama perusahaan',
-      url: 'https://accurate.id',
-      category: 'Accounting',
-      division: Division.FINANCE,
-      icon: '💰',
-      position: 0,
-      createdById: admin.id,
-    },
-    {
-      id: 'seed-link-4',
-      title: 'iBanking BCA Corporate',
-      description: 'Internet banking rekening operasional perusahaan',
-      url: 'https://klikbca.com',
-      category: 'Banking',
-      division: Division.FINANCE,
-      icon: '🏦',
-      position: 1,
-      createdById: admin.id,
-    },
-    // PROPERTY
-    {
-      id: 'seed-link-5',
-      title: 'SOP Operasional Gedung',
-      description: 'Kumpulan SOP teknis dan operasional gedung terbaru',
-      url: 'https://drive.google.com',
-      category: 'Documentation',
-      division: Division.PROPERTY,
-      icon: '📋',
-      position: 0,
-      createdById: bm.id,
-    },
-    {
-      id: 'seed-link-6',
-      title: 'CCTV Monitoring',
-      description: 'Akses remote monitoring CCTV semua area gedung',
-      url: 'http://192.168.1.100',
-      category: 'Security',
-      division: Division.PROPERTY,
-      icon: '📹',
-      position: 1,
-      createdById: bm.id,
-    },
-    // LEGAL
-    {
-      id: 'seed-link-7',
-      title: 'SIMBG — Sistem Informasi Manajemen Bangunan Gedung',
-      description: 'Portal perizinan bangunan gedung online',
-      url: 'https://simbg.pu.go.id',
-      category: 'Government',
-      division: Division.LEGAL,
-      icon: '⚖️',
-      position: 0,
-      createdById: admin.id,
-    },
-    // ENGINEERING
-    {
-      id: 'seed-link-8',
-      title: 'Portal PLN Icon+',
-      description: 'Monitoring tagihan dan gangguan listrik gedung',
-      url: 'https://iconpln.co.id',
-      category: 'Utility',
-      division: Division.ENGINEERING,
-      icon: '⚡',
-      position: 0,
-      createdById: engineer.id,
-    },
-    // RETAIL
-    {
-      id: 'seed-link-9',
-      title: 'Canva Team SAN Group',
-      description: 'Template desain marketing dan sosial media',
-      url: 'https://canva.com',
-      category: 'Design',
-      division: Division.RETAIL,
-      icon: '🎨',
-      position: 0,
-      createdById: admin.id,
-    },
-    // MANAGEMENT
-    {
-      id: 'seed-link-10',
-      title: 'Dashboard Reporting',
-      description: 'Looker Studio — laporan kinerja bulanan manajemen',
-      url: 'https://lookerstudio.google.com',
-      category: 'Analytics',
-      division: Division.MANAGEMENT,
-      icon: '📊',
-      position: 0,
-      createdById: admin.id,
-    },
+  // ── Database Folders & Links ───────────────────────────────
+  const folderHR = await prisma.databaseFolder.upsert({
+    where: { id: 'seed-folder-hr' },
+    update: {},
+    create: { id: 'seed-folder-hr', name: 'HR & People', icon: '👥', color: '#ec4899', position: 0, createdById: admin.id },
+  });
+  const folderFinance = await prisma.databaseFolder.upsert({
+    where: { id: 'seed-folder-finance' },
+    update: {},
+    create: { id: 'seed-folder-finance', name: 'Finance', icon: '💰', color: '#10b981', position: 1, createdById: admin.id },
+  });
+  const folderProperty = await prisma.databaseFolder.upsert({
+    where: { id: 'seed-folder-property' },
+    update: {},
+    create: { id: 'seed-folder-property', name: 'Property & Operasional', icon: '🏢', color: '#3b82f6', position: 2, createdById: admin.id },
+  });
+  const folderLegal = await prisma.databaseFolder.upsert({
+    where: { id: 'seed-folder-legal' },
+    update: {},
+    create: { id: 'seed-folder-legal', name: 'Legal & Perizinan', icon: '⚖️', color: '#8b5cf6', position: 3, createdById: admin.id },
+  });
+  const folderMgmt = await prisma.databaseFolder.upsert({
+    where: { id: 'seed-folder-mgmt' },
+    update: {},
+    create: { id: 'seed-folder-mgmt', name: 'Manajemen', icon: '📊', color: '#6366f1', position: 4, createdById: admin.id },
+  });
+
+  const dbLinks = [
+    { id: 'seed-link-1', title: 'Google Drive HR', url: 'https://drive.google.com', description: 'Folder utama dokumen HR: kontrak, SK, BPJS', folderId: folderHR.id, position: 0, createdById: admin.id },
+    { id: 'seed-link-2', title: 'BPJS Ketenagakerjaan', url: 'https://sso.bpjsketenagakerjaan.go.id', description: 'Portal klaim dan pengecekan BPJS', folderId: folderHR.id, position: 1, createdById: admin.id },
+    { id: 'seed-link-3', title: 'Accurate Online', url: 'https://accurate.id', description: 'Software akuntansi utama', folderId: folderFinance.id, position: 0, createdById: admin.id },
+    { id: 'seed-link-4', title: 'iBanking BCA Corporate', url: 'https://klikbca.com', description: 'Rekening operasional perusahaan', folderId: folderFinance.id, position: 1, createdById: admin.id },
+    { id: 'seed-link-5', title: 'SOP Operasional Gedung', url: 'https://drive.google.com', description: 'Kumpulan SOP teknis terbaru', folderId: folderProperty.id, position: 0, createdById: bm.id },
+    { id: 'seed-link-6', title: 'CCTV Monitoring', url: 'http://192.168.1.100', description: 'Remote monitoring CCTV gedung', folderId: folderProperty.id, position: 1, createdById: bm.id },
+    { id: 'seed-link-7', title: 'Portal PLN Icon+', url: 'https://iconpln.co.id', description: 'Monitoring tagihan listrik gedung', folderId: folderProperty.id, position: 2, createdById: engineer.id },
+    { id: 'seed-link-8', title: 'SIMBG', url: 'https://simbg.pu.go.id', description: 'Sistem Informasi Manajemen Bangunan Gedung', folderId: folderLegal.id, position: 0, createdById: admin.id },
+    { id: 'seed-link-9', title: 'Dashboard Reporting', url: 'https://lookerstudio.google.com', description: 'Laporan kinerja bulanan manajemen', folderId: folderMgmt.id, position: 0, createdById: admin.id },
+    { id: 'seed-link-10', title: 'Canva Team SAN', url: 'https://canva.com', description: 'Template desain marketing', folderId: folderMgmt.id, position: 1, createdById: admin.id },
   ];
 
-  for (const link of links) {
-    await prisma.databaseLink.upsert({
-      where: { id: link.id },
-      update: {},
-      create: link,
-    });
+  for (const link of dbLinks) {
+    await prisma.databaseLink.upsert({ where: { id: link.id }, update: {}, create: link });
   }
 
-  console.log('✅ Database links created');
+  console.log('✅ Database folders & links created');
 
   // ── Notifications ──────────────────────────────────────────
   const notifications = [

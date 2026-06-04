@@ -1,323 +1,111 @@
 import { useEffect, useState, useCallback, FormEvent } from 'react';
 import {
-  Database, Plus, Search, X, ExternalLink,
-  Trash2, Edit2, Loader2, AlertCircle, Link2,
+  Folder, FolderOpen, Plus, ChevronRight, Loader2,
+  X, Edit2, Trash2, ExternalLink, Search, FileText,
+  AlertCircle,
 } from 'lucide-react';
 import api from '@/lib/api';
 import { useAuthStore } from '@/stores/authStore';
 import { cn } from '@/lib/cn';
 
 // ── Types ──────────────────────────────────────────────────
-type Division =
-  | 'MANAGEMENT' | 'RETAIL' | 'HOTEL' | 'HOUSING' | 'FNB' | 'GENERAL'
-  | 'LEASING' | 'PROPERTY' | 'ENGINEERING'
-  | 'FINANCE' | 'LEGAL' | 'TAX' | 'HR' | 'GA';
+interface DbFolder {
+  id:          string;
+  name:        string;
+  icon:        string | null;
+  color:       string;
+  description: string | null;
+  position:    number;
+  createdAt:   string;
+  createdBy:   { id: string; fullName: string };
+  _count:      { links: number };
+}
 
 interface DbLink {
   id:          string;
   title:       string;
-  description: string | null;
   url:         string;
-  category:    string;
-  division:    Division;
-  icon:        string | null;
+  description: string | null;
   position:    number;
   createdAt:   string;
   createdBy:   { id: string; fullName: string };
 }
 
-// ── Constants ──────────────────────────────────────────────
-const DIVISIONS: Division[] = [
-  'MANAGEMENT','RETAIL','HOTEL','HOUSING','FNB','GENERAL',
-  'LEASING','PROPERTY','ENGINEERING',
-  'FINANCE','LEGAL','TAX','HR','GA',
-];
-
-const DIVISION_LABELS: Record<Division, string> = {
-  MANAGEMENT:  'Manajemen',
-  RETAIL:      'Retail',
-  HOTEL:       'Hotel & Ballroom',
-  HOUSING:     'Housing',
-  FNB:         'F&B',
-  GENERAL:     'General',
-  LEASING:     'Leasing',
-  PROPERTY:    'Property',
-  ENGINEERING: 'Engineering',
-  FINANCE:     'Finance',
-  LEGAL:       'Legal',
-  TAX:         'Tax',
-  HR:          'HR',
-  GA:          'General Affairs',
-};
-
-const DIVISION_COLORS: Record<Division, string> = {
-  MANAGEMENT:  'bg-navy/10 text-navy',
-  RETAIL:      'bg-teal-100 text-teal-700',
-  HOTEL:       'bg-violet-100 text-violet-700',
-  HOUSING:     'bg-sky-100 text-sky-700',
-  FNB:         'bg-rose-100 text-rose-700',
-  GENERAL:     'bg-gray-100 text-gray-600',
-  LEASING:     'bg-emerald-100 text-emerald-700',
-  PROPERTY:    'bg-cyan-100 text-cyan-700',
-  ENGINEERING: 'bg-orange-100 text-orange-700',
-  FINANCE:     'bg-green-100 text-green-700',
-  LEGAL:       'bg-purple-100 text-purple-700',
-  TAX:         'bg-indigo-100 text-indigo-700',
-  HR:          'bg-pink-100 text-pink-700',
-  GA:          'bg-yellow-100 text-yellow-700',
-};
-
-const SUGGESTED_CATEGORIES = [
-  'Database', 'System', 'Dashboard', 'Tool', 'Report', 'Documentation', 'API', 'Monitoring',
-];
-
-const ICON_OPTIONS = [
-  '🗄️','📊','📋','🔧','📁','🌐','📈','💼','🔗','📝','⚙️','🏢','📌','🔍','💡','🖥️',
-];
-
 // ── Helpers ────────────────────────────────────────────────
-function hostname(url: string) {
-  try { return new URL(url).hostname.replace('www.', ''); } catch { return url; }
+const COLORS = ['#6366f1','#10b981','#f59e0b','#ef4444','#3b82f6','#8b5cf6','#ec4899','#14b8a6','#f97316','#64748b'];
+
+function extractErr(err: unknown): string {
+  return (err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'Terjadi kesalahan';
 }
 
-function groupByCategory(links: DbLink[]): Map<string, DbLink[]> {
-  const map = new Map<string, DbLink[]>();
-  for (const link of links) {
-    const arr = map.get(link.category) ?? [];
-    arr.push(link);
-    map.set(link.category, arr);
-  }
-  return map;
-}
-
-// ── Form Modal ─────────────────────────────────────────────
-interface FormState {
-  title:       string;
-  description: string;
-  url:         string;
-  category:    string;
-  customCat:   string;
-  division:    Division | '';
-  icon:        string;
-}
-
-const EMPTY_FORM: FormState = {
-  title: '', description: '', url: '', category: '', customCat: '', division: '', icon: '',
-};
-
-function LinkFormModal({
-  open, link, onClose, onSaved,
-}: {
-  open:    boolean;
-  link:    DbLink | null;
-  onClose: () => void;
-  onSaved: (l: DbLink) => void;
+// ── Folder Modal ───────────────────────────────────────────
+function FolderModal({ folder, onClose, onSaved }: {
+  folder?: DbFolder; onClose: () => void; onSaved: (f: DbFolder) => void;
 }) {
-  const [form, setForm]     = useState<FormState>(EMPTY_FORM);
+  const [name,  setName]  = useState(folder?.name  ?? '');
+  const [icon,  setIcon]  = useState(folder?.icon  ?? '');
+  const [color, setColor] = useState(folder?.color ?? '#6366f1');
+  const [desc,  setDesc]  = useState(folder?.description ?? '');
   const [saving, setSaving] = useState(false);
-  const [error, setError]   = useState('');
-
-  useEffect(() => {
-    if (!open) return;
-    if (link) {
-      const isCustom = !SUGGESTED_CATEGORIES.includes(link.category);
-      setForm({
-        title:       link.title,
-        description: link.description ?? '',
-        url:         link.url,
-        category:    isCustom ? '__custom__' : link.category,
-        customCat:   isCustom ? link.category : '',
-        division:    link.division,
-        icon:        link.icon ?? '',
-      });
-    } else {
-      setForm(EMPTY_FORM);
-    }
-    setError('');
-  }, [open, link]);
-
-  function resolvedCategory() {
-    return form.category === '__custom__' ? form.customCat.trim() : form.category;
-  }
+  const [error,  setError]  = useState('');
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    const cat = resolvedCategory();
-    if (!form.title.trim())   { setError('Judul tidak boleh kosong'); return; }
-    if (!form.url.trim())     { setError('URL tidak boleh kosong'); return; }
-    if (!cat)                 { setError('Pilih atau masukkan kategori'); return; }
-    if (!form.division)       { setError('Pilih divisi'); return; }
+    if (!name.trim()) { setError('Nama folder wajib diisi'); return; }
     setSaving(true); setError('');
     try {
-      const payload = {
-        title:       form.title.trim(),
-        description: form.description.trim() || undefined,
-        url:         form.url.trim(),
-        category:    cat,
-        division:    form.division,
-        icon:        form.icon || undefined,
-      };
-      const res = link
-        ? await api.patch(`/db-links/${link.id}`, payload)
-        : await api.post('/db-links', payload);
+      const payload = { name: name.trim(), icon: icon.trim() || null, color, description: desc.trim() || null };
+      const res = folder
+        ? await api.patch(`/db-folders/${folder.id}`, payload)
+        : await api.post('/db-folders', payload);
       onSaved(res.data.data);
       onClose();
-    } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
-      setError(msg ?? 'Terjadi kesalahan');
-    } finally {
-      setSaving(false);
-    }
+    } catch (err) { setError(extractErr(err)); } finally { setSaving(false); }
   }
-
-  if (!open) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
-      <div className="relative bg-white rounded-lg shadow-lg w-full max-w-lg flex flex-col max-h-[90vh] overflow-y-auto">
-        {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200 sticky top-0 bg-white">
-          <h2 className="text-sm font-semibold text-gray-800">
-            {link ? 'Edit Link' : 'Tambah DB Link'}
-          </h2>
+      <div className="relative bg-white rounded-xl shadow-xl w-full max-w-sm">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+          <h2 className="text-sm font-semibold text-gray-800">{folder ? 'Edit Folder' : 'Folder Baru'}</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={16} /></button>
         </div>
-
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4 px-5 py-4">
-          {/* Icon picker */}
+        <form onSubmit={handleSubmit} className="p-5 space-y-4">
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-2">
-              Ikon <span className="font-normal text-gray-400">(opsional)</span>
-            </label>
-            <div className="flex flex-wrap gap-1.5">
-              <button
-                type="button"
-                onClick={() => setForm((f) => ({ ...f, icon: '' }))}
-                className={cn(
-                  'w-8 h-8 text-xs flex items-center justify-center rounded border',
-                  !form.icon ? 'border-navy bg-navy-50 text-navy' : 'border-gray-200 text-gray-400 hover:border-gray-300',
-                )}
-              >
-                —
-              </button>
-              {ICON_OPTIONS.map((ic) => (
-                <button
-                  key={ic}
-                  type="button"
-                  onClick={() => setForm((f) => ({ ...f, icon: ic }))}
-                  className={cn(
-                    'w-8 h-8 text-base flex items-center justify-center rounded border transition-colors',
-                    form.icon === ic ? 'border-navy bg-navy-50' : 'border-gray-200 hover:border-gray-300',
-                  )}
-                >
-                  {ic}
-                </button>
+            <label className="block text-xs text-gray-500 mb-1">Nama folder</label>
+            <input autoFocus type="text" value={name} onChange={(e) => setName(e.target.value)}
+              placeholder="contoh: Dokumen HRD"
+              className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-navy" />
+          </div>
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">Emoji icon (opsional)</label>
+            <input type="text" value={icon} onChange={(e) => setIcon(e.target.value)}
+              placeholder="📁"
+              className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-navy" />
+          </div>
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">Deskripsi (opsional)</label>
+            <input type="text" value={desc} onChange={(e) => setDesc(e.target.value)}
+              placeholder="Keterangan singkat…"
+              className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-navy" />
+          </div>
+          <div>
+            <label className="block text-xs text-gray-500 mb-2">Warna</label>
+            <div className="flex gap-2 flex-wrap">
+              {COLORS.map((c) => (
+                <button key={c} type="button" onClick={() => setColor(c)}
+                  className={cn('w-6 h-6 rounded-full transition-all', color === c && 'ring-2 ring-offset-1 ring-gray-500')}
+                  style={{ backgroundColor: c }} />
               ))}
             </div>
           </div>
-
-          {/* Title */}
-          <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">
-              Judul <span className="text-danger">*</span>
-            </label>
-            <input
-              type="text" maxLength={100} placeholder="Nama sistem / database..."
-              value={form.title}
-              onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
-              className="w-full border border-gray-200 rounded px-3 py-2 text-sm focus:outline-none focus:border-navy focus:ring-1 focus:ring-navy"
-            />
-          </div>
-
-          {/* URL */}
-          <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">
-              URL <span className="text-danger">*</span>
-            </label>
-            <input
-              type="url" placeholder="https://..."
-              value={form.url}
-              onChange={(e) => setForm((f) => ({ ...f, url: e.target.value }))}
-              className="w-full border border-gray-200 rounded px-3 py-2 text-sm focus:outline-none focus:border-navy focus:ring-1 focus:ring-navy"
-            />
-          </div>
-
-          {/* Description */}
-          <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">
-              Deskripsi <span className="font-normal text-gray-400">(opsional)</span>
-            </label>
-            <textarea
-              rows={2} maxLength={300} placeholder="Keterangan singkat..."
-              value={form.description}
-              onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-              className="w-full border border-gray-200 rounded px-3 py-2 text-sm resize-none focus:outline-none focus:border-navy focus:ring-1 focus:ring-navy"
-            />
-          </div>
-
-          {/* Category */}
-          <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">
-              Kategori <span className="text-danger">*</span>
-            </label>
-            <select
-              value={form.category}
-              onChange={(e) => setForm((f) => ({ ...f, category: e.target.value, customCat: '' }))}
-              className="w-full border border-gray-200 rounded px-3 py-2 text-sm focus:outline-none focus:border-navy"
-            >
-              <option value="">-- Pilih kategori --</option>
-              {SUGGESTED_CATEGORIES.map((c) => (
-                <option key={c} value={c}>{c}</option>
-              ))}
-              <option value="__custom__">Lainnya (isi manual)</option>
-            </select>
-            {form.category === '__custom__' && (
-              <input
-                type="text" maxLength={50} placeholder="Tulis kategori..."
-                value={form.customCat}
-                onChange={(e) => setForm((f) => ({ ...f, customCat: e.target.value }))}
-                className="mt-2 w-full border border-gray-200 rounded px-3 py-2 text-sm focus:outline-none focus:border-navy focus:ring-1 focus:ring-navy"
-              />
-            )}
-          </div>
-
-          {/* Division */}
-          <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">
-              Divisi <span className="text-danger">*</span>
-            </label>
-            <select
-              value={form.division}
-              onChange={(e) => setForm((f) => ({ ...f, division: e.target.value as Division }))}
-              className="w-full border border-gray-200 rounded px-3 py-2 text-sm focus:outline-none focus:border-navy"
-            >
-              <option value="">-- Pilih divisi --</option>
-              {DIVISIONS.map((d) => (
-                <option key={d} value={d}>{DIVISION_LABELS[d]}</option>
-              ))}
-            </select>
-          </div>
-
-          {error && (
-            <p className="flex items-center gap-1.5 text-xs text-danger">
-              <AlertCircle size={12} /> {error}
-            </p>
-          )}
-
-          <div className="flex justify-end gap-2 pt-1 border-t border-gray-100">
-            <button
-              type="button" onClick={onClose}
-              className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded hover:bg-gray-50"
-            >
-              Batal
-            </button>
-            <button
-              type="submit" disabled={saving}
-              className="flex items-center gap-1.5 px-4 py-2 text-sm text-white bg-navy hover:bg-navy-light rounded disabled:opacity-50"
-            >
-              {saving && <Loader2 size={13} className="animate-spin" />}
-              {link ? 'Simpan' : 'Tambah Link'}
+          {error && <p className="text-xs text-red-500 flex items-center gap-1"><AlertCircle size={12} />{error}</p>}
+          <div className="flex justify-end gap-2 pt-1">
+            <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50">Batal</button>
+            <button type="submit" disabled={saving || !name.trim()}
+              className="flex items-center gap-1.5 px-4 py-2 text-sm text-white bg-navy rounded-lg hover:bg-navy-light disabled:opacity-50">
+              {saving && <Loader2 size={13} className="animate-spin" />}{folder ? 'Simpan' : 'Buat'}
             </button>
           </div>
         </form>
@@ -326,83 +114,68 @@ function LinkFormModal({
   );
 }
 
-// ── Link Card ──────────────────────────────────────────────
-function LinkCard({
-  link, userId, isAdmin, onEdit, onDelete,
-}: {
-  link:    DbLink;
-  userId:  string;
-  isAdmin: boolean;
-  onEdit:  (l: DbLink) => void;
-  onDelete:(id: string) => void;
+// ── Link Modal ─────────────────────────────────────────────
+function LinkModal({ link, folderId, onClose, onSaved }: {
+  link?: DbLink; folderId: string; onClose: () => void; onSaved: (l: DbLink) => void;
 }) {
-  const [deleting, setDeleting] = useState(false);
-  const canEdit = isAdmin || link.createdBy.id === userId;
+  const [title, setTitle] = useState(link?.title ?? '');
+  const [url,   setUrl]   = useState(link?.url   ?? '');
+  const [desc,  setDesc]  = useState(link?.description ?? '');
+  const [saving, setSaving] = useState(false);
+  const [error,  setError]  = useState('');
 
-  async function handleDelete(e: React.MouseEvent) {
-    e.stopPropagation(); e.preventDefault();
-    if (!confirm(`Hapus link "${link.title}"?`)) return;
-    setDeleting(true);
+  async function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+    if (!title.trim()) { setError('Nama wajib diisi'); return; }
+    if (!url.trim())   { setError('Link/URL wajib diisi'); return; }
+    setSaving(true); setError('');
     try {
-      await api.delete(`/db-links/${link.id}`);
-      onDelete(link.id);
-    } catch { setDeleting(false); }
+      const payload = { title: title.trim(), url: url.trim(), description: desc.trim() || undefined, folderId };
+      const res = link
+        ? await api.patch(`/db-links/${link.id}`, { title: title.trim(), url: url.trim(), description: desc.trim() || null })
+        : await api.post('/db-links', payload);
+      onSaved(res.data.data);
+      onClose();
+    } catch (err) { setError(extractErr(err)); } finally { setSaving(false); }
   }
 
   return (
-    <div className="group relative bg-white border border-gray-200 rounded-lg p-4 hover:border-navy/30 hover:shadow-sm transition-all flex flex-col gap-2">
-      {/* Top row */}
-      <div className="flex items-start gap-3">
-        <div className="flex-shrink-0 w-9 h-9 rounded-lg bg-gray-50 border border-gray-100 flex items-center justify-center text-lg">
-          {link.icon ?? <Link2 size={16} className="text-gray-400" />}
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
+      <div className="relative bg-white rounded-xl shadow-xl w-full max-w-sm">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+          <h2 className="text-sm font-semibold text-gray-800">{link ? 'Edit Link' : 'Tambah Link'}</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={16} /></button>
         </div>
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium text-gray-800 truncate">{link.title}</p>
-          {link.description && (
-            <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{link.description}</p>
-          )}
-        </div>
-      </div>
-
-      {/* URL chip */}
-      <a
-        href={link.url}
-        target="_blank"
-        rel="noopener noreferrer"
-        onClick={(e) => e.stopPropagation()}
-        className="flex items-center gap-1.5 text-xs text-navy hover:text-navy-light group/link w-fit max-w-full"
-      >
-        <ExternalLink size={11} className="flex-shrink-0" />
-        <span className="truncate">{hostname(link.url)}</span>
-      </a>
-
-      {/* Footer */}
-      <div className="flex items-center justify-between pt-1 mt-auto">
-        <span className={cn(
-          'inline-block text-xs px-2 py-0.5 rounded-full font-medium',
-          DIVISION_COLORS[link.division],
-        )}>
-          {link.division}
-        </span>
-
-        {/* Actions — admin or creator */}
-        {canEdit && (
-          <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-            <button
-              onClick={(e) => { e.stopPropagation(); onEdit(link); }}
-              className="w-6 h-6 flex items-center justify-center rounded text-gray-400 hover:text-navy hover:bg-navy-50 transition-colors"
-            >
-              <Edit2 size={12} />
-            </button>
-            <button
-              onClick={handleDelete}
-              disabled={deleting}
-              className="w-6 h-6 flex items-center justify-center rounded text-gray-400 hover:text-danger hover:bg-danger/10 transition-colors"
-            >
-              {deleting ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
+        <form onSubmit={handleSubmit} className="p-5 space-y-4">
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">Nama tampilan</label>
+            <input autoFocus type="text" value={title} onChange={(e) => setTitle(e.target.value)}
+              placeholder="contoh: Rekap Absensi Juni"
+              className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-navy" />
+            <p className="text-[10px] text-gray-400 mt-1">Nama inilah yang ditampilkan, bukan URL-nya</p>
+          </div>
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">Link / URL</label>
+            <input type="url" value={url} onChange={(e) => setUrl(e.target.value)}
+              placeholder="https://drive.google.com/…"
+              className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-navy" />
+          </div>
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">Keterangan (opsional)</label>
+            <input type="text" value={desc} onChange={(e) => setDesc(e.target.value)}
+              placeholder="Deskripsi singkat…"
+              className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-navy" />
+          </div>
+          {error && <p className="text-xs text-red-500 flex items-center gap-1"><AlertCircle size={12} />{error}</p>}
+          <div className="flex justify-end gap-2 pt-1">
+            <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50">Batal</button>
+            <button type="submit" disabled={saving || !title.trim() || !url.trim()}
+              className="flex items-center gap-1.5 px-4 py-2 text-sm text-white bg-navy rounded-lg hover:bg-navy-light disabled:opacity-50">
+              {saving && <Loader2 size={13} className="animate-spin" />}{link ? 'Simpan' : 'Tambah'}
             </button>
           </div>
-        )}
+        </form>
       </div>
     </div>
   );
@@ -410,195 +183,264 @@ function LinkCard({
 
 // ── Main Page ──────────────────────────────────────────────
 export default function DatabasePage() {
-  const user    = useAuthStore((s) => s.user);
-  const isAdmin = user?.role === 'SUPER_ADMIN' || user?.role === 'ADMIN';
+  const { user } = useAuthStore();
+  const isAdmin = ['SUPER_ADMIN', 'ADMIN'].includes(user?.role ?? '');
 
-  const [links, setLinks]     = useState<DbLink[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError]     = useState('');
-  const [search, setSearch]   = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState('');
-  const [divFilter, setDivFilter] = useState<Division | ''>('');
-  const [modalOpen, setModalOpen] = useState(false);
-  const [editing, setEditing]     = useState<DbLink | null>(null);
+  const [folders,        setFolders]        = useState<DbFolder[]>([]);
+  const [loadingFolders, setLoadingFolders] = useState(true);
+  const [activeFolder,   setActiveFolder]   = useState<DbFolder | null>(null);
+  const [links,          setLinks]          = useState<DbLink[]>([]);
+  const [loadingLinks,   setLoadingLinks]   = useState(false);
+  const [search,         setSearch]         = useState('');
+  const [folderModal,    setFolderModal]    = useState<{ open: boolean; folder?: DbFolder }>({ open: false });
+  const [linkModal,      setLinkModal]      = useState<{ open: boolean; link?: DbLink }>({ open: false });
 
-  useEffect(() => {
-    const t = setTimeout(() => setDebouncedSearch(search), 400);
-    return () => clearTimeout(t);
-  }, [search]);
-
-  const fetchLinks = useCallback(async () => {
-    setLoading(true); setError('');
+  const loadFolders = useCallback(async () => {
+    setLoadingFolders(true);
     try {
-      const params: Record<string, string> = {};
-      if (debouncedSearch) params.search   = debouncedSearch;
-      if (divFilter)       params.division = divFilter;
-      const res = await api.get('/db-links', { params });
-      setLinks(res.data.data);
-    } catch {
-      setError('Gagal memuat data. Coba lagi.');
-    } finally {
-      setLoading(false);
-    }
-  }, [debouncedSearch, divFilter]);
+      const res = await api.get('/db-folders');
+      setFolders(res.data.data ?? []);
+    } catch { /* silent */ } finally { setLoadingFolders(false); }
+  }, []);
 
-  useEffect(() => { fetchLinks(); }, [fetchLinks]);
+  useEffect(() => { loadFolders(); }, [loadFolders]);
 
-  function handleSaved(saved: DbLink) {
+  const loadLinks = useCallback(async (folderId: string) => {
+    setLoadingLinks(true);
+    try {
+      const res = await api.get(`/db-folders/${folderId}/links`);
+      setLinks(res.data.data ?? []);
+    } catch { /* silent */ } finally { setLoadingLinks(false); }
+  }, []);
+
+  useEffect(() => { if (activeFolder) loadLinks(activeFolder.id); }, [activeFolder, loadLinks]);
+
+  const filteredLinks = search
+    ? links.filter((l) =>
+        l.title.toLowerCase().includes(search.toLowerCase()) ||
+        (l.description ?? '').toLowerCase().includes(search.toLowerCase())
+      )
+    : links;
+
+  function handleFolderSaved(f: DbFolder) {
+    setFolders((prev) => {
+      const idx = prev.findIndex((x) => x.id === f.id);
+      return idx >= 0 ? prev.map((x) => x.id === f.id ? f : x) : [...prev, f];
+    });
+    if (activeFolder?.id === f.id) setActiveFolder(f);
+  }
+
+  async function handleDeleteFolder(folder: DbFolder) {
+    if (!confirm(`Hapus folder "${folder.name}"? Semua link di dalamnya ikut terhapus.`)) return;
+    try {
+      await api.delete(`/db-folders/${folder.id}`);
+      setFolders((prev) => prev.filter((f) => f.id !== folder.id));
+      if (activeFolder?.id === folder.id) setActiveFolder(null);
+    } catch { /* silent */ }
+  }
+
+  function handleLinkSaved(l: DbLink) {
     setLinks((prev) => {
-      const idx = prev.findIndex((l) => l.id === saved.id);
-      if (idx >= 0) { const next = [...prev]; next[idx] = saved; return next; }
-      return [...prev, saved];
+      const idx = prev.findIndex((x) => x.id === l.id);
+      if (idx >= 0) return prev.map((x) => x.id === l.id ? l : x);
+      setFolders((pf) => pf.map((f) =>
+        f.id === activeFolder?.id ? { ...f, _count: { links: f._count.links + 1 } } : f
+      ));
+      return [...prev, l];
     });
   }
 
-  function handleDeleted(id: string) {
-    setLinks((prev) => prev.filter((l) => l.id !== id));
+  async function handleDeleteLink(link: DbLink) {
+    if (!confirm(`Hapus "${link.title}"?`)) return;
+    try {
+      await api.delete(`/db-links/${link.id}`);
+      setLinks((prev) => prev.filter((l) => l.id !== link.id));
+      setFolders((prev) => prev.map((f) =>
+        f.id === activeFolder?.id ? { ...f, _count: { links: Math.max(0, f._count.links - 1) } } : f
+      ));
+    } catch { /* silent */ }
   }
 
-  // Group by category for display
-  const grouped = groupByCategory(links);
-  const categories = Array.from(grouped.keys()).sort();
-
-  return (
-    <div>
-      {/* Page header */}
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-xl font-semibold text-gray-800">DB Links</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Direktori akses cepat ke sistem & database internal</p>
-        </div>
-        <button
-          onClick={() => { setEditing(null); setModalOpen(true); }}
-          className="flex items-center gap-1.5 px-3 py-2 text-sm text-white bg-navy hover:bg-navy-light rounded transition-colors"
-        >
-          <Plus size={15} />
-          Tambah Link
-        </button>
-      </div>
-
-      {/* Filters */}
-      <div className="flex items-center gap-3 mb-6 flex-wrap">
-        {/* Search */}
-        <div className="relative">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-          <input
-            type="text" placeholder="Cari link..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-8 pr-8 py-2 text-sm border border-gray-200 rounded focus:outline-none focus:border-navy focus:ring-1 focus:ring-navy w-56"
-          />
-          {search && (
-            <button onClick={() => setSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
-              <X size={13} />
+  // ── Folder grid view ──────────────────────────────────────
+  if (!activeFolder) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-lg font-semibold text-gray-900">Database Links</h1>
+            <p className="text-sm text-gray-500 mt-0.5">Direktori akses cepat — klik folder untuk membuka</p>
+          </div>
+          {isAdmin && (
+            <button onClick={() => setFolderModal({ open: true })}
+              className="flex items-center gap-1.5 px-4 py-2 text-sm text-white bg-navy hover:bg-navy-light rounded-lg transition-colors">
+              <Plus size={15} /> Folder Baru
             </button>
           )}
         </div>
 
-        {/* Division filter */}
-        <div className="flex items-center gap-1.5 flex-wrap">
-          <button
-            onClick={() => setDivFilter('')}
-            className={cn(
-              'px-2.5 py-1 text-xs rounded border transition-colors',
-              divFilter === ''
-                ? 'bg-navy text-white border-navy'
-                : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300',
+        {loadingFolders ? (
+          <div className="flex items-center justify-center py-24">
+            <Loader2 size={24} className="animate-spin text-gray-300" />
+          </div>
+        ) : folders.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-24 gap-3 text-gray-400">
+            <Folder size={40} className="text-gray-200" />
+            <p className="text-sm">Belum ada folder</p>
+            {isAdmin && (
+              <button onClick={() => setFolderModal({ open: true })}
+                className="text-xs text-navy hover:underline flex items-center gap-1">
+                <Plus size={12} /> Buat folder pertama
+              </button>
             )}
-          >
-            Semua Divisi
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+            {folders.map((folder) => (
+              <div key={folder.id} className="group relative">
+                <button
+                  onClick={() => setActiveFolder(folder)}
+                  className="w-full flex flex-col items-center gap-3 p-5 bg-white border border-gray-100 rounded-xl hover:border-gray-300 hover:shadow-md transition-all"
+                >
+                  <div className="w-14 h-14 rounded-xl flex items-center justify-center"
+                    style={{ backgroundColor: `${folder.color}18` }}>
+                    {folder.icon
+                      ? <span className="text-3xl leading-none">{folder.icon}</span>
+                      : <Folder size={30} style={{ color: folder.color }} />
+                    }
+                  </div>
+                  <div className="w-full text-center space-y-0.5">
+                    <p className="text-sm font-medium text-gray-800 truncate">{folder.name}</p>
+                    <p className="text-[11px] text-gray-400">{folder._count.links} item</p>
+                  </div>
+                </button>
+                {isAdmin && (
+                  <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button onClick={(e) => { e.stopPropagation(); setFolderModal({ open: true, folder }); }}
+                      className="p-1.5 bg-white border border-gray-200 rounded-lg text-gray-400 hover:text-navy shadow-sm">
+                      <Edit2 size={11} />
+                    </button>
+                    <button onClick={(e) => { e.stopPropagation(); handleDeleteFolder(folder); }}
+                      className="p-1.5 bg-white border border-gray-200 rounded-lg text-gray-400 hover:text-red-500 shadow-sm">
+                      <Trash2 size={11} />
+                    </button>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {folderModal.open && (
+          <FolderModal folder={folderModal.folder}
+            onClose={() => setFolderModal({ open: false })} onSaved={handleFolderSaved} />
+        )}
+      </div>
+    );
+  }
+
+  // ── Folder contents view ──────────────────────────────────
+  return (
+    <div className="space-y-5">
+      {/* Breadcrumb */}
+      <div className="flex items-center justify-between gap-4 flex-wrap">
+        <div className="flex items-center gap-2 min-w-0 flex-wrap">
+          <button onClick={() => { setActiveFolder(null); setSearch(''); setLinks([]); }}
+            className="text-sm text-gray-500 hover:text-navy transition-colors">
+            Database Links
           </button>
-          {DIVISIONS.map((d) => (
-            <button
-              key={d}
-              onClick={() => setDivFilter(divFilter === d ? '' : d)}
-              className={cn(
-                'px-2.5 py-1 text-xs rounded border transition-colors',
-                divFilter === d
-                  ? 'bg-navy text-white border-navy'
-                  : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300',
-              )}
-            >
-              {d}
-            </button>
-          ))}
+          <ChevronRight size={13} className="text-gray-300 flex-shrink-0" />
+          <div className="flex items-center gap-2">
+            {activeFolder.icon && <span className="text-base leading-none">{activeFolder.icon}</span>}
+            <FolderOpen size={16} style={{ color: activeFolder.color }} />
+            <span className="text-sm font-semibold text-gray-900">{activeFolder.name}</span>
+          </div>
+          {activeFolder.description && (
+            <span className="text-xs text-gray-400 hidden sm:block">— {activeFolder.description}</span>
+          )}
         </div>
 
-        {links.length > 0 && (
-          <span className="ml-auto text-xs text-gray-400">{links.length} link</span>
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <div className="relative">
+            <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input type="text" placeholder="Cari…" value={search} onChange={(e) => setSearch(e.target.value)}
+              className="pl-7 pr-6 py-1.5 text-xs border border-gray-200 rounded-lg outline-none focus:border-navy w-32" />
+            {search && <button onClick={() => setSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400"><X size={11} /></button>}
+          </div>
+          <button onClick={() => setLinkModal({ open: true })}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-white bg-navy hover:bg-navy-light rounded-lg transition-colors">
+            <Plus size={13} /> Tambah Link
+          </button>
+        </div>
+      </div>
+
+      {/* Link list */}
+      <div className="bg-white border border-gray-100 rounded-xl overflow-hidden">
+        {loadingLinks ? (
+          <div className="flex items-center justify-center py-16">
+            <Loader2 size={20} className="animate-spin text-gray-300" />
+          </div>
+        ) : filteredLinks.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-16 gap-2 text-gray-400">
+            <FileText size={32} className="text-gray-200" />
+            <p className="text-sm">{search ? 'Tidak ada hasil' : 'Folder ini masih kosong'}</p>
+            {!search && (
+              <button onClick={() => setLinkModal({ open: true })}
+                className="text-xs text-navy hover:underline flex items-center gap-1 mt-1">
+                <Plus size={12} /> Tambah link pertama
+              </button>
+            )}
+          </div>
+        ) : (
+          <div className="divide-y divide-gray-50">
+            {filteredLinks.map((link, idx) => (
+              <div key={link.id} className="group flex items-center gap-3 px-5 py-3.5 hover:bg-gray-50/70 transition-colors">
+                <span className="text-xs text-gray-300 w-5 text-right flex-shrink-0 tabular-nums">{idx + 1}</span>
+
+                {/* Clickable name — hides the URL */}
+                <a href={link.url} target="_blank" rel="noopener noreferrer"
+                  className="flex-1 min-w-0 group/link" onClick={(e) => e.stopPropagation()}>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-sm font-medium text-gray-800 group-hover/link:text-navy transition-colors truncate">
+                      {link.title}
+                    </span>
+                    <ExternalLink size={11}
+                      className="text-gray-300 group-hover/link:text-navy flex-shrink-0 opacity-0 group-hover/link:opacity-100 transition-all" />
+                  </div>
+                  {link.description && (
+                    <p className="text-[11px] text-gray-400 truncate mt-0.5">{link.description}</p>
+                  )}
+                </a>
+
+                {/* Actions */}
+                <div className="flex items-center gap-1.5 flex-shrink-0">
+                  <span className="text-[10px] text-gray-300 hidden sm:block">{link.createdBy.fullName}</span>
+                  <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button onClick={() => setLinkModal({ open: true, link })}
+                      className="p-1.5 text-gray-400 hover:text-navy hover:bg-navy/5 rounded-lg">
+                      <Edit2 size={12} />
+                    </button>
+                    {(isAdmin || link.createdBy.id === user?.id) && (
+                      <button onClick={() => handleDeleteLink(link)}
+                        className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg">
+                        <Trash2 size={12} />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
         )}
       </div>
 
-      {/* States */}
-      {loading && (
-        <div className="flex items-center justify-center py-16 text-gray-400">
-          <Loader2 size={24} className="animate-spin" />
-        </div>
+      {!loadingLinks && filteredLinks.length > 0 && (
+        <p className="text-xs text-gray-400 text-right">{filteredLinks.length} item</p>
       )}
 
-      {!loading && error && (
-        <div className="flex flex-col items-center justify-center py-16 text-center">
-          <AlertCircle size={32} className="text-danger mb-3" />
-          <p className="text-sm text-gray-600">{error}</p>
-          <button
-            onClick={fetchLinks}
-            className="mt-3 px-4 py-1.5 text-sm text-navy border border-navy rounded hover:bg-navy-50"
-          >
-            Coba lagi
-          </button>
-        </div>
+      {linkModal.open && (
+        <LinkModal link={linkModal.link} folderId={activeFolder.id}
+          onClose={() => setLinkModal({ open: false })} onSaved={handleLinkSaved} />
       )}
-
-      {!loading && !error && links.length === 0 && (
-        <div className="flex flex-col items-center justify-center py-16 text-center">
-          <Database size={40} className="text-gray-300 mb-3" />
-          <p className="text-sm font-medium text-gray-600">
-            {debouncedSearch || divFilter ? 'Tidak ada link yang cocok' : 'Belum ada link'}
-          </p>
-          <p className="text-xs text-gray-400 mt-1">
-            {debouncedSearch || divFilter
-              ? 'Coba ubah filter pencarian'
-              : 'Klik "Tambah Link" untuk menambahkan link pertama'}
-          </p>
-        </div>
-      )}
-
-      {/* Grouped by category */}
-      {!loading && !error && links.length > 0 && (
-        <div className="space-y-8">
-          {categories.map((cat) => {
-            const catLinks = grouped.get(cat) ?? [];
-            return (
-              <div key={cat}>
-                <div className="flex items-center gap-2 mb-3">
-                  <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">{cat}</h2>
-                  <div className="flex-1 border-t border-gray-100" />
-                  <span className="text-xs text-gray-400">{catLinks.length}</span>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-                  {catLinks.map((link) => (
-                    <LinkCard
-                      key={link.id}
-                      link={link}
-                      userId={user?.id ?? ''}
-                      isAdmin={isAdmin}
-                      onEdit={(l) => { setEditing(l); setModalOpen(true); }}
-                      onDelete={handleDeleted}
-                    />
-                  ))}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-
-      <LinkFormModal
-        open={modalOpen}
-        link={editing}
-        onClose={() => setModalOpen(false)}
-        onSaved={handleSaved}
-      />
     </div>
   );
 }

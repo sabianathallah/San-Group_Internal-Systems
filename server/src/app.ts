@@ -13,6 +13,7 @@ import taskRoutes from '@/routes/task.routes';
 import bulletinRoutes from '@/routes/bulletin.routes';
 import noteRoutes from '@/routes/note.routes';
 import dblinkRoutes from '@/routes/dblink.routes';
+import dbfolderRoutes from '@/routes/dbfolder.routes';
 import notificationRoutes from '@/routes/notification.routes';
 import taskListRoutes from '@/routes/task-list.routes';
 
@@ -63,7 +64,8 @@ app.use('/api/users', userRoutes);
 app.use('/api/tasks', taskRoutes);
 app.use('/api/bulletins', bulletinRoutes);
 app.use('/api/notes', noteRoutes);
-app.use('/api/db-links', dblinkRoutes);
+app.use('/api/db-links',   dblinkRoutes);
+app.use('/api/db-folders', dbfolderRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/task-lists', taskListRoutes);
 
