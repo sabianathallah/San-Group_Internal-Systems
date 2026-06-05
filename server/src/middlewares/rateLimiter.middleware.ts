@@ -11,7 +11,7 @@ export const generalLimiter = isTest
   ? passThrough
   : rateLimit({
       windowMs: 15 * 60 * 1000, // 15 menit
-      max: 100,
+      max: 1000,
       standardHeaders: true,
       legacyHeaders: false,
       handler: (_req, res) => {
