@@ -8,6 +8,7 @@ import {
   Lock, Unlock, Link2, ExternalLink, MessageSquare, AlertCircle,
   Check, XCircle, Columns3, CalendarDays, GripVertical, ChevronLeft,
 } from 'lucide-react';
+import { useLocation } from 'react-router-dom';
 import api from '@/lib/api';
 import { useAuthStore } from '@/stores/authStore';
 import { cn } from '@/lib/cn';
@@ -45,10 +46,20 @@ interface UserOption { id: string; fullName: string; role: string; avatar: strin
 
 // ── Constants ──────────────────────────────────────────────
 const STATUS_CONFIG: Record<TaskStatus, { label: string; icon: React.ElementType; color: string; bg: string }> = {
-  TODO:        { label: 'Belum Mulai', icon: Circle,       color: 'text-gray-400',  bg: 'bg-gray-100'  },
-  IN_PROGRESS: { label: 'Berlangsung', icon: Clock,        color: 'text-blue-500',  bg: 'bg-blue-50'   },
-  DONE:        { label: 'Selesai',     icon: CheckCircle2, color: 'text-green-500', bg: 'bg-green-50'  },
+  TODO:        { label: 'Undone',       icon: Circle,       color: 'text-gray-400',  bg: 'bg-gray-100' },
+  IN_PROGRESS: { label: 'On Progress',  icon: Clock,        color: 'text-blue-500',  bg: 'bg-blue-50'  },
+  DONE:        { label: 'Done',         icon: CheckCircle2, color: 'text-green-500', bg: 'bg-green-50' },
 };
+
+// Display status — overrides with "Waiting for Confirmation" when pending assignment
+function displayStatus(task: { status: TaskStatus; assignmentStatus: AssignmentStatus | null }): {
+  label: string; color: string; bg: string;
+} {
+  if (task.assignmentStatus === 'PENDING') {
+    return { label: 'Waiting for Confirmation', color: 'text-amber-600', bg: 'bg-amber-50' };
+  }
+  return STATUS_CONFIG[task.status];
+}
 
 const PRIORITY_CONFIG: Record<TaskPriority, { label: string; color: string; dot: string; border: string }> = {
   URGENT: { label: 'Mendesak', color: 'text-red-500',    dot: 'bg-red-500',    border: 'border-l-red-400'    },
@@ -105,13 +116,13 @@ function PriorityDot({ priority }: { priority: TaskPriority }) {
 }
 
 function AssignBadge({ status }: { status: AssignmentStatus }) {
+  if (status === 'PENDING') return null; // handled by displayStatus
   return (
     <span className={cn('text-[10px] font-medium px-1.5 py-0.5 rounded-full flex-shrink-0', {
-      'bg-amber-100 text-amber-700': status === 'PENDING',
       'bg-green-100 text-green-700': status === 'ACCEPTED',
       'bg-red-100   text-red-600':   status === 'REJECTED',
     })}>
-      {status === 'PENDING' ? 'Menunggu' : status === 'ACCEPTED' ? 'Diterima' : 'Ditolak'}
+      {status === 'ACCEPTED' ? 'Accepted' : 'Rejected'}
     </span>
   );
 }
@@ -299,7 +310,7 @@ function ListView({
                       {showUser && <p className="text-[10px] text-gray-400 truncate">{task.creator.fullName}</p>}
                     </div>
                     <div className="py-2.5 border-b border-gray-50">
-                      <span className={cn('text-[10px] font-medium px-1.5 py-0.5 rounded-full', cfg.bg, cfg.color)}>{cfg.label}</span>
+                      {(() => { const ds = displayStatus(task); return <span className={cn('text-[10px] font-medium px-1.5 py-0.5 rounded-full', ds.bg, ds.color)}>{ds.label}</span>; })()}
                     </div>
                     <div className="flex items-center gap-1.5 py-2.5 border-b border-gray-50">
                       <PriorityDot priority={task.priority} />
@@ -1225,6 +1236,7 @@ function NewListModal({ onClose, onCreated }: {
 export default function TasksPage() {
   const { user } = useAuthStore();
   const canSeeTeam = MANAGER_ROLES.includes(user?.role ?? '');
+  const location   = useLocation();
 
   const [sidebarView,  setSidebarView]  = useState<SidebarView>('my_day');
   const [viewMode,     setViewMode]     = useState<ViewMode>('list');
@@ -1240,6 +1252,7 @@ export default function TasksPage() {
   const [debSearch,    setDebSearch]   = useState('');
   const [statusFilter, setStatusFilter] = useState<TaskStatus | ''>('');
   const [priFilter,    setPriFilter]   = useState<TaskPriority | ''>('');
+  const [toggleError,  setToggleError]  = useState<string | null>(null);
 
   // Debounce search
   useEffect(() => {
@@ -1269,6 +1282,17 @@ export default function TasksPage() {
     loadLists();
     loadPendingCount();
   }, [loadLists, loadPendingCount]);
+
+  // Open task from navigation state (e.g. from Dashboard)
+  useEffect(() => {
+    const state = location.state as { selectedTaskId?: string } | null;
+    if (state?.selectedTaskId) {
+      setSelectedId(state.selectedTaskId);
+      setSidebarView('all');
+      window.history.replaceState({}, '');
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Load tasks when view/filters change
   const loadTasks = useCallback(async () => {
@@ -1329,13 +1353,21 @@ export default function TasksPage() {
   }, [loadLists]);
 
   const handleToggle = useCallback(async (task: Task) => {
+    // Block toggle if task is pending assignment
+    if (task.assignmentStatus === 'PENDING') return;
+
     const next: TaskStatus = task.status === 'DONE' ? 'TODO' : 'DONE';
     setTasks((prev) => prev.map((t) => t.id === task.id ? { ...t, status: next } : t));
     try {
       const res = await api.patch(`/tasks/${task.id}`, { status: next });
       setTasks((prev) => prev.map((t) => t.id === task.id ? { ...t, ...res.data.data } : t));
-    } catch {
+    } catch (err) {
       setTasks((prev) => prev.map((t) => t.id === task.id ? { ...t, status: task.status } : t));
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      if (msg) {
+        setToggleError(msg);
+        setTimeout(() => setToggleError(null), 4000);
+      }
     }
   }, []);
 
@@ -1349,6 +1381,14 @@ export default function TasksPage() {
 
   return (
     <div className="flex h-full -m-6 overflow-hidden">
+      {/* Toggle error toast */}
+      {toggleError && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 px-4 py-3 bg-gray-900 text-white text-sm rounded-lg shadow-lg max-w-sm text-center">
+          <AlertCircle size={15} className="text-amber-400 flex-shrink-0" />
+          {toggleError}
+        </div>
+      )}
+
       {/* Sidebar */}
       <Sidebar
         active={sidebarView}

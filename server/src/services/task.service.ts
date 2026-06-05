@@ -258,6 +258,19 @@ export async function updateTaskService(id: string, userId: string, role: string
   const isOwner = task.userId === userId || task.assignedToId === userId;
   if (!canManage(role) && !isOwner) throw new AppError('Akses ditolak', 403);
 
+  // Block marking as DONE if subtasks are not all done
+  if (data.status === TaskStatus.DONE) {
+    const pendingSubs = await prisma.task.count({
+      where: { parentTaskId: id, status: { not: TaskStatus.DONE } },
+    });
+    if (pendingSubs > 0) {
+      throw new AppError(
+        `Selesaikan semua subtask terlebih dahulu (${pendingSubs} subtask belum selesai)`,
+        400,
+      );
+    }
+  }
+
   const completedAt =
     data.status === TaskStatus.DONE ? new Date() :
     data.status !== undefined ? null : undefined;

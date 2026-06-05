@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, FormEvent } from 'react';
+import { useEffect, useState, useRef, useCallback, FormEvent } from 'react';
 import {
   Star, AlertCircle, Megaphone, Users,
   ArrowRight, Clock, CheckCircle2, Circle,
@@ -116,33 +116,34 @@ function ProgressRing({ done, total, size = 56 }: { done: number; total: number;
 }
 
 // ── Task Row ───────────────────────────────────────────────
-function TaskRow({ task, onToggleDone }: { task: Task; onToggleDone: (id: string) => void }) {
-  const isDone      = task.status === 'DONE';
-  const isProgress  = task.status === 'IN_PROGRESS';
+function TaskRow({ task, onNavigate }: { task: Task; onNavigate: (id: string) => void }) {
+  const isDone     = task.status === 'DONE';
+  const isProgress = task.status === 'IN_PROGRESS';
+  const isPending  = task.assignmentStatus === 'PENDING';
   const { label: dueLabel, overdue } = task.dueDate
     ? relativeDate(task.dueDate)
     : { label: '', overdue: false };
 
+  // Status indicator dot (read-only, no checkbox)
+  const dotColor = isDone ? '#22c55e' : isPending ? '#f59e0b' : isProgress ? '#3b82f6' : '#d1d5db';
+
   return (
-    <div className={cn(
-      'group flex items-center gap-3 px-5 py-3 border-b border-gray-50 last:border-0',
-      'hover:bg-gray-50/60 transition-colors cursor-default',
-    )}>
-      {/* Checkbox */}
-      <button
-        onClick={() => onToggleDone(task.id)}
-        className="flex-shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all duration-150"
-        style={{
-          borderColor: isDone ? '#22c55e' : isProgress ? '#3b82f6' : '#d1d5db',
-          backgroundColor: isDone ? '#22c55e' : 'transparent',
-        }}
-        title={isDone ? 'Tandai belum selesai' : 'Tandai selesai'}
+    <button
+      onClick={() => onNavigate(task.id)}
+      className={cn(
+        'group flex items-center gap-3 px-5 py-3 border-b border-gray-50 last:border-0 w-full text-left',
+        'hover:bg-gray-50/70 transition-colors',
+      )}
+    >
+      {/* Status dot — read only */}
+      <span
+        className="flex-shrink-0 w-4 h-4 rounded-full border-2 flex items-center justify-center"
+        style={{ borderColor: dotColor, backgroundColor: isDone ? dotColor : 'transparent' }}
       >
-        {isDone && <CheckCircle2 size={12} className="text-white" strokeWidth={3} />}
-        {isProgress && !isDone && (
-          <span className="w-2 h-2 rounded-full bg-info" />
-        )}
-      </button>
+        {isDone && <CheckCircle2 size={9} className="text-white" strokeWidth={3} />}
+        {isProgress && !isDone && <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: dotColor }} />}
+        {isPending && <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: dotColor }} />}
+      </span>
 
       {/* Title + meta */}
       <div className="flex-1 min-w-0">
@@ -150,10 +151,11 @@ function TaskRow({ task, onToggleDone }: { task: Task; onToggleDone: (id: string
           {task.title}
         </p>
         <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-          {isProgress && !isDone && (
-            <span className="text-[10px] font-medium text-info flex items-center gap-0.5">
-              <Clock size={9} /> Berjalan
-            </span>
+          {isPending && (
+            <span className="text-[10px] font-medium text-amber-500">Waiting for confirmation</span>
+          )}
+          {isProgress && !isDone && !isPending && (
+            <span className="text-[10px] font-medium text-info">On progress</span>
           )}
           {dueLabel && (
             <span className={cn('text-[10px]', overdue ? 'text-danger font-semibold' : 'text-gray-400')}>
@@ -169,10 +171,11 @@ function TaskRow({ task, onToggleDone }: { task: Task; onToggleDone: (id: string
       {/* Priority star */}
       <Star
         size={13}
-        className={cn('flex-shrink-0', PRIORITY_COLOR[task.priority])}
+        className={cn('flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity', PRIORITY_COLOR[task.priority])}
         fill={task.priority === 'URGENT' || task.priority === 'HIGH' ? 'currentColor' : 'none'}
       />
-    </div>
+      <ArrowRight size={13} className="flex-shrink-0 text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity" />
+    </button>
   );
 }
 
@@ -255,10 +258,13 @@ export default function DashboardPage() {
   const isAdmin   = user?.role === 'SUPER_ADMIN' || user?.role === 'ADMIN';
 
   // ── Shared task store ──
-  const allTasks     = useTaskStore((s) => s.tasks);
-  const taskLoading  = useTaskStore((s) => s.loading);
-  const addTask      = useTaskStore((s) => s.addTask);
-  const toggleStatus = useTaskStore((s) => s.toggleStatus);
+  const allTasks    = useTaskStore((s) => s.tasks);
+  const taskLoading = useTaskStore((s) => s.loading);
+  const addTask     = useTaskStore((s) => s.addTask);
+
+  const goToTask = useCallback((taskId: string) => {
+    navigate(ROUTES.TASKS, { state: { selectedTaskId: taskId } });
+  }, [navigate]);
 
   // ── Shared note store ──
   const allNotes = useNoteStore((s) => s.notes);
@@ -410,7 +416,7 @@ export default function DashboardPage() {
               ) : (
                 <div>
                   {sortedActive.map((task) => (
-                    <TaskRow key={task.id} task={task} onToggleDone={(id) => toggleStatus(id, task.status)} />
+                    <TaskRow key={task.id} task={task} onNavigate={goToTask} />
                   ))}
                 </div>
               )}
@@ -430,7 +436,7 @@ export default function DashboardPage() {
                     <span className="text-gray-400">{done.length}</span>
                   </button>
                   {showDone && done.map((task) => (
-                    <TaskRow key={task.id} task={task} onToggleDone={(id) => toggleStatus(id, task.status)} />
+                    <TaskRow key={task.id} task={task} onNavigate={goToTask} />
                   ))}
                 </div>
               )}
