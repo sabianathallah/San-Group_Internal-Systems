@@ -11,12 +11,14 @@ import { successResponse } from '@/helpers/response';
 import { AuthRequest } from '@/types';
 import { AppError } from '@/middlewares/errorHandler.middleware';
 
+const isProd = process.env.NODE_ENV === 'production';
+
 const REFRESH_COOKIE_OPTIONS = {
   httpOnly: true,
-  secure: process.env.NODE_ENV === 'production',
-  sameSite: 'strict' as const,
-  maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days in ms
-  path: '/',
+  secure:   isProd,
+  sameSite: (isProd ? 'none' : 'lax') as 'none' | 'lax',
+  maxAge:   12 * 60 * 60 * 1000, // 12 hours
+  path:     '/',
 };
 
 export async function login(req: Request, res: Response, next: NextFunction): Promise<void> {
