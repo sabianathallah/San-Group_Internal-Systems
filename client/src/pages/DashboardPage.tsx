@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef, useCallback, FormEvent } from 'react';
 import {
   Star, AlertCircle, Megaphone, Users,
-  ArrowRight, Clock, CheckCircle2, Circle,
+  ArrowRight, CheckCircle2,
   Loader2, CalendarDays, ChevronDown, ChevronRight,
   Plus, ExternalLink, StickyNote, Pin,
 } from 'lucide-react';

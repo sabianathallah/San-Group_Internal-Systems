@@ -11,20 +11,23 @@ export interface TaskUser {
 }
 
 export interface Task {
-  id:          string;
-  title:       string;
-  description: string | null;
-  status:      TaskStatus;
-  priority:    TaskPriority;
-  category:    TaskCategory;
-  dueDate:     string | null;
-  completedAt: string | null;
-  createdAt:   string;
-  creator:     TaskUser;
-  assignee:    TaskUser | null;
-  taskList:    { id: string; name: string; color: string } | null;
-  _count:      { subTasks: number; attachments: number };
-  subTasks?:   Task[];
+  id:               string;
+  title:            string;
+  description:      string | null;
+  status:           TaskStatus;
+  priority:         TaskPriority;
+  category:         TaskCategory;
+  dueDate:          string | null;
+  completedAt:      string | null;
+  isPrivate:        boolean;
+  assignmentStatus: 'PENDING' | 'ACCEPTED' | 'REJECTED' | null;
+  assignmentNote:   string | null;
+  createdAt:        string;
+  creator:          TaskUser;
+  assignee:         TaskUser | null;
+  taskList:         { id: string; name: string; color: string } | null;
+  _count:           { subTasks: number; attachments: number; comments: number };
+  subTasks?:        Task[];
 }
 
 interface TaskState {
