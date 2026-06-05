@@ -1268,7 +1268,7 @@ export default function TasksPage() {
   useEffect(() => {
     loadLists();
     loadPendingCount();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [loadLists, loadPendingCount]);
 
   // Load tasks when view/filters change
   const loadTasks = useCallback(async () => {

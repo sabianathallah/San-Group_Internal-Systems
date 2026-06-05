@@ -255,37 +255,32 @@ export default function DashboardPage() {
   const isAdmin   = user?.role === 'SUPER_ADMIN' || user?.role === 'ADMIN';
 
   // ── Shared task store ──
-  const allTasks    = useTaskStore((s) => s.tasks);
-  const taskLoading = useTaskStore((s) => s.loading);
-  const fetchTasks  = useTaskStore((s) => s.fetchTasks);
-  const addTask     = useTaskStore((s) => s.addTask);
+  const allTasks     = useTaskStore((s) => s.tasks);
+  const taskLoading  = useTaskStore((s) => s.loading);
+  const addTask      = useTaskStore((s) => s.addTask);
   const toggleStatus = useTaskStore((s) => s.toggleStatus);
 
   // ── Shared note store ──
-  const allNotes    = useNoteStore((s) => s.notes);
-  const fetchNotes  = useNoteStore((s) => s.fetchNotes);
+  const allNotes = useNoteStore((s) => s.notes);
 
-  const [bulletins, setBulletins] = useState<Bulletin[]>([]);
+  const [bulletins,   setBulletins]   = useState<Bulletin[]>([]);
   const [activeUsers, setActiveUsers] = useState(0);
-  const [showDone, setShowDone]   = useState(false);
+  const [showDone,    setShowDone]    = useState(false);
 
-  useEffect(() => { fetchTasks(); }, [fetchTasks]);
-  useEffect(() => { fetchNotes(); }, [fetchNotes]);
-
-  // Fetch bulletins
+  // Single mount effect — fetch all dashboard data once
   useEffect(() => {
+    useTaskStore.getState().fetchTasks();
+    useNoteStore.getState().fetchNotes();
     api.get('/bulletins', { params: { limit: 50 } })
       .then((r) => setBulletins(r.data.data ?? []))
       .catch(() => {});
+    if (isAdmin) {
+      api.get('/users', { params: { isActive: 'true', limit: 1 } })
+        .then((r) => setActiveUsers(r.data.meta?.total ?? 0))
+        .catch(() => {});
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  // Fetch active users (admin)
-  useEffect(() => {
-    if (!isAdmin) return;
-    api.get('/users', { params: { isActive: 'true', limit: 1 } })
-      .then((r) => setActiveUsers(r.data.meta?.total ?? 0))
-      .catch(() => {});
-  }, [isAdmin]);
 
   function handleTaskAdded(task: Task) {
     addTask(task);

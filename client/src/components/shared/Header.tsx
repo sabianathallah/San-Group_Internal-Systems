@@ -60,8 +60,12 @@ export default function Header() {
   const toggle  = useUiStore((s) => s.toggleSidebar);
   const user    = useAuthStore((s) => s.user);
   const logout  = useAuthStore((s) => s.logout);
-  const { notifications, unreadCount, loading: notifLoading, fetch: fetchNotifs, markRead, markAllRead } =
-    useNotificationStore();
+  const notifications = useNotificationStore((s) => s.notifications);
+  const unreadCount   = useNotificationStore((s) => s.unreadCount);
+  const notifLoading  = useNotificationStore((s) => s.loading);
+  const fetchNotifs   = useNotificationStore((s) => s.fetch);
+  const markRead      = useNotificationStore((s) => s.markRead);
+  const markAllRead   = useNotificationStore((s) => s.markAllRead);
   const navigate = useNavigate();
   const crumbs   = useBreadcrumbs();
 
