@@ -1256,8 +1256,6 @@ export default function TasksPage() {
     } catch { /* silent */ } finally { setLoadingLists(false); }
   }, []);
 
-  useEffect(() => { loadLists(); }, [loadLists]);
-
   // Load pending count
   const loadPendingCount = useCallback(async () => {
     try {
@@ -1266,7 +1264,11 @@ export default function TasksPage() {
     } catch { /* silent */ }
   }, []);
 
-  useEffect(() => { loadPendingCount(); }, [loadPendingCount]);
+  // Single mount effect — load lists + pending count together
+  useEffect(() => {
+    loadLists();
+    loadPendingCount();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Load tasks when view/filters change
   const loadTasks = useCallback(async () => {
@@ -1308,40 +1310,40 @@ export default function TasksPage() {
   const activeList   = taskLists.find((l) => l.id === activeListId);
   const pageTitle    = activeList ? `${activeList.icon ?? ''}${activeList.icon ? ' ' : ''}${activeList.name}` : (VIEW_LABELS[sidebarView] ?? 'Tasks');
 
-  function handleTaskCreated(task: Task) {
+  const handleTaskUpdated = useCallback((task: Task) => {
+    setTasks((prev) => prev.map((t) => t.id === task.id ? { ...t, ...task } : t));
+    loadPendingCount();
+  }, [loadPendingCount]);
+
+  const handleTaskCreated = useCallback((task: Task) => {
     setTasks((prev) => [task, ...prev]);
     setSelectedId(task.id);
     loadPendingCount();
-    if (activeListId) loadLists();
-  }
+    loadLists();
+  }, [loadPendingCount, loadLists]);
 
-  function handleTaskUpdated(task: Task) {
-    setTasks((prev) => prev.map((t) => t.id === task.id ? { ...t, ...task } : t));
-    loadPendingCount();
-  }
-
-  function handleTaskDeleted(id: string) {
+  const handleTaskDeleted = useCallback((id: string) => {
     setTasks((prev) => prev.filter((t) => t.id !== id));
-    if (selectedId === id) setSelectedId(null);
-    if (activeListId) loadLists();
-  }
+    setSelectedId((prev) => prev === id ? null : prev);
+    loadLists();
+  }, [loadLists]);
 
-  async function handleToggle(task: Task) {
+  const handleToggle = useCallback(async (task: Task) => {
     const next: TaskStatus = task.status === 'DONE' ? 'TODO' : 'DONE';
     setTasks((prev) => prev.map((t) => t.id === task.id ? { ...t, status: next } : t));
     try {
       const res = await api.patch(`/tasks/${task.id}`, { status: next });
-      handleTaskUpdated(res.data.data);
+      setTasks((prev) => prev.map((t) => t.id === task.id ? { ...t, ...res.data.data } : t));
     } catch {
       setTasks((prev) => prev.map((t) => t.id === task.id ? { ...t, status: task.status } : t));
     }
-  }
+  }, []);
 
-  async function handleDelete(id: string) {
+  const handleDelete = useCallback(async (id: string) => {
     if (!confirm('Hapus task ini?')) return;
     handleTaskDeleted(id);
     try { await api.delete(`/tasks/${id}`); } catch { loadTasks(); }
-  }
+  }, [handleTaskDeleted, loadTasks]);
 
   const doneCount = tasks.filter((t) => t.status === 'DONE').length;
 

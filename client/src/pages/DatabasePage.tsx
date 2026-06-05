@@ -233,14 +233,16 @@ export default function DatabasePage() {
   }
 
   function handleLinkSaved(l: DbLink) {
+    const isNew = !links.find((x) => x.id === l.id);
     setLinks((prev) => {
       const idx = prev.findIndex((x) => x.id === l.id);
-      if (idx >= 0) return prev.map((x) => x.id === l.id ? l : x);
+      return idx >= 0 ? prev.map((x) => x.id === l.id ? l : x) : [...prev, l];
+    });
+    if (isNew) {
       setFolders((pf) => pf.map((f) =>
         f.id === activeFolder?.id ? { ...f, _count: { links: f._count.links + 1 } } : f
       ));
-      return [...prev, l];
-    });
+    }
   }
 
   async function handleDeleteLink(link: DbLink) {
