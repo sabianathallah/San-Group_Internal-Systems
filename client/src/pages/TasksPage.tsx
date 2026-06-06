@@ -916,7 +916,6 @@ function TaskDetailPanel({
   const titleRef = useRef<HTMLInputElement>(null);
 
   const [descVal,   setDescVal]   = useState('');
-  const [descFocus, setDescFocus] = useState(false);
 
   const [newSub,    setNewSub]    = useState('');
   const [addingSub, setAddingSub] = useState(false);
@@ -982,14 +981,6 @@ function TaskDetailPanel({
     if (!task || titleVal.trim() === task.title) return;
     if (!titleVal.trim()) { setTitleVal(task.title); return; }
     await patch({ title: titleVal.trim() });
-  }
-
-  async function saveDesc() {
-    if (descFocus) { setDescFocus(false); return; } // only save on blur from textarea
-    if (!task) return;
-    const val = descVal.trim() || null;
-    if (val === (task.description ?? null)) return;
-    await patch({ description: val });
   }
 
   async function addSubTask(e: FormEvent) {

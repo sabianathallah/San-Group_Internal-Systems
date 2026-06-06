@@ -27,7 +27,7 @@ export async function listBulletinsService(userId: string, roleLevel: number, qu
   const where: Prisma.BulletinWhereInput = {};
 
   // Non-admin hanya lihat yang published dan belum expired
-  if (!isAdmin(role)) {
+  if (!isAdmin(roleLevel)) {
     where.isPublished = true;
     where.OR = [{ expiresAt: null }, { expiresAt: { gt: new Date() } }];
   } else if (query.isPublished !== undefined) {
@@ -93,7 +93,7 @@ export async function getBulletinByIdService(id: string, userId: string, roleLev
   });
 
   if (!bulletin) throw new AppError('Bulletin tidak ditemukan', 404);
-  if (!isAdmin(role) && !bulletin.isPublished) throw new AppError('Bulletin tidak ditemukan', 404);
+  if (!isAdmin(roleLevel) && !bulletin.isPublished) throw new AppError('Bulletin tidak ditemukan', 404);
 
   // Auto mark-as-read when staff opens a published bulletin
   if (bulletin.isPublished && bulletin.readStatus.length === 0) {

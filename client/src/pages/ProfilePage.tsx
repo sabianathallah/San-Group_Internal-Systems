@@ -23,51 +23,6 @@ interface FullProfile {
   createdAt:   string;
 }
 
-// ── Constants ──────────────────────────────────────────────
-const ROLE_LABELS: Record<string, string> = {
-  SUPER_ADMIN:          'Super Admin',
-  ADMIN:                'Admin',
-  OWNER:                'Owner',
-  DIRECTOR:             'Director',
-  PROPERTY_MANAGER:     'Property Manager',
-  LEASING_MANAGER:      'Leasing Manager',
-  LEASING_ASSISTANT:    'Leasing Assistant',
-  LEASING_STAFF:        'Leasing Staff',
-  TENANT_RELATIONS:     'Tenant Relations',
-  FACILITY_MANAGER:     'Facility Manager',
-  CHIEF_ENGINEER:       'Chief Engineer',
-  ENGINEER:             'Engineer',
-  FINANCE_MANAGER:      'Finance Manager',
-  ASST_FINANCE_MANAGER: 'Asst. Finance Manager',
-  ACCOUNTANT:           'Accountant',
-  LEGAL_HEAD:           'Legal Head',
-  LEGAL_SPV:            'Legal SPV',
-  LEGAL_STAFF:          'Legal Staff',
-  TAX_STAFF:            'Tax Staff',
-  HR_MANAGER:           'HR Manager',
-  HR_SPV:               'HR SPV',
-  HR_STAFF:             'HR Staff',
-  FNB_MANAGER:          'F&B Manager',
-  GA_MANAGER:           'GA Manager',
-  STAFF:                'Staff',
-};
-
-const DIV_LABELS: Record<string, string> = {
-  MANAGEMENT:  'Manajemen',
-  RETAIL:      'Retail',
-  HOTEL:       'Hotel & Ballroom',
-  HOUSING:     'Housing',
-  FNB:         'F&B',
-  GENERAL:     'General',
-  LEASING:     'Leasing',
-  PROPERTY:    'Property',
-  ENGINEERING: 'Engineering',
-  FINANCE:     'Finance',
-  LEGAL:       'Legal',
-  TAX:         'Tax',
-  HR:          'HR',
-  GA:          'General Affairs',
-};
 
 // ── Helpers ────────────────────────────────────────────────
 function initials(name: string) {
@@ -268,7 +223,7 @@ export default function ProfilePage() {
   function handleProfileSaved(updated: FullProfile) {
     setProfile(updated);
     // Sync name and avatar into authStore so header updates immediately
-    updateStore({ name: updated.fullName, avatar: updated.avatar });
+    updateStore({ fullName: updated.fullName, avatar: updated.avatar });
   }
 
   function handleAvatarUpdated(avatar: string) {

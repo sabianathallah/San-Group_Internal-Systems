@@ -22,14 +22,14 @@ export async function createFolder(req: AuthRequest, res: Response, next: NextFu
 
 export async function updateFolder(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
-    const folder = await updateFolderService(String(req.params.id), req.user!.userId, req.user!.role, req.body);
+    const folder = await updateFolderService(String(req.params.id), req.user!.userId, req.user!.roleLevel, req.body);
     successResponse(res, folder, 'Folder berhasil diperbarui');
   } catch (err) { next(err); }
 }
 
 export async function deleteFolder(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
-    await deleteFolderService(String(req.params.id), req.user!.userId, req.user!.role);
+    await deleteFolderService(String(req.params.id), req.user!.userId, req.user!.roleLevel);
     successResponse(res, null, 'Folder berhasil dihapus');
   } catch (err) { next(err); }
 }

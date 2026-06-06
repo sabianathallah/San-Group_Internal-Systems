@@ -177,7 +177,7 @@ function LinkModal({ link, folderId, onClose, onSaved }: {
 // ── Main Page ──────────────────────────────────────────────
 export default function DatabasePage() {
   const { user } = useAuthStore();
-  const isAdmin = ['SUPER_ADMIN', 'ADMIN'].includes(user?.role ?? '');
+  const isAdmin = (user?.role?.level ?? 99) <= 2;
 
   const [folders,        setFolders]        = useState<DbFolder[]>([]);
   const [loadingFolders, setLoadingFolders] = useState(true);

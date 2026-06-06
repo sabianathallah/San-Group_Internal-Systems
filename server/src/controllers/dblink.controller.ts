@@ -14,14 +14,14 @@ export async function createDatabaseLink(req: AuthRequest, res: Response, next: 
 
 export async function updateDatabaseLink(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
-    const link = await updateDatabaseLinkService(String(req.params.id), req.user!.userId, req.user!.role, req.body);
+    const link = await updateDatabaseLinkService(String(req.params.id), req.user!.userId, req.user!.roleLevel, req.body);
     successResponse(res, link, 'Link berhasil diperbarui');
   } catch (err) { next(err); }
 }
 
 export async function deleteDatabaseLink(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
-    await deleteDatabaseLinkService(String(req.params.id), req.user!.userId, req.user!.role);
+    await deleteDatabaseLinkService(String(req.params.id), req.user!.userId, req.user!.roleLevel);
     successResponse(res, null, 'Link berhasil dihapus');
   } catch (err) { next(err); }
 }
