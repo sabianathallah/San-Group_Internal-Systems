@@ -67,19 +67,17 @@ export async function listTasksService(
 
   // View-specific filters
   if (view === 'my_day') {
-    const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
-    const todayEnd   = new Date(); todayEnd.setHours(23, 59, 59, 999);
-    base.AND = [{
-      OR: [
-        { userId, category: TaskCategory.MY_DAY },
-        { userId, dueDate: { gte: todayStart, lte: todayEnd }, status: { not: TaskStatus.DONE } },
-      ],
-    }];
+    base.userId   = userId;
+    base.category = TaskCategory.MY_DAY;
   } else if (view === 'assigned') {
     base.assignedToId = userId;
   } else if (view === 'important') {
     base.userId   = userId;
     base.category = TaskCategory.IMPORTANT;
+  } else if (view === 'planned') {
+    base.userId   = userId;
+    base.dueDate  = { not: null };
+    base.status   = { not: TaskStatus.DONE };
   } else if (view === 'list' && typeof query.listId === 'string') {
     base.listId = query.listId;
     base.AND = [{ OR: [{ userId }, { assignedToId: userId }] }];

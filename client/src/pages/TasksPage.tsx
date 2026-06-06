@@ -8,7 +8,7 @@ import {
   AlertCircle, Calendar, User, Loader2, Trash2, FileText,
   ChevronsRight, GripVertical, ChevronLeft, Columns3,
   Filter, SortDesc, Lock, Unlock, Link2, ExternalLink, MessageSquare,
-  Check, XCircle,
+  Check, XCircle, Eye, EyeOff,
 } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
 import api from '@/lib/api';
@@ -170,11 +170,11 @@ function TasksSidebar({
   onNewList: () => void; loadingLists: boolean;
 }) {
   const items: { id: SidebarView; icon: React.ElementType; label: string; badge?: number }[] = [
-    { id: 'my_day',    icon: Sun,          label: 'My Day'                              },
-    { id: 'important', icon: Star,         label: 'Important'                           },
-    { id: 'planned',   icon: CalendarDays, label: 'Planned'                             },
+    { id: 'all',       icon: LayoutList,    label: 'All Tasks'                           },
+    { id: 'my_day',    icon: Sun,           label: 'My Day'                              },
+    { id: 'important', icon: Star,          label: 'Important'                           },
+    { id: 'planned',   icon: CalendarDays,  label: 'Planned'                             },
     { id: 'assigned',  icon: ClipboardList, label: 'Assigned to Me', badge: pendingCount },
-    { id: 'all',       icon: LayoutList,   label: 'All Tasks'                           },
     ...(canSeeTeam ? [{ id: 'team' as SidebarView, icon: Users, label: 'Team Tasks' }] : []),
   ];
 
@@ -390,21 +390,25 @@ function groupTasks(tasks: Task[], groupBy: GroupBy): { label: string; tasks: Ta
 
 // ── List View ──────────────────────────────────────────────
 function ListView({
-  tasks, selectedId, onSelect, onToggle, onDelete, onCreated, listId, showUser, groupBy,
+  tasks, selectedId, onSelect, onToggle, onDelete, onCreated, onToggleMyDay, onToggleImportant,
+  listId, showUser, groupBy, showDone,
 }: {
   tasks: Task[]; selectedId: string | null; onSelect: (id: string) => void;
   onToggle: (t: Task) => void; onDelete: (id: string) => void; onCreated: (t: Task) => void;
-  listId?: string | null; showUser?: boolean; groupBy: GroupBy;
+  onToggleMyDay: (t: Task) => void; onToggleImportant: (t: Task) => void;
+  listId?: string | null; showUser?: boolean; groupBy: GroupBy; showDone?: boolean;
 }) {
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({ DONE: true });
   const [addingTo,  setAddingTo]  = useState<string | null>(null);
   const [newTitle,  setNewTitle]  = useState('');
   const [adding,    setAdding]    = useState(false);
 
-  const doneCount = tasks.filter((t) => t.status === 'DONE').length;
-  const progress  = tasks.length > 0 ? Math.round((doneCount / tasks.length) * 100) : 0;
+  const allDoneCount = tasks.filter((t) => t.status === 'DONE').length;
+  const doneCount    = allDoneCount;
+  const visibleTasks = (showDone === false) ? tasks.filter((t) => t.status !== 'DONE') : tasks;
+  const progress     = tasks.length > 0 ? Math.round((doneCount / tasks.length) * 100) : 0;
 
-  const groups = groupTasks(tasks, groupBy);
+  const groups = groupTasks(visibleTasks, groupBy);
 
   async function quickAdd(status: string) {
     if (!newTitle.trim()) { setAddingTo(null); return; }
@@ -481,6 +485,16 @@ function ListView({
                         </span>
                       )}
                       {showUser && <p className="text-[10px] text-gray-400 truncate">{task.creator.fullName}</p>}
+                      <button onClick={(e) => { e.stopPropagation(); onToggleMyDay(task); }}
+                        title={task.category === 'MY_DAY' ? 'Hapus dari My Day' : 'Tambah ke My Day'}
+                        className={cn('flex-shrink-0 transition-colors', task.category === 'MY_DAY' ? 'text-amber-400' : 'text-gray-200 hover:text-amber-400')}>
+                        <Sun size={12} />
+                      </button>
+                      <button onClick={(e) => { e.stopPropagation(); onToggleImportant(task); }}
+                        title={task.category === 'IMPORTANT' ? 'Hapus dari Important' : 'Tandai penting'}
+                        className={cn('flex-shrink-0 transition-colors', task.category === 'IMPORTANT' ? 'text-yellow-400' : 'text-gray-200 hover:text-yellow-400')}>
+                        <Star size={12} />
+                      </button>
                     </div>
                     <div className="py-2.5 border-b border-gray-50">
                       {(() => { const ds = displayStatus(task); return <span className={cn('text-[10px] font-medium px-1.5 py-0.5 rounded-full', ds.bg, ds.color)}>{ds.label}</span>; })()}
@@ -526,9 +540,10 @@ function ListView({
 }
 
 // ── Board View ─────────────────────────────────────────────
-function BoardView({ tasks, selectedId, onSelect, onToggle, onDelete, onCreated, groupBy }: {
+function BoardView({ tasks, selectedId, onSelect, onToggle, onDelete, onCreated, onToggleMyDay, onToggleImportant, groupBy }: {
   tasks: Task[]; selectedId: string | null; onSelect: (id: string) => void;
   onToggle: (t: Task) => void; onDelete: (id: string) => void; onCreated: (t: Task) => void;
+  onToggleMyDay: (t: Task) => void; onToggleImportant: (t: Task) => void;
   groupBy: GroupBy;
 }) {
   const [addingTo, setAddingTo] = useState<string | null>(null);
@@ -591,6 +606,14 @@ function BoardView({ tasks, selectedId, onSelect, onToggle, onDelete, onCreated,
                         {task.isPrivate && <Lock size={10} className="text-gray-300" />}
                         {task.assignmentStatus && <AssignBadge status={task.assignmentStatus} />}
                         {task.assignee && <div className="ml-auto"><Avatar name={task.assignee.fullName} avatar={task.assignee.avatar} size={18} /></div>}
+                        <button onClick={(e) => { e.stopPropagation(); onToggleMyDay(task); }}
+                          className={cn('transition-colors', task.category === 'MY_DAY' ? 'text-amber-400' : 'text-gray-200 hover:text-amber-400')}>
+                          <Sun size={11} />
+                        </button>
+                        <button onClick={(e) => { e.stopPropagation(); onToggleImportant(task); }}
+                          className={cn('transition-colors', task.category === 'IMPORTANT' ? 'text-yellow-400' : 'text-gray-200 hover:text-yellow-400')}>
+                          <Star size={11} />
+                        </button>
                       </div>
                     </div>
                   );
@@ -848,6 +871,109 @@ function CalendarView({ tasks, onSelect }: { tasks: Task[]; onSelect: (id: strin
             ))}
           </div>
         </div>
+      )}
+    </div>
+  );
+}
+
+// ── Planned View (grouped by date bucket) ─────────────────
+function PlannedView({ tasks, selectedId, onSelect, onToggle, onDelete, onToggleMyDay, onToggleImportant, currentUserId }: {
+  tasks: Task[]; selectedId: string | null; onSelect: (id: string) => void;
+  onToggle: (t: Task) => void; onDelete: (id: string) => void;
+  onToggleMyDay: (t: Task) => void; onToggleImportant: (t: Task) => void;
+  currentUserId: string;
+}) {
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+
+  const now = new Date(); now.setHours(0, 0, 0, 0);
+  const tomorrow = new Date(now); tomorrow.setDate(now.getDate() + 1);
+  const weekEnd  = new Date(now); weekEnd.setDate(now.getDate() + 7);
+  const monthEnd = new Date(now); monthEnd.setDate(now.getDate() + 30);
+
+  function getBucket(dueDate: string): string {
+    const d = new Date(dueDate); d.setHours(0, 0, 0, 0);
+    if (d < now)           return '0_overdue';
+    if (d.getTime() === now.getTime()) return '1_today';
+    if (d.getTime() === tomorrow.getTime()) return '2_tomorrow';
+    if (d <= weekEnd)      return '3_week';
+    if (d <= monthEnd)     return '4_month';
+    return '5_later';
+  }
+
+  const BUCKET_LABELS: Record<string, string> = {
+    '0_overdue':  'Terlambat',
+    '1_today':    'Hari Ini',
+    '2_tomorrow': 'Besok',
+    '3_week':     'Minggu Ini',
+    '4_month':    'Bulan Ini',
+    '5_later':    'Nanti',
+  };
+
+  const groups = useMemo(() => {
+    const map = new Map<string, Task[]>();
+    const sorted = [...tasks].sort((a, b) => (a.dueDate ?? '').localeCompare(b.dueDate ?? ''));
+    for (const t of sorted) {
+      const key = t.dueDate ? getBucket(t.dueDate) : '5_later';
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(t);
+    }
+    return Array.from(map.entries()).sort(([a], [b]) => a.localeCompare(b));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tasks]);
+
+  return (
+    <div className="flex-1 overflow-y-auto">
+      {groups.map(([key, groupTasks]) => {
+        const isCollapsed = collapsed[key];
+        const isOverdue   = key === '0_overdue';
+        return (
+          <div key={key}>
+            <button
+              onClick={() => setCollapsed((c) => ({ ...c, [key]: !c[key] }))}
+              className="flex items-center gap-2 w-full px-4 py-2.5 hover:bg-gray-50 border-b border-gray-50 text-left"
+            >
+              {isCollapsed ? <ChevronRight size={13} className="text-gray-400" /> : <ChevronDown size={13} className="text-gray-400" />}
+              <CalendarDays size={13} className={isOverdue ? 'text-red-400' : 'text-blue-400'} />
+              <span className={cn('text-xs font-semibold', isOverdue ? 'text-red-500' : 'text-gray-700')}>{BUCKET_LABELS[key]}</span>
+              <span className="text-[10px] text-gray-400 ml-1">{groupTasks.length}</span>
+            </button>
+            {!isCollapsed && groupTasks.map((task) => {
+              const due = fmtDue(task.dueDate);
+              const isMe = task.creator?.id === currentUserId;
+              return (
+                <div key={task.id} className={cn(
+                  'flex items-center gap-2 px-4 py-2.5 border-b border-gray-50 cursor-pointer hover:bg-gray-50 border-l-2 transition-colors',
+                  selectedId === task.id ? 'bg-navy/5 border-l-navy' : PRIORITY_CONFIG[task.priority].border,
+                )} onClick={() => onSelect(task.id)}>
+                  <button onClick={(e) => { e.stopPropagation(); onToggle(task); }}
+                    className={cn('w-4 h-4 rounded-full border-2 flex items-center justify-center flex-shrink-0',
+                      task.status === 'DONE' ? 'border-green-500 bg-green-500' :
+                      task.status === 'IN_PROGRESS' ? 'border-blue-400' : 'border-gray-300 hover:border-navy')}>
+                    {task.status === 'DONE' && <CheckCircle2 size={9} className="text-white" strokeWidth={3} />}
+                    {task.status === 'IN_PROGRESS' && <span className="w-1.5 h-1.5 rounded-full bg-blue-400" />}
+                  </button>
+                  <span className={cn('text-sm flex-1 truncate', task.status === 'DONE' && 'line-through text-gray-400')}>{task.title}</span>
+                  {due.text && <span className={cn('text-[11px] flex-shrink-0', due.overdue ? 'text-red-500' : 'text-gray-400')}>{due.text}</span>}
+                  {task.assignee && <Avatar name={task.assignee.fullName} avatar={task.assignee.avatar} size={18} />}
+                  <button onClick={(e) => { e.stopPropagation(); onToggleMyDay(task); }}
+                    title={task.category === 'MY_DAY' ? 'Hapus dari My Day' : 'Tambah ke My Day'}
+                    className={cn('flex-shrink-0 transition-colors', task.category === 'MY_DAY' ? 'text-amber-400' : 'text-gray-200 hover:text-amber-400')}>
+                    <Sun size={13} />
+                  </button>
+                  <button onClick={(e) => { e.stopPropagation(); onToggleImportant(task); }}
+                    title={task.category === 'IMPORTANT' ? 'Hapus dari Important' : 'Tandai penting'}
+                    className={cn('flex-shrink-0 transition-colors', task.category === 'IMPORTANT' ? 'text-yellow-400' : 'text-gray-200 hover:text-yellow-400')}>
+                    <Star size={13} />
+                  </button>
+                  {isMe && <button onClick={(e) => { e.stopPropagation(); onDelete(task.id); }} className="text-gray-200 hover:text-red-400 flex-shrink-0"><Trash2 size={12} /></button>}
+                </div>
+              );
+            })}
+          </div>
+        );
+      })}
+      {groups.length === 0 && (
+        <div className="flex items-center justify-center py-16 text-gray-400 text-sm">Tidak ada task terjadwal</div>
       )}
     </div>
   );
@@ -1205,6 +1331,28 @@ function TaskDetailPanel({
                 <option value="">— Tidak diassign —</option>
                 {users.map((u) => <option key={u.id} value={u.id}>{u.fullName}</option>)}
               </select>
+            </div>
+
+            <div className="flex items-center gap-3 px-1 py-2 rounded hover:bg-gray-50">
+              <div className="flex items-center gap-2 w-24 flex-shrink-0">
+                <Sun size={13} className={task.category === 'MY_DAY' ? 'text-amber-400' : 'text-gray-400'} />
+                <span className="text-xs text-gray-400">My Day</span>
+              </div>
+              <button onClick={() => patch({ category: task.category === 'MY_DAY' ? 'NONE' : 'MY_DAY' })}
+                className={cn('w-8 h-4 rounded-full transition-colors relative flex-shrink-0', task.category === 'MY_DAY' ? 'bg-amber-400' : 'bg-gray-200')}>
+                <span className={cn('absolute top-0.5 w-3 h-3 bg-white rounded-full shadow transition-all', task.category === 'MY_DAY' ? 'left-4' : 'left-0.5')} />
+              </button>
+            </div>
+
+            <div className="flex items-center gap-3 px-1 py-2 rounded hover:bg-gray-50">
+              <div className="flex items-center gap-2 w-24 flex-shrink-0">
+                <Star size={13} className={task.category === 'IMPORTANT' ? 'text-yellow-400' : 'text-gray-400'} />
+                <span className="text-xs text-gray-400">Important</span>
+              </div>
+              <button onClick={() => patch({ category: task.category === 'IMPORTANT' ? 'NONE' : 'IMPORTANT' })}
+                className={cn('w-8 h-4 rounded-full transition-colors relative flex-shrink-0', task.category === 'IMPORTANT' ? 'bg-yellow-400' : 'bg-gray-200')}>
+                <span className={cn('absolute top-0.5 w-3 h-3 bg-white rounded-full shadow transition-all', task.category === 'IMPORTANT' ? 'left-4' : 'left-0.5')} />
+              </button>
             </div>
 
             <div className="flex items-center gap-3 px-1 py-2 rounded hover:bg-gray-50">
@@ -1572,9 +1720,10 @@ export default function TasksPage() {
   const canSeeTeam = (user?.role?.level ?? 99) <= 4;
   const location   = useLocation();
 
-  const [sidebarView,  setSidebarView]  = useState<SidebarView>('my_day');
+  const [sidebarView,  setSidebarView]  = useState<SidebarView>('all');
   const [viewMode,     setViewMode]     = useState<ViewMode>('list');
   const [groupBy,      setGroupBy]      = useState<GroupBy>('status');
+  const [showDone,     setShowDone]     = useState(false);
   const [tasks,        setTasks]        = useState<Task[]>([]);
   const [loading,      setLoading]      = useState(false);
   const [taskLists,    setTaskLists]    = useState<TaskList[]>([]);
@@ -1728,7 +1877,27 @@ export default function TasksPage() {
     try { await api.delete(`/tasks/${id}`); } catch { loadTasks(); }
   }, [handleTaskDeleted, loadTasks]);
 
-  const doneCount = filteredTasks.filter((t) => t.status === 'DONE').length;
+  const handleToggleMyDay = useCallback(async (task: Task) => {
+    const next = task.category === 'MY_DAY' ? 'NONE' : 'MY_DAY';
+    setTasks((prev) => prev.map((t) => t.id === task.id ? { ...t, category: next } : t));
+    try { await api.patch(`/tasks/${task.id}`, { category: next }); }
+    catch { setTasks((prev) => prev.map((t) => t.id === task.id ? { ...t, category: task.category } : t)); }
+  }, []);
+
+  const handleToggleImportant = useCallback(async (task: Task) => {
+    const next = task.category === 'IMPORTANT' ? 'NONE' : 'IMPORTANT';
+    setTasks((prev) => prev.map((t) => t.id === task.id ? { ...t, category: next } : t));
+    try { await api.patch(`/tasks/${task.id}`, { category: next }); }
+    catch { setTasks((prev) => prev.map((t) => t.id === task.id ? { ...t, category: task.category } : t)); }
+  }, []);
+
+  const totalDone = filteredTasks.filter((t) => t.status === 'DONE').length;
+  const doneCount = totalDone;
+
+  // My Day greeting
+  const greetingHour = new Date().getHours();
+  const greeting = greetingHour < 11 ? 'Selamat pagi' : greetingHour < 15 ? 'Selamat siang' : greetingHour < 18 ? 'Selamat sore' : 'Selamat malam';
+  const todayStr = new Date().toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
 
   return (
     <div className="flex h-full -m-6 overflow-hidden">
@@ -1752,9 +1921,35 @@ export default function TasksPage() {
 
       {/* Main */}
       <div className="flex flex-col flex-1 min-w-0 overflow-hidden bg-white">
+
+        {/* My Day greeting header */}
+        {sidebarView === 'my_day' && (
+          <div className="px-6 pt-5 pb-4 border-b border-gray-100 bg-gradient-to-r from-amber-50 to-orange-50 flex-shrink-0">
+            <div className="flex items-center gap-2 mb-0.5">
+              <Sun size={18} className="text-amber-400" />
+              <h1 className="text-lg font-semibold text-gray-800">My Day</h1>
+            </div>
+            <p className="text-xs text-gray-500">{greeting}, {user?.fullName?.split(' ')[0]} · {todayStr}</p>
+            <p className="text-[11px] text-amber-600 mt-1">Task yang kamu tambahkan ke hari ini</p>
+          </div>
+        )}
+
+        {/* Important header */}
+        {sidebarView === 'important' && (
+          <div className="px-6 pt-5 pb-4 border-b border-gray-100 bg-gradient-to-r from-yellow-50 to-amber-50 flex-shrink-0">
+            <div className="flex items-center gap-2 mb-0.5">
+              <Star size={18} className="text-yellow-400" />
+              <h1 className="text-lg font-semibold text-gray-800">Important</h1>
+            </div>
+            <p className="text-[11px] text-yellow-600 mt-1">Task yang kamu tandai sebagai penting ⭐</p>
+          </div>
+        )}
+
         {/* Toolbar */}
         <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-200 flex-shrink-0 flex-wrap bg-white">
-          <h1 className="text-sm font-semibold text-gray-800 mr-1">{pageTitle}</h1>
+          {sidebarView !== 'my_day' && sidebarView !== 'important' && (
+            <h1 className="text-sm font-semibold text-gray-800 mr-1">{pageTitle}</h1>
+          )}
 
           {/* View mode switcher */}
           <div className="flex items-center gap-0.5 bg-gray-100 rounded-lg p-0.5">
@@ -1812,6 +2007,16 @@ export default function TasksPage() {
           </button>
 
           <div className="flex-1" />
+          {sidebarView === 'all' && (viewMode === 'list' || viewMode === 'board') && (
+            <button
+              onClick={() => setShowDone((v) => !v)}
+              className={cn('flex items-center gap-1.5 px-2 py-1.5 text-xs rounded-lg border transition-colors',
+                showDone ? 'border-navy text-navy bg-navy/5' : 'border-gray-200 text-gray-400 hover:border-gray-300')}
+            >
+              {showDone ? <Eye size={12} /> : <EyeOff size={12} />}
+              {showDone ? 'Sembunyikan selesai' : `Tampilkan selesai (${totalDone})`}
+            </button>
+          )}
           {!loading && <span className="text-xs text-gray-400">{doneCount}/{filteredTasks.length} selesai</span>}
 
           <button onClick={() => setShowCreate(true)}
@@ -1842,6 +2047,17 @@ export default function TasksPage() {
                   <Plus size={12} /> Buat task pertama
                 </button>
               </div>
+            ) : sidebarView === 'planned' ? (
+              <PlannedView
+                tasks={filteredTasks}
+                selectedId={selectedId}
+                onSelect={setSelectedId}
+                onToggle={handleToggle}
+                onDelete={handleDelete}
+                onToggleMyDay={handleToggleMyDay}
+                onToggleImportant={handleToggleImportant}
+                currentUserId={user?.id ?? ''}
+              />
             ) : viewMode === 'list' ? (
               <ListView
                 tasks={filteredTasks}
@@ -1850,9 +2066,12 @@ export default function TasksPage() {
                 onToggle={handleToggle}
                 onDelete={handleDelete}
                 onCreated={handleTaskCreated}
+                onToggleMyDay={handleToggleMyDay}
+                onToggleImportant={handleToggleImportant}
                 listId={activeListId}
                 showUser={sidebarView === 'team'}
                 groupBy={groupBy}
+                showDone={sidebarView === 'all' ? showDone : undefined}
               />
             ) : viewMode === 'board' ? (
               <BoardView
@@ -1862,6 +2081,8 @@ export default function TasksPage() {
                 onToggle={handleToggle}
                 onDelete={handleDelete}
                 onCreated={handleTaskCreated}
+                onToggleMyDay={handleToggleMyDay}
+                onToggleImportant={handleToggleImportant}
                 groupBy={groupBy}
               />
             ) : viewMode === 'calendar' ? (
