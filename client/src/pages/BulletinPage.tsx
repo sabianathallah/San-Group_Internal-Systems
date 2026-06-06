@@ -11,6 +11,9 @@ import { cn } from '@/lib/cn';
 // ── Types ──────────────────────────────────────────────────
 type BulletinCategory = 'ANNOUNCEMENT' | 'HOLIDAY' | 'MAINTENANCE' | 'EVENT' | 'GENERAL';
 type BulletinPriority = 'NORMAL' | 'IMPORTANT' | 'URGENT';
+type AudienceType     = 'ALL' | 'DIVISION' | 'CUSTOM';
+
+interface DivisionOption { id: string; name: string; color: string }
 
 interface Bulletin {
   id: string;
@@ -19,11 +22,13 @@ interface Bulletin {
   category: BulletinCategory;
   priority: BulletinPriority;
   isPublished: boolean;
+  audienceType: AudienceType;
   publishedAt: string | null;
   expiresAt: string | null;
   createdAt: string;
   isRead: boolean;
-  author: { id: string; fullName: string };
+  author: { id: string; fullName: string; divisionId?: string };
+  audiences: { division: { id: string; name: string; color: string } }[];
   _count: { readStatus: number };
 }
 
@@ -289,7 +294,7 @@ function BulletinCard({ bulletin: b, isSelected, isAdmin, onClick, onEdit, onDel
           <p className={cn('text-sm font-medium text-gray-800 leading-snug truncate', !b.isRead && 'font-semibold')}>
             {b.title}
           </p>
-          <div className="flex items-center gap-2 mt-1">
+          <div className="flex items-center gap-2 mt-1 flex-wrap">
             <span className="text-xs text-gray-400">{categoryLabel(b.category)}</span>
             {b.publishedAt && (
               <span className="text-xs text-gray-400">{formatDate(b.publishedAt)}</span>
@@ -298,6 +303,12 @@ function BulletinCard({ bulletin: b, isSelected, isAdmin, onClick, onEdit, onDel
               <span className="text-xs font-medium text-warning bg-warning-light px-1.5 py-0.5 rounded">
                 Draft
               </span>
+            )}
+            {b.audienceType === 'DIVISION' && (
+              <span className="text-xs text-blue-500 bg-blue-50 px-1.5 py-0.5 rounded">Divisi</span>
+            )}
+            {b.audienceType === 'CUSTOM' && (
+              <span className="text-xs text-purple-500 bg-purple-50 px-1.5 py-0.5 rounded">Kustom</span>
             )}
           </div>
         </div>
@@ -415,32 +426,52 @@ function BulletinFormModal({ bulletin, onClose, onSaved }: {
   bulletin: Bulletin | null; onClose: () => void; onSaved: () => void;
 }) {
   const isEdit = !!bulletin;
-  const [loading,   setLoading]   = useState(false);
-  const [error,     setError]     = useState<string | null>(null);
-  const [title,     setTitle]     = useState(bulletin?.title      ?? '');
-  const [content,   setContent]   = useState(bulletin?.content    ?? '');
-  const [category,  setCategory]  = useState<BulletinCategory>(bulletin?.category ?? 'GENERAL');
-  const [priority,  setPriority]  = useState<BulletinPriority>(bulletin?.priority ?? 'NORMAL');
-  const [published, setPublished] = useState(bulletin?.isPublished ?? false);
-  const [expiresAt, setExpiresAt] = useState(
+  const [loading,          setLoading]          = useState(false);
+  const [error,            setError]            = useState<string | null>(null);
+  const [title,            setTitle]            = useState(bulletin?.title      ?? '');
+  const [content,          setContent]          = useState(bulletin?.content    ?? '');
+  const [category,         setCategory]         = useState<BulletinCategory>(bulletin?.category ?? 'GENERAL');
+  const [priority,         setPriority]         = useState<BulletinPriority>(bulletin?.priority ?? 'NORMAL');
+  const [published,        setPublished]        = useState(bulletin?.isPublished ?? false);
+  const [expiresAt,        setExpiresAt]        = useState(
     bulletin?.expiresAt ? bulletin.expiresAt.slice(0, 10) : '',
   );
+  const [audienceType,     setAudienceType]     = useState<AudienceType>(bulletin?.audienceType ?? 'ALL');
+  const [divisions,        setDivisions]        = useState<DivisionOption[]>([]);
+  const [selectedDivIds,   setSelectedDivIds]   = useState<string[]>(
+    bulletin?.audiences?.map((a) => a.division.id) ?? [],
+  );
+
+  useEffect(() => {
+    api.get('/divisions').then((res) => setDivisions(res.data.data ?? [])).catch(() => {});
+  }, []);
+
+  function toggleDivision(divId: string) {
+    setSelectedDivIds((prev) =>
+      prev.includes(divId) ? prev.filter((d) => d !== divId) : [...prev, divId],
+    );
+  }
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!title.trim())   { setError('Judul wajib diisi'); return; }
     if (!content.trim()) { setError('Konten wajib diisi'); return; }
+    if (audienceType === 'CUSTOM' && selectedDivIds.length === 0) {
+      setError('Pilih minimal satu divisi untuk audience kustom'); return;
+    }
 
     setLoading(true);
     setError(null);
     try {
-      const payload = {
+      const payload: Record<string, unknown> = {
         title: title.trim(),
         content: content.trim(),
         category,
         priority,
         isPublished: published,
         expiresAt: expiresAt ? new Date(expiresAt).toISOString() : null,
+        audienceType,
+        audienceDivisionIds: audienceType === 'CUSTOM' ? selectedDivIds : [],
       };
       if (isEdit) {
         await api.patch(`/bulletins/${bulletin.id}`, payload);
@@ -515,6 +546,44 @@ function BulletinFormModal({ bulletin, onClose, onSaved }: {
               </select>
             </div>
           </div>
+
+          <div className="space-y-1">
+            <label className="block text-sm font-medium text-gray-700">Kirim ke</label>
+            <select value={audienceType} onChange={(e) => setAudienceType(e.target.value as AudienceType)}
+              className="w-full h-9 px-3 text-sm border border-gray-300 rounded bg-white focus:border-navy focus:outline-none focus:ring-2 focus:ring-navy-50"
+            >
+              <option value="ALL">Semua Orang</option>
+              <option value="DIVISION">Divisi Penulis</option>
+              <option value="CUSTOM">Pilih Divisi...</option>
+            </select>
+          </div>
+
+          {audienceType === 'CUSTOM' && (
+            <div className="space-y-1">
+              <label className="block text-sm font-medium text-gray-700">Pilih Divisi</label>
+              <div className="flex flex-wrap gap-1.5 p-2 border border-gray-300 rounded bg-white max-h-28 overflow-y-auto">
+                {divisions.map((div) => (
+                  <button
+                    key={div.id}
+                    type="button"
+                    onClick={() => toggleDivision(div.id)}
+                    className={cn(
+                      'px-2.5 py-1 text-xs rounded-full border transition-colors',
+                      selectedDivIds.includes(div.id)
+                        ? 'text-white border-transparent'
+                        : 'text-gray-600 border-gray-200 bg-gray-50 hover:bg-gray-100',
+                    )}
+                    style={selectedDivIds.includes(div.id) ? { backgroundColor: div.color, borderColor: div.color } : {}}
+                  >
+                    {div.name}
+                  </button>
+                ))}
+                {divisions.length === 0 && (
+                  <span className="text-xs text-gray-400 p-1">Memuat divisi...</span>
+                )}
+              </div>
+            </div>
+          )}
 
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">

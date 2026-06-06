@@ -38,7 +38,7 @@ export const taskFilterSchema = z.object({
     search:   z.string().optional(),
     status:   z.nativeEnum(TaskStatus).optional(),
     priority: z.nativeEnum(TaskPriority).optional(),
-    view:     z.enum(['my_day', 'assigned', 'important', 'all', 'list']).optional(),
+    view:     z.enum(['my_day', 'assigned', 'important', 'planned', 'all', 'list']).optional(),
     listId:   z.string().optional(),
     userId:   z.string().optional(),
   }),

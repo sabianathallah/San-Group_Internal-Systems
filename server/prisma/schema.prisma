@@ -62,6 +62,18 @@ enum NotificationType {
   TASK_OVERDUE
 }
 
+enum TaskVisibility {
+  PRIVATE
+  DIVISION
+  PUBLIC
+}
+
+enum AudienceType {
+  ALL
+  DIVISION
+  CUSTOM
+}
+
 // ============================================================
 // PHASE 1 — ACTIVE TABLES
 // ============================================================
@@ -78,8 +90,10 @@ model Division {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  users User[]
-  roles Role[]
+  users            User[]
+  roles            Role[]
+  bulletinAudiences BulletinAudience[]
+  dbFolders        DatabaseFolder[]    @relation("FolderDivision")
 
   @@map("divisions")
 }
@@ -98,7 +112,8 @@ model Role {
   divisionId  String?
   division    Division? @relation(fields: [divisionId], references: [id], onDelete: SetNull)
 
-  users User[]
+  users          User[]
+  rolePermission RolePermission?
 
   @@map("roles")
   @@index([divisionId])
@@ -138,6 +153,7 @@ model User {
   databaseLinks      DatabaseLink[]
   databaseFolders    DatabaseFolder[]
   taskComments       TaskComment[]
+  grantedShares      ResourceShare[]
 
   @@index([email])
   @@index([username])
@@ -185,6 +201,7 @@ model Task {
   dueDate          DateTime?
   completedAt      DateTime?
   isPrivate        Boolean           @default(false)
+  visibility       TaskVisibility    @default(DIVISION)
   assignmentStatus AssignmentStatus?
   assignmentNote   String?
   position         Int               @default(0)
@@ -287,8 +304,9 @@ model Bulletin {
   content     String
   category    BulletinCategory @default(GENERAL)
   priority    BulletinPriority @default(NORMAL)
-  isPublished Boolean          @default(false)
-  publishedAt DateTime?
+  isPublished  Boolean          @default(false)
+  audienceType AudienceType     @default(ALL)
+  publishedAt  DateTime?
   expiresAt   DateTime?
   createdAt   DateTime         @default(now())
   updatedAt   DateTime         @updatedAt
@@ -298,6 +316,7 @@ model Bulletin {
 
   attachments BulletinAttachment[]
   readStatus  BulletinReadStatus[]
+  audiences   BulletinAudience[]
 
   @@index([authorId])
   @@index([category])
@@ -351,7 +370,11 @@ model DatabaseFolder {
   createdBy   User          @relation(fields: [createdById], references: [id], onDelete: Cascade)
   links       DatabaseLink[]
 
+  divisionId  String?
+  division    Division?      @relation("FolderDivision", fields: [divisionId], references: [id], onDelete: SetNull)
+
   @@index([createdById])
+  @@index([divisionId])
 }
 
 model DatabaseLink {
@@ -394,6 +417,45 @@ model Notification {
   @@index([actorId])
   @@index([isRead])
   @@index([type])
+}
+
+model RolePermission {
+  id          String   @id @default(uuid())
+  roleId      String   @unique
+  role        Role     @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permissions Json     @default("{}")
+  updatedAt   DateTime @updatedAt
+
+  @@map("role_permissions")
+}
+
+model BulletinAudience {
+  id         String   @id @default(uuid())
+  bulletinId String
+  bulletin   Bulletin @relation(fields: [bulletinId], references: [id], onDelete: Cascade)
+  divisionId String
+  division   Division @relation(fields: [divisionId], references: [id], onDelete: Cascade)
+
+  @@unique([bulletinId, divisionId])
+  @@index([bulletinId])
+  @@index([divisionId])
+  @@map("bulletin_audiences")
+}
+
+model ResourceShare {
+  id           String   @id @default(uuid())
+  resourceType String
+  resourceId   String
+  targetType   String
+  targetId     String
+  grantedById  String
+  grantedBy    User     @relation(fields: [grantedById], references: [id], onDelete: Cascade)
+  createdAt    DateTime @default(now())
+
+  @@unique([resourceType, resourceId, targetType, targetId])
+  @@index([resourceType, resourceId])
+  @@index([grantedById])
+  @@map("resource_shares")
 }
 
 // ============================================================

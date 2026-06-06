@@ -1,5 +1,6 @@
 import { prisma } from '@/config/database';
 import { AppError } from '@/middlewares/errorHandler.middleware';
+import { ensureDefaultPermissions } from '@/services/permission.service';
 
 export async function listRolesService(divisionId?: string) {
   return prisma.role.findMany({
@@ -46,7 +47,7 @@ export async function createRoleService(data: {
     if (!division) throw new AppError('Divisi tidak ditemukan', 404);
   }
 
-  return prisma.role.create({
+  const role = await prisma.role.create({
     data: {
       name:        data.name,
       slug:        data.slug.toUpperCase(),
@@ -61,6 +62,11 @@ export async function createRoleService(data: {
       _count: { select: { users: true } },
     },
   });
+
+  // Ensure permission record exists for new role
+  await ensureDefaultPermissions(role.id, role.level).catch(() => {});
+
+  return role;
 }
 
 export async function updateRoleService(

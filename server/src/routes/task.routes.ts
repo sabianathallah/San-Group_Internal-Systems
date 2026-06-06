@@ -7,6 +7,7 @@ import {
   addLink, deleteLink,
 } from '@/controllers/task.controller';
 import { authenticate } from '@/middlewares/auth.middleware';
+import { checkPerm } from '@/middlewares/permission.middleware';
 import { validate } from '@/middlewares/validate.middleware';
 import { uuidParamSchema } from '@/validations/common.validation';
 import {
@@ -21,12 +22,12 @@ router.use(authenticate);
 router.get('/team',          listTeamTasks);
 router.get('/pending-count', getPendingCount);
 
-router.get('/',    validate(taskFilterSchema, ['query']), listTasks);
-router.post('/',   validate(createTaskSchema), createTask);
+router.get('/',    checkPerm('task', 'view'),   validate(taskFilterSchema, ['query']), listTasks);
+router.post('/',   checkPerm('task', 'create'), validate(createTaskSchema), createTask);
 
-router.get('/:id',    validate(uuidParamSchema, ['params']), getTaskById);
-router.patch('/:id',  validate(uuidParamSchema, ['params']), validate(updateTaskSchema), updateTask);
-router.delete('/:id', validate(uuidParamSchema, ['params']), deleteTask);
+router.get('/:id',    checkPerm('task', 'view'),   validate(uuidParamSchema, ['params']), getTaskById);
+router.patch('/:id',  checkPerm('task', 'edit'),   validate(uuidParamSchema, ['params']), validate(updateTaskSchema), updateTask);
+router.delete('/:id', checkPerm('task', 'delete'), validate(uuidParamSchema, ['params']), deleteTask);
 
 router.post('/:id/accept', validate(uuidParamSchema, ['params']), acceptTask);
 router.post('/:id/reject', validate(uuidParamSchema, ['params']), validate(rejectTaskSchema), rejectTask);

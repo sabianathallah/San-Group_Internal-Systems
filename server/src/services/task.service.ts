@@ -1,4 +1,4 @@
-import { Prisma, TaskStatus, TaskPriority, TaskCategory, AssignmentStatus, NotificationType } from '@prisma/client';
+import { Prisma, TaskStatus, TaskPriority, TaskCategory, AssignmentStatus, NotificationType, TaskVisibility } from '@prisma/client';
 import { ParsedQs } from 'qs';
 import { prisma } from '@/config/database';
 import { parsePagination, buildMeta } from '@/helpers/pagination';
@@ -15,7 +15,7 @@ const USER_MINI = { id: true, fullName: true, avatar: true } as const;
 
 const TASK_SELECT = {
   id: true, title: true, description: true, status: true, priority: true,
-  category: true, dueDate: true, completedAt: true, isPrivate: true,
+  category: true, dueDate: true, completedAt: true, isPrivate: true, visibility: true,
   assignmentStatus: true, assignmentNote: true, position: true,
   createdAt: true, updatedAt: true,
   creator:  { select: USER_MINI },
@@ -55,60 +55,74 @@ async function notify(data: {
 
 // ── List tasks ─────────────────────────────────────────────
 export async function listTasksService(
-  userId: string, roleLevel: number, query: ParsedQs,
+  userId: string,
+  roleLevel: number,
+  divisionId: string | undefined,
+  permScope: string,
+  viewPrivate: boolean,
+  query: ParsedQs,
 ) {
   const { page, limit, skip } = parsePagination(query, { createdAt: 'desc' });
   const view = typeof query.view === 'string' ? query.view : 'all';
 
-  const base: Prisma.TaskWhereInput = {
-    parentTaskId: null,
-    ...privacyFilter(userId, roleLevel),
-  };
+  const base: Prisma.TaskWhereInput = { parentTaskId: null };
+  const andConditions: Prisma.TaskWhereInput[] = [];
 
-  // View-specific filters
   if (view === 'my_day') {
     base.category = TaskCategory.MY_DAY;
-    base.AND      = [{ OR: [{ userId }, { assignedToId: userId }] }];
-    delete (base as Record<string, unknown>).OR;
+    andConditions.push({ OR: [{ userId }, { assignedToId: userId }] });
   } else if (view === 'assigned') {
     base.assignedToId = userId;
   } else if (view === 'important') {
     base.userId   = userId;
     base.category = TaskCategory.IMPORTANT;
   } else if (view === 'planned') {
-    base.userId   = userId;
-    base.dueDate  = { not: null };
-    base.status   = { not: TaskStatus.DONE };
+    base.userId  = userId;
+    base.dueDate = { not: null };
+    base.status  = { not: TaskStatus.DONE };
   } else if (view === 'list' && typeof query.listId === 'string') {
     base.listId = query.listId;
-    base.AND = [{ OR: [{ userId }, { assignedToId: userId }] }];
-    if (!canManage(roleLevel)) {
-      (base.AND as Prisma.TaskWhereInput[]).push({ OR: [{ isPrivate: false }, { isPrivate: true, userId }] });
+    andConditions.push({ OR: [{ userId }, { assignedToId: userId }] });
+    if (!viewPrivate) {
+      andConditions.push({ OR: [{ isPrivate: false }, { userId }, { assignedToId: userId }] });
     }
-    delete (base as Record<string, unknown>).OR;
   } else {
-    // all — own or assigned
-    if (!canManage(roleLevel)) {
-      base.AND = [
-        { OR: [{ userId }, { assignedToId: userId }] },
-        { OR: [{ isPrivate: false }, { isPrivate: true, userId }] },
-      ];
-      delete (base as Record<string, unknown>).OR;
-    } else if (typeof query.userId === 'string') {
-      base.OR = [{ userId: query.userId }, { assignedToId: query.userId }];
+    // 'all' view — apply permission scope
+    if (permScope === 'own') {
+      andConditions.push({ OR: [{ userId }, { assignedToId: userId }] });
+    } else if (permScope === 'division') {
+      andConditions.push({
+        OR: [
+          { userId },
+          { assignedToId: userId },
+          {
+            visibility: { in: [TaskVisibility.DIVISION, TaskVisibility.PUBLIC] },
+            creator: { divisionId: divisionId ?? '' },
+          },
+        ],
+      });
+      if (!viewPrivate) {
+        andConditions.push({ OR: [{ isPrivate: false }, { userId }, { assignedToId: userId }] });
+      }
     } else {
-      base.OR = [{ userId }, { assignedToId: userId }];
+      // permScope === 'all'
+      if (typeof query.userId === 'string') {
+        andConditions.push({ OR: [{ userId: query.userId }, { assignedToId: query.userId }] });
+      }
+      if (!viewPrivate) {
+        andConditions.push({ OR: [{ isPrivate: false }, { userId }, { assignedToId: userId }] });
+      }
     }
   }
 
-  // Common filters
+  if (andConditions.length > 0) base.AND = andConditions;
+
   const where = { ...base };
   if (query.status)   where.status   = query.status as TaskStatus;
   if (query.priority) where.priority = query.priority as TaskPriority;
   if (query.search && typeof query.search === 'string') {
     const s = { contains: query.search, mode: 'insensitive' as const };
-    const sf = [{ title: s }, { description: s }];
-    where.AND = [...((where.AND as Prisma.TaskWhereInput[] | undefined) ?? []), { OR: sf }];
+    where.AND = [...((where.AND as Prisma.TaskWhereInput[] | undefined) ?? []), { OR: [{ title: s }, { description: s }] }];
   }
 
   const [tasks, total] = await prisma.$transaction([
@@ -172,7 +186,9 @@ export async function listTeamTasksService(
 }
 
 // ── Get single task ────────────────────────────────────────
-export async function getTaskByIdService(id: string, userId: string, roleLevel: number) {
+export async function getTaskByIdService(
+  id: string, userId: string, permScope: string, viewPrivate: boolean,
+) {
   const task = await prisma.task.findUnique({
     where: { id },
     select: {
@@ -184,9 +200,10 @@ export async function getTaskByIdService(id: string, userId: string, roleLevel: 
   if (!task) throw new AppError('Task tidak ditemukan', 404);
 
   const isOwner = task.creator.id === userId || task.assignee?.id === userId;
-  if (!canManage(roleLevel) && !isOwner) {
-    throw new AppError('Akses ditolak', 403);
-  }
+
+  if (permScope === 'own' && !isOwner) throw new AppError('Akses ditolak', 403);
+
+  if (!viewPrivate && task.isPrivate && !isOwner) throw new AppError('Akses ditolak', 403);
 
   return task;
 }
@@ -197,6 +214,7 @@ export async function createTaskService(userId: string, data: {
   priority?: TaskPriority; category?: TaskCategory;
   dueDate?: string | null; assignedToId?: string | null;
   listId?: string | null; parentTaskId?: string | null; isPrivate?: boolean;
+  visibility?: TaskVisibility;
 }) {
   const isAssigned = !!data.assignedToId;
 
@@ -212,6 +230,7 @@ export async function createTaskService(userId: string, data: {
       listId:           data.listId       ?? null,
       parentTaskId:     data.parentTaskId ?? null,
       isPrivate:        data.isPrivate    ?? false,
+      visibility:       data.visibility   ?? TaskVisibility.DIVISION,
       assignmentStatus: isAssigned ? AssignmentStatus.PENDING : null,
       userId,
     },
@@ -233,11 +252,12 @@ export async function createTaskService(userId: string, data: {
 }
 
 // ── Update task ────────────────────────────────────────────
-export async function updateTaskService(id: string, userId: string, roleLevel: number, data: {
+export async function updateTaskService(id: string, userId: string, permScope: string, data: {
   title?: string; description?: string | null; status?: TaskStatus;
   priority?: TaskPriority; category?: TaskCategory;
   dueDate?: string | null; assignedToId?: string | null;
   listId?: string | null; parentTaskId?: string | null; isPrivate?: boolean;
+  visibility?: TaskVisibility;
 }) {
   const task = await prisma.task.findUnique({
     where: { id },
@@ -246,7 +266,7 @@ export async function updateTaskService(id: string, userId: string, roleLevel: n
   if (!task) throw new AppError('Task tidak ditemukan', 404);
 
   const isOwner = task.userId === userId || task.assignedToId === userId;
-  if (!canManage(roleLevel) && !isOwner) throw new AppError('Akses ditolak', 403);
+  if (permScope === 'own' && !isOwner) throw new AppError('Akses ditolak', 403);
 
   // Block marking as DONE if subtasks are not all done
   if (data.status === TaskStatus.DONE) {
@@ -283,6 +303,7 @@ export async function updateTaskService(id: string, userId: string, roleLevel: n
       ...(data.listId           !== undefined && { listId: data.listId }),
       ...(data.parentTaskId     !== undefined && { parentTaskId: data.parentTaskId }),
       ...(data.isPrivate        !== undefined && { isPrivate: data.isPrivate }),
+      ...(data.visibility       !== undefined && { visibility: data.visibility }),
       ...(newAssignmentStatus   !== undefined && { assignmentStatus: newAssignmentStatus }),
       ...(completedAt           !== undefined && { completedAt }),
     },
@@ -304,10 +325,10 @@ export async function updateTaskService(id: string, userId: string, roleLevel: n
 }
 
 // ── Delete task ────────────────────────────────────────────
-export async function deleteTaskService(id: string, userId: string, roleLevel: number) {
+export async function deleteTaskService(id: string, userId: string, permScope: string) {
   const task = await prisma.task.findUnique({ where: { id }, select: { userId: true } });
   if (!task) throw new AppError('Task tidak ditemukan', 404);
-  if (!canManage(roleLevel) && task.userId !== userId) throw new AppError('Akses ditolak', 403);
+  if (permScope === 'own' && task.userId !== userId) throw new AppError('Akses ditolak', 403);
   await prisma.task.delete({ where: { id } });
 }
 

@@ -18,6 +18,8 @@ import notificationRoutes from '@/routes/notification.routes';
 import taskListRoutes from '@/routes/task-list.routes';
 import divisionRoutes from '@/routes/division.routes';
 import roleRoutes from '@/routes/role.routes';
+import permissionRoutes from '@/routes/permission.routes';
+import shareRoutes from '@/routes/share.routes';
 
 const app = express();
 
@@ -72,6 +74,8 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/task-lists', taskListRoutes);
 app.use('/api/divisions', divisionRoutes);
 app.use('/api/roles', roleRoutes);
+app.use('/api/permissions', permissionRoutes);
+app.use('/api/shares', shareRoutes);
 
 // ── Error Handling ─────────────────────────────────────────
 app.use(notFound);

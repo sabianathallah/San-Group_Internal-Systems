@@ -11,8 +11,7 @@ import NotesPage from '@/pages/NotesPage';
 import DatabasePage from '@/pages/DatabasePage';
 import ProfilePage from '@/pages/ProfilePage';
 import UsersPage from '@/pages/admin/UsersPage';
-import DivisionsPage from '@/pages/admin/DivisionsPage';
-import RolesPage from '@/pages/admin/RolesPage';
+import PermissionPage from '@/pages/admin/PermissionPage';
 
 function AdminRoute() {
   const user = useAuthStore((s) => s.user);
@@ -41,9 +40,10 @@ export default function App() {
 
           {/* Admin-only routes */}
           <Route element={<AdminRoute />}>
-            <Route path={ROUTES.ADMIN_USERS}      element={<UsersPage />}      />
-            <Route path={ROUTES.ADMIN_DIVISIONS}  element={<DivisionsPage />}  />
-            <Route path={ROUTES.ADMIN_ROLES}      element={<RolesPage />}      />
+            <Route path={ROUTES.ADMIN_USERS}        element={<UsersPage />}      />
+            <Route path={ROUTES.ADMIN_PERMISSIONS}  element={<PermissionPage />} />
+            <Route path={ROUTES.ADMIN_DIVISIONS}    element={<Navigate to={ROUTES.ADMIN_USERS} replace />} />
+            <Route path={ROUTES.ADMIN_ROLES}        element={<Navigate to={ROUTES.ADMIN_USERS} replace />} />
           </Route>
         </Route>
 

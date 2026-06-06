@@ -8,7 +8,9 @@ import {
 
 export async function listFolders(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
-    const folders = await listFoldersService();
+    const { userId, divisionId } = req.user!;
+    const viewScope = (req.permScope ?? 'all') as import('@/types/permissions').Scope;
+    const folders = await listFoldersService(userId, divisionId, viewScope);
     successResponse(res, folders, 'Folder berhasil diambil');
   } catch (err) { next(err); }
 }

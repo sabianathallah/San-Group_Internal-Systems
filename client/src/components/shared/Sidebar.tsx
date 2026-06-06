@@ -6,8 +6,7 @@ import {
   StickyNote,
   Database,
   Users,
-  Shield,
-  Layers,
+  Lock,
   ChevronLeft,
   ChevronRight,
 } from 'lucide-react';
@@ -31,9 +30,8 @@ const mainNav: NavItem[] = [
 ];
 
 const adminNav: NavItem[] = [
-  { label: 'Manage Users',    to: ROUTES.ADMIN_USERS,      icon: Users  },
-  { label: 'Divisions',       to: ROUTES.ADMIN_DIVISIONS,  icon: Layers },
-  { label: 'Roles',           to: ROUTES.ADMIN_ROLES,      icon: Shield },
+  { label: 'Manage Users', to: ROUTES.ADMIN_USERS,       icon: Users },
+  { label: 'Permissions',  to: ROUTES.ADMIN_PERMISSIONS, icon: Lock  },
 ];
 
 export default function Sidebar() {
@@ -154,7 +152,8 @@ function SidebarLink({ item, open }: { item: NavItem; open: boolean }) {
   );
 }
 
-function getInitials(name: string): string {
+function getInitials(name?: string): string {
+  if (!name) return '?';
   return name
     .split(' ')
     .map((w) => w[0])

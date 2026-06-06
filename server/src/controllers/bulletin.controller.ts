@@ -11,8 +11,8 @@ import {
 
 export async function listBulletins(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
-    const { userId, roleLevel } = req.user!;
-    const { bulletins, meta } = await listBulletinsService(userId, roleLevel, req.query);
+    const { userId, roleLevel, divisionId } = req.user!;
+    const { bulletins, meta } = await listBulletinsService(userId, roleLevel, divisionId, req.query);
     successResponse(res, bulletins, 'Daftar bulletin berhasil diambil', 200, meta);
   } catch (err) { next(err); }
 }

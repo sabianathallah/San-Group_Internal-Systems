@@ -11,8 +11,10 @@ import {
 
 export async function listTasks(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
-    const { userId, roleLevel } = req.user!;
-    const { tasks, meta } = await listTasksService(userId, roleLevel, req.query);
+    const { userId, roleLevel, divisionId } = req.user!;
+    const permScope   = req.permScope  ?? 'own';
+    const viewPrivate = req.viewPrivate ?? false;
+    const { tasks, meta } = await listTasksService(userId, roleLevel, divisionId, permScope, viewPrivate, req.query);
     successResponse(res, tasks, 'Daftar task berhasil diambil', 200, meta);
   } catch (err) { next(err); }
 }
@@ -34,8 +36,10 @@ export async function getPendingCount(req: AuthRequest, res: Response, next: Nex
 
 export async function getTaskById(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
-    const { userId, roleLevel } = req.user!;
-    const task = await getTaskByIdService(String(req.params.id), userId, roleLevel);
+    const { userId } = req.user!;
+    const permScope   = req.permScope  ?? 'own';
+    const viewPrivate = req.viewPrivate ?? false;
+    const task = await getTaskByIdService(String(req.params.id), userId, permScope, viewPrivate);
     successResponse(res, task, 'Detail task berhasil diambil');
   } catch (err) { next(err); }
 }
@@ -49,16 +53,18 @@ export async function createTask(req: AuthRequest, res: Response, next: NextFunc
 
 export async function updateTask(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
-    const { userId, roleLevel } = req.user!;
-    const task = await updateTaskService(String(req.params.id), userId, roleLevel, req.body);
+    const { userId } = req.user!;
+    const permScope = req.permScope ?? 'own';
+    const task = await updateTaskService(String(req.params.id), userId, permScope, req.body);
     successResponse(res, task, 'Task berhasil diperbarui');
   } catch (err) { next(err); }
 }
 
 export async function deleteTask(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
-    const { userId, roleLevel } = req.user!;
-    await deleteTaskService(String(req.params.id), userId, roleLevel);
+    const { userId } = req.user!;
+    const permScope = req.permScope ?? 'own';
+    await deleteTaskService(String(req.params.id), userId, permScope);
     successResponse(res, null, 'Task berhasil dihapus');
   } catch (err) { next(err); }
 }

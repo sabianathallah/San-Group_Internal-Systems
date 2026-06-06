@@ -1,4 +1,4 @@
-import { Prisma, BulletinCategory, BulletinPriority } from '@prisma/client';
+import { Prisma, BulletinCategory, BulletinPriority, AudienceType } from '@prisma/client';
 import { ParsedQs } from 'qs';
 import { prisma } from '@/config/database';
 import { parsePagination, buildMeta } from '@/helpers/pagination';
@@ -11,25 +11,55 @@ const BULLETIN_SELECT = {
   category: true,
   priority: true,
   isPublished: true,
+  audienceType: true,
   publishedAt: true,
   expiresAt: true,
   createdAt: true,
   updatedAt: true,
-  author: { select: { id: true, fullName: true, avatar: true } },
+  author: { select: { id: true, fullName: true, avatar: true, divisionId: true } },
+  audiences: {
+    select: {
+      division: { select: { id: true, name: true, color: true } },
+    },
+  },
   _count: { select: { readStatus: true } },
 } as const;
 
-const isAdmin = (roleLevel: number) => roleLevel <= 2;
-
-export async function listBulletinsService(userId: string, roleLevel: number, query: ParsedQs) {
+export async function listBulletinsService(
+  userId: string,
+  roleLevel: number,
+  userDivisionId: string,
+  query: ParsedQs,
+) {
   const { page, limit, skip } = parsePagination(query, { publishedAt: 'desc' });
+
+  const isAdmin = roleLevel <= 2;
 
   const where: Prisma.BulletinWhereInput = {};
 
   // Non-admin hanya lihat yang published dan belum expired
-  if (!isAdmin(roleLevel)) {
+  if (!isAdmin) {
     where.isPublished = true;
-    where.OR = [{ expiresAt: null }, { expiresAt: { gt: new Date() } }];
+    const expiryFilter: Prisma.BulletinWhereInput = {
+      OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+    };
+
+    // Audience filter for non-admin
+    const audienceFilter: Prisma.BulletinWhereInput = {
+      OR: [
+        { audienceType: AudienceType.ALL },
+        {
+          audienceType: AudienceType.DIVISION,
+          author: { divisionId: userDivisionId },
+        },
+        {
+          audienceType: AudienceType.CUSTOM,
+          audiences: { some: { divisionId: userDivisionId } },
+        },
+      ],
+    };
+
+    where.AND = [expiryFilter, audienceFilter];
   } else if (query.isPublished !== undefined) {
     where.isPublished = query.isPublished === 'true';
   }
@@ -42,14 +72,8 @@ export async function listBulletinsService(userId: string, roleLevel: number, qu
   }
   if (query.search && typeof query.search === 'string') {
     const s = { contains: query.search, mode: 'insensitive' as const };
-    const searchOr = [{ title: s }, { content: s }];
-    if (where.OR) {
-      // Wrap expiry filter + search in AND so both conditions must be satisfied
-      where.AND = [{ OR: where.OR }, { OR: searchOr }];
-      delete where.OR;
-    } else {
-      where.OR = searchOr;
-    }
+    const searchOr: Prisma.BulletinWhereInput[] = [{ title: s }, { content: s }];
+    where.AND = [...((where.AND as Prisma.BulletinWhereInput[] | undefined) ?? []), { OR: searchOr }];
   }
 
   const [bulletins, total] = await prisma.$transaction([
@@ -80,6 +104,8 @@ export async function listBulletinsService(userId: string, roleLevel: number, qu
 }
 
 export async function getBulletinByIdService(id: string, userId: string, roleLevel: number) {
+  const isAdmin = roleLevel <= 2;
+
   const bulletin = await prisma.bulletin.findUnique({
     where: { id },
     select: {
@@ -93,7 +119,7 @@ export async function getBulletinByIdService(id: string, userId: string, roleLev
   });
 
   if (!bulletin) throw new AppError('Bulletin tidak ditemukan', 404);
-  if (!isAdmin(roleLevel) && !bulletin.isPublished) throw new AppError('Bulletin tidak ditemukan', 404);
+  if (!isAdmin && !bulletin.isPublished) throw new AppError('Bulletin tidak ditemukan', 404);
 
   // Auto mark-as-read when staff opens a published bulletin
   if (bulletin.isPublished && bulletin.readStatus.length === 0) {
@@ -113,9 +139,12 @@ export async function createBulletinService(
     priority?: BulletinPriority;
     isPublished?: boolean;
     expiresAt?: string | null;
+    audienceType?: AudienceType;
+    audienceDivisionIds?: string[];
   },
 ) {
   const publishedAt = data.isPublished ? new Date() : null;
+  const audienceType = data.audienceType ?? AudienceType.ALL;
 
   return prisma.bulletin.create({
     data: {
@@ -124,9 +153,16 @@ export async function createBulletinService(
       category:    data.category    ?? BulletinCategory.GENERAL,
       priority:    data.priority    ?? BulletinPriority.NORMAL,
       isPublished: data.isPublished ?? false,
+      audienceType,
       publishedAt,
       expiresAt:   data.expiresAt ? new Date(data.expiresAt) : null,
       authorId,
+      audiences:
+        audienceType === AudienceType.CUSTOM && data.audienceDivisionIds?.length
+          ? {
+              create: data.audienceDivisionIds.map((divisionId) => ({ divisionId })),
+            }
+          : undefined,
     },
     select: BULLETIN_SELECT,
   });
@@ -142,9 +178,14 @@ export async function updateBulletinService(
     priority?: BulletinPriority;
     isPublished?: boolean;
     expiresAt?: string | null;
+    audienceType?: AudienceType;
+    audienceDivisionIds?: string[];
   },
 ) {
-  const exists = await prisma.bulletin.findUnique({ where: { id }, select: { id: true, isPublished: true } });
+  const exists = await prisma.bulletin.findUnique({
+    where: { id },
+    select: { id: true, isPublished: true },
+  });
   if (!exists) throw new AppError('Bulletin tidak ditemukan', 404);
 
   // publishedAt: set when newly published, clear when unpublished
@@ -152,7 +193,7 @@ export async function updateBulletinService(
   if (data.isPublished === true && !exists.isPublished)  publishedAt = new Date();
   if (data.isPublished === false && exists.isPublished)  publishedAt = null;
 
-  return prisma.bulletin.update({
+  const updated = await prisma.bulletin.update({
     where: { id },
     data: {
       ...(data.title       !== undefined && { title: data.title }),
@@ -162,9 +203,26 @@ export async function updateBulletinService(
       ...(data.isPublished !== undefined && { isPublished: data.isPublished }),
       ...(publishedAt      !== undefined && { publishedAt }),
       ...(data.expiresAt   !== undefined && { expiresAt: data.expiresAt ? new Date(data.expiresAt) : null }),
+      ...(data.audienceType !== undefined && { audienceType: data.audienceType }),
     },
     select: BULLETIN_SELECT,
   });
+
+  // Re-sync audience records if audienceType or audienceDivisionIds changed
+  if (data.audienceType !== undefined || data.audienceDivisionIds !== undefined) {
+    await prisma.bulletinAudience.deleteMany({ where: { bulletinId: id } });
+    if (
+      (data.audienceType ?? updated.audienceType) === AudienceType.CUSTOM &&
+      data.audienceDivisionIds?.length
+    ) {
+      await prisma.bulletinAudience.createMany({
+        data: data.audienceDivisionIds.map((divisionId) => ({ bulletinId: id, divisionId })),
+        skipDuplicates: true,
+      });
+    }
+  }
+
+  return updated;
 }
 
 export async function deleteBulletinService(id: string) {

@@ -19,6 +19,7 @@ import { cn } from '@/lib/cn';
 type AssignmentStatus = 'PENDING' | 'ACCEPTED' | 'REJECTED';
 type TaskStatus       = 'TODO' | 'IN_PROGRESS' | 'DONE';
 type TaskPriority     = 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
+type TaskVisibility   = 'PRIVATE' | 'DIVISION' | 'PUBLIC';
 type ViewMode         = 'list' | 'board' | 'calendar' | 'table';
 type SidebarView      = 'my_day' | 'important' | 'planned' | 'assigned' | 'all' | 'team' | `list:${string}`;
 type GroupBy          = 'status' | 'priority' | 'assignee';
@@ -31,7 +32,7 @@ interface Task {
   id: string; title: string; description: string | null;
   status: TaskStatus; priority: TaskPriority; category: string;
   dueDate: string | null; completedAt: string | null;
-  isPrivate: boolean;
+  isPrivate: boolean; visibility: TaskVisibility;
   assignmentStatus: AssignmentStatus | null; assignmentNote: string | null;
   position: number; createdAt: string; updatedAt: string;
   creator: TaskUser; assignee: TaskUser | null;
@@ -1604,10 +1605,11 @@ function CreateTaskModal({ onClose, onCreated, defaultListId }: {
   const [priority,   setPriority]   = useState<TaskPriority>('MEDIUM');
   const [dueDate,    setDueDate]    = useState('');
   const [assignedTo, setAssignedTo] = useState('');
-  const [isPrivate,  setIsPrivate]  = useState(false);
-  const [saving,     setSaving]     = useState(false);
-  const [error,      setError]      = useState('');
-  const [users,      setUsers]      = useState<UserOption[]>([]);
+  const [isPrivate,   setIsPrivate]   = useState(false);
+  const [visibility,  setVisibility]  = useState<TaskVisibility>('DIVISION');
+  const [saving,      setSaving]      = useState(false);
+  const [error,       setError]       = useState('');
+  const [users,       setUsers]       = useState<UserOption[]>([]);
 
   useEffect(() => {
     api.get('/users', { params: { limit: 100 } })
@@ -1620,7 +1622,7 @@ function CreateTaskModal({ onClose, onCreated, defaultListId }: {
     if (!title.trim()) { setError('Judul wajib diisi'); return; }
     setSaving(true); setError('');
     try {
-      const payload: Record<string, unknown> = { title: title.trim(), status, priority, isPrivate };
+      const payload: Record<string, unknown> = { title: title.trim(), status, priority, isPrivate, visibility };
       if (desc.trim())   payload.description = desc.trim();
       if (dueDate)       payload.dueDate      = toLocalISO(dueDate);
       if (assignedTo)    payload.assignedToId = assignedTo;
@@ -1680,11 +1682,22 @@ function CreateTaskModal({ onClose, onCreated, defaultListId }: {
             </div>
           </div>
 
-          <label className="flex items-center gap-2 cursor-pointer select-none">
-            <input type="checkbox" checked={isPrivate} onChange={(e) => setIsPrivate(e.target.checked)} className="w-4 h-4 rounded border-gray-300 accent-navy" />
-            <Lock size={13} className="text-gray-400" />
-            <span className="text-xs text-gray-600">Private (hanya saya)</span>
-          </label>
+          <div className="space-y-2">
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Visibilitas</label>
+              <select value={visibility} onChange={(e) => setVisibility(e.target.value as TaskVisibility)}
+                className="w-full text-sm border border-gray-200 rounded px-2.5 py-1.5 outline-none focus:border-navy">
+                <option value="PRIVATE">Hanya Saya &amp; Assignee</option>
+                <option value="DIVISION">Divisi Saya</option>
+                <option value="PUBLIC">Semua (Public)</option>
+              </select>
+            </div>
+            <label className="flex items-center gap-2 cursor-pointer select-none">
+              <input type="checkbox" checked={isPrivate} onChange={(e) => setIsPrivate(e.target.checked)} className="w-4 h-4 rounded border-gray-300 accent-navy" />
+              <Lock size={13} className="text-gray-400" />
+              <span className="text-xs text-gray-600">Private (sembunyikan konten)</span>
+            </label>
+          </div>
 
           {error && <p className="text-xs text-red-500 flex items-center gap-1"><AlertCircle size={12} />{error}</p>}
 
