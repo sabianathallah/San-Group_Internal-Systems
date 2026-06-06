@@ -3,9 +3,8 @@ import { env } from '@/config/env';
 import { generateAccessToken, generateRefreshToken, verifyToken } from '@/helpers/jwt';
 import { hashPassword, comparePassword } from '@/helpers/hash';
 import { AppError } from '@/middlewares/errorHandler.middleware';
-import { Division, Role } from '@prisma/client';
 
-// Fields to always exclude from user queries
+// Fields to always return for user queries (includes role and division relations)
 const USER_SAFE_SELECT = {
   id: true,
   email: true,
@@ -13,19 +12,42 @@ const USER_SAFE_SELECT = {
   fullName: true,
   phone: true,
   avatar: true,
-  role: true,
-  division: true,
   isActive: true,
   lastLoginAt: true,
   createdAt: true,
   updatedAt: true,
+  role:     { select: { id: true, name: true, slug: true, color: true, level: true } },
+  division: { select: { id: true, name: true, slug: true, color: true } },
 } as const;
 
+function buildJwtPayload(user: {
+  id: string; email: string; username: string;
+  role:     { id: string; slug: string; name: string; level: number };
+  division: { id: string; slug: string; name: string };
+}) {
+  return {
+    userId:       user.id,
+    email:        user.email,
+    username:     user.username,
+    roleId:       user.role.id,
+    roleSlug:     user.role.slug,
+    roleName:     user.role.name,
+    roleLevel:    user.role.level,
+    divisionId:   user.division.id,
+    divisionSlug: user.division.slug,
+    divisionName: user.division.name,
+  };
+}
+
 export async function loginService(identifier: string, password: string) {
-  // Find by email or username
+  // Find by email or username (include role+division for JWT)
   const user = await prisma.user.findFirst({
     where: {
       OR: [{ email: identifier }, { username: identifier }],
+    },
+    include: {
+      role:     { select: { id: true, slug: true, name: true, level: true } },
+      division: { select: { id: true, slug: true, name: true } },
     },
   });
 
@@ -42,14 +64,7 @@ export async function loginService(identifier: string, password: string) {
     throw new AppError('Akun Anda telah dinonaktifkan. Hubungi administrator.', 403);
   }
 
-  const payload = {
-    userId:   user.id,
-    email:    user.email,
-    username: user.username,
-    role:     user.role,
-    division: user.division,
-  };
-
+  const payload = buildJwtPayload(user);
   const accessToken = generateAccessToken(payload);
   const refreshToken = generateRefreshToken(payload);
 
@@ -70,7 +85,6 @@ export async function loginService(identifier: string, password: string) {
   ]);
 
   // Return user without password
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { password: _pw, ...safeUser } = user;
 
   return { accessToken, refreshToken, user: safeUser };
@@ -82,8 +96,8 @@ export async function registerService(data: {
   password: string;
   fullName: string;
   phone?: string;
-  role?: Role;
-  division: Division;
+  roleId: string;
+  divisionId: string;
 }) {
   const existing = await prisma.user.findFirst({
     where: { OR: [{ email: data.email }, { username: data.username }] },
@@ -94,17 +108,26 @@ export async function registerService(data: {
     throw new AppError(`${field} sudah terdaftar`, 409);
   }
 
+  // Validate role and division exist
+  const [role, division] = await Promise.all([
+    prisma.role.findUnique({ where: { id: data.roleId } }),
+    prisma.division.findUnique({ where: { id: data.divisionId } }),
+  ]);
+
+  if (!role) throw new AppError('Role tidak ditemukan', 404);
+  if (!division) throw new AppError('Divisi tidak ditemukan', 404);
+
   const hashed = await hashPassword(data.password);
 
   const user = await prisma.user.create({
     data: {
-      email: data.email,
+      email:    data.email,
       username: data.username,
       password: hashed,
       fullName: data.fullName,
-      phone: data.phone,
-      role: data.role ?? Role.STAFF,
-      division: data.division,
+      phone:    data.phone,
+      roleId:   data.roleId,
+      divisionId: data.divisionId,
     },
     select: USER_SAFE_SELECT,
   });
@@ -127,20 +150,19 @@ export async function refreshTokenService(token: string) {
     throw new AppError('Sesi sudah berakhir, silakan login ulang', 401);
   }
 
-  // Confirm user still active
-  const user = await prisma.user.findUnique({ where: { id: payload.userId } });
+  // Confirm user still active, include role+division for new JWT
+  const user = await prisma.user.findUnique({
+    where: { id: payload.userId },
+    include: {
+      role:     { select: { id: true, slug: true, name: true, level: true } },
+      division: { select: { id: true, slug: true, name: true } },
+    },
+  });
   if (!user || !user.isActive) {
     throw new AppError('Akun tidak aktif', 403);
   }
 
-  const newPayload = {
-    userId:   user.id,
-    email:    user.email,
-    username: user.username,
-    role:     user.role,
-    division: user.division,
-  };
-
+  const newPayload = buildJwtPayload(user);
   const newAccessToken = generateAccessToken(newPayload);
   const newRefreshToken = generateRefreshToken(newPayload);
 

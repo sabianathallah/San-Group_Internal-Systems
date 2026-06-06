@@ -11,51 +11,6 @@ datasource db {
 // ENUMS
 // ============================================================
 
-enum Role {
-  SUPER_ADMIN
-  ADMIN
-  OWNER
-  DIRECTOR
-  PROPERTY_MANAGER
-  LEASING_MANAGER
-  LEASING_ASSISTANT
-  LEASING_STAFF
-  TENANT_RELATIONS
-  FACILITY_MANAGER
-  CHIEF_ENGINEER
-  ENGINEER
-  FINANCE_MANAGER
-  ASST_FINANCE_MANAGER
-  ACCOUNTANT
-  LEGAL_HEAD
-  LEGAL_SPV
-  LEGAL_STAFF
-  TAX_STAFF
-  HR_MANAGER
-  HR_SPV
-  HR_STAFF
-  FNB_MANAGER
-  GA_MANAGER
-  STAFF
-}
-
-enum Division {
-  MANAGEMENT
-  RETAIL
-  HOTEL
-  HOUSING
-  FNB
-  GENERAL
-  LEASING
-  PROPERTY
-  ENGINEERING
-  FINANCE
-  LEGAL
-  TAX
-  HR
-  GA
-}
-
 enum TaskStatus {
   TODO
   IN_PROGRESS
@@ -102,11 +57,51 @@ enum NotificationType {
   BULLETIN_NEW
   BULLETIN_URGENT
   SYSTEM
+  TASK_DUE_SOON
+  TASK_OVERDUE
 }
 
 // ============================================================
 // PHASE 1 — ACTIVE TABLES
 // ============================================================
+
+// --- Division & Role (dynamic tables) ---
+
+model Division {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  slug        String   @unique
+  color       String   @default("#6366f1")
+  description String?
+  position    Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  users User[]
+  roles Role[]
+
+  @@map("divisions")
+}
+
+model Role {
+  id          String    @id @default(uuid())
+  name        String    @unique
+  slug        String    @unique
+  color       String    @default("#6366f1")
+  level       Int       @default(6)
+  description String?
+  position    Int       @default(0)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  divisionId  String?
+  division    Division? @relation(fields: [divisionId], references: [id], onDelete: SetNull)
+
+  users User[]
+
+  @@map("roles")
+  @@index([divisionId])
+}
 
 // --- User & Auth ---
 
@@ -118,12 +113,15 @@ model User {
   fullName    String
   phone       String?
   avatar      String?
-  role        Role      @default(STAFF)
-  division    Division
   isActive    Boolean   @default(true)
   lastLoginAt DateTime?
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
+
+  roleId     String
+  role       Role     @relation(fields: [roleId], references: [id])
+  divisionId String
+  division   Division @relation(fields: [divisionId], references: [id])
 
   // Relations
   refreshTokens      RefreshToken[]
@@ -142,8 +140,8 @@ model User {
 
   @@index([email])
   @@index([username])
-  @@index([role])
-  @@index([division])
+  @@index([roleId])
+  @@index([divisionId])
 }
 
 model RefreshToken {
@@ -406,217 +404,33 @@ model Notification {
 // enum WorkOrderPriority { LOW, MEDIUM, HIGH, URGENT }
 // enum WorkOrderCategory { ELECTRICAL, PLUMBING, HVAC, CIVIL, CLEANING, SECURITY, OTHER }
 //
-// model WorkOrder {
-//   id           String            @id @default(uuid())
-//   code         String            @unique
-//   title        String
-//   description  String
-//   category     WorkOrderCategory
-//   status       WorkOrderStatus   @default(OPEN)
-//   priority     WorkOrderPriority @default(MEDIUM)
-//   location     String?
-//   reportedById String
-//   assignedToId String?
-//   dueDate      DateTime?
-//   closedAt     DateTime?
-//   createdAt    DateTime          @default(now())
-//   updatedAt    DateTime          @updatedAt
-//   history      WorkOrderHistory[]
-//   attachments  WorkOrderAttachment[]
-// }
-//
-// model WorkOrderHistory {
-//   id          String   @id @default(uuid())
-//   workOrderId String
-//   changedById String
-//   fromStatus  String
-//   toStatus    String
-//   notes       String?
-//   createdAt   DateTime @default(now())
-// }
-//
-// model WorkOrderAttachment {
-//   id           String   @id @default(uuid())
-//   workOrderId  String
-//   fileName     String
-//   filePath     String
-//   fileSize     Int
-//   mimeType     String
-//   uploadedById String
-//   createdAt    DateTime @default(now())
-// }
+// model WorkOrder { ... }
+// model WorkOrderHistory { ... }
+// model WorkOrderAttachment { ... }
 
 // --- HRIS ---
-// enum AttendanceType { CLOCK_IN, CLOCK_OUT }
-// enum LeaveStatus   { PENDING, APPROVED, REJECTED, CANCELLED }
-// enum LeaveType     { ANNUAL, SICK, PERSONAL, UNPAID }
-//
-// model Attendance {
-//   id        String         @id @default(uuid())
-//   userId    String
-//   type      AttendanceType
-//   timestamp DateTime
-//   latitude  Float?
-//   longitude Float?
-//   photo     String?
-//   notes     String?
-//   createdAt DateTime       @default(now())
-// }
-//
-// model Leave {
-//   id           String      @id @default(uuid())
-//   userId       String
-//   type         LeaveType
-//   status       LeaveStatus @default(PENDING)
-//   startDate    DateTime
-//   endDate      DateTime
-//   totalDays    Int
-//   reason       String
-//   approvedById String?
-//   approvedAt   DateTime?
-//   createdAt    DateTime    @default(now())
-//   updatedAt    DateTime    @updatedAt
-// }
-//
-// model LeaveBalance {
-//   id        String    @id @default(uuid())
-//   userId    String
-//   year      Int
-//   leaveType LeaveType
-//   total     Int
-//   used      Int       @default(0)
-//   remaining Int
-// }
-//
-// model Timetable {
-//   id        String   @id @default(uuid())
-//   userId    String
-//   date      DateTime
-//   shiftIn   String
-//   shiftOut  String
-//   notes     String?
-//   createdAt DateTime @default(now())
-// }
+// model Attendance { ... }
+// model Leave { ... }
+// model LeaveBalance { ... }
+// model Timetable { ... }
 
 // ============================================================
 // PHASE 3 — COMMENTED OUT (uncomment saat Phase 3 dimulai)
 // ============================================================
 
 // --- Inventory & Asset Management ---
-// enum AssetStatus    { ACTIVE, UNDER_MAINTENANCE, RETIRED, LOST }
-// enum AssetCondition { EXCELLENT, GOOD, FAIR, POOR }
-//
-// model AssetCategory {
-//   id     String  @id @default(uuid())
-//   name   String
-//   code   String  @unique
-//   assets Asset[]
-// }
-//
-// model Asset {
-//   id            String         @id @default(uuid())
-//   code          String         @unique
-//   name          String
-//   categoryId    String
-//   status        AssetStatus    @default(ACTIVE)
-//   condition     AssetCondition @default(GOOD)
-//   location      String?
-//   purchaseDate  DateTime?
-//   purchasePrice Decimal?
-//   assignedToId  String?
-//   notes         String?
-//   createdAt     DateTime       @default(now())
-//   updatedAt     DateTime       @updatedAt
-//   history       AssetHistory[]
-// }
-//
-// model AssetHistory {
-//   id          String   @id @default(uuid())
-//   assetId     String
-//   changedById String
-//   action      String
-//   notes       String?
-//   createdAt   DateTime @default(now())
-// }
+// model AssetCategory { ... }
+// model Asset { ... }
+// model AssetHistory { ... }
 
 // --- Tenant Database ---
-// enum TenantStatus { ACTIVE, INACTIVE, PROSPECT }
-//
-// model Tenant {
-//   id            String       @id @default(uuid())
-//   companyName   String
-//   contactPerson String
-//   email         String
-//   phone         String
-//   floor         String?
-//   unit          String?
-//   status        TenantStatus @default(ACTIVE)
-//   leaseStart    DateTime?
-//   leaseEnd      DateTime?
-//   createdAt     DateTime     @default(now())
-//   updatedAt     DateTime     @updatedAt
-//   documents     TenantDocument[]
-//   reminders     TenantReminder[]
-// }
-//
-// model TenantDocument {
-//   id        String   @id @default(uuid())
-//   tenantId  String
-//   name      String
-//   filePath  String
-//   fileSize  Int
-//   mimeType  String
-//   createdAt DateTime @default(now())
-// }
-//
-// model TenantReminder {
-//   id          String   @id @default(uuid())
-//   tenantId    String
-//   title       String
-//   dueDate     DateTime
-//   isResolved  Boolean  @default(false)
-//   createdById String
-//   createdAt   DateTime @default(now())
-// }
+// model Tenant { ... }
+// model TenantDocument { ... }
+// model TenantReminder { ... }
 
 // --- Meeting Room Booking ---
-// enum BookingStatus { PENDING, CONFIRMED, CANCELLED }
-//
-// model MeetingRoom {
-//   id        String    @id @default(uuid())
-//   name      String
-//   capacity  Int
-//   floor     String?
-//   amenities String?
-//   isActive  Boolean   @default(true)
-//   bookings  Booking[]
-// }
-//
-// model Booking {
-//   id        String        @id @default(uuid())
-//   roomId    String
-//   userId    String
-//   title     String
-//   startTime DateTime
-//   endTime   DateTime
-//   status    BookingStatus @default(PENDING)
-//   notes     String?
-//   createdAt DateTime      @default(now())
-//   updatedAt DateTime      @updatedAt
-// }
+// model MeetingRoom { ... }
+// model Booking { ... }
 
 // --- Utility Tracking ---
-// enum UtilityType { ELECTRICITY, WATER, GAS, INTERNET }
-//
-// model UtilityRecord {
-//   id           String      @id @default(uuid())
-//   type         UtilityType
-//   month        Int
-//   year         Int
-//   reading      Decimal
-//   unit         String
-//   cost         Decimal?
-//   notes        String?
-//   recordedById String
-//   createdAt    DateTime    @default(now())
-// }
+// model UtilityRecord { ... }

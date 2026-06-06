@@ -1,22 +1,13 @@
-import { Prisma, Role, TaskStatus, TaskPriority, TaskCategory, AssignmentStatus, NotificationType } from '@prisma/client';
+import { Prisma, TaskStatus, TaskPriority, TaskCategory, AssignmentStatus, NotificationType } from '@prisma/client';
 import { ParsedQs } from 'qs';
 import { prisma } from '@/config/database';
 import { parsePagination, buildMeta } from '@/helpers/pagination';
 import { AppError } from '@/middlewares/errorHandler.middleware';
 
-// ── Role hierarchy ─────────────────────────────────────────
-const ROLE_LEVEL: Record<string, number> = {
-  OWNER: 1, SUPER_ADMIN: 1, ADMIN: 2, DIRECTOR: 3,
-  PROPERTY_MANAGER: 4, LEASING_MANAGER: 4, FINANCE_MANAGER: 4,
-  HR_MANAGER: 4, FNB_MANAGER: 4, GA_MANAGER: 4, LEGAL_HEAD: 4,
-  LEASING_ASSISTANT: 5, FACILITY_MANAGER: 5, CHIEF_ENGINEER: 5,
-  ASST_FINANCE_MANAGER: 5, LEGAL_SPV: 5, HR_SPV: 5,
-  TENANT_RELATIONS: 6, LEASING_STAFF: 6, ENGINEER: 6,
-  ACCOUNTANT: 6, LEGAL_STAFF: 6, TAX_STAFF: 6, HR_STAFF: 6, STAFF: 6,
-};
-
-function canManage(role: string): boolean {
-  return ['OWNER', 'SUPER_ADMIN', 'ADMIN'].includes(role);
+// ── Role hierarchy helpers ─────────────────────────────────
+// level 1 = Owner/SuperAdmin, 2 = Admin, 3 = Director, 4 = Manager, 5 = Supervisor, 6 = Staff
+function canManage(roleLevel: number): boolean {
+  return roleLevel <= 2;
 }
 
 // ── Select shapes ──────────────────────────────────────────
@@ -35,9 +26,8 @@ const TASK_SELECT = {
 } as const;
 
 // ── Privacy filter helper ──────────────────────────────────
-function privacyFilter(userId: string, role: string): Prisma.TaskWhereInput {
-  if (canManage(role)) return {};
-  // exclude other people's private tasks
+function privacyFilter(userId: string, roleLevel: number): Prisma.TaskWhereInput {
+  if (canManage(roleLevel)) return {};
   return {
     OR: [
       { isPrivate: false },
@@ -65,14 +55,14 @@ async function notify(data: {
 
 // ── List tasks ─────────────────────────────────────────────
 export async function listTasksService(
-  userId: string, role: string, query: ParsedQs,
+  userId: string, roleLevel: number, query: ParsedQs,
 ) {
   const { page, limit, skip } = parsePagination(query, { createdAt: 'desc' });
   const view = typeof query.view === 'string' ? query.view : 'all';
 
   const base: Prisma.TaskWhereInput = {
     parentTaskId: null,
-    ...privacyFilter(userId, role),
+    ...privacyFilter(userId, roleLevel),
   };
 
   // View-specific filters
@@ -93,14 +83,13 @@ export async function listTasksService(
   } else if (view === 'list' && typeof query.listId === 'string') {
     base.listId = query.listId;
     base.AND = [{ OR: [{ userId }, { assignedToId: userId }] }];
-    if (!canManage(role)) {
+    if (!canManage(roleLevel)) {
       (base.AND as Prisma.TaskWhereInput[]).push({ OR: [{ isPrivate: false }, { isPrivate: true, userId }] });
     }
-    // remove top-level privacyFilter to avoid conflict
     delete (base as Record<string, unknown>).OR;
   } else {
     // all — own or assigned
-    if (!canManage(role)) {
+    if (!canManage(roleLevel)) {
       base.AND = [
         { OR: [{ userId }, { assignedToId: userId }] },
         { OR: [{ isPrivate: false }, { isPrivate: true, userId }] },
@@ -134,24 +123,27 @@ export async function listTasksService(
 
 // ── Team tasks ─────────────────────────────────────────────
 export async function listTeamTasksService(
-  userId: string, role: string, division: string, query: ParsedQs,
+  userId: string, roleLevel: number, divisionId: string, query: ParsedQs,
 ) {
   const { page, limit, skip } = parsePagination(query, { createdAt: 'desc' });
 
   let userIds: string[];
-  if (canManage(role)) {
+
+  if (canManage(roleLevel)) {
+    // Admins see all users except themselves
     const users = await prisma.user.findMany({ where: { id: { not: userId } }, select: { id: true } });
     userIds = users.map((u) => u.id);
+  } else if (roleLevel >= 6) {
+    // Staff level — no team view
+    return { tasks: [], meta: buildMeta(0, 1, limit) };
   } else {
-    const myLevel = ROLE_LEVEL[role] ?? 6;
-    const subordinateRoles = Object.entries(ROLE_LEVEL)
-      .filter(([, lvl]) => lvl > myLevel)
-      .map(([r]) => r as Role);
-
-    if (!subordinateRoles.length) return { tasks: [], meta: buildMeta(0, 1, limit) };
-
+    // Managers/supervisors (level 3-5): see same division, lower-level (higher number) roles
     const users = await prisma.user.findMany({
-      where: { division: division as never, role: { in: subordinateRoles }, id: { not: userId } },
+      where: {
+        divisionId,
+        id: { not: userId },
+        role: { level: { gt: roleLevel } },
+      },
       select: { id: true },
     });
     userIds = users.map((u) => u.id);
@@ -181,7 +173,7 @@ export async function listTeamTasksService(
 }
 
 // ── Get single task ────────────────────────────────────────
-export async function getTaskByIdService(id: string, userId: string, role: string) {
+export async function getTaskByIdService(id: string, userId: string, roleLevel: number) {
   const task = await prisma.task.findUnique({
     where: { id },
     select: {
@@ -193,8 +185,7 @@ export async function getTaskByIdService(id: string, userId: string, role: strin
   if (!task) throw new AppError('Task tidak ditemukan', 404);
 
   const isOwner = task.creator.id === userId || task.assignee?.id === userId;
-  if (!canManage(role) && !isOwner) {
-    if (task.isPrivate) throw new AppError('Akses ditolak', 403);
+  if (!canManage(roleLevel) && !isOwner) {
     throw new AppError('Akses ditolak', 403);
   }
 
@@ -243,7 +234,7 @@ export async function createTaskService(userId: string, data: {
 }
 
 // ── Update task ────────────────────────────────────────────
-export async function updateTaskService(id: string, userId: string, role: string, data: {
+export async function updateTaskService(id: string, userId: string, roleLevel: number, data: {
   title?: string; description?: string | null; status?: TaskStatus;
   priority?: TaskPriority; category?: TaskCategory;
   dueDate?: string | null; assignedToId?: string | null;
@@ -256,7 +247,7 @@ export async function updateTaskService(id: string, userId: string, role: string
   if (!task) throw new AppError('Task tidak ditemukan', 404);
 
   const isOwner = task.userId === userId || task.assignedToId === userId;
-  if (!canManage(role) && !isOwner) throw new AppError('Akses ditolak', 403);
+  if (!canManage(roleLevel) && !isOwner) throw new AppError('Akses ditolak', 403);
 
   // Block marking as DONE if subtasks are not all done
   if (data.status === TaskStatus.DONE) {
@@ -275,7 +266,6 @@ export async function updateTaskService(id: string, userId: string, role: string
     data.status === TaskStatus.DONE ? new Date() :
     data.status !== undefined ? null : undefined;
 
-  // Re-assign case
   let newAssignmentStatus: AssignmentStatus | null | undefined;
   if (data.assignedToId !== undefined) {
     newAssignmentStatus = data.assignedToId ? AssignmentStatus.PENDING : null;
@@ -300,7 +290,6 @@ export async function updateTaskService(id: string, userId: string, role: string
     select: TASK_SELECT,
   });
 
-  // Notify new assignee if re-assigned
   if (data.assignedToId && data.assignedToId !== task.assignedToId && data.assignedToId !== userId) {
     const actor = await prisma.user.findUnique({ where: { id: userId }, select: { fullName: true } });
     await notify({
@@ -316,10 +305,10 @@ export async function updateTaskService(id: string, userId: string, role: string
 }
 
 // ── Delete task ────────────────────────────────────────────
-export async function deleteTaskService(id: string, userId: string, role: string) {
+export async function deleteTaskService(id: string, userId: string, roleLevel: number) {
   const task = await prisma.task.findUnique({ where: { id }, select: { userId: true } });
   if (!task) throw new AppError('Task tidak ditemukan', 404);
-  if (!canManage(role) && task.userId !== userId) throw new AppError('Akses ditolak', 403);
+  if (!canManage(roleLevel) && task.userId !== userId) throw new AppError('Akses ditolak', 403);
   await prisma.task.delete({ where: { id } });
 }
 
@@ -386,7 +375,7 @@ export async function rejectTaskService(id: string, userId: string, note: string
 }
 
 // ── Comments ───────────────────────────────────────────────
-export async function listCommentsService(taskId: string, userId: string, role: string) {
+export async function listCommentsService(taskId: string, userId: string, roleLevel: number) {
   const task = await prisma.task.findUnique({
     where: { id: taskId },
     select: { userId: true, assignedToId: true, isPrivate: true },
@@ -394,7 +383,7 @@ export async function listCommentsService(taskId: string, userId: string, role: 
   if (!task) throw new AppError('Task tidak ditemukan', 404);
 
   const isOwner = task.userId === userId || task.assignedToId === userId;
-  if (!canManage(role) && !isOwner) throw new AppError('Akses ditolak', 403);
+  if (!canManage(roleLevel) && !isOwner) throw new AppError('Akses ditolak', 403);
 
   return prisma.taskComment.findMany({
     where: { taskId },
@@ -406,7 +395,7 @@ export async function listCommentsService(taskId: string, userId: string, role: 
   });
 }
 
-export async function addCommentService(taskId: string, userId: string, role: string, content: string) {
+export async function addCommentService(taskId: string, userId: string, roleLevel: number, content: string) {
   const task = await prisma.task.findUnique({
     where: { id: taskId },
     select: { userId: true, assignedToId: true },
@@ -414,7 +403,7 @@ export async function addCommentService(taskId: string, userId: string, role: st
   if (!task) throw new AppError('Task tidak ditemukan', 404);
 
   const isOwner = task.userId === userId || task.assignedToId === userId;
-  if (!canManage(role) && !isOwner) throw new AppError('Akses ditolak', 403);
+  if (!canManage(roleLevel) && !isOwner) throw new AppError('Akses ditolak', 403);
 
   return prisma.taskComment.create({
     data: { content, taskId, userId },
@@ -425,19 +414,19 @@ export async function addCommentService(taskId: string, userId: string, role: st
   });
 }
 
-export async function deleteCommentService(commentId: string, userId: string, role: string) {
+export async function deleteCommentService(commentId: string, userId: string, roleLevel: number) {
   const comment = await prisma.taskComment.findUnique({
     where: { id: commentId },
     select: { userId: true },
   });
   if (!comment) throw new AppError('Komentar tidak ditemukan', 404);
-  if (!canManage(role) && comment.userId !== userId)
+  if (!canManage(roleLevel) && comment.userId !== userId)
     throw new AppError('Akses ditolak', 403);
   await prisma.taskComment.delete({ where: { id: commentId } });
 }
 
 // ── Links ──────────────────────────────────────────────────
-export async function addLinkService(taskId: string, userId: string, role: string, data: { url: string; title?: string }) {
+export async function addLinkService(taskId: string, userId: string, roleLevel: number, data: { url: string; title?: string }) {
   const task = await prisma.task.findUnique({
     where: { id: taskId },
     select: { userId: true, assignedToId: true },
@@ -445,7 +434,7 @@ export async function addLinkService(taskId: string, userId: string, role: strin
   if (!task) throw new AppError('Task tidak ditemukan', 404);
 
   const isOwner = task.userId === userId || task.assignedToId === userId;
-  if (!canManage(role) && !isOwner) throw new AppError('Akses ditolak', 403);
+  if (!canManage(roleLevel) && !isOwner) throw new AppError('Akses ditolak', 403);
 
   return prisma.taskLink.create({
     data: { url: data.url, title: data.title ?? null, taskId },
@@ -453,7 +442,7 @@ export async function addLinkService(taskId: string, userId: string, role: strin
   });
 }
 
-export async function deleteLinkService(linkId: string, taskId: string, userId: string, role: string) {
+export async function deleteLinkService(linkId: string, taskId: string, userId: string, roleLevel: number) {
   const link = await prisma.taskLink.findFirst({
     where: { id: linkId, taskId },
     select: { id: true },
@@ -465,7 +454,7 @@ export async function deleteLinkService(linkId: string, taskId: string, userId: 
     select: { userId: true, assignedToId: true },
   });
   const isOwner = task?.userId === userId || task?.assignedToId === userId;
-  if (!canManage(role) && !isOwner) throw new AppError('Akses ditolak', 403);
+  if (!canManage(roleLevel) && !isOwner) throw new AppError('Akses ditolak', 403);
 
   await prisma.taskLink.delete({ where: { id: linkId } });
 }

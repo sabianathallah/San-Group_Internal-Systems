@@ -1,4 +1,4 @@
-import { Prisma, Role, BulletinCategory, BulletinPriority } from '@prisma/client';
+import { Prisma, BulletinCategory, BulletinPriority } from '@prisma/client';
 import { ParsedQs } from 'qs';
 import { prisma } from '@/config/database';
 import { parsePagination, buildMeta } from '@/helpers/pagination';
@@ -19,10 +19,9 @@ const BULLETIN_SELECT = {
   _count: { select: { readStatus: true } },
 } as const;
 
-const isAdmin = (role: Role) =>
-  role === Role.SUPER_ADMIN || role === Role.ADMIN;
+const isAdmin = (roleLevel: number) => roleLevel <= 2;
 
-export async function listBulletinsService(userId: string, role: Role, query: ParsedQs) {
+export async function listBulletinsService(userId: string, roleLevel: number, query: ParsedQs) {
   const { page, limit, skip } = parsePagination(query, { publishedAt: 'desc' });
 
   const where: Prisma.BulletinWhereInput = {};
@@ -80,7 +79,7 @@ export async function listBulletinsService(userId: string, role: Role, query: Pa
   return { bulletins: result, meta: buildMeta(total, page, limit) };
 }
 
-export async function getBulletinByIdService(id: string, userId: string, role: Role) {
+export async function getBulletinByIdService(id: string, userId: string, roleLevel: number) {
   const bulletin = await prisma.bulletin.findUnique({
     where: { id },
     select: {
@@ -135,7 +134,7 @@ export async function createBulletinService(
 
 export async function updateBulletinService(
   id: string,
-  role: Role,
+  _roleLevel: number,
   data: {
     title?: string;
     content?: string;

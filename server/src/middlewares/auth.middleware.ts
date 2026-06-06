@@ -1,5 +1,4 @@
 import { Response, NextFunction } from 'express';
-import { Role } from '@prisma/client';
 import { verifyToken } from '@/helpers/jwt';
 import { env } from '@/config/env';
 import { AuthRequest } from '@/types';
@@ -25,13 +24,32 @@ export function authenticate(req: AuthRequest, _res: Response, next: NextFunctio
   }
 }
 
-export function authorize(...roles: Role[]) {
+/**
+ * Authorize by role slugs (e.g. 'SUPER_ADMIN', 'ADMIN').
+ * Replaces the old enum-based authorize.
+ */
+export function authorize(...slugs: string[]) {
   return (req: AuthRequest, _res: Response, next: NextFunction): void => {
     if (!req.user) {
       next(new AppError('Akses ditolak', 401));
       return;
     }
-    if (!roles.includes(req.user.role as Role)) {
+    if (!slugs.includes(req.user.roleSlug)) {
+      next(new AppError('Anda tidak memiliki izin untuk aksi ini', 403));
+      return;
+    }
+    next();
+  };
+}
+
+/**
+ * Authorize by maximum role level.
+ * Level 1 = top (Owner/SuperAdmin), 6 = staff.
+ * e.g. authorizeLevel(2) allows anyone with level <= 2 (Owner, SuperAdmin, Admin).
+ */
+export function authorizeLevel(maxLevel: number) {
+  return (req: AuthRequest, _res: Response, next: NextFunction): void => {
+    if (!req.user || req.user.roleLevel > maxLevel) {
       next(new AppError('Anda tidak memiliki izin untuk aksi ini', 403));
       return;
     }

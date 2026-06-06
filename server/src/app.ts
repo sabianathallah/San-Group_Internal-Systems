@@ -16,6 +16,8 @@ import dblinkRoutes from '@/routes/dblink.routes';
 import dbfolderRoutes from '@/routes/dbfolder.routes';
 import notificationRoutes from '@/routes/notification.routes';
 import taskListRoutes from '@/routes/task-list.routes';
+import divisionRoutes from '@/routes/division.routes';
+import roleRoutes from '@/routes/role.routes';
 
 const app = express();
 
@@ -68,6 +70,8 @@ app.use('/api/db-links',   dblinkRoutes);
 app.use('/api/db-folders', dbfolderRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/task-lists', taskListRoutes);
+app.use('/api/divisions', divisionRoutes);
+app.use('/api/roles', roleRoutes);
 
 // ── Error Handling ─────────────────────────────────────────
 app.use(notFound);

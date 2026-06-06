@@ -1,4 +1,4 @@
-import { Division, Prisma, Role } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 import { prisma } from '@/config/database';
 import { hashPassword } from '@/helpers/hash';
 import { parsePagination, buildMeta } from '@/helpers/pagination';
@@ -14,12 +14,12 @@ const USER_SAFE_SELECT = {
   fullName: true,
   phone: true,
   avatar: true,
-  role: true,
-  division: true,
   isActive: true,
   lastLoginAt: true,
   createdAt: true,
   updatedAt: true,
+  role:     { select: { id: true, name: true, slug: true, color: true, level: true } },
+  division: { select: { id: true, name: true, slug: true, color: true } },
 } as const;
 
 export async function listUsersService(query: ParsedQs) {
@@ -35,12 +35,23 @@ export async function listUsersService(query: ParsedQs) {
     ];
   }
 
+  // Filter by roleId (UUID) or roleSlug
   if (query.role && typeof query.role === 'string') {
-    where.role = query.role as Role;
+    // Support both UUID and slug
+    if (query.role.includes('-')) {
+      where.roleId = query.role;
+    } else {
+      where.role = { slug: query.role };
+    }
   }
 
+  // Filter by divisionId (UUID) or divisionSlug
   if (query.division && typeof query.division === 'string') {
-    where.division = query.division as Division;
+    if (query.division.includes('-')) {
+      where.divisionId = query.division;
+    } else {
+      where.division = { slug: query.division };
+    }
   }
 
   if (query.isActive !== undefined) {
@@ -70,8 +81,8 @@ export async function createUserService(data: {
   password: string;
   fullName: string;
   phone?: string;
-  role?: Role;
-  division: Division;
+  roleId: string;
+  divisionId: string;
 }) {
   const existing = await prisma.user.findFirst({
     where: { OR: [{ email: data.email }, { username: data.username }] },
@@ -81,10 +92,26 @@ export async function createUserService(data: {
     throw new AppError(`${field} sudah terdaftar`, 409);
   }
 
+  // Validate role and division exist
+  const [role, division] = await Promise.all([
+    prisma.role.findUnique({ where: { id: data.roleId } }),
+    prisma.division.findUnique({ where: { id: data.divisionId } }),
+  ]);
+  if (!role) throw new AppError('Role tidak ditemukan', 404);
+  if (!division) throw new AppError('Divisi tidak ditemukan', 404);
+
   const hashed = await hashPassword(data.password);
 
   return prisma.user.create({
-    data: { ...data, password: hashed, role: data.role ?? Role.STAFF },
+    data: {
+      email:      data.email,
+      username:   data.username,
+      password:   hashed,
+      fullName:   data.fullName,
+      phone:      data.phone,
+      roleId:     data.roleId,
+      divisionId: data.divisionId,
+    },
     select: USER_SAFE_SELECT,
   });
 }
@@ -94,12 +121,21 @@ export async function updateUserService(
   data: {
     fullName?: string;
     phone?: string | null;
-    role?: Role;
-    division?: Division;
+    roleId?: string;
+    divisionId?: string;
   },
 ) {
   const exists = await prisma.user.findUnique({ where: { id }, select: { id: true } });
   if (!exists) throw new AppError('User tidak ditemukan', 404);
+
+  if (data.roleId) {
+    const role = await prisma.role.findUnique({ where: { id: data.roleId } });
+    if (!role) throw new AppError('Role tidak ditemukan', 404);
+  }
+  if (data.divisionId) {
+    const division = await prisma.division.findUnique({ where: { id: data.divisionId } });
+    if (!division) throw new AppError('Divisi tidak ditemukan', 404);
+  }
 
   return prisma.user.update({
     where: { id },
@@ -109,10 +145,13 @@ export async function updateUserService(
 }
 
 export async function toggleUserService(id: string, requesterId: string) {
-  const user = await prisma.user.findUnique({ where: { id }, select: { id: true, isActive: true, role: true } });
+  const user = await prisma.user.findUnique({
+    where: { id },
+    select: { id: true, isActive: true, role: { select: { slug: true } } },
+  });
   if (!user) throw new AppError('User tidak ditemukan', 404);
   if (id === requesterId) throw new AppError('Tidak dapat menonaktifkan akun sendiri', 400);
-  if (user.role === Role.SUPER_ADMIN) throw new AppError('SUPER_ADMIN tidak dapat dinonaktifkan', 403);
+  if (user.role.slug === 'SUPER_ADMIN') throw new AppError('SUPER_ADMIN tidak dapat dinonaktifkan', 403);
 
   return prisma.user.update({
     where: { id },
@@ -122,10 +161,13 @@ export async function toggleUserService(id: string, requesterId: string) {
 }
 
 export async function deleteUserService(id: string, requesterId: string) {
-  const user = await prisma.user.findUnique({ where: { id }, select: { id: true, role: true } });
+  const user = await prisma.user.findUnique({
+    where: { id },
+    select: { id: true, role: { select: { slug: true } } },
+  });
   if (!user) throw new AppError('User tidak ditemukan', 404);
   if (id === requesterId) throw new AppError('Tidak dapat menghapus akun sendiri', 400);
-  if (user.role === Role.SUPER_ADMIN) throw new AppError('SUPER_ADMIN tidak dapat dihapus', 403);
+  if (user.role.slug === 'SUPER_ADMIN') throw new AppError('SUPER_ADMIN tidak dapat dihapus', 403);
 
   // Soft delete
   return prisma.user.update({

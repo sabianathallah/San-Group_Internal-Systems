@@ -11,16 +11,16 @@ import {
 
 export async function listTasks(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
-    const { userId, role } = req.user!;
-    const { tasks, meta } = await listTasksService(userId, role, req.query);
+    const { userId, roleLevel } = req.user!;
+    const { tasks, meta } = await listTasksService(userId, roleLevel, req.query);
     successResponse(res, tasks, 'Daftar task berhasil diambil', 200, meta);
   } catch (err) { next(err); }
 }
 
 export async function listTeamTasks(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
-    const { userId, role, division } = req.user!;
-    const { tasks, meta } = await listTeamTasksService(userId, role, division, req.query);
+    const { userId, roleLevel, divisionId } = req.user!;
+    const { tasks, meta } = await listTeamTasksService(userId, roleLevel, divisionId, req.query);
     successResponse(res, tasks, 'Team tasks berhasil diambil', 200, meta);
   } catch (err) { next(err); }
 }
@@ -34,8 +34,8 @@ export async function getPendingCount(req: AuthRequest, res: Response, next: Nex
 
 export async function getTaskById(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
-    const { userId, role } = req.user!;
-    const task = await getTaskByIdService(String(req.params.id), userId, role);
+    const { userId, roleLevel } = req.user!;
+    const task = await getTaskByIdService(String(req.params.id), userId, roleLevel);
     successResponse(res, task, 'Detail task berhasil diambil');
   } catch (err) { next(err); }
 }
@@ -49,16 +49,16 @@ export async function createTask(req: AuthRequest, res: Response, next: NextFunc
 
 export async function updateTask(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
-    const { userId, role } = req.user!;
-    const task = await updateTaskService(String(req.params.id), userId, role, req.body);
+    const { userId, roleLevel } = req.user!;
+    const task = await updateTaskService(String(req.params.id), userId, roleLevel, req.body);
     successResponse(res, task, 'Task berhasil diperbarui');
   } catch (err) { next(err); }
 }
 
 export async function deleteTask(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
-    const { userId, role } = req.user!;
-    await deleteTaskService(String(req.params.id), userId, role);
+    const { userId, roleLevel } = req.user!;
+    await deleteTaskService(String(req.params.id), userId, roleLevel);
     successResponse(res, null, 'Task berhasil dihapus');
   } catch (err) { next(err); }
 }
@@ -79,40 +79,40 @@ export async function rejectTask(req: AuthRequest, res: Response, next: NextFunc
 
 export async function listComments(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
-    const { userId, role } = req.user!;
-    const comments = await listCommentsService(String(req.params.id), userId, role);
+    const { userId, roleLevel } = req.user!;
+    const comments = await listCommentsService(String(req.params.id), userId, roleLevel);
     successResponse(res, comments, 'Komentar berhasil diambil');
   } catch (err) { next(err); }
 }
 
 export async function addComment(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
-    const { userId, role } = req.user!;
-    const comment = await addCommentService(String(req.params.id), userId, role, req.body.content);
+    const { userId, roleLevel } = req.user!;
+    const comment = await addCommentService(String(req.params.id), userId, roleLevel, req.body.content);
     successResponse(res, comment, 'Komentar berhasil ditambahkan', 201);
   } catch (err) { next(err); }
 }
 
 export async function deleteComment(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
-    const { userId, role } = req.user!;
-    await deleteCommentService(String(req.params.commentId), userId, role);
+    const { userId, roleLevel } = req.user!;
+    await deleteCommentService(String(req.params.commentId), userId, roleLevel);
     successResponse(res, null, 'Komentar berhasil dihapus');
   } catch (err) { next(err); }
 }
 
 export async function addLink(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
-    const { userId, role } = req.user!;
-    const link = await addLinkService(String(req.params.id), userId, role, req.body);
+    const { userId, roleLevel } = req.user!;
+    const link = await addLinkService(String(req.params.id), userId, roleLevel, req.body);
     successResponse(res, link, 'Link berhasil ditambahkan', 201);
   } catch (err) { next(err); }
 }
 
 export async function deleteLink(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
-    const { userId, role } = req.user!;
-    await deleteLinkService(String(req.params.linkId), String(req.params.id), userId, role);
+    const { userId, roleLevel } = req.user!;
+    await deleteLinkService(String(req.params.linkId), String(req.params.id), userId, roleLevel);
     successResponse(res, null, 'Link berhasil dihapus');
   } catch (err) { next(err); }
 }

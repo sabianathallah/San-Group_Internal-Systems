@@ -11,16 +11,16 @@ import {
 
 export async function listBulletins(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
-    const { userId, role } = req.user!;
-    const { bulletins, meta } = await listBulletinsService(userId, role, req.query);
+    const { userId, roleLevel } = req.user!;
+    const { bulletins, meta } = await listBulletinsService(userId, roleLevel, req.query);
     successResponse(res, bulletins, 'Daftar bulletin berhasil diambil', 200, meta);
   } catch (err) { next(err); }
 }
 
 export async function getBulletinById(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
-    const { userId, role } = req.user!;
-    const bulletin = await getBulletinByIdService(String(req.params.id), userId, role);
+    const { userId, roleLevel } = req.user!;
+    const bulletin = await getBulletinByIdService(String(req.params.id), userId, roleLevel);
     successResponse(res, bulletin, 'Detail bulletin berhasil diambil');
   } catch (err) { next(err); }
 }
@@ -34,7 +34,7 @@ export async function createBulletin(req: AuthRequest, res: Response, next: Next
 
 export async function updateBulletin(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
-    const bulletin = await updateBulletinService(String(req.params.id), req.user!.role, req.body);
+    const bulletin = await updateBulletinService(String(req.params.id), req.user!.roleLevel, req.body);
     successResponse(res, bulletin, 'Bulletin berhasil diperbarui');
   } catch (err) { next(err); }
 }

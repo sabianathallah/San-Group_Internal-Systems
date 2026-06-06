@@ -1,8 +1,7 @@
-import { Role } from '@prisma/client';
 import { prisma } from '@/config/database';
 import { AppError } from '@/middlewares/errorHandler.middleware';
 
-const isAdmin = (role: Role) => ['SUPER_ADMIN', 'ADMIN'].includes(role);
+const isAdmin = (roleLevel: number) => roleLevel <= 2;
 
 const FOLDER_SELECT = {
   id:          true,
@@ -40,12 +39,12 @@ export async function createFolderService(userId: string, data: {
   });
 }
 
-export async function updateFolderService(id: string, userId: string, role: Role, data: {
+export async function updateFolderService(id: string, userId: string, roleLevel: number, data: {
   name?: string; icon?: string | null; color?: string; description?: string | null;
 }) {
   const folder = await prisma.databaseFolder.findUnique({ where: { id }, select: { id: true, createdById: true } });
   if (!folder) throw new AppError('Folder tidak ditemukan', 404);
-  if (!isAdmin(role) && folder.createdById !== userId) throw new AppError('Tidak diizinkan', 403);
+  if (!isAdmin(roleLevel) && folder.createdById !== userId) throw new AppError('Tidak diizinkan', 403);
 
   return prisma.databaseFolder.update({
     where: { id },
@@ -59,10 +58,10 @@ export async function updateFolderService(id: string, userId: string, role: Role
   });
 }
 
-export async function deleteFolderService(id: string, userId: string, role: Role) {
+export async function deleteFolderService(id: string, userId: string, roleLevel: number) {
   const folder = await prisma.databaseFolder.findUnique({ where: { id }, select: { id: true, createdById: true } });
   if (!folder) throw new AppError('Folder tidak ditemukan', 404);
-  if (!isAdmin(role) && folder.createdById !== userId) throw new AppError('Tidak diizinkan', 403);
+  if (!isAdmin(roleLevel) && folder.createdById !== userId) throw new AppError('Tidak diizinkan', 403);
   await prisma.databaseFolder.delete({ where: { id } });
 }
 

@@ -1,8 +1,7 @@
-import { Role } from '@prisma/client';
 import { prisma } from '@/config/database';
 import { AppError } from '@/middlewares/errorHandler.middleware';
 
-const isAdmin = (role: Role) => ['SUPER_ADMIN', 'ADMIN'].includes(role);
+const isAdmin = (roleLevel: number) => roleLevel <= 2;
 
 const LINK_SELECT = {
   id:          true,
@@ -39,12 +38,12 @@ export async function createDatabaseLinkService(
 export async function updateDatabaseLinkService(
   id: string,
   userId: string,
-  role: Role,
+  roleLevel: number,
   data: { title?: string; url?: string; description?: string | null },
 ) {
   const link = await prisma.databaseLink.findUnique({ where: { id }, select: { id: true, createdById: true } });
   if (!link) throw new AppError('Link tidak ditemukan', 404);
-  if (!isAdmin(role) && link.createdById !== userId) throw new AppError('Tidak diizinkan', 403);
+  if (!isAdmin(roleLevel) && link.createdById !== userId) throw new AppError('Tidak diizinkan', 403);
 
   return prisma.databaseLink.update({
     where: { id },
@@ -57,9 +56,9 @@ export async function updateDatabaseLinkService(
   });
 }
 
-export async function deleteDatabaseLinkService(id: string, userId: string, role: Role) {
+export async function deleteDatabaseLinkService(id: string, userId: string, roleLevel: number) {
   const link = await prisma.databaseLink.findUnique({ where: { id }, select: { id: true, createdById: true } });
   if (!link) throw new AppError('Link tidak ditemukan', 404);
-  if (!isAdmin(role) && link.createdById !== userId) throw new AppError('Tidak diizinkan', 403);
+  if (!isAdmin(roleLevel) && link.createdById !== userId) throw new AppError('Tidak diizinkan', 403);
   await prisma.databaseLink.delete({ where: { id } });
 }
