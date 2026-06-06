@@ -2,8 +2,8 @@ import { useEffect, useState, useRef, useCallback, FormEvent } from 'react';
 import {
   Star, AlertCircle, Megaphone, Users,
   ArrowRight, CheckCircle2, Circle,
-  Loader2, CalendarDays, ChevronDown, ChevronRight,
-  Plus, ExternalLink, StickyNote, Pin,
+  Loader2, Sun, ChevronDown, ChevronRight,
+  Plus, ExternalLink, Pin,
 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/stores/authStore';
@@ -196,7 +196,7 @@ function QuickAddTask({ onAdded }: { onAdded: (task: Task) => void }) {
     if (!title.trim()) return;
     setSaving(true);
     try {
-      const res = await api.post('/tasks', { title: title.trim(), status: 'TODO', priority: 'MEDIUM' });
+      const res = await api.post('/tasks', { title: title.trim(), status: 'TODO', priority: 'MEDIUM', category: 'MY_DAY' });
       onAdded(res.data.data);
       setTitle('');
       setActive(false);
@@ -292,10 +292,11 @@ export default function DashboardPage() {
     addTask(task);
   }
 
-  // Derived
+  // Derived — dashboard hanya tampilkan MY_DAY tasks
   const now = new Date(); now.setHours(0, 0, 0, 0);
-  const active  = allTasks.filter((t) => t.status !== 'DONE');
-  const done    = allTasks.filter((t) => t.status === 'DONE');
+  const myDayTasks = allTasks.filter((t) => t.category === 'MY_DAY');
+  const active  = myDayTasks.filter((t) => t.status !== 'DONE');
+  const done    = myDayTasks.filter((t) => t.status === 'DONE');
   const overdue = active.filter((t) => t.dueDate && new Date(t.dueDate) < now);
   const unreadBulletins = bulletins.filter((b) => !b.isRead);
 
@@ -311,11 +312,8 @@ export default function DashboardPage() {
     return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
   });
 
-  // Notes widget: pinned first, then recent, max 4
-  const dashNotes = [
-    ...allNotes.filter((n) => n.isPinned),
-    ...allNotes.filter((n) => !n.isPinned),
-  ].slice(0, 4);
+  // Notes widget: hanya yang disematkan (pinned), max 4
+  const dashNotes = allNotes.filter((n) => n.isPinned).slice(0, 4);
 
   const firstName = user?.fullName?.split(' ')[0] ?? 'User';
 
@@ -332,9 +330,11 @@ export default function DashboardPage() {
               {getGreeting()}, {firstName}
             </h1>
             <p className="text-white/50 text-sm mt-1">
-              {active.length === 0
-                ? 'Semua tugas selesai!'
-                : `${active.length} tugas menunggu diselesaikan`}
+              {myDayTasks.length === 0
+                ? 'Tidak ada task di My Day hari ini'
+                : active.length === 0
+                  ? 'Semua My Day selesai!'
+                  : `${active.length} tugas My Day menunggu`}
             </p>
           </div>
 
@@ -342,10 +342,10 @@ export default function DashboardPage() {
           <div className="flex flex-col items-center gap-1">
             {taskLoading
               ? <div className="w-14 h-14 rounded-full border-4 border-white/20 animate-pulse" />
-              : <ProgressRing done={done.length} total={allTasks.length} size={60} />
+              : <ProgressRing done={done.length} total={myDayTasks.length} size={60} />
             }
             <p className="text-white/60 text-[10px] mt-0.5">
-              {done.length}/{allTasks.length} selesai
+              {done.length}/{myDayTasks.length} selesai
             </p>
           </div>
         </div>
@@ -381,8 +381,8 @@ export default function DashboardPage() {
           {/* Section header */}
           <div className="flex items-center justify-between px-5 py-3.5 border-b border-gray-100 sticky top-0 bg-white z-10">
             <div className="flex items-center gap-2">
-              <CalendarDays size={15} className="text-navy" />
-              <span className="text-sm font-semibold text-gray-800">Tugas Saya</span>
+              <Sun size={15} className="text-navy" />
+              <span className="text-sm font-semibold text-gray-800">My Day</span>
               {active.length > 0 && (
                 <span className="text-[10px] font-semibold text-white bg-navy rounded-full px-1.5 py-0.5 leading-none">
                   {active.length}
@@ -404,7 +404,7 @@ export default function DashboardPage() {
               <p className="text-xs text-gray-400">Memuat tugas…</p>
             </div>
           ) : sortedActive.length === 0 && done.length === 0 ? (
-            <EmptyTasks onNavigate={() => navigate(ROUTES.TASKS)} />
+            <EmptyMyDay onNavigate={() => navigate(ROUTES.TASKS)} />
           ) : (
             <>
               {sortedActive.length === 0 ? (
@@ -511,10 +511,10 @@ export default function DashboardPage() {
           <div className="border-b border-gray-100 bg-white">
             <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
               <div className="flex items-center gap-2">
-                <StickyNote size={14} className="text-navy" />
-                <span className="text-sm font-semibold text-gray-800">Catatan</span>
-                {allNotes.length > 0 && (
-                  <span className="text-[10px] text-gray-400">({allNotes.length})</span>
+                <Pin size={14} className="text-navy" />
+                <span className="text-sm font-semibold text-gray-800">Catatan Disematkan</span>
+                {dashNotes.length > 0 && (
+                  <span className="text-[10px] text-gray-400">({dashNotes.length})</span>
                 )}
               </div>
               <Link to={ROUTES.NOTES} className="flex items-center gap-1 text-xs text-gray-400 hover:text-navy transition-colors">
@@ -522,10 +522,11 @@ export default function DashboardPage() {
               </Link>
             </div>
 
-            {allNotes.length === 0 ? (
+            {dashNotes.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-6 text-center px-4">
-                <StickyNote size={20} className="text-gray-200 mb-1.5" />
-                <p className="text-xs text-gray-400">Belum ada catatan</p>
+                <Pin size={20} className="text-gray-200 mb-1.5" />
+                <p className="text-xs text-gray-400">Belum ada catatan disematkan</p>
+                <p className="text-[10px] text-gray-300 mt-0.5">Sematkan catatan agar muncul di sini</p>
               </div>
             ) : (
               <div className="p-3 space-y-2">
@@ -554,12 +555,12 @@ export default function DashboardPage() {
                     </Link>
                   );
                 })}
-                {allNotes.length > 4 && (
+                {allNotes.filter((n) => n.isPinned).length > 4 && (
                   <Link
                     to={ROUTES.NOTES}
                     className="block text-center text-xs text-gray-400 hover:text-navy py-1 transition-colors"
                   >
-                    +{allNotes.length - 4} catatan lainnya
+                    +{allNotes.filter((n) => n.isPinned).length - 4} catatan lainnya
                   </Link>
                 )}
               </div>
@@ -617,15 +618,15 @@ function NavLink({ to, label }: { to: string; label: string }) {
   );
 }
 
-function EmptyTasks({ onNavigate }: { onNavigate: () => void }) {
+function EmptyMyDay({ onNavigate }: { onNavigate: () => void }) {
   return (
     <div className="flex flex-col items-center justify-center py-20 text-center px-8">
       <div className="w-16 h-16 rounded-full bg-navy/5 flex items-center justify-center mb-4">
-        <CheckCircle2 size={28} className="text-navy/30" />
+        <Sun size={28} className="text-navy/30" />
       </div>
-      <p className="text-sm font-semibold text-gray-700">Belum ada tugas</p>
-      <p className="text-xs text-gray-400 mt-1 leading-relaxed max-w-[200px]">
-        Buat tugas pertama kamu atau minta admin untuk menugaskan.
+      <p className="text-sm font-semibold text-gray-700">My Day kosong</p>
+      <p className="text-xs text-gray-400 mt-1 leading-relaxed max-w-[220px]">
+        Tambah task dari sini atau pilih task di halaman Tasks lalu klik ☀️ untuk memasukkannya ke My Day.
       </p>
       <button
         onClick={onNavigate}

@@ -67,8 +67,9 @@ export async function listTasksService(
 
   // View-specific filters
   if (view === 'my_day') {
-    base.userId   = userId;
     base.category = TaskCategory.MY_DAY;
+    base.AND      = [{ OR: [{ userId }, { assignedToId: userId }] }];
+    delete (base as Record<string, unknown>).OR;
   } else if (view === 'assigned') {
     base.assignedToId = userId;
   } else if (view === 'important') {

@@ -1,5 +1,5 @@
 import {
-  useEffect, useState, useRef, useCallback, FormEvent, KeyboardEvent, useMemo,
+  useEffect, useState, useRef, useCallback, FormEvent, KeyboardEvent, useMemo, memo,
 } from 'react';
 import {
   Sun, Star, ClipboardList, CalendarDays, LayoutList, Users, Table2,
@@ -160,6 +160,50 @@ function AssignBadge({ status }: { status: AssignmentStatus }) {
     </span>
   );
 }
+
+// ── Completion Toast (My Day done confirmation) ────────────
+const CompletionToast = memo(function CompletionToast({
+  task, onConfirm, onCancel,
+}: { task: Task; onConfirm: () => void; onCancel: () => void }) {
+  const DURATION = 5000;
+  const [progress, setProgress] = useState(100);
+
+  useEffect(() => {
+    const start = Date.now();
+    const id = setInterval(() => {
+      const pct = Math.max(0, 100 - ((Date.now() - start) / DURATION) * 100);
+      setProgress(pct);
+      if (pct === 0) clearInterval(id);
+    }, 40);
+    return () => clearInterval(id);
+  }, []);
+
+  return (
+    <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-gray-900 text-white rounded-xl shadow-2xl overflow-hidden w-80">
+      <div className="px-4 pt-3 pb-3">
+        <p className="text-[11px] text-white/50 mb-0.5">Tugas selesai?</p>
+        <p className="text-sm font-medium truncate">{task.title}</p>
+        <div className="flex items-center gap-3 mt-3">
+          <button
+            onClick={onConfirm}
+            className="flex-1 text-xs font-semibold bg-green-500 hover:bg-green-600 text-white py-1.5 rounded-lg transition-colors"
+          >
+            Ya, selesai
+          </button>
+          <button
+            onClick={onCancel}
+            className="text-xs text-white/50 hover:text-white transition-colors"
+          >
+            Batal
+          </button>
+        </div>
+      </div>
+      <div className="h-0.5 bg-white/10">
+        <div className="h-full bg-green-400 transition-none" style={{ width: `${progress}%` }} />
+      </div>
+    </div>
+  );
+});
 
 // ── Tasks Sidebar ──────────────────────────────────────────
 function TasksSidebar({
@@ -1737,7 +1781,9 @@ export default function TasksPage() {
   const [showFilters,  setShowFilters] = useState(false);
   const [filters,      setFilters]     = useState<FilterState>(EMPTY_FILTER);
   const [filterUsers,  setFilterUsers] = useState<UserOption[]>([]);
-  const [toggleError,  setToggleError] = useState<string | null>(null);
+  const [toggleError,      setToggleError]      = useState<string | null>(null);
+  const [pendingComplete,  setPendingComplete]  = useState<Task | null>(null);
+  const completeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Debounce search
   useEffect(() => {
@@ -1871,6 +1917,32 @@ export default function TasksPage() {
     }
   }, []);
 
+  const confirmMyDayDone = useCallback(async (task: Task) => {
+    if (completeTimerRef.current) clearTimeout(completeTimerRef.current);
+    setPendingComplete(null);
+    setTasks((prev) => prev.filter((t) => t.id !== task.id));
+    try {
+      await api.patch(`/tasks/${task.id}`, { status: 'DONE', category: 'NONE' });
+    } catch {
+      setTasks((prev) => [task, ...prev]);
+    }
+  }, []);
+
+  const cancelMyDayDone = useCallback(() => {
+    if (completeTimerRef.current) clearTimeout(completeTimerRef.current);
+    setPendingComplete(null);
+  }, []);
+
+  const handleMyDayToggle = useCallback((task: Task) => {
+    if (task.status === 'DONE') {
+      handleToggle(task);
+      return;
+    }
+    if (completeTimerRef.current) clearTimeout(completeTimerRef.current);
+    setPendingComplete(task);
+    completeTimerRef.current = setTimeout(() => confirmMyDayDone(task), 5000);
+  }, [handleToggle, confirmMyDayDone]);
+
   const handleDelete = useCallback(async (id: string) => {
     if (!confirm('Hapus task ini?')) return;
     handleTaskDeleted(id);
@@ -1908,6 +1980,14 @@ export default function TasksPage() {
         </div>
       )}
 
+      {pendingComplete && (
+        <CompletionToast
+          task={pendingComplete}
+          onConfirm={() => confirmMyDayDone(pendingComplete)}
+          onCancel={cancelMyDayDone}
+        />
+      )}
+
       {/* Sidebar */}
       <TasksSidebar
         active={sidebarView}
@@ -1924,24 +2004,23 @@ export default function TasksPage() {
 
         {/* My Day greeting header */}
         {sidebarView === 'my_day' && (
-          <div className="px-6 pt-5 pb-4 border-b border-gray-100 bg-gradient-to-r from-amber-50 to-orange-50 flex-shrink-0">
-            <div className="flex items-center gap-2 mb-0.5">
-              <Sun size={18} className="text-amber-400" />
-              <h1 className="text-lg font-semibold text-gray-800">My Day</h1>
+          <div className="px-6 pt-5 pb-4 border-b border-navy/20 bg-navy flex-shrink-0">
+            <div className="flex items-center gap-2.5 mb-1">
+              <Sun size={20} className="text-white/80" />
+              <h1 className="text-xl font-bold text-white">My Day</h1>
             </div>
-            <p className="text-xs text-gray-500">{greeting}, {user?.fullName?.split(' ')[0]} · {todayStr}</p>
-            <p className="text-[11px] text-amber-600 mt-1">Task yang kamu tambahkan ke hari ini</p>
+            <p className="text-xs text-white/60">{greeting}, {user?.fullName?.split(' ')[0]} · {todayStr}</p>
           </div>
         )}
 
         {/* Important header */}
         {sidebarView === 'important' && (
-          <div className="px-6 pt-5 pb-4 border-b border-gray-100 bg-gradient-to-r from-yellow-50 to-amber-50 flex-shrink-0">
-            <div className="flex items-center gap-2 mb-0.5">
-              <Star size={18} className="text-yellow-400" />
-              <h1 className="text-lg font-semibold text-gray-800">Important</h1>
+          <div className="px-6 pt-5 pb-4 border-b border-navy/20 bg-navy flex-shrink-0">
+            <div className="flex items-center gap-2.5 mb-1">
+              <Star size={20} className="text-white/80" />
+              <h1 className="text-xl font-bold text-white">Important</h1>
             </div>
-            <p className="text-[11px] text-yellow-600 mt-1">Task yang kamu tandai sebagai penting ⭐</p>
+            <p className="text-xs text-white/60">Task yang kamu tandai sebagai penting</p>
           </div>
         )}
 
@@ -2063,7 +2142,7 @@ export default function TasksPage() {
                 tasks={filteredTasks}
                 selectedId={selectedId}
                 onSelect={setSelectedId}
-                onToggle={handleToggle}
+                onToggle={sidebarView === 'my_day' ? handleMyDayToggle : handleToggle}
                 onDelete={handleDelete}
                 onCreated={handleTaskCreated}
                 onToggleMyDay={handleToggleMyDay}
@@ -2078,7 +2157,7 @@ export default function TasksPage() {
                 tasks={filteredTasks}
                 selectedId={selectedId}
                 onSelect={setSelectedId}
-                onToggle={handleToggle}
+                onToggle={sidebarView === 'my_day' ? handleMyDayToggle : handleToggle}
                 onDelete={handleDelete}
                 onCreated={handleTaskCreated}
                 onToggleMyDay={handleToggleMyDay}
