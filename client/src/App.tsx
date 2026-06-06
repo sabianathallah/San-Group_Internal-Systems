@@ -11,10 +11,12 @@ import NotesPage from '@/pages/NotesPage';
 import DatabasePage from '@/pages/DatabasePage';
 import ProfilePage from '@/pages/ProfilePage';
 import UsersPage from '@/pages/admin/UsersPage';
+import DivisionsPage from '@/pages/admin/DivisionsPage';
+import RolesPage from '@/pages/admin/RolesPage';
 
 function AdminRoute() {
-  const role = useAuthStore((s) => s.user?.role);
-  const isAdmin = role === 'SUPER_ADMIN' || role === 'ADMIN';
+  const user = useAuthStore((s) => s.user);
+  const isAdmin = (user?.role?.level ?? 99) <= 2;
   if (!isAdmin) return <Navigate to={ROUTES.DASHBOARD} replace />;
   return <Outlet />;
 }
@@ -39,7 +41,9 @@ export default function App() {
 
           {/* Admin-only routes */}
           <Route element={<AdminRoute />}>
-            <Route path={ROUTES.ADMIN_USERS} element={<UsersPage />} />
+            <Route path={ROUTES.ADMIN_USERS}      element={<UsersPage />}      />
+            <Route path={ROUTES.ADMIN_DIVISIONS}  element={<DivisionsPage />}  />
+            <Route path={ROUTES.ADMIN_ROLES}      element={<RolesPage />}      />
           </Route>
         </Route>
 

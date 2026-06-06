@@ -74,7 +74,7 @@ function formatDate(iso: string) {
 // ── Main Page ──────────────────────────────────────────────
 export default function BulletinPage() {
   const user = useAuthStore((s) => s.user);
-  const isAdmin = user?.role === 'SUPER_ADMIN' || user?.role === 'ADMIN';
+  const isAdmin = (user?.role?.level ?? 99) <= 2;
 
   const [bulletins, setBulletins] = useState<Bulletin[]>([]);
   const [meta,      setMeta]      = useState<Meta | null>(null);

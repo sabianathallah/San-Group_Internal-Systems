@@ -16,8 +16,8 @@ interface FullProfile {
   fullName:    string;
   phone:       string | null;
   avatar:      string | null;
-  role:        string;
-  division:    string;
+  role:        { id: string; name: string; slug: string; color: string; level: number };
+  division:    { id: string; name: string; slug: string; color: string };
   isActive:    boolean;
   lastLoginAt: string | null;
   createdAt:   string;
@@ -316,14 +316,17 @@ export default function ProfilePage() {
               <p className="text-xs text-gray-400 mt-0.5">@{profile.username}</p>
             </div>
             <div className="flex flex-col gap-1.5 w-full">
-              <span className={cn(
-                'text-xs font-medium px-2.5 py-1 rounded-full text-center',
-                profile.role === 'SUPER_ADMIN' ? 'bg-navy text-white' : 'bg-navy-50 text-navy',
-              )}>
-                {ROLE_LABELS[profile.role] ?? profile.role}
+              <span
+                className="text-xs font-medium px-2.5 py-1 rounded-full text-center text-white"
+                style={{ backgroundColor: profile.role.color }}
+              >
+                {profile.role.name}
               </span>
-              <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-gray-100 text-gray-600 text-center">
-                {DIV_LABELS[profile.division] ?? profile.division}
+              <span
+                className="text-xs font-medium px-2.5 py-1 rounded-full text-center text-white"
+                style={{ backgroundColor: profile.division.color }}
+              >
+                {profile.division.name}
               </span>
             </div>
           </div>
@@ -386,8 +389,8 @@ export default function ProfilePage() {
                 <InfoRow icon={User}      label="Username" value={<span className="font-mono">@{profile.username}</span>} />
               </div>
               <div>
-                <InfoRow icon={Shield}    label="Role"     value={ROLE_LABELS[profile.role] ?? profile.role} />
-                <InfoRow icon={Building2} label="Divisi"   value={DIV_LABELS[profile.division] ?? profile.division} />
+                <InfoRow icon={Shield}    label="Role"     value={profile.role.name} />
+                <InfoRow icon={Building2} label="Divisi"   value={profile.division.name} />
               </div>
             </div>
             {profile.phone && (

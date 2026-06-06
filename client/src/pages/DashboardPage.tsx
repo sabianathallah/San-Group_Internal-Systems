@@ -255,7 +255,7 @@ function QuickAddTask({ onAdded }: { onAdded: (task: Task) => void }) {
 export default function DashboardPage() {
   const user      = useAuthStore((s) => s.user);
   const navigate  = useNavigate();
-  const isAdmin   = user?.role === 'SUPER_ADMIN' || user?.role === 'ADMIN';
+  const isAdmin   = (user?.role?.level ?? 99) <= 2;
 
   // ── Shared task store ──
   const allTasks    = useTaskStore((s) => s.tasks);
@@ -317,7 +317,7 @@ export default function DashboardPage() {
     ...allNotes.filter((n) => !n.isPinned),
   ].slice(0, 4);
 
-  const firstName = user?.name?.split(' ')[0] ?? 'User';
+  const firstName = user?.fullName?.split(' ')[0] ?? 'User';
 
   return (
     <div className="space-y-0 -m-6">

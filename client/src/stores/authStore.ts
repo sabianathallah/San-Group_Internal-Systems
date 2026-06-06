@@ -1,13 +1,34 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
+export interface UserRole {
+  id:    string;
+  name:  string;
+  slug:  string;
+  color: string;
+  level: number;
+}
+
+export interface UserDivision {
+  id:    string;
+  name:  string;
+  slug:  string;
+  color: string;
+}
+
 export interface User {
-  id:       string;
-  name:     string;
-  email:    string;
-  role:     string;
-  avatar:   string | null;
-  division: string;
+  id:          string;
+  email:       string;
+  username:    string;
+  fullName:    string;
+  phone:       string | null;
+  avatar:      string | null;
+  isActive:    boolean;
+  lastLoginAt: string | null;
+  createdAt:   string;
+  updatedAt:   string;
+  role:        UserRole;
+  division:    UserDivision;
 }
 
 interface AuthState {

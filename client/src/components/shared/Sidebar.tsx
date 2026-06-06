@@ -6,6 +6,8 @@ import {
   StickyNote,
   Database,
   Users,
+  Shield,
+  Layers,
   ChevronLeft,
   ChevronRight,
 } from 'lucide-react';
@@ -29,15 +31,17 @@ const mainNav: NavItem[] = [
 ];
 
 const adminNav: NavItem[] = [
-  { label: 'Manage Users', to: ROUTES.ADMIN_USERS, icon: Users },
+  { label: 'Manage Users',    to: ROUTES.ADMIN_USERS,      icon: Users  },
+  { label: 'Divisions',       to: ROUTES.ADMIN_DIVISIONS,  icon: Layers },
+  { label: 'Roles',           to: ROUTES.ADMIN_ROLES,      icon: Shield },
 ];
 
 export default function Sidebar() {
-  const open = useUiStore((s) => s.sidebarOpen);
+  const open   = useUiStore((s) => s.sidebarOpen);
   const toggle = useUiStore((s) => s.toggleSidebar);
-  const user = useAuthStore((s) => s.user);
+  const user   = useAuthStore((s) => s.user);
 
-  const isAdmin = user?.role === 'SUPER_ADMIN' || user?.role === 'ADMIN';
+  const isAdmin = (user?.role?.level ?? 99) <= 2;
 
   return (
     <aside
@@ -95,15 +99,15 @@ export default function Sidebar() {
         <div className="flex-shrink-0 border-t border-white/10 p-3">
           <div className="flex items-center gap-3 min-w-0">
             <div className="flex-shrink-0 w-8 h-8 rounded-full bg-navy-light flex items-center justify-center text-white text-xs font-semibold">
-              {getInitials(user.name)}
+              {getInitials(user.fullName)}
             </div>
             {open && (
               <div className="min-w-0">
                 <p className="text-white text-sm font-medium truncate leading-tight">
-                  {user.name}
+                  {user.fullName}
                 </p>
                 <p className="text-white/50 text-xs truncate leading-tight mt-0.5">
-                  {user.role}
+                  {user.role?.name ?? ''}
                 </p>
               </div>
             )}

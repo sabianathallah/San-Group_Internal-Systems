@@ -179,11 +179,11 @@ export default function Header() {
               <div className="w-7 h-7 rounded-full bg-navy flex items-center justify-center text-white text-xs font-semibold flex-shrink-0 overflow-hidden">
                 {user?.avatar
                   ? <img src={user.avatar} alt="" className="w-full h-full object-cover" />
-                  : getInitials(user?.name ?? '?')}
+                  : getInitials(user?.fullName ?? '?')}
               </div>
               <div className="text-left hidden sm:block">
-                <p className="text-sm font-medium text-gray-800 leading-tight">{user?.name ?? '—'}</p>
-                <p className="text-xs text-gray-400 leading-tight">{user?.role?.replace(/_/g, ' ') ?? ''}</p>
+                <p className="text-sm font-medium text-gray-800 leading-tight">{user?.fullName ?? '—'}</p>
+                <p className="text-xs text-gray-400 leading-tight">{user?.role?.name ?? ''}</p>
               </div>
               <ChevronDown size={14} className="text-gray-400 ml-1" />
             </button>
@@ -191,7 +191,7 @@ export default function Header() {
             {userMenuOpen && (
               <div className="absolute right-0 top-11 w-56 bg-white border border-gray-200 rounded-lg shadow-md z-50 py-1">
                 <div className="px-4 py-3 border-b border-gray-100">
-                  <p className="text-sm font-semibold text-gray-800 leading-tight">{user?.name}</p>
+                  <p className="text-sm font-semibold text-gray-800 leading-tight">{user?.fullName}</p>
                   <p className="text-xs text-gray-400 mt-0.5">{user?.email}</p>
                 </div>
 

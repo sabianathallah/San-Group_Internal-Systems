@@ -9,19 +9,12 @@ import { useAuthStore } from '@/stores/authStore';
 import { cn } from '@/lib/cn';
 
 // ── Types ──────────────────────────────────────────────────
-type Role =
-  | 'SUPER_ADMIN' | 'ADMIN' | 'OWNER' | 'DIRECTOR'
-  | 'PROPERTY_MANAGER' | 'LEASING_MANAGER' | 'LEASING_ASSISTANT' | 'LEASING_STAFF'
-  | 'TENANT_RELATIONS' | 'FACILITY_MANAGER' | 'CHIEF_ENGINEER' | 'ENGINEER'
-  | 'FINANCE_MANAGER' | 'ASST_FINANCE_MANAGER' | 'ACCOUNTANT'
-  | 'LEGAL_HEAD' | 'LEGAL_SPV' | 'LEGAL_STAFF'
-  | 'TAX_STAFF' | 'HR_MANAGER' | 'HR_SPV' | 'HR_STAFF'
-  | 'FNB_MANAGER' | 'GA_MANAGER' | 'STAFF';
-
-type Division =
-  | 'MANAGEMENT' | 'RETAIL' | 'HOTEL' | 'HOUSING' | 'FNB' | 'GENERAL'
-  | 'LEASING' | 'PROPERTY' | 'ENGINEERING'
-  | 'FINANCE' | 'LEGAL' | 'TAX' | 'HR' | 'GA';
+interface RoleOption {
+  id: string; name: string; slug: string; color: string; level: number;
+}
+interface DivisionOption {
+  id: string; name: string; slug: string; color: string;
+}
 
 interface UserRow {
   id:          string;
@@ -30,104 +23,14 @@ interface UserRow {
   fullName:    string;
   phone:       string | null;
   avatar:      string | null;
-  role:        Role;
-  division:    Division;
+  role:        RoleOption;
+  division:    DivisionOption;
   isActive:    boolean;
   lastLoginAt: string | null;
   createdAt:   string;
 }
 
 interface Meta { total: number; page: number; limit: number; totalPages: number; }
-
-// ── Constants ──────────────────────────────────────────────
-const ROLES: Role[] = [
-  'SUPER_ADMIN','ADMIN','OWNER','DIRECTOR',
-  'PROPERTY_MANAGER','LEASING_MANAGER','LEASING_ASSISTANT','LEASING_STAFF',
-  'TENANT_RELATIONS','FACILITY_MANAGER','CHIEF_ENGINEER','ENGINEER',
-  'FINANCE_MANAGER','ASST_FINANCE_MANAGER','ACCOUNTANT',
-  'LEGAL_HEAD','LEGAL_SPV','LEGAL_STAFF',
-  'TAX_STAFF','HR_MANAGER','HR_SPV','HR_STAFF',
-  'FNB_MANAGER','GA_MANAGER','STAFF',
-];
-
-const ROLE_LABELS: Record<Role, string> = {
-  SUPER_ADMIN:          'Super Admin',
-  ADMIN:                'Admin',
-  OWNER:                'Owner',
-  DIRECTOR:             'Director',
-  PROPERTY_MANAGER:     'Property Manager',
-  LEASING_MANAGER:      'Leasing Manager',
-  LEASING_ASSISTANT:    'Leasing Assistant',
-  LEASING_STAFF:        'Leasing Staff',
-  TENANT_RELATIONS:     'Tenant Relations',
-  FACILITY_MANAGER:     'Facility Manager',
-  CHIEF_ENGINEER:       'Chief Engineer',
-  ENGINEER:             'Engineer',
-  FINANCE_MANAGER:      'Finance Manager',
-  ASST_FINANCE_MANAGER: 'Asst. Finance Manager',
-  ACCOUNTANT:           'Accountant',
-  LEGAL_HEAD:           'Legal Head',
-  LEGAL_SPV:            'Legal SPV',
-  LEGAL_STAFF:          'Legal Staff',
-  TAX_STAFF:            'Tax Staff',
-  HR_MANAGER:           'HR Manager',
-  HR_SPV:               'HR SPV',
-  HR_STAFF:             'HR Staff',
-  FNB_MANAGER:          'F&B Manager',
-  GA_MANAGER:           'GA Manager',
-  STAFF:                'Staff',
-};
-
-const ROLE_COLORS: Record<Role, string> = {
-  SUPER_ADMIN:          'bg-navy text-white',
-  ADMIN:                'bg-blue-100 text-blue-700',
-  OWNER:                'bg-yellow-100 text-yellow-800',
-  DIRECTOR:             'bg-violet-100 text-violet-700',
-  PROPERTY_MANAGER:     'bg-cyan-100 text-cyan-700',
-  LEASING_MANAGER:      'bg-teal-100 text-teal-700',
-  LEASING_ASSISTANT:    'bg-teal-50 text-teal-600',
-  LEASING_STAFF:        'bg-gray-100 text-gray-600',
-  TENANT_RELATIONS:     'bg-emerald-100 text-emerald-700',
-  FACILITY_MANAGER:     'bg-sky-100 text-sky-700',
-  CHIEF_ENGINEER:       'bg-orange-100 text-orange-700',
-  ENGINEER:             'bg-amber-100 text-amber-700',
-  FINANCE_MANAGER:      'bg-green-100 text-green-700',
-  ASST_FINANCE_MANAGER: 'bg-green-50 text-green-600',
-  ACCOUNTANT:           'bg-lime-100 text-lime-700',
-  LEGAL_HEAD:           'bg-purple-100 text-purple-700',
-  LEGAL_SPV:            'bg-purple-50 text-purple-600',
-  LEGAL_STAFF:          'bg-gray-100 text-gray-600',
-  TAX_STAFF:            'bg-indigo-100 text-indigo-700',
-  HR_MANAGER:           'bg-pink-100 text-pink-700',
-  HR_SPV:               'bg-pink-50 text-pink-600',
-  HR_STAFF:             'bg-gray-100 text-gray-600',
-  FNB_MANAGER:          'bg-rose-100 text-rose-700',
-  GA_MANAGER:           'bg-yellow-100 text-yellow-700',
-  STAFF:                'bg-gray-100 text-gray-500',
-};
-
-const DIVISIONS: Division[] = [
-  'MANAGEMENT','RETAIL','HOTEL','HOUSING','FNB','GENERAL',
-  'LEASING','PROPERTY','ENGINEERING',
-  'FINANCE','LEGAL','TAX','HR','GA',
-];
-
-const DIV_LABELS: Record<Division, string> = {
-  MANAGEMENT:  'Manajemen',
-  RETAIL:      'Retail',
-  HOTEL:       'Hotel & Ballroom',
-  HOUSING:     'Housing',
-  FNB:         'F&B',
-  GENERAL:     'General',
-  LEASING:     'Leasing',
-  PROPERTY:    'Property',
-  ENGINEERING: 'Engineering',
-  FINANCE:     'Finance',
-  LEGAL:       'Legal',
-  TAX:         'Tax',
-  HR:          'HR',
-  GA:          'General Affairs',
-};
 
 // ── Helpers ────────────────────────────────────────────────
 function initials(name: string) {
@@ -137,6 +40,14 @@ function initials(name: string) {
 function formatDate(iso: string | null) {
   if (!iso) return '—';
   return new Date(iso).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
+function hexToRgba(hex: string, alpha: number) {
+  const safe = hex?.startsWith('#') ? hex : '#64748b';
+  const r = parseInt(safe.slice(1, 3), 16);
+  const g = parseInt(safe.slice(3, 5), 16);
+  const b = parseInt(safe.slice(5, 7), 16);
+  return `rgba(${r},${g},${b},${alpha})`;
 }
 
 // ── Avatar Cell ────────────────────────────────────────────
@@ -156,27 +67,29 @@ type ModalMode = 'create' | 'edit';
 
 interface CreateForm {
   fullName: string; email: string; username: string;
-  password: string; phone: string; role: Role | ''; division: Division | '';
+  password: string; phone: string; roleId: string; divisionId: string;
 }
 interface EditForm {
-  fullName: string; phone: string; role: Role | ''; division: Division | '';
+  fullName: string; phone: string; roleId: string; divisionId: string;
 }
 
 const EMPTY_CREATE: CreateForm = {
-  fullName: '', email: '', username: '', password: '', phone: '', role: '', division: '',
+  fullName: '', email: '', username: '', password: '', phone: '', roleId: '', divisionId: '',
 };
 
 function UserFormModal({
-  open, mode, user, onClose, onSaved,
+  open, mode, user, roles, divisions, onClose, onSaved,
 }: {
-  open:    boolean;
-  mode:    ModalMode;
-  user:    UserRow | null;
-  onClose: () => void;
-  onSaved: (u: UserRow) => void;
+  open:      boolean;
+  mode:      ModalMode;
+  user:      UserRow | null;
+  roles:     RoleOption[];
+  divisions: DivisionOption[];
+  onClose:   () => void;
+  onSaved:   (u: UserRow) => void;
 }) {
   const [createForm, setCreateForm] = useState<CreateForm>(EMPTY_CREATE);
-  const [editForm,   setEditForm]   = useState<EditForm>({ fullName: '', phone: '', role: '', division: '' });
+  const [editForm,   setEditForm]   = useState<EditForm>({ fullName: '', phone: '', roleId: '', divisionId: '' });
   const [saving, setSaving]         = useState(false);
   const [error, setError]           = useState('');
 
@@ -184,7 +97,7 @@ function UserFormModal({
     if (!open) return;
     setError('');
     if (mode === 'edit' && user) {
-      setEditForm({ fullName: user.fullName, phone: user.phone ?? '', role: user.role, division: user.division });
+      setEditForm({ fullName: user.fullName, phone: user.phone ?? '', roleId: user.role?.id ?? '', divisionId: user.division?.id ?? '' });
     } else {
       setCreateForm(EMPTY_CREATE);
     }
@@ -195,25 +108,25 @@ function UserFormModal({
     setSaving(true); setError('');
     try {
       if (mode === 'create') {
-        if (!createForm.role)     { setError('Pilih role'); setSaving(false); return; }
-        if (!createForm.division) { setError('Pilih divisi'); setSaving(false); return; }
+        if (!createForm.roleId)     { setError('Pilih role'); setSaving(false); return; }
+        if (!createForm.divisionId) { setError('Pilih divisi'); setSaving(false); return; }
         const payload = {
-          fullName: createForm.fullName.trim(),
-          email:    createForm.email.trim(),
-          username: createForm.username.trim(),
-          password: createForm.password,
-          phone:    createForm.phone.trim() || undefined,
-          role:     createForm.role,
-          division: createForm.division,
+          fullName:   createForm.fullName.trim(),
+          email:      createForm.email.trim(),
+          username:   createForm.username.trim(),
+          password:   createForm.password,
+          phone:      createForm.phone.trim() || undefined,
+          roleId:     createForm.roleId,
+          divisionId: createForm.divisionId,
         };
         const res = await api.post('/users', payload);
         onSaved(res.data.data);
       } else {
         const payload = {
-          fullName: editForm.fullName.trim(),
-          phone:    editForm.phone.trim() || null,
-          role:     editForm.role || undefined,
-          division: editForm.division || undefined,
+          fullName:   editForm.fullName.trim(),
+          phone:      editForm.phone.trim() || null,
+          roleId:     editForm.roleId || undefined,
+          divisionId: editForm.divisionId || undefined,
         };
         const res = await api.patch(`/users/${user!.id}`, payload);
         onSaved(res.data.data);
@@ -289,24 +202,50 @@ function UserFormModal({
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <Field label="Role" required>
-                  <select
-                    value={createForm.role}
-                    onChange={(e) => setCreateForm((f) => ({ ...f, role: e.target.value as Role }))}
-                    className={selectCls}
-                  >
-                    <option value="">-- Pilih role --</option>
-                    {ROLES.map((r) => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}
-                  </select>
+                  <div className="space-y-1">
+                    <select
+                      value={createForm.roleId}
+                      onChange={(e) => setCreateForm((f) => ({ ...f, roleId: e.target.value }))}
+                      className={selectCls}
+                    >
+                      <option value="">-- Pilih role --</option>
+                      {roles.map((r) => (
+                        <option key={r.id} value={r.id}>{r.name}</option>
+                      ))}
+                    </select>
+                    {createForm.roleId && (() => {
+                      const sel = roles.find((r) => r.id === createForm.roleId);
+                      return sel ? (
+                        <div className="flex items-center gap-1.5 px-1">
+                          <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: sel.color }} />
+                          <span className="text-xs text-gray-500">{sel.name}</span>
+                        </div>
+                      ) : null;
+                    })()}
+                  </div>
                 </Field>
                 <Field label="Divisi" required>
-                  <select
-                    value={createForm.division}
-                    onChange={(e) => setCreateForm((f) => ({ ...f, division: e.target.value as Division }))}
-                    className={selectCls}
-                  >
-                    <option value="">-- Pilih divisi --</option>
-                    {DIVISIONS.map((d) => <option key={d} value={d}>{DIV_LABELS[d]}</option>)}
-                  </select>
+                  <div className="space-y-1">
+                    <select
+                      value={createForm.divisionId}
+                      onChange={(e) => setCreateForm((f) => ({ ...f, divisionId: e.target.value }))}
+                      className={selectCls}
+                    >
+                      <option value="">-- Pilih divisi --</option>
+                      {divisions.map((d) => (
+                        <option key={d.id} value={d.id}>{d.name}</option>
+                      ))}
+                    </select>
+                    {createForm.divisionId && (() => {
+                      const sel = divisions.find((d) => d.id === createForm.divisionId);
+                      return sel ? (
+                        <div className="flex items-center gap-1.5 px-1">
+                          <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: sel.color }} />
+                          <span className="text-xs text-gray-500">{sel.name}</span>
+                        </div>
+                      ) : null;
+                    })()}
+                  </div>
                 </Field>
               </div>
             </>
@@ -330,24 +269,50 @@ function UserFormModal({
               </Field>
               <div className="grid grid-cols-2 gap-4">
                 <Field label="Role" required>
-                  <select
-                    value={editForm.role}
-                    onChange={(e) => setEditForm((f) => ({ ...f, role: e.target.value as Role }))}
-                    className={selectCls}
-                  >
-                    <option value="">-- Pilih role --</option>
-                    {ROLES.map((r) => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}
-                  </select>
+                  <div className="space-y-1">
+                    <select
+                      value={editForm.roleId}
+                      onChange={(e) => setEditForm((f) => ({ ...f, roleId: e.target.value }))}
+                      className={selectCls}
+                    >
+                      <option value="">-- Pilih role --</option>
+                      {roles.map((r) => (
+                        <option key={r.id} value={r.id}>{r.name}</option>
+                      ))}
+                    </select>
+                    {editForm.roleId && (() => {
+                      const sel = roles.find((r) => r.id === editForm.roleId);
+                      return sel ? (
+                        <div className="flex items-center gap-1.5 px-1">
+                          <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: sel.color }} />
+                          <span className="text-xs text-gray-500">{sel.name}</span>
+                        </div>
+                      ) : null;
+                    })()}
+                  </div>
                 </Field>
                 <Field label="Divisi" required>
-                  <select
-                    value={editForm.division}
-                    onChange={(e) => setEditForm((f) => ({ ...f, division: e.target.value as Division }))}
-                    className={selectCls}
-                  >
-                    <option value="">-- Pilih divisi --</option>
-                    {DIVISIONS.map((d) => <option key={d} value={d}>{DIV_LABELS[d]}</option>)}
-                  </select>
+                  <div className="space-y-1">
+                    <select
+                      value={editForm.divisionId}
+                      onChange={(e) => setEditForm((f) => ({ ...f, divisionId: e.target.value }))}
+                      className={selectCls}
+                    >
+                      <option value="">-- Pilih divisi --</option>
+                      {divisions.map((d) => (
+                        <option key={d.id} value={d.id}>{d.name}</option>
+                      ))}
+                    </select>
+                    {editForm.divisionId && (() => {
+                      const sel = divisions.find((d) => d.id === editForm.divisionId);
+                      return sel ? (
+                        <div className="flex items-center gap-1.5 px-1">
+                          <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: sel.color }} />
+                          <span className="text-xs text-gray-500">{sel.name}</span>
+                        </div>
+                      ) : null;
+                    })()}
+                  </div>
                 </Field>
               </div>
             </>
@@ -377,7 +342,7 @@ function UserFormModal({
 }
 
 // small helpers for the form
-const inputCls = 'w-full border border-gray-200 rounded px-3 py-2 text-sm focus:outline-none focus:border-navy focus:ring-1 focus:ring-navy';
+const inputCls  = 'w-full border border-gray-200 rounded px-3 py-2 text-sm focus:outline-none focus:border-navy focus:ring-1 focus:ring-navy';
 const selectCls = 'w-full border border-gray-200 rounded px-3 py-2 text-sm focus:outline-none focus:border-navy';
 function Field({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
   return (
@@ -394,17 +359,21 @@ function Field({ label, required, children }: { label: string; required?: boolea
 const PAGE_SIZE = 15;
 
 export default function UsersPage() {
-  const currentUser = useAuthStore((s) => s.user);
-  const isSuperAdmin = currentUser?.role === 'SUPER_ADMIN';
+  const currentUser  = useAuthStore((s) => s.user);
+  const isSuperAdmin = (currentUser?.role?.level ?? 99) <= 1;
 
-  const [users, setUsers]   = useState<UserRow[]>([]);
-  const [meta, setMeta]     = useState<Meta>({ total: 0, page: 1, limit: PAGE_SIZE, totalPages: 1 });
+  const [users, setUsers]     = useState<UserRow[]>([]);
+  const [meta, setMeta]       = useState<Meta>({ total: 0, page: 1, limit: PAGE_SIZE, totalPages: 1 });
   const [loading, setLoading] = useState(true);
-  const [error, setError]   = useState('');
+  const [error, setError]     = useState('');
+
+  // dynamic roles & divisions for filters and form
+  const [roles,     setRoles]     = useState<RoleOption[]>([]);
+  const [divisions, setDivisions] = useState<DivisionOption[]>([]);
 
   // filters
-  const [search, setSearch]       = useState('');
-  const [debSearch, setDebSearch] = useState('');
+  const [search, setSearch]             = useState('');
+  const [debSearch, setDebSearch]       = useState('');
   const [roleFilter, setRoleFilter]     = useState('');
   const [divFilter, setDivFilter]       = useState('');
   const [statusFilter, setStatusFilter] = useState('');
@@ -416,8 +385,14 @@ export default function UsersPage() {
   const [editing, setEditing]     = useState<UserRow | null>(null);
 
   // inline action states
-  const [toggling, setToggling]   = useState<string | null>(null);
-  const [deleting, setDeleting]   = useState<string | null>(null);
+  const [toggling, setToggling] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState<string | null>(null);
+
+  // Load roles & divisions once
+  useEffect(() => {
+    api.get('/roles').then((r)     => setRoles(r.data.data ?? [])).catch(() => {});
+    api.get('/divisions').then((r) => setDivisions(r.data.data ?? [])).catch(() => {});
+  }, []);
 
   useEffect(() => {
     const t = setTimeout(() => { setDebSearch(search); setPage(1); }, 400);
@@ -428,10 +403,10 @@ export default function UsersPage() {
     setLoading(true); setError('');
     try {
       const params: Record<string, string> = { page: String(page), limit: String(PAGE_SIZE) };
-      if (debSearch)    params.search   = debSearch;
-      if (roleFilter)   params.role     = roleFilter;
-      if (divFilter)    params.division = divFilter;
-      if (statusFilter) params.isActive = statusFilter;
+      if (debSearch)    params.search     = debSearch;
+      if (roleFilter)   params.roleId     = roleFilter;
+      if (divFilter)    params.divisionId = divFilter;
+      if (statusFilter) params.isActive   = statusFilter;
       const res = await api.get('/users', { params });
       setUsers(res.data.data);
       setMeta(res.data.meta);
@@ -475,7 +450,6 @@ export default function UsersPage() {
     setDeleting(u.id);
     try {
       const res = await api.delete(`/users/${u.id}`);
-      // Soft delete — backend returns updated user with isActive: false; reflect in list
       setUsers((prev) => prev.map((x) => (x.id === u.id ? res.data.data : x)));
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
@@ -512,7 +486,6 @@ export default function UsersPage() {
 
       {/* Filters */}
       <div className="bg-white border border-gray-200 rounded-lg p-4 mb-4 flex flex-wrap items-center gap-3">
-        {/* Search */}
         <div className="relative flex-1 min-w-48">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
           <input
@@ -528,27 +501,24 @@ export default function UsersPage() {
           )}
         </div>
 
-        {/* Role filter */}
         <select
           value={roleFilter}
           onChange={(e) => { setRoleFilter(e.target.value); setPage(1); }}
           className="py-2 px-3 text-sm border border-gray-200 rounded focus:outline-none focus:border-navy"
         >
           <option value="">Semua Role</option>
-          {ROLES.map((r) => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}
+          {roles.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
         </select>
 
-        {/* Division filter */}
         <select
           value={divFilter}
           onChange={(e) => { setDivFilter(e.target.value); setPage(1); }}
           className="py-2 px-3 text-sm border border-gray-200 rounded focus:outline-none focus:border-navy"
         >
           <option value="">Semua Divisi</option>
-          {DIVISIONS.map((d) => <option key={d} value={d}>{DIV_LABELS[d]}</option>)}
+          {divisions.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
         </select>
 
-        {/* Status filter */}
         <select
           value={statusFilter}
           onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
@@ -611,6 +581,7 @@ export default function UsersPage() {
               <tbody className="divide-y divide-gray-50">
                 {users.map((u) => {
                   const isCurrentUser = u.id === currentUser?.id;
+                  const isTopRole     = (u.role?.level ?? 99) <= 1;
                   return (
                     <tr key={u.id} className={cn('hover:bg-gray-50/50 transition-colors', !u.isActive && 'opacity-60')}>
                       {/* User */}
@@ -632,17 +603,34 @@ export default function UsersPage() {
                       {/* Username */}
                       <td className="px-4 py-3 text-sm text-gray-600 font-mono">{u.username}</td>
 
-                      {/* Role */}
+                      {/* Role — colored badge using role.color */}
                       <td className="px-4 py-3">
-                        <span className={cn('inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium', ROLE_COLORS[u.role])}>
-                          {u.role === 'SUPER_ADMIN' && <ShieldCheck size={10} />}
-                          {u.role === 'ADMIN' && <UserIcon size={10} />}
-                          {ROLE_LABELS[u.role]}
+                        <span
+                          className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium text-white"
+                          style={{ backgroundColor: u.role?.color ?? '#64748b' }}
+                        >
+                          {(u.role?.level ?? 99) <= 1 && <ShieldCheck size={10} />}
+                          {(u.role?.level ?? 99) === 2 && <UserIcon size={10} />}
+                          {u.role?.name ?? '—'}
                         </span>
                       </td>
 
-                      {/* Division */}
-                      <td className="px-4 py-3 text-sm text-gray-600">{DIV_LABELS[u.division]}</td>
+                      {/* Division — tinted badge using division.color */}
+                      <td className="px-4 py-3">
+                        {u.division ? (
+                          <span
+                            className="inline-flex items-center text-xs px-2 py-0.5 rounded-full font-medium"
+                            style={{
+                              backgroundColor: hexToRgba(u.division.color, 0.15),
+                              color: u.division.color,
+                            }}
+                          >
+                            {u.division.name}
+                          </span>
+                        ) : (
+                          <span className="text-xs text-gray-400">—</span>
+                        )}
+                      </td>
 
                       {/* Status */}
                       <td className="px-4 py-3">
@@ -660,7 +648,6 @@ export default function UsersPage() {
                       {/* Actions */}
                       <td className="px-4 py-3">
                         <div className="flex items-center justify-end gap-1">
-                          {/* Edit — admin & super_admin */}
                           <button
                             onClick={() => openEdit(u)}
                             title="Edit user"
@@ -669,8 +656,7 @@ export default function UsersPage() {
                             <Edit2 size={13} />
                           </button>
 
-                          {/* Toggle — super_admin, not self, not SUPER_ADMIN */}
-                          {isSuperAdmin && !isCurrentUser && u.role !== 'SUPER_ADMIN' && (
+                          {isSuperAdmin && !isCurrentUser && !isTopRole && (
                             <button
                               onClick={() => handleToggle(u)}
                               disabled={toggling === u.id}
@@ -689,8 +675,7 @@ export default function UsersPage() {
                             </button>
                           )}
 
-                          {/* Delete — super_admin, not self, not SUPER_ADMIN */}
-                          {isSuperAdmin && !isCurrentUser && u.role !== 'SUPER_ADMIN' && (
+                          {isSuperAdmin && !isCurrentUser && !isTopRole && (
                             <button
                               onClick={() => handleDelete(u)}
                               disabled={deleting === u.id}
@@ -768,6 +753,8 @@ export default function UsersPage() {
         open={modalOpen}
         mode={modalMode}
         user={editing}
+        roles={roles}
+        divisions={divisions}
         onClose={() => setModalOpen(false)}
         onSaved={handleSaved}
       />

@@ -1,7 +1,7 @@
 import { useState, FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Eye, EyeOff, Loader2 } from 'lucide-react';
-import { useAuthStore } from '@/stores/authStore';
+import { useAuthStore, User } from '@/stores/authStore';
 import { ROUTES } from '@/lib/constants';
 import api from '@/lib/api';
 import { cn } from '@/lib/cn';
@@ -10,15 +10,7 @@ interface LoginResponse {
   success: boolean;
   data: {
     accessToken: string;
-    user: {
-      id:       string;
-      fullName: string;
-      email:    string;
-      username: string;
-      role:     string;
-      division: string;
-      avatar:   string | null;
-    };
+    user: User;
   };
   message: string;
 }
@@ -57,18 +49,7 @@ export default function LoginPage() {
       });
 
       const { accessToken, user } = res.data;
-
-      login(
-        {
-          id:       user.id,
-          name:     user.fullName,
-          email:    user.email,
-          role:     user.role,
-          division: user.division,
-          avatar:   user.avatar,
-        },
-        accessToken,
-      );
+      login(user, accessToken);
 
       navigate(ROUTES.DASHBOARD, { replace: true });
     } catch (err: unknown) {
