@@ -22,8 +22,8 @@ const USER_SAFE_SELECT = {
 
 function buildJwtPayload(user: {
   id: string; email: string; username: string;
-  role:     { id: string; slug: string; name: string; level: number };
-  division: { id: string; slug: string; name: string };
+  role:     { id: string; slug: string; name: string; color: string; level: number };
+  division: { id: string; slug: string; name: string; color: string };
 }) {
   return {
     userId:       user.id,
@@ -46,8 +46,8 @@ export async function loginService(identifier: string, password: string) {
       OR: [{ email: identifier }, { username: identifier }],
     },
     include: {
-      role:     { select: { id: true, slug: true, name: true, level: true } },
-      division: { select: { id: true, slug: true, name: true } },
+      role:     { select: { id: true, slug: true, name: true, color: true, level: true } },
+      division: { select: { id: true, slug: true, name: true, color: true } },
     },
   });
 
@@ -154,8 +154,8 @@ export async function refreshTokenService(token: string) {
   const user = await prisma.user.findUnique({
     where: { id: payload.userId },
     include: {
-      role:     { select: { id: true, slug: true, name: true, level: true } },
-      division: { select: { id: true, slug: true, name: true } },
+      role:     { select: { id: true, slug: true, name: true, color: true, level: true } },
+      division: { select: { id: true, slug: true, name: true, color: true } },
     },
   });
   if (!user || !user.isActive) {
