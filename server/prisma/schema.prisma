@@ -25,6 +25,7 @@ enum TaskPriority {
 }
 
 enum TaskCategory {
+  NONE
   MY_DAY
   IMPORTANT
   PLANNED
@@ -180,7 +181,7 @@ model Task {
   description String?
   status      TaskStatus   @default(TODO)
   priority    TaskPriority @default(MEDIUM)
-  category    TaskCategory @default(MY_DAY)
+  category    TaskCategory @default(NONE)
   dueDate          DateTime?
   completedAt      DateTime?
   isPrivate        Boolean           @default(false)

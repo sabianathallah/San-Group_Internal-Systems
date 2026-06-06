@@ -206,7 +206,7 @@ export async function createTaskService(userId: string, data: {
       description:      data.description,
       status:           data.status       ?? TaskStatus.TODO,
       priority:         data.priority     ?? TaskPriority.MEDIUM,
-      category:         data.category     ?? TaskCategory.MY_DAY,
+      category:         data.category     ?? TaskCategory.NONE,
       dueDate:          data.dueDate      ? new Date(data.dueDate) : null,
       assignedToId:     data.assignedToId ?? null,
       listId:           data.listId       ?? null,
