@@ -16,8 +16,11 @@ interface BulletinPerms {
 interface DbLinkPerms {
   view: Scope; addLink: boolean; manageFolder: boolean; shareFolder: boolean;
 }
+interface NotePerms {
+  view: Scope; create: boolean; edit: Scope; delete: Scope;
+}
 interface PermissionConfig {
-  task: TaskPerms; bulletin: BulletinPerms; db_link: DbLinkPerms;
+  task: TaskPerms; bulletin: BulletinPerms; db_link: DbLinkPerms; note: NotePerms;
 }
 
 interface RoleWithPerms {
@@ -419,6 +422,41 @@ export default function PermissionPage() {
                   <Toggle
                     checked={perms.db_link.shareFolder}
                     onChange={(v) => update('db_link', 'shareFolder', v)}
+                    disabled={isSuperAdmin}
+                  />
+                </PermRow>
+              </Section>
+
+              {/* Notes */}
+              <Section title="Notes">
+                <PermRow label="Lihat catatan">
+                  <ScopeSelector
+                    value={perms.note?.view ?? 'own'}
+                    options={TASK_SCOPE_OPTS}
+                    onChange={(v) => update('note', 'view', v)}
+                    disabled={isSuperAdmin}
+                  />
+                </PermRow>
+                <PermRow label="Buat catatan">
+                  <Toggle
+                    checked={perms.note?.create ?? true}
+                    onChange={(v) => update('note', 'create', v)}
+                    disabled={isSuperAdmin}
+                  />
+                </PermRow>
+                <PermRow label="Edit catatan">
+                  <ScopeSelector
+                    value={perms.note?.edit ?? 'own'}
+                    options={EDIT_SCOPE_OPTS}
+                    onChange={(v) => update('note', 'edit', v)}
+                    disabled={isSuperAdmin}
+                  />
+                </PermRow>
+                <PermRow label="Hapus catatan">
+                  <ScopeSelector
+                    value={perms.note?.delete ?? 'own'}
+                    options={EDIT_SCOPE_OPTS}
+                    onChange={(v) => update('note', 'delete', v)}
                     disabled={isSuperAdmin}
                   />
                 </PermRow>
