@@ -308,7 +308,7 @@ function BulletinCard({ bulletin: b, isSelected, isAdmin, onClick, onEdit, onDel
               <span className="text-xs text-blue-500 bg-blue-50 px-1.5 py-0.5 rounded">Divisi</span>
             )}
             {b.audienceType === 'CUSTOM' && (
-              <span className="text-xs text-purple-500 bg-purple-50 px-1.5 py-0.5 rounded">Kustom</span>
+              <span className="text-xs text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded">Terbatas</span>
             )}
           </div>
         </div>
@@ -548,14 +548,28 @@ function BulletinFormModal({ bulletin, onClose, onSaved }: {
           </div>
 
           <div className="space-y-1">
-            <label className="block text-sm font-medium text-gray-700">Kirim ke</label>
-            <select value={audienceType} onChange={(e) => setAudienceType(e.target.value as AudienceType)}
-              className="w-full h-9 px-3 text-sm border border-gray-300 rounded bg-white focus:border-navy focus:outline-none focus:ring-2 focus:ring-navy-50"
-            >
-              <option value="ALL">Semua Orang</option>
-              <option value="DIVISION">Divisi Penulis</option>
-              <option value="CUSTOM">Pilih Divisi...</option>
-            </select>
+            <label className="block text-sm font-medium text-gray-700">Audience</label>
+            <div className="flex gap-2">
+              {([
+                { value: 'ALL'      as AudienceType, label: 'Semua'       },
+                { value: 'DIVISION' as AudienceType, label: 'Divisi Saya' },
+                { value: 'CUSTOM'   as AudienceType, label: 'Pilih Divisi' },
+              ] as { value: AudienceType; label: string }[]).map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => setAudienceType(opt.value)}
+                  className={cn(
+                    'flex-1 h-9 text-sm rounded border transition-colors',
+                    audienceType === opt.value
+                      ? 'bg-navy text-white border-navy'
+                      : 'bg-white text-gray-600 border-gray-300 hover:border-navy hover:text-navy',
+                  )}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
           </div>
 
           {audienceType === 'CUSTOM' && (

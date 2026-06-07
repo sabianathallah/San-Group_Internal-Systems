@@ -185,8 +185,10 @@ function LinkModal({ link, folderId, onClose, onSaved }: {
   );
 }
 
-// ── Share Modal ────────────────────────────────────────────
-function ShareModal({ folder, onClose }: { folder: DbFolder; onClose: () => void }) {
+// ── Share Folder Modal ─────────────────────────────────────
+function ShareFolderModal({ folderId, folderName, onClose }: {
+  folderId: string; folderName: string; onClose: () => void;
+}) {
   const [shares,    setShares]    = useState<ShareEntry[]>([]);
   const [divisions, setDivisions] = useState<DivisionOption[]>([]);
   const [selDiv,    setSelDiv]    = useState('');
@@ -196,21 +198,24 @@ function ShareModal({ folder, onClose }: { folder: DbFolder; onClose: () => void
 
   useEffect(() => {
     Promise.all([
-      api.get(`/shares/db_folder/${folder.id}`),
+      api.get('/shares', { params: { resourceType: 'FOLDER', resourceId: folderId } }),
       api.get('/divisions'),
     ]).then(([s, d]) => {
       setShares(s.data.data ?? []);
       setDivisions(d.data.data ?? []);
     }).catch(() => setError('Gagal memuat data'))
       .finally(() => setLoading(false));
-  }, [folder.id]);
+  }, [folderId]);
 
   async function handleAdd() {
     if (!selDiv) return;
     setAdding(true); setError('');
     try {
-      const res = await api.post(`/shares/db_folder/${folder.id}`, {
-        targetType: 'division', targetId: selDiv,
+      const res = await api.post('/shares', {
+        resourceType: 'FOLDER',
+        resourceId:   folderId,
+        targetType:   'DIVISION',
+        targetId:     selDiv,
       });
       setShares((prev) => [...prev, res.data.data]);
       setSelDiv('');
@@ -219,79 +224,80 @@ function ShareModal({ folder, onClose }: { folder: DbFolder; onClose: () => void
     } finally { setAdding(false); }
   }
 
-  async function handleRevoke(share: ShareEntry) {
+  async function handleRevoke(shareId: string) {
     try {
-      await api.delete(`/shares/db_folder/${folder.id}`, {
-        data: { targetType: share.targetType, targetId: share.targetId },
-      });
-      setShares((prev) => prev.filter((s) => s.id !== share.id));
+      await api.delete(`/shares/${shareId}`);
+      setShares((prev) => prev.filter((s) => s.id !== shareId));
     } catch { /* silent */ }
   }
 
-  const availableDivisions = divisions.filter(
-    (d) => !shares.some((s) => s.targetType === 'division' && s.targetId === d.id),
+  const sharedDivisionIds = new Set(
+    shares.filter((s) => s.targetType === 'DIVISION').map((s) => s.targetId),
   );
+  const availableDivisions = divisions.filter((d) => !sharedDivisionIds.has(d.id));
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
-      <div className="relative bg-white rounded-xl shadow-xl w-full max-w-sm">
+      <div className="relative bg-white rounded-xl shadow-xl w-full max-w-md">
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
           <div>
             <h2 className="text-sm font-semibold text-gray-800">Bagikan Folder</h2>
-            <p className="text-xs text-gray-400 mt-0.5">{folder.name}</p>
+            <p className="text-xs text-gray-400 mt-0.5">{folderName}</p>
           </div>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={16} /></button>
         </div>
 
         <div className="p-5 space-y-4">
-          {/* Add share */}
-          <div className="flex gap-2">
-            <select value={selDiv} onChange={(e) => setSelDiv(e.target.value)}
-              className="flex-1 text-sm border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-navy">
-              <option value="">Pilih divisi…</option>
-              {availableDivisions.map((d) => (
-                <option key={d.id} value={d.id}>{d.name}</option>
-              ))}
-            </select>
-            <button onClick={handleAdd} disabled={!selDiv || adding}
-              className="px-3 py-2 text-sm text-white bg-navy rounded-lg hover:bg-navy-light disabled:opacity-50 flex items-center gap-1.5">
-              {adding ? <Loader2 size={13} className="animate-spin" /> : <Plus size={13} />} Bagikan
-            </button>
+          {/* Section: Tambah akses */}
+          <div>
+            <p className="text-xs text-gray-500 font-medium mb-2">Tambah akses</p>
+            <div className="flex gap-2">
+              <select value={selDiv} onChange={(e) => setSelDiv(e.target.value)}
+                className="flex-1 text-sm border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-navy">
+                <option value="">Pilih divisi…</option>
+                {availableDivisions.map((d) => (
+                  <option key={d.id} value={d.id}>{d.name}</option>
+                ))}
+              </select>
+              <button onClick={handleAdd} disabled={!selDiv || adding}
+                className="px-3 py-2 text-sm text-white bg-navy rounded-lg hover:bg-navy-light disabled:opacity-50 flex items-center gap-1.5">
+                {adding ? <Loader2 size={13} className="animate-spin" /> : <Plus size={13} />} Bagikan
+              </button>
+            </div>
           </div>
 
           {error && <p className="text-xs text-red-500 flex items-center gap-1"><AlertCircle size={12} />{error}</p>}
 
-          {/* Current shares */}
-          {loading ? (
-            <div className="flex justify-center py-4"><Loader2 size={18} className="animate-spin text-gray-300" /></div>
-          ) : shares.length === 0 ? (
-            <div className="text-center py-6">
-              <ShieldCheck size={28} className="text-gray-200 mx-auto mb-2" />
-              <p className="text-xs text-gray-400">Folder belum dibagikan ke divisi lain</p>
-            </div>
-          ) : (
-            <div className="space-y-1">
-              <p className="text-xs text-gray-500 font-medium mb-2">Dibagikan ke:</p>
-              {shares.map((s) => {
-                const div = divisions.find((d) => d.id === s.targetId);
-                return (
-                  <div key={s.id} className="flex items-center justify-between py-1.5 px-2 bg-gray-50 rounded-lg">
-                    <div className="flex items-center gap-2">
-                      {div && (
-                        <span className="w-2 h-2 rounded-full" style={{ backgroundColor: div.color }} />
-                      )}
-                      <span className="text-sm text-gray-700">{div?.name ?? s.targetId}</span>
-                    </div>
-                    <button onClick={() => handleRevoke(s)}
-                      className="text-gray-300 hover:text-red-500 p-1 rounded transition-colors">
-                      <X size={13} />
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
-          )}
+          {/* Section: Dibagikan ke */}
+          <div>
+            <p className="text-xs text-gray-500 font-medium mb-2">Dibagikan ke</p>
+            {loading ? (
+              <div className="flex justify-center py-4"><Loader2 size={18} className="animate-spin text-gray-300" /></div>
+            ) : shares.length === 0 ? (
+              <div className="text-center py-6">
+                <ShieldCheck size={28} className="text-gray-200 mx-auto mb-2" />
+                <p className="text-xs text-gray-400">Belum dibagikan ke siapapun</p>
+              </div>
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                {shares.map((s) => {
+                  const div = divisions.find((d) => d.id === s.targetId);
+                  return (
+                    <span key={s.id}
+                      className="inline-flex items-center gap-1.5 pl-2.5 pr-1.5 py-1 rounded-full text-xs font-medium text-white"
+                      style={{ backgroundColor: div?.color ?? '#64748b' }}>
+                      {div?.name ?? s.targetId}
+                      <button onClick={() => handleRevoke(s.id)}
+                        className="w-4 h-4 rounded-full bg-white/20 hover:bg-white/40 flex items-center justify-center transition-colors">
+                        <X size={10} />
+                      </button>
+                    </span>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>
@@ -311,7 +317,8 @@ export default function DatabasePage() {
   const [search,         setSearch]         = useState('');
   const [folderModal,    setFolderModal]    = useState<{ open: boolean; folder?: DbFolder }>({ open: false });
   const [linkModal,      setLinkModal]      = useState<{ open: boolean; link?: DbLink }>({ open: false });
-  const [shareFolder,    setShareFolder]    = useState<DbFolder | null>(null);
+  const [shareFolderId,   setShareFolderId]   = useState<string | null>(null);
+  const [shareFolderName, setShareFolderName] = useState<string>('');
 
   const loadFolders = useCallback(async () => {
     setLoadingFolders(true);
@@ -432,7 +439,7 @@ export default function DatabasePage() {
                 </button>
                 {isAdmin && (
                   <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button onClick={(e) => { e.stopPropagation(); setShareFolder(folder); }}
+                    <button onClick={(e) => { e.stopPropagation(); setShareFolderId(folder.id); setShareFolderName(folder.name); }}
                       className="p-1.5 bg-white border border-gray-200 rounded-lg text-gray-400 hover:text-info shadow-sm"
                       title="Bagikan folder">
                       <Share2 size={11} />
@@ -467,8 +474,12 @@ export default function DatabasePage() {
           <FolderModal folder={folderModal.folder}
             onClose={() => setFolderModal({ open: false })} onSaved={handleFolderSaved} />
         )}
-        {shareFolder && (
-          <ShareModal folder={shareFolder} onClose={() => setShareFolder(null)} />
+        {shareFolderId && (
+          <ShareFolderModal
+            folderId={shareFolderId}
+            folderName={shareFolderName}
+            onClose={() => setShareFolderId(null)}
+          />
         )}
       </div>
     );

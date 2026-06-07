@@ -109,6 +109,9 @@ export async function listTasksService(
       if (typeof query.userId === 'string') {
         andConditions.push({ OR: [{ userId: query.userId }, { assignedToId: query.userId }] });
       }
+      if (typeof query.divisionId === 'string') {
+        andConditions.push({ creator: { divisionId: query.divisionId } });
+      }
       if (!viewPrivate) {
         andConditions.push({ OR: [{ isPrivate: false }, { userId }, { assignedToId: userId }] });
       }
@@ -395,7 +398,7 @@ export async function rejectTaskService(id: string, userId: string, note: string
 }
 
 // ── Comments ───────────────────────────────────────────────
-export async function listCommentsService(taskId: string, userId: string, roleLevel: number) {
+export async function listCommentsService(taskId: string, userId: string, permScope: string) {
   const task = await prisma.task.findUnique({
     where: { id: taskId },
     select: { userId: true, assignedToId: true, isPrivate: true },
@@ -403,7 +406,7 @@ export async function listCommentsService(taskId: string, userId: string, roleLe
   if (!task) throw new AppError('Task tidak ditemukan', 404);
 
   const isOwner = task.userId === userId || task.assignedToId === userId;
-  if (!canManage(roleLevel) && !isOwner) throw new AppError('Akses ditolak', 403);
+  if (permScope === 'own' && !isOwner) throw new AppError('Akses ditolak', 403);
 
   return prisma.taskComment.findMany({
     where: { taskId },
@@ -415,7 +418,7 @@ export async function listCommentsService(taskId: string, userId: string, roleLe
   });
 }
 
-export async function addCommentService(taskId: string, userId: string, roleLevel: number, content: string) {
+export async function addCommentService(taskId: string, userId: string, permScope: string, content: string) {
   const task = await prisma.task.findUnique({
     where: { id: taskId },
     select: { userId: true, assignedToId: true },
@@ -423,7 +426,7 @@ export async function addCommentService(taskId: string, userId: string, roleLeve
   if (!task) throw new AppError('Task tidak ditemukan', 404);
 
   const isOwner = task.userId === userId || task.assignedToId === userId;
-  if (!canManage(roleLevel) && !isOwner) throw new AppError('Akses ditolak', 403);
+  if (permScope === 'own' && !isOwner) throw new AppError('Akses ditolak', 403);
 
   return prisma.taskComment.create({
     data: { content, taskId, userId },
@@ -434,19 +437,19 @@ export async function addCommentService(taskId: string, userId: string, roleLeve
   });
 }
 
-export async function deleteCommentService(commentId: string, userId: string, roleLevel: number) {
+export async function deleteCommentService(commentId: string, userId: string, permScope: string) {
   const comment = await prisma.taskComment.findUnique({
     where: { id: commentId },
     select: { userId: true },
   });
   if (!comment) throw new AppError('Komentar tidak ditemukan', 404);
-  if (!canManage(roleLevel) && comment.userId !== userId)
+  if (permScope === 'own' && comment.userId !== userId)
     throw new AppError('Akses ditolak', 403);
   await prisma.taskComment.delete({ where: { id: commentId } });
 }
 
 // ── Links ──────────────────────────────────────────────────
-export async function addLinkService(taskId: string, userId: string, roleLevel: number, data: { url: string; title?: string }) {
+export async function addLinkService(taskId: string, userId: string, permScope: string, data: { url: string; title?: string }) {
   const task = await prisma.task.findUnique({
     where: { id: taskId },
     select: { userId: true, assignedToId: true },
@@ -454,7 +457,7 @@ export async function addLinkService(taskId: string, userId: string, roleLevel: 
   if (!task) throw new AppError('Task tidak ditemukan', 404);
 
   const isOwner = task.userId === userId || task.assignedToId === userId;
-  if (!canManage(roleLevel) && !isOwner) throw new AppError('Akses ditolak', 403);
+  if (permScope === 'own' && !isOwner) throw new AppError('Akses ditolak', 403);
 
   return prisma.taskLink.create({
     data: { url: data.url, title: data.title ?? null, taskId },
@@ -462,7 +465,7 @@ export async function addLinkService(taskId: string, userId: string, roleLevel: 
   });
 }
 
-export async function deleteLinkService(linkId: string, taskId: string, userId: string, roleLevel: number) {
+export async function deleteLinkService(linkId: string, taskId: string, userId: string, permScope: string) {
   const link = await prisma.taskLink.findFirst({
     where: { id: linkId, taskId },
     select: { id: true },
@@ -474,7 +477,7 @@ export async function deleteLinkService(linkId: string, taskId: string, userId: 
     select: { userId: true, assignedToId: true },
   });
   const isOwner = task?.userId === userId || task?.assignedToId === userId;
-  if (!canManage(roleLevel) && !isOwner) throw new AppError('Akses ditolak', 403);
+  if (permScope === 'own' && !isOwner) throw new AppError('Akses ditolak', 403);
 
   await prisma.taskLink.delete({ where: { id: linkId } });
 }

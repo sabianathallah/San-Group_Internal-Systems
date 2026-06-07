@@ -85,40 +85,45 @@ export async function rejectTask(req: AuthRequest, res: Response, next: NextFunc
 
 export async function listComments(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
-    const { userId, roleLevel } = req.user!;
-    const comments = await listCommentsService(String(req.params.id), userId, roleLevel);
+    const { userId } = req.user!;
+    const permScope = req.permScope ?? 'own';
+    const comments = await listCommentsService(String(req.params.id), userId, permScope);
     successResponse(res, comments, 'Komentar berhasil diambil');
   } catch (err) { next(err); }
 }
 
 export async function addComment(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
-    const { userId, roleLevel } = req.user!;
-    const comment = await addCommentService(String(req.params.id), userId, roleLevel, req.body.content);
+    const { userId } = req.user!;
+    const permScope = req.permScope ?? 'own';
+    const comment = await addCommentService(String(req.params.id), userId, permScope, req.body.content);
     successResponse(res, comment, 'Komentar berhasil ditambahkan', 201);
   } catch (err) { next(err); }
 }
 
 export async function deleteComment(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
-    const { userId, roleLevel } = req.user!;
-    await deleteCommentService(String(req.params.commentId), userId, roleLevel);
+    const { userId } = req.user!;
+    const permScope = req.permScope ?? 'own';
+    await deleteCommentService(String(req.params.commentId), userId, permScope);
     successResponse(res, null, 'Komentar berhasil dihapus');
   } catch (err) { next(err); }
 }
 
 export async function addLink(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
-    const { userId, roleLevel } = req.user!;
-    const link = await addLinkService(String(req.params.id), userId, roleLevel, req.body);
+    const { userId } = req.user!;
+    const permScope = req.permScope ?? 'own';
+    const link = await addLinkService(String(req.params.id), userId, permScope, req.body);
     successResponse(res, link, 'Link berhasil ditambahkan', 201);
   } catch (err) { next(err); }
 }
 
 export async function deleteLink(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
-    const { userId, roleLevel } = req.user!;
-    await deleteLinkService(String(req.params.linkId), String(req.params.id), userId, roleLevel);
+    const { userId } = req.user!;
+    const permScope = req.permScope ?? 'own';
+    await deleteLinkService(String(req.params.linkId), String(req.params.id), userId, permScope);
     successResponse(res, null, 'Link berhasil dihapus');
   } catch (err) { next(err); }
 }

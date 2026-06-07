@@ -3,12 +3,13 @@ import {
 } from 'react';
 import {
   Sun, Star, ClipboardList, CalendarDays, LayoutList, Users, Table2,
+  FolderOpen, Building2,
   Plus, Search, X, ChevronDown, ChevronRight,
   Circle, CheckCircle2, Clock,
   AlertCircle, Calendar, User, Loader2, Trash2, FileText,
   ChevronsRight, GripVertical, ChevronLeft, Columns3,
   Filter, SortDesc, Lock, Unlock, Link2, ExternalLink, MessageSquare,
-  Check, XCircle, Eye, EyeOff,
+  Check, XCircle, Eye, EyeOff, Download,
 } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
 import api from '@/lib/api';
@@ -48,6 +49,11 @@ interface TaskList {
 }
 
 interface UserOption { id: string; fullName: string; avatar: string | null }
+
+interface Division {
+  id: string; name: string; color: string; description?: string | null;
+  _count?: { members: number };
+}
 
 // ── Active filter state ────────────────────────────────────
 interface FilterState {
@@ -1771,6 +1777,93 @@ function NewListModal({ onClose, onCreated }: {
   );
 }
 
+// ── Division Folder Grid ───────────────────────────────────
+function DivisionFolderGrid({
+  divisions, onSelect, userDivisionId, loading,
+}: {
+  divisions: Division[]; onSelect: (div: Division) => void;
+  userDivisionId?: string; loading: boolean;
+}) {
+  if (loading) return (
+    <div className="flex flex-col items-center justify-center flex-1 gap-2">
+      <Loader2 size={24} className="animate-spin text-gray-300" />
+      <p className="text-sm text-gray-400">Memuat divisi…</p>
+    </div>
+  );
+
+  if (!divisions.length) return (
+    <div className="flex flex-col items-center justify-center flex-1 gap-3 text-gray-400">
+      <Building2 size={32} className="text-gray-200" />
+      <p className="text-sm">Tidak ada divisi tersedia</p>
+    </div>
+  );
+
+  return (
+    <div className="flex-1 overflow-y-auto p-6">
+      <div className="mb-6">
+        <h2 className="text-base font-semibold text-gray-800">Pilih Divisi</h2>
+        <p className="text-xs text-gray-400 mt-0.5">Klik divisi untuk melihat task-task di dalamnya</p>
+      </div>
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+        {divisions.map((div) => (
+          <button
+            key={div.id}
+            onClick={() => onSelect(div)}
+            className="group bg-white rounded-xl border border-gray-100 hover:shadow-md hover:border-transparent transition-all text-left overflow-hidden"
+          >
+            <div className="h-1.5 w-full" style={{ backgroundColor: div.color ?? '#6366f1' }} />
+            <div className="p-4">
+              <div
+                className="w-10 h-10 rounded-lg flex items-center justify-center text-white font-bold text-sm mb-3 flex-shrink-0"
+                style={{ backgroundColor: div.color ?? '#6366f1' }}
+              >
+                {div.name.charAt(0).toUpperCase()}
+              </div>
+              <p className="font-semibold text-gray-800 text-sm leading-tight truncate">{div.name}</p>
+              {div.description && (
+                <p className="text-xs text-gray-400 mt-0.5 line-clamp-1">{div.description}</p>
+              )}
+              {userDivisionId === div.id && (
+                <span
+                  className="inline-block mt-2 text-[10px] font-semibold text-white px-1.5 py-0.5 rounded-full"
+                  style={{ backgroundColor: div.color ?? '#6366f1' }}
+                >
+                  Divisi Saya
+                </span>
+              )}
+              <div className="mt-3 flex items-center gap-1 text-[10px] text-gray-300 group-hover:text-gray-400 transition-colors">
+                <FolderOpen size={11} />
+                <span>Buka</span>
+              </div>
+            </div>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── CSV Export ─────────────────────────────────────────────
+function exportToCSV(tasks: Task[], filename: string) {
+  const headers = ['Title', 'Status', 'Priority', 'Due Date', 'Creator', 'Assignee', 'List', 'Created At'];
+  const rows = tasks.map((t) => [
+    `"${t.title.replace(/"/g, '""')}"`,
+    t.status,
+    t.priority,
+    t.dueDate ? new Date(t.dueDate).toLocaleDateString('id-ID') : '',
+    t.creator.fullName,
+    t.assignee?.fullName ?? '',
+    t.taskList?.name ?? '',
+    new Date(t.createdAt).toLocaleDateString('id-ID'),
+  ]);
+  const csv = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename; a.click();
+  URL.revokeObjectURL(url);
+}
+
 // ── Main Page ──────────────────────────────────────────────
 export default function TasksPage() {
   const { user } = useAuthStore();
@@ -1794,6 +1887,9 @@ export default function TasksPage() {
   const [showFilters,  setShowFilters] = useState(false);
   const [filters,      setFilters]     = useState<FilterState>(EMPTY_FILTER);
   const [filterUsers,  setFilterUsers] = useState<UserOption[]>([]);
+  const [selectedDivision,  setSelectedDivision]  = useState<Division | null>(null);
+  const [divisions,         setDivisions]          = useState<Division[]>([]);
+  const [loadingDivisions,  setLoadingDivisions]   = useState(false);
   const [toggleError,      setToggleError]      = useState<string | null>(null);
   const [pendingComplete,  setPendingComplete]  = useState<Task | null>(null);
   const completeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -1859,15 +1955,28 @@ export default function TasksPage() {
         } else {
           params.view = sidebarView;
         }
+        if (sidebarView === 'all' && selectedDivision) {
+          params.divisionId = selectedDivision.id;
+        }
         if (debSearch) params.search = debSearch;
         const res = await api.get('/tasks', { params });
         fetched = res.data.data ?? [];
       }
       setTasks(fetched);
     } catch { /* silent */ } finally { setLoading(false); }
-  }, [sidebarView, debSearch]);
+  }, [sidebarView, debSearch, selectedDivision]);
 
   useEffect(() => { loadTasks(); }, [loadTasks]);
+
+  // Load divisions for the folder picker
+  useEffect(() => {
+    if (sidebarView !== 'all') return;
+    setLoadingDivisions(true);
+    api.get('/divisions')
+      .then((r) => setDivisions(r.data.data ?? []))
+      .catch(() => {})
+      .finally(() => setLoadingDivisions(false));
+  }, [sidebarView]);
 
   // Client-side filtering
   const filteredTasks = useMemo(() => {
@@ -2004,7 +2113,7 @@ export default function TasksPage() {
       {/* Sidebar */}
       <TasksSidebar
         active={sidebarView}
-        onSelect={(v) => { setSidebarView(v); setSelectedId(null); }}
+        onSelect={(v) => { setSidebarView(v); setSelectedId(null); setSelectedDivision(null); }}
         taskLists={taskLists}
         pendingCount={pendingCount}
         canSeeTeam={canSeeTeam}
@@ -2040,7 +2149,27 @@ export default function TasksPage() {
         {/* Toolbar */}
         <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-200 flex-shrink-0 flex-wrap bg-white">
           {sidebarView !== 'my_day' && sidebarView !== 'important' && (
-            <h1 className="text-sm font-semibold text-gray-800 mr-1">{pageTitle}</h1>
+            <div className="flex items-center gap-1.5 mr-1">
+              {sidebarView === 'all' && selectedDivision ? (
+                <>
+                  <button
+                    onClick={() => { setSelectedDivision(null); setSelectedId(null); }}
+                    className="text-sm text-gray-400 hover:text-navy transition-colors"
+                  >
+                    All Tasks
+                  </button>
+                  <ChevronRight size={13} className="text-gray-300" />
+                  <span
+                    className="text-sm font-semibold text-gray-800 flex items-center gap-1.5"
+                  >
+                    <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: selectedDivision.color }} />
+                    {selectedDivision.name}
+                  </span>
+                </>
+              ) : (
+                <h1 className="text-sm font-semibold text-gray-800">{pageTitle}</h1>
+              )}
+            </div>
           )}
 
           {/* View mode switcher */}
@@ -2098,6 +2227,20 @@ export default function TasksPage() {
             )}
           </button>
 
+          {/* Export CSV button */}
+          {filteredTasks.length > 0 && (
+            <button
+              onClick={() => exportToCSV(
+                filteredTasks,
+                `tasks-${sidebarView}-${new Date().toISOString().slice(0, 10)}.csv`,
+              )}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs rounded-lg border border-gray-200 text-gray-600 hover:border-gray-400 transition-colors"
+              title="Export ke CSV"
+            >
+              <Download size={12} /> CSV
+            </button>
+          )}
+
           <div className="flex-1" />
           {sidebarView === 'all' && (viewMode === 'list' || viewMode === 'board') && (
             <button
@@ -2125,7 +2268,14 @@ export default function TasksPage() {
         {/* Content */}
         <div className="flex flex-1 min-h-0 overflow-hidden">
           <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
-            {loading ? (
+            {sidebarView === 'all' && !selectedDivision ? (
+              <DivisionFolderGrid
+                divisions={divisions}
+                onSelect={(div) => { setSelectedDivision(div); setSelectedId(null); }}
+                userDivisionId={user?.division?.id}
+                loading={loadingDivisions}
+              />
+            ) : loading ? (
               <div className="flex flex-col items-center justify-center flex-1 gap-2">
                 <Loader2 size={24} className="animate-spin text-gray-300" />
                 <p className="text-sm text-gray-400">Memuat tasks…</p>
