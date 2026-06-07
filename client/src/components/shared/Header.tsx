@@ -19,7 +19,7 @@ const BREADCRUMB_MAP: Record<string, string> = {
   '/bulletin':           'Bulletin',
   '/notes':              'Notes',
   '/database':           'DB Links',
-  '/profile':            'Profil Saya',
+  '/profile':            'My Profile',
   '/analytics':          'Analytics',
   '/admin/users':        'Manage Users',
   '/admin/permissions':  'Permissions',
@@ -52,11 +52,11 @@ function NotifIcon({ type }: { type: string }) {
 
 function notifAge(iso: string) {
   const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
-  if (diff < 1)  return 'Baru saja';
-  if (diff < 60) return `${diff} menit lalu`;
+  if (diff < 1)  return 'Just now';
+  if (diff < 60) return `${diff} minutes ago`;
   const h = Math.floor(diff / 60);
-  if (h < 24)   return `${h} jam lalu`;
-  return `${Math.floor(h / 24)} hari lalu`;
+  if (h < 24)   return `${h} hours ago`;
+  return `${Math.floor(h / 24)} days ago`;
 }
 
 export default function Header({ onSearchClick }: { onSearchClick?: () => void }) {
@@ -121,7 +121,7 @@ export default function Header({ onSearchClick }: { onSearchClick?: () => void }
             className="hidden sm:flex items-center gap-2 px-3 py-1.5 text-sm text-gray-400 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors mr-1"
           >
             <Search size={13} />
-            <span>Cari...</span>
+            <span>Search...</span>
             <kbd className="text-xs bg-white px-1.5 py-0.5 rounded border border-gray-200 font-mono ml-2">⌘K</kbd>
           </button>
           <button
@@ -148,13 +148,13 @@ export default function Header({ onSearchClick }: { onSearchClick?: () => void }
               <div className="absolute right-0 top-10 w-80 bg-white border border-gray-200 rounded-lg shadow-md z-50">
                 <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
                   <span className="text-sm font-semibold text-gray-800">
-                    Notifikasi
+                    Notifications
                     {unreadCount > 0 && (
                       <span className="ml-1.5 text-xs bg-danger text-white px-1.5 py-0.5 rounded-full">{unreadCount}</span>
                     )}
                   </span>
                   {unreadCount > 0 && (
-                    <button onClick={markAllRead} className="text-xs text-info hover:underline">Tandai semua dibaca</button>
+                    <button onClick={markAllRead} className="text-xs text-info hover:underline">Mark all as read</button>
                   )}
                 </div>
                 <div className="max-h-72 overflow-y-auto">
@@ -165,7 +165,7 @@ export default function Header({ onSearchClick }: { onSearchClick?: () => void }
                   ) : notifications.length === 0 ? (
                     <div className="py-8 text-center">
                       <Bell size={24} className="text-gray-200 mx-auto mb-2" />
-                      <p className="text-sm text-gray-400">Belum ada notifikasi</p>
+                      <p className="text-sm text-gray-400">No notifications yet</p>
                     </div>
                   ) : notifications.map((n) => (
                     <button key={n.id} onClick={() => markRead(n.id)}
@@ -218,13 +218,13 @@ export default function Header({ onSearchClick }: { onSearchClick?: () => void }
                   onClick={() => setUserMenuOpen(false)}
                   className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors">
                   <User size={15} className="text-gray-400" />
-                  Profil Saya
+                  My Profile
                 </Link>
 
                 <button onClick={() => { setUserMenuOpen(false); setChangePwOpen(true); }}
                   className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors">
                   <KeyRound size={15} className="text-gray-400" />
-                  Ganti Password
+                  Change Password
                 </button>
 
                 <div className="border-t border-gray-100 mt-1 pt-1">

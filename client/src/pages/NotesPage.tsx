@@ -60,7 +60,7 @@ function NoteFormModal({
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    if (!form.content.trim()) { setError('Konten tidak boleh kosong'); return; }
+    if (!form.content.trim()) { setError('Content cannot be empty'); return; }
     setSaving(true);
     setError('');
     try {
@@ -77,7 +77,7 @@ function NoteFormModal({
       onClose();
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
-      setError(msg ?? 'Terjadi kesalahan');
+      setError(msg ?? 'An error occurred');
     } finally {
       setSaving(false);
     }
@@ -92,7 +92,7 @@ function NoteFormModal({
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200">
           <h2 className="text-sm font-semibold text-gray-800">
-            {note ? 'Edit Note' : 'Note Baru'}
+            {note ? 'Edit Note' : 'New Note'}
           </h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
             <X size={16} />
@@ -103,12 +103,12 @@ function NoteFormModal({
           {/* Title */}
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">
-              Judul <span className="font-normal text-gray-400">(opsional)</span>
+              Title <span className="font-normal text-gray-400">(optional)</span>
             </label>
             <input
               type="text"
               maxLength={100}
-              placeholder="Tambah judul..."
+              placeholder="Add a title..."
               value={form.title}
               onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
               className="w-full border border-gray-200 rounded px-3 py-2 text-sm focus:outline-none focus:border-navy focus:ring-1 focus:ring-navy"
@@ -118,13 +118,13 @@ function NoteFormModal({
           {/* Content */}
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">
-              Konten <span className="text-danger">*</span>
+              Content <span className="text-danger">*</span>
             </label>
             <textarea
               ref={textRef}
               rows={6}
               maxLength={2000}
-              placeholder="Tulis catatan..."
+              placeholder="Write your note..."
               value={form.content}
               onChange={(e) => setForm((f) => ({ ...f, content: e.target.value }))}
               className="w-full border border-gray-200 rounded px-3 py-2 text-sm resize-none focus:outline-none focus:border-navy focus:ring-1 focus:ring-navy"
@@ -134,7 +134,7 @@ function NoteFormModal({
 
           {/* Color picker */}
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-2">Warna</label>
+            <label className="block text-xs font-medium text-gray-600 mb-2">Color</label>
             <div className="flex gap-2">
               {COLOR_OPTS.map((c) => (
                 <button
@@ -159,7 +159,7 @@ function NoteFormModal({
               onChange={(e) => setForm((f) => ({ ...f, isPinned: e.target.checked }))}
               className="w-4 h-4 rounded border-gray-300 text-navy focus:ring-navy"
             />
-            <span className="text-sm text-gray-700">Pin catatan ini</span>
+            <span className="text-sm text-gray-700">Pin this note</span>
           </label>
 
           {error && (
@@ -175,7 +175,7 @@ function NoteFormModal({
               onClick={onClose}
               className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 border border-gray-200 rounded hover:bg-gray-50"
             >
-              Batal
+              Cancel
             </button>
             <button
               type="submit"
@@ -183,7 +183,7 @@ function NoteFormModal({
               className="flex items-center gap-1.5 px-4 py-2 text-sm text-white bg-navy hover:bg-navy-light rounded disabled:opacity-50"
             >
               {saving && <Loader2 size={13} className="animate-spin" />}
-              {note ? 'Simpan' : 'Buat Note'}
+              {note ? 'Save' : 'Create Note'}
             </button>
           </div>
         </form>
@@ -209,7 +209,7 @@ function NoteCard({
 
   async function handleDelete(e: React.MouseEvent) {
     e.stopPropagation();
-    if (!confirm('Hapus note ini?')) return;
+    if (!confirm('Delete this note?')) return;
     setDeleting(true);
     try {
       await api.delete(`/notes/${note.id}`);
@@ -224,7 +224,7 @@ function NoteCard({
     onTogglePin(note);
   }
 
-  const date = new Date(note.updatedAt).toLocaleDateString('id-ID', {
+  const date = new Date(note.updatedAt).toLocaleDateString('en-US', {
     day: '2-digit', month: 'short', year: 'numeric',
   });
 
@@ -241,7 +241,7 @@ function NoteCard({
       <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
         <button
           onClick={handlePin}
-          title={note.isPinned ? 'Lepas pin' : 'Pin note'}
+          title={note.isPinned ? 'Unpin' : 'Pin note'}
           className={cn(
             'w-6 h-6 flex items-center justify-center rounded',
             'bg-white/70 hover:bg-white text-gray-500 hover:text-navy transition-colors',
@@ -259,7 +259,7 @@ function NoteCard({
         <button
           onClick={handleDelete}
           disabled={deleting}
-          title="Hapus"
+          title="Delete"
           className="w-6 h-6 flex items-center justify-center rounded bg-white/70 hover:bg-white text-gray-500 hover:text-danger transition-colors"
         >
           {deleting ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
@@ -270,7 +270,7 @@ function NoteCard({
       {note.isPinned && (
         <div className="flex items-center gap-1 mb-2">
           <Pin size={10} className="text-gray-500" />
-          <span className="text-xs text-gray-500">Disematkan</span>
+          <span className="text-xs text-gray-500">Pinned</span>
         </div>
       )}
 
@@ -295,16 +295,13 @@ export default function NotesPage() {
   const [modalOpen, setModalOpen]         = useState(false);
   const [editing, setEditing]             = useState<Note | null>(null);
 
-  // Debounce search
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(search), 400);
     return () => clearTimeout(t);
   }, [search]);
 
-  // Fetch all notes once on mount
   useEffect(() => { fetchNotes(); }, [fetchNotes]);
 
-  // Client-side filtering
   const notes = useMemo(() => {
     let result = allNotes;
     if (debouncedSearch) {
@@ -350,7 +347,7 @@ export default function NotesPage() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-xl font-semibold text-gray-800">Notes</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Catatan pribadi & referensi cepat</p>
+          <p className="text-sm text-gray-500 mt-0.5">Personal notes & quick references</p>
         </div>
         {perms.note.create && (
           <button
@@ -358,7 +355,7 @@ export default function NotesPage() {
             className="flex items-center gap-1.5 px-3 py-2 text-sm text-white bg-navy hover:bg-navy-light rounded transition-colors"
           >
             <Plus size={15} />
-            Note Baru
+            New Note
           </button>
         )}
       </div>
@@ -370,7 +367,7 @@ export default function NotesPage() {
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
           <input
             type="text"
-            placeholder="Cari catatan..."
+            placeholder="Search notes..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="pl-8 pr-8 py-2 text-sm border border-gray-200 rounded focus:outline-none focus:border-navy focus:ring-1 focus:ring-navy w-56"
@@ -387,7 +384,7 @@ export default function NotesPage() {
 
         {/* Color filter */}
         <div className="flex items-center gap-1.5">
-          <span className="text-xs text-gray-500">Warna:</span>
+          <span className="text-xs text-gray-500">Color:</span>
           <button
             onClick={() => setColorFilter('')}
             className={cn(
@@ -397,7 +394,7 @@ export default function NotesPage() {
                 : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300',
             )}
           >
-            Semua
+            All
           </button>
           {COLOR_OPTS.map((c) => (
             <button
@@ -415,7 +412,7 @@ export default function NotesPage() {
 
         {allNotes.length > 0 && (
           <span className="ml-auto text-xs text-gray-400">
-            {notes.length} catatan{notes.length !== allNotes.length ? ` dari ${allNotes.length}` : ''}
+            {notes.length} note{notes.length !== 1 ? 's' : ''}{notes.length !== allNotes.length ? ` of ${allNotes.length}` : ''}
           </span>
         )}
       </div>
@@ -435,7 +432,7 @@ export default function NotesPage() {
             onClick={fetchNotes}
             className="mt-3 px-4 py-1.5 text-sm text-navy border border-navy rounded hover:bg-navy-50"
           >
-            Coba lagi
+            Try again
           </button>
         </div>
       )}
@@ -443,9 +440,9 @@ export default function NotesPage() {
       {!loading && !error && allNotes.length === 0 && (
         <div className="flex flex-col items-center justify-center py-16 text-center">
           <StickyNote size={40} className="text-gray-300 mb-3" />
-          <p className="text-sm font-medium text-gray-600">Belum ada catatan</p>
+          <p className="text-sm font-medium text-gray-600">No notes yet</p>
           <p className="text-xs text-gray-400 mt-1">
-            Klik "Note Baru" untuk membuat catatan pertama
+            Click "New Note" to create your first note
           </p>
         </div>
       )}
@@ -453,8 +450,8 @@ export default function NotesPage() {
       {!loading && !error && allNotes.length > 0 && notes.length === 0 && (
         <div className="flex flex-col items-center justify-center py-16 text-center">
           <StickyNote size={40} className="text-gray-300 mb-3" />
-          <p className="text-sm font-medium text-gray-600">Tidak ada catatan yang cocok</p>
-          <p className="text-xs text-gray-400 mt-1">Coba ubah filter pencarian</p>
+          <p className="text-sm font-medium text-gray-600">No matching notes</p>
+          <p className="text-xs text-gray-400 mt-1">Try adjusting your search filters</p>
         </div>
       )}
 
@@ -465,7 +462,7 @@ export default function NotesPage() {
             <div className="mb-6">
               <p className="flex items-center gap-1.5 text-xs font-medium text-gray-500 uppercase tracking-wider mb-3">
                 <Pin size={11} />
-                Disematkan
+                Pinned
               </p>
               <div className="columns-1 sm:columns-2 lg:columns-3 xl:columns-4 gap-4">
                 {pinned.map((note) => (
@@ -486,7 +483,7 @@ export default function NotesPage() {
             <div>
               {pinned.length > 0 && (
                 <p className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-3">
-                  Lainnya
+                  Others
                 </p>
               )}
               <div className="columns-1 sm:columns-2 lg:columns-3 xl:columns-4 gap-4">

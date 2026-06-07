@@ -37,25 +37,31 @@ interface RoleWithPerms {
 
 // ── Scope options ─────────────────────────────────────────────
 const TASK_SCOPE_OPTS: { value: Scope; label: string }[] = [
-  { value: 'none',     label: 'Tidak Bisa' },
-  { value: 'own',      label: 'Sendiri'    },
-  { value: 'division', label: 'Divisi'     },
-  { value: 'all',      label: 'Semua'      },
+  { value: 'none',     label: 'None'     },
+  { value: 'own',      label: 'Own'      },
+  { value: 'division', label: 'Division' },
+  { value: 'all',      label: 'All'      },
 ];
 const EDIT_SCOPE_OPTS: { value: Scope; label: string }[] = [
-  { value: 'none', label: 'Tidak Bisa' },
-  { value: 'own',  label: 'Milik Sendiri' },
-  { value: 'all',  label: 'Semua' },
+  { value: 'none', label: 'None' },
+  { value: 'own',  label: 'Own'  },
+  { value: 'all',  label: 'All'  },
 ];
 const AUDIENCE_SCOPE_OPTS: { value: AudienceScope; label: string }[] = [
-  { value: 'none',     label: 'Tidak Bisa'     },
-  { value: 'division', label: 'Divisi Sendiri'  },
-  { value: 'all',      label: 'Semua'           },
+  { value: 'none',     label: 'None'            },
+  { value: 'division', label: 'Own Division'     },
+  { value: 'all',      label: 'All'              },
 ];
 const VIEW_DB_SCOPE_OPTS: { value: Scope; label: string }[] = [
-  { value: 'none',     label: 'Tidak Bisa' },
-  { value: 'division', label: 'Divisi'     },
-  { value: 'all',      label: 'Semua'      },
+  { value: 'none',     label: 'None'     },
+  { value: 'division', label: 'Division' },
+  { value: 'all',      label: 'All'      },
+];
+const VIEW_SCOPE_OPTS: { value: Scope; label: string }[] = [
+  { value: 'none',     label: 'None'     },
+  { value: 'own',      label: 'Own'      },
+  { value: 'division', label: 'Division' },
+  { value: 'all',      label: 'All'      },
 ];
 
 // ── Sub-components ────────────────────────────────────────────
@@ -157,12 +163,12 @@ export default function PermissionPage() {
           setPerms(JSON.parse(JSON.stringify(data[0].permissions)));
         }
       })
-      .catch(() => setError('Gagal memuat data permission'))
+      .catch(() => setError('Failed to load permission data'))
       .finally(() => setLoading(false));
   }, []);
 
   function handleSelectRole(role: RoleWithPerms) {
-    if (isDirty && !confirm('Ada perubahan yang belum disimpan. Lanjutkan?')) return;
+    if (isDirty && !confirm('You have unsaved changes. Continue?')) return;
     setSelectedId(role.id);
     setPerms(JSON.parse(JSON.stringify(role.permissions)));
     setIsDirty(false);
@@ -196,10 +202,10 @@ export default function PermissionPage() {
           : r,
       ));
       setIsDirty(false);
-      setToast('Permission berhasil disimpan');
+      setToast('Permissions saved successfully');
       setTimeout(() => setToast(null), 3000);
     } catch {
-      setToast('Gagal menyimpan permission');
+      setToast('Failed to save permissions');
       setTimeout(() => setToast(null), 3000);
     } finally {
       setSaving(false);
@@ -239,7 +245,7 @@ export default function PermissionPage() {
       <div className="w-56 flex-shrink-0 flex flex-col bg-white border border-gray-200 rounded-lg overflow-hidden">
         <div className="px-4 py-3 border-b border-gray-100">
           <h2 className="text-sm font-semibold text-gray-800">Roles</h2>
-          <p className="text-xs text-gray-400 mt-0.5">Pilih role untuk diedit</p>
+          <p className="text-xs text-gray-400 mt-0.5">Select a role to edit</p>
         </div>
         <div className="flex-1 overflow-y-auto py-2">
           {roles.map((role) => (
@@ -262,7 +268,7 @@ export default function PermissionPage() {
                 <p className="text-xs text-gray-400">Level {role.level}</p>
               </div>
               {role.hasCustomPermissions && (
-                <span className="w-1.5 h-1.5 rounded-full bg-info flex-shrink-0" title="Kustom" />
+                <span className="w-1.5 h-1.5 rounded-full bg-info flex-shrink-0" title="Custom" />
               )}
             </button>
           ))}
@@ -284,8 +290,8 @@ export default function PermissionPage() {
                   <h2 className="text-sm font-semibold text-gray-800">{selectedRole.name}</h2>
                   <p className="text-xs text-gray-400">
                     Level {selectedRole.level}
-                    {isSuperAdmin && ' — SuperAdmin tidak dapat dikonfigurasi'}
-                    {!isSuperAdmin && selectedRole.hasCustomPermissions && ' — Permission kustom'}
+                    {isSuperAdmin && ' — SuperAdmin cannot be configured'}
+                    {!isSuperAdmin && selectedRole.hasCustomPermissions && ' — Custom permissions'}
                   </p>
                 </div>
               </div>
@@ -300,14 +306,14 @@ export default function PermissionPage() {
                 )}
               >
                 {saving ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
-                Simpan
+                Save
               </button>
             </div>
 
             {isSuperAdmin && (
               <div className="mx-6 mt-4 px-4 py-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-700 flex items-center gap-2">
                 <ShieldCheck size={15} />
-                SuperAdmin selalu memiliki semua izin penuh dan tidak dapat dikonfigurasi.
+                SuperAdmin always has full permissions and cannot be configured.
               </div>
             )}
 
@@ -315,7 +321,7 @@ export default function PermissionPage() {
             <div className="flex-1 overflow-y-auto px-6 py-4">
               {/* Task */}
               <Section title="Task">
-                <PermRow label="Lihat task">
+                <PermRow label="View tasks">
                   <ScopeSelector
                     value={perms.task.view}
                     options={TASK_SCOPE_OPTS}
@@ -323,14 +329,14 @@ export default function PermissionPage() {
                     disabled={isSuperAdmin}
                   />
                 </PermRow>
-                <PermRow label="Buat task">
+                <PermRow label="Create tasks">
                   <Toggle
                     checked={perms.task.create}
                     onChange={(v) => update('task', 'create', v)}
                     disabled={isSuperAdmin}
                   />
                 </PermRow>
-                <PermRow label="Edit task">
+                <PermRow label="Edit tasks">
                   <ScopeSelector
                     value={perms.task.edit}
                     options={TASK_SCOPE_OPTS}
@@ -338,7 +344,7 @@ export default function PermissionPage() {
                     disabled={isSuperAdmin}
                   />
                 </PermRow>
-                <PermRow label="Hapus task">
+                <PermRow label="Delete tasks">
                   <ScopeSelector
                     value={perms.task.delete}
                     options={TASK_SCOPE_OPTS}
@@ -346,7 +352,7 @@ export default function PermissionPage() {
                     disabled={isSuperAdmin}
                   />
                 </PermRow>
-                <PermRow label="Lihat task private orang lain">
+                <PermRow label="View others' private tasks">
                   <Toggle
                     checked={perms.task.viewPrivate}
                     onChange={(v) => update('task', 'viewPrivate', v)}
@@ -357,14 +363,14 @@ export default function PermissionPage() {
 
               {/* Bulletin */}
               <Section title="Bulletin">
-                <PermRow label="Lihat bulletin">
+                <PermRow label="View bulletins">
                   <Toggle
                     checked={perms.bulletin.view}
                     onChange={(v) => update('bulletin', 'view', v)}
                     disabled={isSuperAdmin}
                   />
                 </PermRow>
-                <PermRow label="Buat & publish bulletin">
+                <PermRow label="Create & publish bulletins">
                   <Toggle
                     checked={perms.bulletin.create}
                     onChange={(v) => update('bulletin', 'create', v)}
@@ -379,7 +385,7 @@ export default function PermissionPage() {
                     disabled={isSuperAdmin || !perms.bulletin.create}
                   />
                 </PermRow>
-                <PermRow label="Edit bulletin">
+                <PermRow label="Edit bulletins">
                   <ScopeSelector
                     value={perms.bulletin.edit}
                     options={EDIT_SCOPE_OPTS}
@@ -387,7 +393,7 @@ export default function PermissionPage() {
                     disabled={isSuperAdmin}
                   />
                 </PermRow>
-                <PermRow label="Hapus bulletin">
+                <PermRow label="Delete bulletins">
                   <ScopeSelector
                     value={perms.bulletin.delete}
                     options={EDIT_SCOPE_OPTS}
@@ -399,7 +405,7 @@ export default function PermissionPage() {
 
               {/* DB Links */}
               <Section title="DB Links">
-                <PermRow label="Lihat folder">
+                <PermRow label="View folders">
                   <ScopeSelector
                     value={perms.db_link.view}
                     options={VIEW_DB_SCOPE_OPTS}
@@ -407,21 +413,21 @@ export default function PermissionPage() {
                     disabled={isSuperAdmin}
                   />
                 </PermRow>
-                <PermRow label="Tambah link ke folder">
+                <PermRow label="Add links to folders">
                   <Toggle
                     checked={perms.db_link.addLink}
                     onChange={(v) => update('db_link', 'addLink', v)}
                     disabled={isSuperAdmin}
                   />
                 </PermRow>
-                <PermRow label="Kelola folder (buat/edit/hapus)">
+                <PermRow label="Manage folders (create/edit/delete)">
                   <Toggle
                     checked={perms.db_link.manageFolder}
                     onChange={(v) => update('db_link', 'manageFolder', v)}
                     disabled={isSuperAdmin}
                   />
                 </PermRow>
-                <PermRow label="Bagikan folder ke divisi lain">
+                <PermRow label="Share folders with other divisions">
                   <Toggle
                     checked={perms.db_link.shareFolder}
                     onChange={(v) => update('db_link', 'shareFolder', v)}
@@ -432,7 +438,7 @@ export default function PermissionPage() {
 
               {/* Notes */}
               <Section title="Notes">
-                <PermRow label="Lihat catatan">
+                <PermRow label="View notes">
                   <ScopeSelector
                     value={perms.note?.view ?? 'own'}
                     options={TASK_SCOPE_OPTS}
@@ -440,14 +446,14 @@ export default function PermissionPage() {
                     disabled={isSuperAdmin}
                   />
                 </PermRow>
-                <PermRow label="Buat catatan">
+                <PermRow label="Create notes">
                   <Toggle
                     checked={perms.note?.create ?? true}
                     onChange={(v) => update('note', 'create', v)}
                     disabled={isSuperAdmin}
                   />
                 </PermRow>
-                <PermRow label="Edit catatan">
+                <PermRow label="Edit notes">
                   <ScopeSelector
                     value={perms.note?.edit ?? 'own'}
                     options={EDIT_SCOPE_OPTS}
@@ -455,7 +461,7 @@ export default function PermissionPage() {
                     disabled={isSuperAdmin}
                   />
                 </PermRow>
-                <PermRow label="Hapus catatan">
+                <PermRow label="Delete notes">
                   <ScopeSelector
                     value={perms.note?.delete ?? 'own'}
                     options={EDIT_SCOPE_OPTS}
@@ -467,7 +473,7 @@ export default function PermissionPage() {
 
               {/* Analytics */}
               <Section title="Analytics">
-                <PermRow label="Lihat analytics">
+                <PermRow label="View analytics">
                   <ScopeSelector
                     value={perms.analytics?.view ?? 'none'}
                     options={VIEW_SCOPE_OPTS}
@@ -479,7 +485,7 @@ export default function PermissionPage() {
 
               {/* Audit Log */}
               <Section title="Audit Log">
-                <PermRow label="Lihat audit log">
+                <PermRow label="View audit log">
                   <ScopeSelector
                     value={perms.audit_log?.view ?? 'none'}
                     options={VIEW_SCOPE_OPTS}
@@ -493,7 +499,7 @@ export default function PermissionPage() {
         ) : (
           <div className="flex flex-col items-center justify-center h-full text-center p-8">
             <ShieldCheck size={40} className="text-gray-300 mb-3" />
-            <p className="text-sm font-medium text-gray-600">Pilih role untuk mengonfigurasi permission</p>
+            <p className="text-sm font-medium text-gray-600">Select a role to configure permissions</p>
           </div>
         )}
       </div>

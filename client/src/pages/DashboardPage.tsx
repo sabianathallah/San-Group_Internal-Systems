@@ -18,14 +18,14 @@ import { cn } from '@/lib/cn';
 // ── Helpers ────────────────────────────────────────────────
 function getGreeting(): string {
   const h = new Date().getHours();
-  if (h < 11) return 'Selamat pagi';
-  if (h < 15) return 'Selamat siang';
-  if (h < 18) return 'Selamat sore';
-  return 'Selamat malam';
+  if (h < 11) return 'Good morning';
+  if (h < 15) return 'Good afternoon';
+  if (h < 18) return 'Good evening';
+  return 'Good evening';
 }
 
 function formatDateShort(): string {
-  return new Date().toLocaleDateString('id-ID', {
+  return new Date().toLocaleDateString('en-US', {
     weekday: 'long', day: 'numeric', month: 'long',
   });
 }
@@ -36,17 +36,17 @@ function relativeDate(iso: string | null): { label: string; overdue: boolean } {
   const now  = new Date();
   now.setHours(0, 0, 0, 0);
   const diff = Math.ceil((d.getTime() - now.getTime()) / 86_400_000);
-  if (diff < 0)  return { label: `${Math.abs(diff)} hari lalu`, overdue: true };
-  if (diff === 0) return { label: 'Hari ini', overdue: false };
-  if (diff === 1) return { label: 'Besok', overdue: false };
+  if (diff < 0)  return { label: `${Math.abs(diff)} days ago`, overdue: true };
+  if (diff === 0) return { label: 'Today', overdue: false };
+  if (diff === 1) return { label: 'Tomorrow', overdue: false };
   return {
-    label: d.toLocaleDateString('id-ID', { day: '2-digit', month: 'short' }),
+    label: d.toLocaleDateString('en-US', { day: '2-digit', month: 'short' }),
     overdue: false,
   };
 }
 
 function bulletinDate(iso: string): string {
-  return new Date(iso).toLocaleDateString('id-ID', { day: '2-digit', month: 'short' });
+  return new Date(iso).toLocaleDateString('en-US', { day: '2-digit', month: 'short' });
 }
 
 // ── Types ──────────────────────────────────────────────────
@@ -83,7 +83,7 @@ const BULLETIN_BADGE: Record<BulletinPriority, string> = {
 };
 
 const BULLETIN_LABEL: Record<BulletinPriority, string> = {
-  URGENT: 'Mendesak', IMPORTANT: 'Penting', NORMAL: 'Umum',
+  URGENT: 'Urgent', IMPORTANT: 'Important', NORMAL: 'General',
 };
 
 // ── Note color map (dashboard widget) ─────────────────────
@@ -249,7 +249,7 @@ function QuickAddTask({ onAdded }: { onAdded: (task: Task) => void }) {
         className="flex items-center gap-2.5 w-full px-5 py-3.5 text-sm text-gray-400 hover:text-navy hover:bg-gray-50/60 transition-colors border-t border-gray-100"
       >
         <Plus size={16} className="text-navy" />
-        Tambahkan tugas
+        Add task
       </button>
     );
   }
@@ -265,7 +265,7 @@ function QuickAddTask({ onAdded }: { onAdded: (task: Task) => void }) {
         value={title}
         onChange={(e) => setTitle(e.target.value)}
         onKeyDown={(e) => e.key === 'Escape' && setActive(false)}
-        placeholder="Tulis judul tugas..."
+        placeholder="Enter task title..."
         className="flex-1 text-sm bg-transparent outline-none text-gray-800 placeholder:text-gray-400"
       />
       <button
@@ -273,14 +273,14 @@ function QuickAddTask({ onAdded }: { onAdded: (task: Task) => void }) {
         disabled={saving || !title.trim()}
         className="px-3 py-1 text-xs font-medium text-white bg-navy rounded hover:bg-navy-light disabled:opacity-40 transition-colors"
       >
-        {saving ? <Loader2 size={12} className="animate-spin" /> : 'Tambah'}
+        {saving ? <Loader2 size={12} className="animate-spin" /> : 'Add'}
       </button>
       <button
         type="button"
         onClick={() => setActive(false)}
         className="text-xs text-gray-400 hover:text-gray-600"
       >
-        Batal
+        Cancel
       </button>
     </form>
   );
@@ -300,7 +300,7 @@ function RoleStatsSection({ stats, statsLoading, roleLevel }: {
     <div className="px-4 pt-3 pb-4 bg-white border-b border-gray-100">
       {/* Personal stats — always visible */}
       <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2">
-        Tugas Saya
+        My Tasks
       </p>
       <div className="grid grid-cols-2 gap-2">
         <StatCard
@@ -312,21 +312,21 @@ function RoleStatsSection({ stats, statsLoading, roleLevel }: {
         />
         <StatCard
           icon={Activity}
-          label="Sedang Berjalan"
+          label="In Progress"
           value={stats?.personal.inProgress ?? 0}
           color="bg-amber-50 text-amber-700 border-amber-100"
           loading={statsLoading}
         />
         <StatCard
           icon={CheckCircle2}
-          label="Selesai Minggu Ini"
+          label="Completed This Week"
           value={stats?.personal.done ?? 0}
           color="bg-green-50 text-green-700 border-green-100"
           loading={statsLoading}
         />
         <StatCard
           icon={UserCheck}
-          label="Menunggu Konfirmasi"
+          label="Awaiting Confirmation"
           value={stats?.personal.assigned ?? 0}
           color="bg-orange-50 text-orange-700 border-orange-100"
           loading={statsLoading}
@@ -337,7 +337,7 @@ function RoleStatsSection({ stats, statsLoading, roleLevel }: {
       {roleLevel <= 5 && (
         <div className="mt-3">
           <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2">
-            Tim Saya
+            My Team
           </p>
           <div className="rounded-xl border border-indigo-100 bg-indigo-50 p-3">
             {statsLoading ? (
@@ -348,21 +348,21 @@ function RoleStatsSection({ stats, statsLoading, roleLevel }: {
               <div className="flex items-center gap-3">
                 <div className="flex-1 text-center">
                   <p className="text-xl font-bold text-indigo-700">{stats.team.total}</p>
-                  <p className="text-[10px] text-indigo-500">Total Task</p>
+                  <p className="text-[10px] text-indigo-500">Total Tasks</p>
                 </div>
                 <div className="w-px h-8 bg-indigo-200" />
                 <div className="flex-1 text-center">
                   <p className="text-xl font-bold text-indigo-700">{teamDonePct}%</p>
-                  <p className="text-[10px] text-indigo-500">Selesai</p>
+                  <p className="text-[10px] text-indigo-500">Done</p>
                 </div>
                 <div className="w-px h-8 bg-indigo-200" />
                 <div className="flex-1 text-center">
                   <p className="text-xl font-bold text-indigo-700">{stats.team.memberCount}</p>
-                  <p className="text-[10px] text-indigo-500">Anggota</p>
+                  <p className="text-[10px] text-indigo-500">Members</p>
                 </div>
               </div>
             ) : (
-              <p className="text-xs text-indigo-400 text-center py-2">Tidak ada data tim</p>
+              <p className="text-xs text-indigo-400 text-center py-2">No team data available</p>
             )}
           </div>
         </div>
@@ -372,7 +372,7 @@ function RoleStatsSection({ stats, statsLoading, roleLevel }: {
       {roleLevel <= 3 && roleLevel > 2 && (
         <div className="mt-3">
           <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2">
-            Divisi
+            Division
           </p>
           <div className="rounded-xl border border-violet-100 bg-violet-50 p-3 flex items-center gap-3">
             <div className="w-8 h-8 rounded-lg bg-violet-200 flex items-center justify-center flex-shrink-0">
@@ -386,7 +386,7 @@ function RoleStatsSection({ stats, statsLoading, roleLevel }: {
                   {stats?.team ? `${teamDonePct}% completion rate` : '—'}
                 </p>
                 <p className="text-[10px] text-violet-500">
-                  {stats?.team ? `${stats.team.done} dari ${stats.team.total} task selesai` : 'Memuat data…'}
+                  {stats?.team ? `${stats.team.done} of ${stats.team.total} tasks completed` : 'Loading data…'}
                 </p>
               </div>
             )}
@@ -398,14 +398,14 @@ function RoleStatsSection({ stats, statsLoading, roleLevel }: {
       {roleLevel <= 2 && stats?.system && (
         <div className="mt-3">
           <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2">
-            Sistem
+            System
           </p>
           <div className="grid grid-cols-3 gap-2">
             <div className="rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-center">
               <p className="text-lg font-bold text-slate-700">
                 {statsLoading ? '—' : stats.system.totalUsers}
               </p>
-              <p className="text-[10px] text-slate-500">Pengguna</p>
+              <p className="text-[10px] text-slate-500">Users</p>
             </div>
             <div className="rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-center">
               <p className="text-lg font-bold text-slate-700">
@@ -431,9 +431,9 @@ function QuickActionsSection({ roleLevel }: { roleLevel: number }) {
   const navigate = useNavigate();
 
   const actions: { label: string; to?: string; onClick?: () => void; icon: React.ElementType }[] = [
-    { label: 'Manajemen Tugas',    to: ROUTES.TASKS,    icon: ClipboardList },
-    { label: 'Catatan Saya',       to: ROUTES.NOTES,    icon: Pin },
-    { label: 'Papan Pengumuman',   to: ROUTES.BULLETIN, icon: Megaphone },
+    { label: 'Task Management',    to: ROUTES.TASKS,    icon: ClipboardList },
+    { label: 'My Notes',           to: ROUTES.NOTES,    icon: Pin },
+    { label: 'Bulletin Board',     to: ROUTES.BULLETIN, icon: Megaphone },
     { label: 'Database Links',     to: ROUTES.DATABASE, icon: ExternalLink },
   ];
 
@@ -441,13 +441,13 @@ function QuickActionsSection({ roleLevel }: { roleLevel: number }) {
     actions.push({ label: 'Team Tasks', onClick: () => navigate(ROUTES.TASKS, { state: { view: 'team' } }), icon: Users });
   }
   if (roleLevel <= 2) {
-    actions.push({ label: 'Kelola Pengguna',  to: ROUTES.ADMIN_USERS,       icon: Users });
-    actions.push({ label: 'Permissions',      to: ROUTES.ADMIN_PERMISSIONS, icon: Shield });
+    actions.push({ label: 'Manage Users',  to: ROUTES.ADMIN_USERS,       icon: Users });
+    actions.push({ label: 'Permissions',   to: ROUTES.ADMIN_PERMISSIONS, icon: Shield });
   }
 
   return (
     <div className="bg-white px-4 py-3">
-      <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2">Menu Cepat</p>
+      <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2">Quick Menu</p>
       <div className="space-y-0.5">
         {actions.map((a) =>
           a.to ? (
@@ -571,10 +571,10 @@ export default function DashboardPage() {
             </h1>
             <p className="text-white/50 text-sm mt-1">
               {myDayTasks.length === 0
-                ? 'Tidak ada task di My Day hari ini'
+                ? 'No tasks in My Day today'
                 : active.length === 0
-                  ? 'Semua My Day selesai!'
-                  : `${active.length} tugas My Day menunggu`}
+                  ? 'All My Day tasks completed!'
+                  : `${active.length} My Day task${active.length !== 1 ? 's' : ''} pending`}
             </p>
             {/* Role badge */}
             {user?.role && (
@@ -593,7 +593,7 @@ export default function DashboardPage() {
               : <ProgressRing done={done.length} total={myDayTasks.length} size={60} />
             }
             <p className="text-white/60 text-[10px] mt-0.5">
-              {done.length}/{myDayTasks.length} selesai
+              {done.length}/{myDayTasks.length} done
             </p>
           </div>
         </div>
@@ -608,20 +608,20 @@ export default function DashboardPage() {
           />
           <StatChip
             icon={Megaphone}
-            label={`${unreadBulletins.length} bulletin belum dibaca`}
+            label={`${unreadBulletins.length} unread bulletin${unreadBulletins.length !== 1 ? 's' : ''}`}
             active={unreadBulletins.length > 0}
           />
           {isAdmin && (
             <StatChip
               icon={Users}
-              label={`${activeUsers} staff aktif`}
+              label={`${activeUsers} active staff`}
               active={false}
             />
           )}
           {stats?.personal.assigned !== undefined && stats.personal.assigned > 0 && (
             <StatChip
               icon={UserCheck}
-              label={`${stats.personal.assigned} menunggu konfirmasi`}
+              label={`${stats.personal.assigned} awaiting confirmation`}
               active
             />
           )}
@@ -648,7 +648,7 @@ export default function DashboardPage() {
               to={ROUTES.TASKS}
               className="flex items-center gap-1 text-xs text-gray-400 hover:text-navy transition-colors"
             >
-              Lihat semua <ArrowRight size={11} />
+              View all <ArrowRight size={11} />
             </Link>
           </div>
 
@@ -656,7 +656,7 @@ export default function DashboardPage() {
           {taskLoading ? (
             <div className="flex flex-col items-center justify-center py-16 gap-2">
               <Loader2 size={22} className="animate-spin text-gray-300" />
-              <p className="text-xs text-gray-400">Memuat tugas…</p>
+              <p className="text-xs text-gray-400">Loading tasks...</p>
             </div>
           ) : sortedActive.length === 0 && done.length === 0 ? (
             <EmptyMyDay onNavigate={() => navigate(ROUTES.TASKS)} />
@@ -665,8 +665,8 @@ export default function DashboardPage() {
               {sortedActive.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-10 gap-2">
                   <CheckCircle2 size={28} className="text-success" />
-                  <p className="text-sm font-medium text-gray-700">Semua tugas selesai!</p>
-                  <p className="text-xs text-gray-400">Tidak ada tugas aktif saat ini.</p>
+                  <p className="text-sm font-medium text-gray-700">All tasks done!</p>
+                  <p className="text-xs text-gray-400">No active tasks at the moment.</p>
                 </div>
               ) : (
                 <div>
@@ -687,7 +687,7 @@ export default function DashboardPage() {
                     className="flex items-center gap-2 w-full px-5 py-3 text-xs text-gray-500 hover:bg-gray-50 transition-colors"
                   >
                     {showDone ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
-                    <span className="font-medium">Selesai</span>
+                    <span className="font-medium">Done</span>
                     <span className="text-gray-400">{done.length}</span>
                   </button>
                   {showDone && done.map((task) => (
@@ -718,7 +718,7 @@ export default function DashboardPage() {
                 )}
               </div>
               <Link to={ROUTES.BULLETIN} className="flex items-center gap-1 text-xs text-gray-400 hover:text-navy transition-colors">
-                Semua <ArrowRight size={11} />
+                All <ArrowRight size={11} />
               </Link>
             </div>
 
@@ -726,7 +726,7 @@ export default function DashboardPage() {
               {bulletins.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-10 text-center px-4">
                   <Megaphone size={24} className="text-gray-200 mb-2" />
-                  <p className="text-xs text-gray-400">Belum ada pengumuman</p>
+                  <p className="text-xs text-gray-400">No announcements yet</p>
                 </div>
               ) : (
                 <ul>
@@ -769,21 +769,21 @@ export default function DashboardPage() {
             <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
               <div className="flex items-center gap-2">
                 <Pin size={14} className="text-navy" />
-                <span className="text-sm font-semibold text-gray-800">Catatan Disematkan</span>
+                <span className="text-sm font-semibold text-gray-800">Pinned Notes</span>
                 {dashNotes.length > 0 && (
                   <span className="text-[10px] text-gray-400">({dashNotes.length})</span>
                 )}
               </div>
               <Link to={ROUTES.NOTES} className="flex items-center gap-1 text-xs text-gray-400 hover:text-navy transition-colors">
-                Semua <ArrowRight size={11} />
+                All <ArrowRight size={11} />
               </Link>
             </div>
 
             {dashNotes.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-6 text-center px-4">
                 <Pin size={20} className="text-gray-200 mb-1.5" />
-                <p className="text-xs text-gray-400">Belum ada catatan disematkan</p>
-                <p className="text-[10px] text-gray-300 mt-0.5">Sematkan catatan agar muncul di sini</p>
+                <p className="text-xs text-gray-400">No pinned notes yet</p>
+                <p className="text-[10px] text-gray-300 mt-0.5">Pin notes to see them here</p>
               </div>
             ) : (
               <div className="p-3 space-y-2">
@@ -817,7 +817,7 @@ export default function DashboardPage() {
                     to={ROUTES.NOTES}
                     className="block text-center text-xs text-gray-400 hover:text-navy py-1 transition-colors"
                   >
-                    +{allNotes.filter((n) => n.isPinned).length - 4} catatan lainnya
+                    +{allNotes.filter((n) => n.isPinned).length - 4} more notes
                   </Link>
                 )}
               </div>
@@ -858,15 +858,15 @@ function EmptyMyDay({ onNavigate }: { onNavigate: () => void }) {
       <div className="w-16 h-16 rounded-full bg-navy/5 flex items-center justify-center mb-4">
         <Sun size={28} className="text-navy/30" />
       </div>
-      <p className="text-sm font-semibold text-gray-700">My Day kosong</p>
+      <p className="text-sm font-semibold text-gray-700">My Day is empty</p>
       <p className="text-xs text-gray-400 mt-1 leading-relaxed max-w-[220px]">
-        Tambah task dari sini atau pilih task di halaman Tasks lalu klik ☀️ untuk memasukkannya ke My Day.
+        Add a task here or select a task on the Tasks page and click ☀️ to add it to My Day.
       </p>
       <button
         onClick={onNavigate}
         className="mt-4 text-xs text-white bg-navy hover:bg-navy-light px-4 py-2 rounded transition-colors"
       >
-        Buka Tasks
+        Open Tasks
       </button>
     </div>
   );

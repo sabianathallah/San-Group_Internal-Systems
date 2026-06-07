@@ -83,10 +83,10 @@ function displayStatus(task: { status: TaskStatus; assignmentStatus: AssignmentS
 }
 
 const PRIORITY_CONFIG: Record<TaskPriority, { label: string; color: string; dot: string; border: string }> = {
-  URGENT: { label: 'Mendesak', color: 'text-red-500',    dot: 'bg-red-500',    border: 'border-l-red-400'    },
-  HIGH:   { label: 'Tinggi',   color: 'text-orange-500', dot: 'bg-orange-500', border: 'border-l-orange-400' },
-  MEDIUM: { label: 'Sedang',   color: 'text-blue-500',   dot: 'bg-blue-400',   border: 'border-l-blue-400'   },
-  LOW:    { label: 'Rendah',   color: 'text-gray-400',   dot: 'bg-gray-300',   border: 'border-l-gray-200'   },
+  URGENT: { label: 'Urgent', color: 'text-red-500',    dot: 'bg-red-500',    border: 'border-l-red-400'    },
+  HIGH:   { label: 'High',   color: 'text-orange-500', dot: 'bg-orange-500', border: 'border-l-orange-400' },
+  MEDIUM: { label: 'Medium', color: 'text-blue-500',   dot: 'bg-blue-400',   border: 'border-l-blue-400'   },
+  LOW:    { label: 'Low',    color: 'text-gray-400',   dot: 'bg-gray-300',   border: 'border-l-gray-200'   },
 };
 
 const VIEW_LABELS: Record<string, string> = {
@@ -122,14 +122,14 @@ function fmtDue(iso: string | null): { text: string; overdue: boolean } {
   const d = new Date(iso), now = new Date();
   now.setHours(0, 0, 0, 0);
   const diff = Math.ceil((d.getTime() - now.getTime()) / 86_400_000);
-  if (diff < 0)   return { text: `${Math.abs(diff)}h lalu`, overdue: true };
-  if (diff === 0) return { text: 'Hari ini', overdue: false };
-  if (diff === 1) return { text: 'Besok', overdue: false };
-  return { text: d.toLocaleDateString('id-ID', { day: '2-digit', month: 'short' }), overdue: false };
+  if (diff < 0)   return { text: `${Math.abs(diff)}d ago`, overdue: true };
+  if (diff === 0) return { text: 'Today', overdue: false };
+  if (diff === 1) return { text: 'Tomorrow', overdue: false };
+  return { text: d.toLocaleDateString('en-US', { day: '2-digit', month: 'short' }), overdue: false };
 }
 
 function fmtTime(iso: string) {
-  return new Date(iso).toLocaleString('id-ID', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+  return new Date(iso).toLocaleString('en-US', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
 }
 
 function initials(name: string) {
@@ -139,7 +139,7 @@ function initials(name: string) {
 function toLocalISO(d: string) { return `${d}T00:00:00+07:00`; }
 
 function extractErr(err: unknown): string {
-  return (err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'Terjadi kesalahan';
+  return (err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'An error occurred';
 }
 
 // ── Atom components ────────────────────────────────────────
@@ -189,20 +189,20 @@ const CompletionToast = memo(function CompletionToast({
   return (
     <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-gray-900 text-white rounded-xl shadow-2xl overflow-hidden w-80">
       <div className="px-4 pt-3 pb-3">
-        <p className="text-[11px] text-white/50 mb-0.5">Tugas selesai?</p>
+        <p className="text-[11px] text-white/50 mb-0.5">Mark task as done?</p>
         <p className="text-sm font-medium truncate">{task.title}</p>
         <div className="flex items-center gap-3 mt-3">
           <button
             onClick={onConfirm}
             className="flex-1 text-xs font-semibold bg-green-500 hover:bg-green-600 text-white py-1.5 rounded-lg transition-colors"
           >
-            Ya, selesai
+            Yes, done
           </button>
           <button
             onClick={onCancel}
             className="text-xs text-white/50 hover:text-white transition-colors"
           >
-            Batal
+            Cancel
           </button>
         </div>
       </div>
@@ -377,26 +377,26 @@ function FilterPanel({
           onChange={(e) => onChange({ ...filters, assigneeId: e.target.value })}
           className="text-xs border border-gray-200 rounded px-2 py-1 outline-none focus:border-navy bg-white"
         >
-          <option value="">Semua</option>
+          <option value="">All</option>
           {users.map((u) => <option key={u.id} value={u.id}>{u.fullName}</option>)}
         </select>
       </div>
 
       {/* Toggles */}
       <div>
-        <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Lainnya</p>
+        <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Other</p>
         <div className="flex flex-col gap-1">
           <label className="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer select-none">
             <input type="checkbox" checked={filters.hasDueDate}
               onChange={(e) => onChange({ ...filters, hasDueDate: e.target.checked })}
               className="accent-navy" />
-            Punya due date
+            Has due date
           </label>
           <label className="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer select-none">
             <input type="checkbox" checked={filters.overdueOnly}
               onChange={(e) => onChange({ ...filters, overdueOnly: e.target.checked })}
               className="accent-navy" />
-            Overdue saja
+            Overdue only
           </label>
         </div>
       </div>
@@ -481,12 +481,12 @@ function ListView({
           <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
             <div className="h-full bg-navy rounded-full transition-all" style={{ width: `${progress}%` }} />
           </div>
-          <span className="text-xs text-gray-500 flex-shrink-0">{doneCount}/{tasks.length} selesai</span>
+          <span className="text-xs text-gray-500 flex-shrink-0">{doneCount}/{tasks.length} done</span>
         </div>
       )}
 
       <div className="grid grid-cols-[1fr_110px_100px_80px] gap-2 px-4 py-2 border-b border-gray-100 sticky top-0 bg-white z-10">
-        {['Judul','Status','Prioritas','Due'].map((h) => (
+        {['Title','Status','Priority','Due'].map((h) => (
           <div key={h} className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">{h}</div>
         ))}
       </div>
@@ -538,12 +538,12 @@ function ListView({
                       )}
                       {showUser && <p className="text-[10px] text-gray-400 truncate">{task.creator.fullName}</p>}
                       <button onClick={(e) => { e.stopPropagation(); onToggleMyDay(task); }}
-                        title={task.category === 'MY_DAY' ? 'Hapus dari My Day' : 'Tambah ke My Day'}
+                        title={task.category === 'MY_DAY' ? 'Remove from My Day' : 'Add to My Day'}
                         className={cn('flex-shrink-0 transition-colors', task.category === 'MY_DAY' ? 'text-amber-400' : 'text-gray-200 hover:text-amber-400')}>
                         <Sun size={12} />
                       </button>
                       <button onClick={(e) => { e.stopPropagation(); onToggleImportant(task); }}
-                        title={task.category === 'IMPORTANT' ? 'Hapus dari Important' : 'Tandai penting'}
+                        title={task.category === 'IMPORTANT' ? 'Remove from Important' : 'Mark as important'}
                         className={cn('flex-shrink-0 transition-colors', task.category === 'IMPORTANT' ? 'text-yellow-400' : 'text-gray-200 hover:text-yellow-400')}>
                         <Star size={12} />
                       </button>
@@ -571,7 +571,7 @@ function ListView({
                     <input autoFocus value={newTitle} onChange={(e) => setNewTitle(e.target.value)}
                       onKeyDown={(e) => { if (e.key === 'Enter') quickAdd(group.key); if (e.key === 'Escape') { setAddingTo(null); setNewTitle(''); } }}
                       onBlur={() => { if (!newTitle.trim()) setAddingTo(null); }}
-                      placeholder="Judul task baru…"
+                      placeholder="New task title..."
                       className="flex-1 text-sm outline-none bg-transparent" />
                     {adding ? <Loader2 size={13} className="animate-spin text-gray-400" /> :
                       <button onClick={() => quickAdd(group.key)} className="text-[11px] text-white bg-navy px-2 py-0.5 rounded">OK</button>}
@@ -579,7 +579,7 @@ function ListView({
                 ) : (
                   <button onClick={() => { setAddingTo(group.key); setNewTitle(''); }}
                     className="flex items-center gap-2 w-full px-4 py-2 text-xs text-gray-400 hover:text-navy hover:bg-gray-50 transition-colors border-b border-gray-50">
-                    <Plus size={12} /> Tambah task
+                    <Plus size={12} /> Add task
                   </button>
                 )}
               </>
@@ -675,17 +675,17 @@ function BoardView({ tasks, selectedId, onSelect, onToggle, onDelete, onCreated,
                   <div className="bg-white rounded-lg border border-navy/30 p-3 shadow-sm">
                     <input autoFocus value={newTitle} onChange={(e) => setNewTitle(e.target.value)}
                       onKeyDown={(e) => { if (e.key === 'Enter') quickAdd(group.key); if (e.key === 'Escape') { setAddingTo(null); setNewTitle(''); } }}
-                      placeholder="Judul task…" className="w-full text-sm outline-none placeholder:text-gray-300 mb-2" />
+                      placeholder="Task title..." className="w-full text-sm outline-none placeholder:text-gray-300 mb-2" />
                     <div className="flex gap-1">
                       {adding ? <Loader2 size={13} className="animate-spin text-gray-400" /> :
                         <><button onClick={() => quickAdd(group.key)} className="text-[11px] text-white bg-navy px-2 py-1 rounded">OK</button>
-                          <button onClick={() => { setAddingTo(null); setNewTitle(''); }} className="text-[11px] text-gray-500 px-2 py-1 rounded hover:bg-gray-100">Batal</button></>}
+                          <button onClick={() => { setAddingTo(null); setNewTitle(''); }} className="text-[11px] text-gray-500 px-2 py-1 rounded hover:bg-gray-100">Cancel</button></>}
                     </div>
                   </div>
                 ) : (
                   <button onClick={() => { setAddingTo(group.key); setNewTitle(''); }}
                     className="flex items-center gap-1.5 w-full px-3 py-2 text-xs text-gray-400 hover:text-navy rounded-lg hover:bg-white border border-dashed border-gray-200 hover:border-navy transition-colors">
-                    <Plus size={12} /> Tambah task
+                    <Plus size={12} /> Add task
                   </button>
                 )}
               </div>
@@ -847,7 +847,7 @@ function TableView({ tasks, selectedId, onSelect, onToggle, onDelete }: {
         </tbody>
       </table>
       {sorted.length === 0 && (
-        <div className="flex items-center justify-center py-16 text-gray-400 text-sm">Tidak ada task</div>
+        <div className="flex items-center justify-center py-16 text-gray-400 text-sm">No tasks found</div>
       )}
     </div>
   );
@@ -876,11 +876,11 @@ function CalendarView({ tasks, onSelect }: { tasks: Task[]; onSelect: (id: strin
       <div className="flex-1 flex flex-col overflow-hidden">
         <div className="flex items-center justify-between px-4 py-2.5 border-b border-gray-100">
           <button onClick={() => setMonth((m) => new Date(m.getFullYear(), m.getMonth() - 1, 1))} className="p-1.5 rounded hover:bg-gray-100"><ChevronLeft size={15} /></button>
-          <span className="text-sm font-semibold text-gray-800">{month.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' })}</span>
+          <span className="text-sm font-semibold text-gray-800">{month.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</span>
           <button onClick={() => setMonth((m) => new Date(m.getFullYear(), m.getMonth() + 1, 1))} className="p-1.5 rounded hover:bg-gray-100"><ChevronRight size={15} /></button>
         </div>
         <div className="grid grid-cols-7 border-b border-gray-100">
-          {['Sen','Sel','Rab','Kam','Jum','Sab','Min'].map((d) => <div key={d} className="text-center text-[11px] font-semibold text-gray-400 py-2">{d}</div>)}
+          {['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map((d) => <div key={d} className="text-center text-[11px] font-semibold text-gray-400 py-2">{d}</div>)}
         </div>
         <div className="flex-1 overflow-y-auto">
           <div className="grid grid-cols-7">
@@ -900,7 +900,7 @@ function CalendarView({ tasks, onSelect }: { tasks: Task[]; onSelect: (id: strin
                         {t.title}
                       </button>
                     ))}
-                    {dayTasks.length > 3 && <p className="text-[10px] text-gray-400 pl-1">+{dayTasks.length - 3} lagi</p>}
+                    {dayTasks.length > 3 && <p className="text-[10px] text-gray-400 pl-1">+{dayTasks.length - 3} more</p>}
                   </div>
                 </div>
               );
@@ -911,7 +911,7 @@ function CalendarView({ tasks, onSelect }: { tasks: Task[]; onSelect: (id: strin
       {noDate.length > 0 && (
         <div className="w-48 border-l border-gray-100 flex flex-col flex-shrink-0">
           <div className="px-3 py-2.5 border-b border-gray-100">
-            <p className="text-xs font-semibold text-gray-500">Tanpa jadwal</p>
+            <p className="text-xs font-semibold text-gray-500">No due date</p>
             <p className="text-[10px] text-gray-400">{noDate.length} task</p>
           </div>
           <div className="flex-1 overflow-y-auto p-2 space-y-0.5">
@@ -953,12 +953,12 @@ function PlannedView({ tasks, selectedId, onSelect, onToggle, onDelete, onToggle
   }
 
   const BUCKET_LABELS: Record<string, string> = {
-    '0_overdue':  'Terlambat',
-    '1_today':    'Hari Ini',
-    '2_tomorrow': 'Besok',
-    '3_week':     'Minggu Ini',
-    '4_month':    'Bulan Ini',
-    '5_later':    'Nanti',
+    '0_overdue':  'Overdue',
+    '1_today':    'Today',
+    '2_tomorrow': 'Tomorrow',
+    '3_week':     'This Week',
+    '4_month':    'This Month',
+    '5_later':    'Later',
   };
 
   const groups = useMemo(() => {
@@ -1008,12 +1008,12 @@ function PlannedView({ tasks, selectedId, onSelect, onToggle, onDelete, onToggle
                   {due.text && <span className={cn('text-[11px] flex-shrink-0', due.overdue ? 'text-red-500' : 'text-gray-400')}>{due.text}</span>}
                   {task.assignee && <Avatar name={task.assignee.fullName} avatar={task.assignee.avatar} size={18} />}
                   <button onClick={(e) => { e.stopPropagation(); onToggleMyDay(task); }}
-                    title={task.category === 'MY_DAY' ? 'Hapus dari My Day' : 'Tambah ke My Day'}
+                    title={task.category === 'MY_DAY' ? 'Remove from My Day' : 'Add to My Day'}
                     className={cn('flex-shrink-0 transition-colors', task.category === 'MY_DAY' ? 'text-amber-400' : 'text-gray-200 hover:text-amber-400')}>
                     <Sun size={13} />
                   </button>
                   <button onClick={(e) => { e.stopPropagation(); onToggleImportant(task); }}
-                    title={task.category === 'IMPORTANT' ? 'Hapus dari Important' : 'Tandai penting'}
+                    title={task.category === 'IMPORTANT' ? 'Remove from Important' : 'Mark as important'}
                     className={cn('flex-shrink-0 transition-colors', task.category === 'IMPORTANT' ? 'text-yellow-400' : 'text-gray-200 hover:text-yellow-400')}>
                     <Star size={13} />
                   </button>
@@ -1025,7 +1025,7 @@ function PlannedView({ tasks, selectedId, onSelect, onToggle, onDelete, onToggle
         );
       })}
       {groups.length === 0 && (
-        <div className="flex items-center justify-center py-16 text-gray-400 text-sm">Tidak ada task terjadwal</div>
+        <div className="flex items-center justify-center py-16 text-gray-400 text-sm">No scheduled tasks</div>
       )}
     </div>
   );
@@ -1065,13 +1065,13 @@ function DescriptionEditor({
           onChange={(e) => onChange(e.target.value)}
           onBlur={onBlur}
           rows={5}
-          placeholder="Tambah deskripsi… (Markdown didukung)"
+          placeholder="Add description... (Markdown supported)"
           className="w-full p-3 text-sm text-gray-700 placeholder:text-gray-300 outline-none resize-none leading-relaxed"
         />
       ) : (
         <div
           className="p-3 min-h-[120px] text-sm text-gray-700 leading-relaxed prose-sm"
-          dangerouslySetInnerHTML={{ __html: value ? renderMarkdown(value) : '<span style="color:#d1d5db">Preview akan tampil di sini</span>' }}
+          dangerouslySetInnerHTML={{ __html: value ? renderMarkdown(value) : '<span style="color:#d1d5db">Preview will appear here</span>' }}
         />
       )}
     </div>
@@ -1185,7 +1185,7 @@ function TaskDetailPanel({
   }
 
   async function handleDelete() {
-    if (!task || !confirm('Hapus task ini?')) return;
+    if (!task || !confirm('Delete this task?')) return;
     try { await api.delete(`/tasks/${task.id}`); onDeleted(task.id); onClose(); } catch { /* silent */ }
   }
 
@@ -1252,7 +1252,7 @@ function TaskDetailPanel({
   }
 
   if (loading) return <div className="flex items-center justify-center h-full"><Loader2 size={20} className="animate-spin text-gray-300" /></div>;
-  if (!task)   return <div className="flex items-center justify-center h-full"><p className="text-sm text-gray-400">Task tidak ditemukan</p></div>;
+  if (!task)   return <div className="flex items-center justify-center h-full"><p className="text-sm text-gray-400">Task not found</p></div>;
 
   const doneSubCount = task.subTasks?.filter((s) => s.status === 'DONE').length ?? 0;
   const totalSub     = task.subTasks?.length ?? 0;
@@ -1269,7 +1269,7 @@ function TaskDetailPanel({
         {saving && <Loader2 size={13} className="animate-spin text-gray-400 ml-1" />}
         <div className="flex-1" />
         <button onClick={handleDelete} className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-red-500 px-2 py-1 rounded hover:bg-red-50">
-          <Trash2 size={13} /> Hapus
+          <Trash2 size={13} /> Delete
         </button>
       </div>
 
@@ -1280,31 +1280,31 @@ function TaskDetailPanel({
           {isPending && (
             <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
               <p className="text-xs font-semibold text-amber-700 mb-1">
-                Task ini ditugaskan kepadamu oleh {task.creator.fullName}
+                This task was assigned to you by {task.creator.fullName}
               </p>
               {!showReject ? (
                 <div className="flex gap-2 mt-2">
                   <button onClick={handleAccept} disabled={accepting}
                     className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-green-500 hover:bg-green-600 rounded-lg disabled:opacity-50">
-                    {accepting ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />} Terima
+                    {accepting ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />} Accept
                   </button>
                   <button onClick={() => setShowReject(true)}
                     className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-red-500 hover:bg-red-600 rounded-lg">
-                    <XCircle size={12} /> Tolak
+                    <XCircle size={12} /> Reject
                   </button>
                 </div>
               ) : (
                 <form onSubmit={handleReject} className="mt-2 space-y-2">
                   <textarea autoFocus value={rejectNote} onChange={(e) => setRejectNote(e.target.value)}
-                    placeholder="Tulis alasan penolakan…" rows={2}
+                    placeholder="Write rejection reason..." rows={2}
                     className="w-full text-xs border border-amber-200 rounded p-2 outline-none focus:border-amber-400 resize-none" />
                   <div className="flex gap-2">
                     <button type="submit" disabled={rejecting || !rejectNote.trim()}
                       className="px-3 py-1.5 text-xs font-medium text-white bg-red-500 hover:bg-red-600 rounded disabled:opacity-50">
-                      {rejecting ? <Loader2 size={12} className="animate-spin inline mr-1" /> : null}Kirim
+                      {rejecting ? <Loader2 size={12} className="animate-spin inline mr-1" /> : null}Submit
                     </button>
                     <button type="button" onClick={() => { setShowReject(false); setRejectNote(''); }}
-                      className="px-3 py-1.5 text-xs text-gray-500 hover:bg-gray-100 rounded">Batal</button>
+                      className="px-3 py-1.5 text-xs text-gray-500 hover:bg-gray-100 rounded">Cancel</button>
                   </div>
                 </form>
               )}
@@ -1314,7 +1314,7 @@ function TaskDetailPanel({
           {/* Rejected note */}
           {task.assignmentStatus === 'REJECTED' && task.assignmentNote && (
             <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-xs text-red-700">
-              <p className="font-semibold mb-1">Task ditolak</p>
+              <p className="font-semibold mb-1">Task rejected</p>
               <p>{task.assignmentNote}</p>
             </div>
           )}
@@ -1354,7 +1354,7 @@ function TaskDetailPanel({
             <div className="flex items-center gap-3 px-1 py-2 rounded hover:bg-gray-50">
               <div className="flex items-center gap-2 w-24 flex-shrink-0">
                 <PriorityDot priority={task.priority} />
-                <span className="text-xs text-gray-400">Prioritas</span>
+                <span className="text-xs text-gray-400">Priority</span>
               </div>
               <select value={task.priority} onChange={(e) => patch({ priority: e.target.value })}
                 className="text-xs bg-transparent outline-none cursor-pointer text-gray-700 hover:text-navy">
@@ -1375,12 +1375,12 @@ function TaskDetailPanel({
             <div className="flex items-center gap-3 px-1 py-2 rounded hover:bg-gray-50">
               <div className="flex items-center gap-2 w-24 flex-shrink-0">
                 <User size={13} className="text-gray-400" />
-                <span className="text-xs text-gray-400">Assign ke</span>
+                <span className="text-xs text-gray-400">Assign to</span>
               </div>
               <select value={task.assignee?.id ?? ''}
                 onChange={(e) => patch({ assignedToId: e.target.value || null })}
                 className="text-xs bg-transparent outline-none cursor-pointer text-gray-700 hover:text-navy max-w-[160px]">
-                <option value="">— Tidak diassign —</option>
+                <option value="">— Unassigned —</option>
                 {users.map((u) => <option key={u.id} value={u.id}>{u.fullName}</option>)}
               </select>
             </div>
@@ -1421,7 +1421,7 @@ function TaskDetailPanel({
             <div className="flex items-center gap-3 px-1 py-2 rounded hover:bg-gray-50">
               <div className="flex items-center gap-2 w-24 flex-shrink-0">
                 <User size={13} className="text-gray-400" />
-                <span className="text-xs text-gray-400">Dibuat oleh</span>
+                <span className="text-xs text-gray-400">Created by</span>
               </div>
               <div className="flex items-center gap-1.5">
                 <Avatar name={task.creator.fullName} avatar={task.creator.avatar} size={16} />
@@ -1436,7 +1436,7 @@ function TaskDetailPanel({
           <div>
             <div className="flex items-center gap-1.5 mb-2">
               <FileText size={13} className="text-gray-400" />
-              <span className="text-xs font-medium text-gray-500">Deskripsi</span>
+              <span className="text-xs font-medium text-gray-500">Description</span>
             </div>
             <DescriptionEditor
               value={descVal}
@@ -1505,12 +1505,12 @@ function TaskDetailPanel({
                     <Circle size={14} className="text-gray-300 flex-shrink-0" />
                     <input autoFocus value={newSub} onChange={(e) => setNewSub(e.target.value)}
                       onKeyDown={(e) => e.key === 'Escape' && setSubInput(false)}
-                      placeholder="Nama subtask…"
+                      placeholder="Subtask name..."
                       className="flex-1 text-sm text-gray-800 outline-none placeholder:text-gray-300" />
                     {addingSub ? <Loader2 size={13} className="animate-spin text-gray-400" /> :
                       <div className="flex gap-1">
                         <button type="submit" disabled={!newSub.trim()} className="text-[11px] px-2 py-1 bg-navy text-white rounded disabled:opacity-40">OK</button>
-                        <button type="button" onClick={() => setSubInput(false)} className="text-[11px] px-2 py-1 text-gray-500 hover:bg-gray-100 rounded">Batal</button>
+                        <button type="button" onClick={() => setSubInput(false)} className="text-[11px] px-2 py-1 text-gray-500 hover:bg-gray-100 rounded">Cancel</button>
                       </div>}
                   </form>
                 )}
@@ -1536,21 +1536,21 @@ function TaskDetailPanel({
                 ))}
                 {!linkInput ? (
                   <button onClick={() => setLinkInput(true)} className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-navy transition-colors">
-                    <Plus size={12} /> Tambah link
+                    <Plus size={12} /> Add link
                   </button>
                 ) : (
                   <form onSubmit={addLink} className="space-y-2 p-3 border border-gray-200 rounded-lg bg-gray-50">
                     <input value={newLinkUrl} onChange={(e) => setNewLinkUrl(e.target.value)} placeholder="https://…" autoFocus
                       className="w-full text-xs border border-gray-200 rounded px-2 py-1.5 outline-none focus:border-navy" />
-                    <input value={newLinkTitle} onChange={(e) => setNewLinkTitle(e.target.value)} placeholder="Nama link (opsional)"
+                    <input value={newLinkTitle} onChange={(e) => setNewLinkTitle(e.target.value)} placeholder="Link name (optional)"
                       className="w-full text-xs border border-gray-200 rounded px-2 py-1.5 outline-none focus:border-navy" />
                     <div className="flex gap-1">
                       <button type="submit" disabled={!newLinkUrl.trim() || addingLink}
                         className="text-[11px] px-2 py-1 bg-navy text-white rounded disabled:opacity-40">
-                        {addingLink ? <Loader2 size={10} className="animate-spin inline mr-1" /> : null}Tambah
+                        {addingLink ? <Loader2 size={10} className="animate-spin inline mr-1" /> : null}Add
                       </button>
                       <button type="button" onClick={() => { setLinkInput(false); setNewLinkUrl(''); setNewLinkTitle(''); }}
-                        className="text-[11px] px-2 py-1 text-gray-500 hover:bg-gray-200 rounded">Batal</button>
+                        className="text-[11px] px-2 py-1 text-gray-500 hover:bg-gray-200 rounded">Cancel</button>
                     </div>
                   </form>
                 )}
@@ -1562,7 +1562,7 @@ function TaskDetailPanel({
                 {commLoading ? (
                   <div className="flex justify-center py-4"><Loader2 size={16} className="animate-spin text-gray-300" /></div>
                 ) : comments.length === 0 ? (
-                  <p className="text-xs text-gray-400 text-center py-4">Belum ada catatan</p>
+                  <p className="text-xs text-gray-400 text-center py-4">No notes yet</p>
                 ) : (
                   comments.map((c) => (
                     <div key={c.id} className="group flex gap-2.5">
@@ -1585,12 +1585,12 @@ function TaskDetailPanel({
                 <form onSubmit={submitComment} className="flex gap-2 pt-1">
                   <textarea value={newComment} onChange={(e) => setNewComment(e.target.value)}
                     onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submitComment(e as unknown as FormEvent); } }}
-                    placeholder="Tulis catatan… (Enter kirim, Shift+Enter baris baru)"
+                    placeholder="Write a note... (Enter to submit, Shift+Enter for new line)"
                     rows={2}
                     className="flex-1 text-xs border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-navy resize-none" />
                   <button type="submit" disabled={!newComment.trim() || submitting}
                     className="flex-shrink-0 px-3 py-1 text-xs font-medium text-white bg-navy rounded-lg hover:bg-navy-light disabled:opacity-40 self-end">
-                    {submitting ? <Loader2 size={12} className="animate-spin" /> : 'Kirim'}
+                    {submitting ? <Loader2 size={12} className="animate-spin" /> : 'Send'}
                   </button>
                 </form>
               </div>
@@ -1626,7 +1626,7 @@ function CreateTaskModal({ onClose, onCreated, defaultListId }: {
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    if (!title.trim()) { setError('Judul wajib diisi'); return; }
+    if (!title.trim()) { setError('Title is required'); return; }
     setSaving(true); setError('');
     try {
       const payload: Record<string, unknown> = { title: title.trim(), status, priority, isPrivate, visibility };
@@ -1645,15 +1645,15 @@ function CreateTaskModal({ onClose, onCreated, defaultListId }: {
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
       <div className="relative bg-white rounded-xl shadow-xl w-full max-w-md">
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
-          <h2 className="text-sm font-semibold text-gray-800">Task Baru</h2>
+          <h2 className="text-sm font-semibold text-gray-800">New Task</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={16} /></button>
         </div>
         <form onSubmit={handleSubmit} className="p-5 space-y-4">
-          <input autoFocus type="text" placeholder="Judul task…" value={title}
+          <input autoFocus type="text" placeholder="Task title..." value={title}
             onChange={(e) => { setTitle(e.target.value); setError(''); }}
             className="w-full text-base font-medium text-gray-900 outline-none placeholder:text-gray-300 border-b border-gray-200 pb-2 focus:border-navy transition-colors" />
 
-          <textarea placeholder="Deskripsi (opsional)…" value={desc} onChange={(e) => setDesc(e.target.value)} rows={2}
+          <textarea placeholder="Description (optional)..." value={desc} onChange={(e) => setDesc(e.target.value)} rows={2}
             className="w-full text-sm text-gray-700 placeholder:text-gray-300 outline-none resize-none border-b border-gray-100 pb-2" />
 
           <div className="grid grid-cols-2 gap-3">
@@ -1665,7 +1665,7 @@ function CreateTaskModal({ onClose, onCreated, defaultListId }: {
               </select>
             </div>
             <div>
-              <label className="block text-xs text-gray-500 mb-1">Prioritas</label>
+              <label className="block text-xs text-gray-500 mb-1">Priority</label>
               <select value={priority} onChange={(e) => setPriority(e.target.value as TaskPriority)}
                 className="w-full text-sm border border-gray-200 rounded px-2.5 py-1.5 outline-none focus:border-navy">
                 {Object.entries(PRIORITY_CONFIG).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
@@ -1680,10 +1680,10 @@ function CreateTaskModal({ onClose, onCreated, defaultListId }: {
                 className="text-sm border border-gray-200 rounded px-2.5 py-1.5 outline-none focus:border-navy w-full" />
             </div>
             <div>
-              <label className="block text-xs text-gray-500 mb-1">Assign ke</label>
+              <label className="block text-xs text-gray-500 mb-1">Assign to</label>
               <select value={assignedTo} onChange={(e) => setAssignedTo(e.target.value)}
                 className="w-full text-sm border border-gray-200 rounded px-2.5 py-1.5 outline-none focus:border-navy">
-                <option value="">— Tidak —</option>
+                <option value="">— None —</option>
                 {users.map((u) => <option key={u.id} value={u.id}>{u.fullName}</option>)}
               </select>
             </div>
@@ -1691,28 +1691,28 @@ function CreateTaskModal({ onClose, onCreated, defaultListId }: {
 
           <div className="space-y-2">
             <div>
-              <label className="block text-xs text-gray-500 mb-1">Visibilitas</label>
+              <label className="block text-xs text-gray-500 mb-1">Visibility</label>
               <select value={visibility} onChange={(e) => setVisibility(e.target.value as TaskVisibility)}
                 className="w-full text-sm border border-gray-200 rounded px-2.5 py-1.5 outline-none focus:border-navy">
-                <option value="PRIVATE">Hanya Saya &amp; Assignee</option>
-                <option value="DIVISION">Divisi Saya</option>
-                <option value="PUBLIC">Semua (Public)</option>
+                <option value="PRIVATE">Only Me &amp; Assignee</option>
+                <option value="DIVISION">My Division</option>
+                <option value="PUBLIC">Everyone (Public)</option>
               </select>
             </div>
             <label className="flex items-center gap-2 cursor-pointer select-none">
               <input type="checkbox" checked={isPrivate} onChange={(e) => setIsPrivate(e.target.checked)} className="w-4 h-4 rounded border-gray-300 accent-navy" />
               <Lock size={13} className="text-gray-400" />
-              <span className="text-xs text-gray-600">Private (sembunyikan konten)</span>
+              <span className="text-xs text-gray-600">Private (hide content)</span>
             </label>
           </div>
 
           {error && <p className="text-xs text-red-500 flex items-center gap-1"><AlertCircle size={12} />{error}</p>}
 
           <div className="flex justify-end gap-2 pt-1">
-            <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded hover:bg-gray-50">Batal</button>
+            <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded hover:bg-gray-50">Cancel</button>
             <button type="submit" disabled={saving || !title.trim()}
               className="flex items-center gap-1.5 px-4 py-2 text-sm text-white bg-navy rounded hover:bg-navy-light disabled:opacity-50">
-              {saving && <Loader2 size={13} className="animate-spin" />} Buat Task
+              {saving && <Loader2 size={13} className="animate-spin" />} Create Task
             </button>
           </div>
         </form>
@@ -1747,7 +1747,7 @@ function NewListModal({ onClose, onCreated }: {
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
       <div className="relative bg-white rounded-xl shadow-xl w-full max-w-sm">
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
-          <h2 className="text-sm font-semibold text-gray-800">List Baru</h2>
+          <h2 className="text-sm font-semibold text-gray-800">New List</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={16} /></button>
         </div>
         <form onSubmit={handleSubmit} className="p-5 space-y-4">
@@ -1851,11 +1851,11 @@ function exportToCSV(tasks: Task[], filename: string) {
     `"${t.title.replace(/"/g, '""')}"`,
     t.status,
     t.priority,
-    t.dueDate ? new Date(t.dueDate).toLocaleDateString('id-ID') : '',
+    t.dueDate ? new Date(t.dueDate).toLocaleDateString('en-US') : '',
     t.creator.fullName,
     t.assignee?.fullName ?? '',
     t.taskList?.name ?? '',
-    new Date(t.createdAt).toLocaleDateString('id-ID'),
+    new Date(t.createdAt).toLocaleDateString('en-US'),
   ]);
   const csv = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
@@ -2098,7 +2098,7 @@ export default function TasksPage() {
   // My Day greeting
   const greetingHour = new Date().getHours();
   const greeting = greetingHour < 11 ? 'Selamat pagi' : greetingHour < 15 ? 'Selamat siang' : greetingHour < 18 ? 'Selamat sore' : 'Selamat malam';
-  const todayStr = new Date().toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+  const todayStr = new Date().toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
 
   return (
     <div className="flex h-full -m-6 overflow-hidden">
@@ -2149,7 +2149,7 @@ export default function TasksPage() {
               <Star size={20} className="text-white/80" />
               <h1 className="text-xl font-bold text-white">Important</h1>
             </div>
-            <p className="text-xs text-white/60">Task yang kamu tandai sebagai penting</p>
+            <p className="text-xs text-white/60">Tasks you have marked as important</p>
           </div>
         )}
 

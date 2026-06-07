@@ -29,7 +29,7 @@ const STATUS_COLORS: Record<string, string> = {
   CANCELLED:   'bg-red-100 text-red-600',
 };
 const STATUS_LABELS: Record<string, string> = {
-  TODO: 'Todo', IN_PROGRESS: 'Sedang berjalan', DONE: 'Selesai', CANCELLED: 'Dibatalkan',
+  TODO: 'Todo', IN_PROGRESS: 'In Progress', DONE: 'Done', CANCELLED: 'Cancelled',
 };
 
 // ── Single Result Item ────────────────────────────────────────
@@ -60,7 +60,7 @@ function ResultItem({
         <Megaphone size={14} className="text-amber-500 flex-shrink-0" />
         <p className="flex-1 text-sm text-gray-800 truncate">{result.title}</p>
         <span className="text-xs text-gray-400 flex-shrink-0">
-          {new Date(result.createdAt).toLocaleDateString('id-ID', { day: '2-digit', month: 'short' })}
+          {new Date(result.createdAt).toLocaleDateString('en-US', { day: '2-digit', month: 'short' })}
         </span>
       </div>
     );
@@ -84,7 +84,7 @@ function ResultItem({
       <div className="flex-1 min-w-0">
         <p className="text-sm text-gray-800 truncate">{result.name}</p>
         {result.type === 'link' && result.folder && (
-          <p className="text-xs text-gray-400 truncate">dalam {result.folder.name}</p>
+          <p className="text-xs text-gray-400 truncate">in {result.folder.name}</p>
         )}
       </div>
     </div>
@@ -188,7 +188,7 @@ export default function CommandPalette({ open, onClose }: Props) {
           <input
             ref={inputRef}
             type="text"
-            placeholder="Cari task, bulletin, catatan, file..."
+            placeholder="Search tasks, bulletins, notes, files..."
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={handleKeyDown}
@@ -208,17 +208,17 @@ export default function CommandPalette({ open, onClose }: Props) {
           {!query && (
             <div className="flex flex-col items-center gap-2 py-10 text-center">
               <Search size={24} className="text-gray-200" />
-              <p className="text-sm text-gray-400">Ketik untuk mencari di seluruh sistem</p>
+              <p className="text-sm text-gray-400">Type to search the entire system</p>
               <div className="flex items-center gap-3 mt-2 text-xs text-gray-300">
-                <span className="flex items-center gap-1"><kbd className="bg-gray-100 px-1.5 py-0.5 rounded font-mono">↑↓</kbd> navigasi</span>
-                <span className="flex items-center gap-1"><kbd className="bg-gray-100 px-1.5 py-0.5 rounded font-mono">↵</kbd> buka</span>
+                <span className="flex items-center gap-1"><kbd className="bg-gray-100 px-1.5 py-0.5 rounded font-mono">↑↓</kbd> navigate</span>
+                <span className="flex items-center gap-1"><kbd className="bg-gray-100 px-1.5 py-0.5 rounded font-mono">↵</kbd> open</span>
               </div>
             </div>
           )}
 
           {query && !loading && !hasResults && query.length >= 2 && (
             <p className="text-center text-sm text-gray-400 py-10">
-              Tidak ada hasil untuk &ldquo;<strong>{query}</strong>&rdquo;
+              No results for &ldquo;<strong>{query}</strong>&rdquo;
             </p>
           )}
 
@@ -248,7 +248,7 @@ export default function CommandPalette({ open, onClose }: Props) {
                 )}
                 {results!.notes.length > 0 && (
                   <>
-                    <SectionHeader label="Catatan" />
+                    <SectionHeader label="Notes" />
                     {results!.notes.map((n) => {
                       const idx = cursor++;
                       return <ResultItem key={n.id} result={n} active={activeIdx === idx}
@@ -274,9 +274,9 @@ export default function CommandPalette({ open, onClose }: Props) {
         {/* Footer hint */}
         {hasResults && (
           <div className="flex items-center justify-between px-4 py-2 border-t border-gray-100 bg-gray-50">
-            <span className="text-xs text-gray-400">{flat.length} hasil</span>
+            <span className="text-xs text-gray-400">{flat.length} results</span>
             <span className="flex items-center gap-1 text-xs text-gray-400">
-              <ArrowRight size={11} /> Tekan Enter untuk membuka
+              <ArrowRight size={11} /> Press Enter to open
             </span>
           </div>
         )}

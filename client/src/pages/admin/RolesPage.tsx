@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef, FormEvent } from 'react';
 import {
-  Shield, Edit2, Check, X, Loader2, AlertCircle, Users, ChevronRight,
+  Shield, Edit2, Check, Loader2, AlertCircle, Users, ChevronRight,
 } from 'lucide-react';
 import api from '@/lib/api';
 import { cn } from '@/lib/cn';
@@ -18,12 +18,12 @@ interface Role {
 
 // ── Constants ─────────────────────────────────────────────────
 const LEVEL_META: Record<number, { label: string; desc: string; bg: string; text: string }> = {
-  1: { label: 'L1', desc: 'Akses penuh sistem',          bg: 'bg-slate-100',  text: 'text-slate-700' },
-  2: { label: 'L2', desc: 'Pimpinan organisasi',         bg: 'bg-purple-100', text: 'text-purple-700' },
-  3: { label: 'L3', desc: 'Manajemen operasional',       bg: 'bg-blue-100',   text: 'text-blue-700' },
-  4: { label: 'L4', desc: 'Kepala divisi/departemen',    bg: 'bg-cyan-100',   text: 'text-cyan-700' },
-  5: { label: 'L5', desc: 'Kepala unit/sub-divisi',      bg: 'bg-emerald-100',text: 'text-emerald-700' },
-  6: { label: 'L6', desc: 'Anggota tim / staf',          bg: 'bg-gray-100',   text: 'text-gray-600' },
+  1: { label: 'L1', desc: 'Full system access',           bg: 'bg-slate-100',  text: 'text-slate-700' },
+  2: { label: 'L2', desc: 'Organization leadership',     bg: 'bg-purple-100', text: 'text-purple-700' },
+  3: { label: 'L3', desc: 'Operational management',      bg: 'bg-blue-100',   text: 'text-blue-700' },
+  4: { label: 'L4', desc: 'Division / department head',  bg: 'bg-cyan-100',   text: 'text-cyan-700' },
+  5: { label: 'L5', desc: 'Unit / sub-division head',    bg: 'bg-emerald-100',text: 'text-emerald-700' },
+  6: { label: 'L6', desc: 'Team member / staff',         bg: 'bg-gray-100',   text: 'text-gray-600' },
 };
 
 const PRESET_COLORS = [
@@ -106,7 +106,7 @@ function RoleCard({ role, onUpdated }: { role: Role; onUpdated: (r: Role) => voi
 
   async function save(e: FormEvent) {
     e.preventDefault();
-    if (!nameVal.trim()) { setError('Nama tidak boleh kosong'); return; }
+    if (!nameVal.trim()) { setError('Name cannot be empty'); return; }
     setSaving(true); setError('');
     try {
       const res = await api.patch(`/roles/${role.id}`, {
@@ -118,7 +118,7 @@ function RoleCard({ role, onUpdated }: { role: Role; onUpdated: (r: Role) => voi
       setShowPicker(false);
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
-      setError(msg ?? 'Gagal menyimpan');
+      setError(msg ?? 'Failed to save');
     } finally {
       setSaving(false);
     }
@@ -178,13 +178,13 @@ function RoleCard({ role, onUpdated }: { role: Role; onUpdated: (r: Role) => voi
                 className="flex items-center gap-1 px-2.5 py-1 text-xs text-white bg-navy hover:bg-navy-light rounded disabled:opacity-50"
               >
                 {saving ? <Loader2 size={11} className="animate-spin" /> : <Check size={11} />}
-                Simpan
+                Save
               </button>
               <button
                 type="button" onClick={cancelEdit}
                 className="px-2.5 py-1 text-xs text-gray-500 border border-gray-200 rounded hover:bg-gray-50"
               >
-                Batal
+                Cancel
               </button>
             </div>
           </form>
@@ -200,7 +200,7 @@ function RoleCard({ role, onUpdated }: { role: Role; onUpdated: (r: Role) => voi
             <button
               onClick={startEdit}
               className="flex-shrink-0 w-6 h-6 flex items-center justify-center rounded text-gray-300 hover:text-navy hover:bg-navy-50 transition-colors"
-              title="Edit nama & warna"
+              title="Edit name & color"
             >
               <Edit2 size={12} />
             </button>
@@ -260,7 +260,7 @@ export default function RolesPage() {
       const res = await api.get('/roles');
       setRoles(res.data.data ?? []);
     } catch {
-      setError('Gagal memuat data role.');
+      setError('Failed to load roles.');
     } finally {
       setLoading(false);
     }
@@ -278,16 +278,16 @@ export default function RolesPage() {
     <div>
       {/* Header */}
       <div className="mb-6">
-        <h1 className="text-xl font-semibold text-gray-800">Manajemen Role</h1>
+        <h1 className="text-xl font-semibold text-gray-800">Role Management</h1>
         <p className="text-sm text-gray-500 mt-0.5">
-          6 role hierarkis organisasi — klik ikon edit untuk mengubah nama atau warna
+          6 hierarchical organization roles — click the edit icon to change name or color
         </p>
       </div>
 
       {/* Hierarchy strip */}
       {!loading && roles.length > 0 && (
         <div className="bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 mb-6">
-          <p className="text-xs text-gray-400 font-medium mb-2 uppercase tracking-wider">Hierarki</p>
+          <p className="text-xs text-gray-400 font-medium mb-2 uppercase tracking-wider">Hierarchy</p>
           <HierarchyLine roles={roles} />
         </div>
       )}
@@ -302,13 +302,13 @@ export default function RolesPage() {
           <AlertCircle size={32} className="text-red-400 mb-3" />
           <p className="text-sm text-gray-600">{error}</p>
           <button onClick={load} className="mt-3 px-4 py-1.5 text-sm text-navy border border-navy rounded">
-            Coba lagi
+            Try again
           </button>
         </div>
       ) : sorted.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20">
           <Shield size={40} className="text-gray-200 mb-3" />
-          <p className="text-sm text-gray-500">Belum ada role</p>
+          <p className="text-sm text-gray-500">No roles yet</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -319,7 +319,7 @@ export default function RolesPage() {
       )}
 
       <p className="mt-6 text-xs text-gray-400">
-        Role bersifat sistem dan tidak dapat ditambah atau dihapus. Anda hanya dapat mengubah nama dan warna.
+        Roles are system-defined and cannot be added or deleted. You can only change the name and color.
       </p>
     </div>
   );

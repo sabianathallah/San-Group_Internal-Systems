@@ -26,11 +26,11 @@ const PRIORITY_COLORS: Record<string, string> = {
   LOW:    'bg-gray-300',
 };
 const PRIORITY_LABELS: Record<string, string> = {
-  URGENT: 'Urgen', HIGH: 'Tinggi', MEDIUM: 'Sedang', LOW: 'Rendah',
+  URGENT: 'Urgent', HIGH: 'High', MEDIUM: 'Medium', LOW: 'Low',
 };
 
 function fmt(iso: string) {
-  return new Date(iso).toLocaleDateString('id-ID', { weekday: 'short', day: '2-digit', month: 'short' });
+  return new Date(iso).toLocaleDateString('en-US', { weekday: 'short', day: '2-digit', month: 'short' });
 }
 
 // ── Stat Card ─────────────────────────────────────────────────
@@ -114,7 +114,7 @@ export default function AnalyticsPage() {
     if (!canView) { setLoading(false); return; }
     api.get('/analytics')
       .then((res) => setData(res.data.data))
-      .catch(() => setError('Gagal memuat data analitik'))
+      .catch(() => setError('Failed to load analytics data'))
       .finally(() => setLoading(false));
   }, [loaded, canView]);
 
@@ -132,8 +132,8 @@ export default function AnalyticsPage() {
         <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mb-4">
           <Lock size={28} className="text-gray-400" />
         </div>
-        <h2 className="text-base font-semibold text-gray-700 mb-1">Akses Terbatas</h2>
-        <p className="text-sm text-gray-400">Anda tidak memiliki izin untuk melihat halaman analitik.</p>
+        <h2 className="text-base font-semibold text-gray-700 mb-1">Access Restricted</h2>
+        <p className="text-sm text-gray-400">You don't have permission to view the analytics page.</p>
       </div>
     );
   }
@@ -142,10 +142,10 @@ export default function AnalyticsPage() {
     return (
       <div className="flex flex-col items-center justify-center py-20 text-center">
         <AlertCircle size={32} className="text-red-400 mb-3" />
-        <p className="text-sm text-gray-600">{error || 'Gagal memuat data'}</p>
+        <p className="text-sm text-gray-600">{error || 'Failed to load data'}</p>
         <button onClick={() => window.location.reload()}
           className="mt-3 px-4 py-1.5 text-sm text-navy border border-navy rounded hover:bg-navy-50">
-          Coba lagi
+          Try again
         </button>
       </div>
     );
@@ -157,10 +157,10 @@ export default function AnalyticsPage() {
   const priorityMax = Math.max(...byPriority.map((p) => p.count), 1);
 
   const scopeLabel = perms.analytics?.view === 'all'
-    ? 'Semua Divisi'
+    ? 'All Divisions'
     : perms.analytics?.view === 'division'
-    ? 'Divisi Saya'
-    : 'Milik Saya';
+    ? 'My Division'
+    : 'My Tasks';
 
   return (
     <div className="max-w-6xl">
@@ -168,33 +168,33 @@ export default function AnalyticsPage() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-xl font-semibold text-gray-800">Analytics</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Ringkasan produktivitas · {scopeLabel}</p>
+          <p className="text-sm text-gray-500 mt-0.5">Productivity summary · {scopeLabel}</p>
         </div>
         <div className="flex items-center gap-1.5 text-xs text-gray-400 bg-gray-100 px-3 py-1.5 rounded-lg">
           <BarChart3 size={12} />
-          30 hari terakhir
+          Last 30 days
         </div>
       </div>
 
       {/* Overview stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <StatCard icon={CheckCircle2} label="Total Task" value={overview.total}
-          sub={`${overview.completionRate}% selesai`} color="text-navy" bg="bg-navy/5" />
-        <StatCard icon={TrendingUp} label="Selesai" value={overview.done}
+        <StatCard icon={CheckCircle2} label="Total Tasks" value={overview.total}
+          sub={`${overview.completionRate}% completed`} color="text-navy" bg="bg-navy/5" />
+        <StatCard icon={TrendingUp} label="Completed" value={overview.done}
           color="text-green-600" bg="bg-green-50" />
-        <StatCard icon={Clock} label="Berjalan" value={overview.inProgress}
+        <StatCard icon={Clock} label="In Progress" value={overview.inProgress}
           color="text-blue-600" bg="bg-blue-50" />
-        <StatCard icon={AlertTriangle} label="Terlambat" value={overview.overdue}
+        <StatCard icon={AlertTriangle} label="Overdue" value={overview.overdue}
           color="text-red-500" bg="bg-red-50" />
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <StatCard icon={Plus} label="Baru minggu ini" value={overview.newThisWeek}
+        <StatCard icon={Plus} label="New this week" value={overview.newThisWeek}
           color="text-purple-600" bg="bg-purple-50" />
         <StatCard icon={CheckCircle2} label="Todo" value={overview.todo}
           color="text-gray-500" bg="bg-gray-100" />
-        <StatCard icon={Users} label="User aktif" value={users.active}
-          sub={`dari ${users.total} total`} color="text-cyan-600" bg="bg-cyan-50" />
+        <StatCard icon={Users} label="Active users" value={users.active}
+          sub={`of ${users.total} total`} color="text-cyan-600" bg="bg-cyan-50" />
         <div className="bg-white border border-gray-200 rounded-xl p-5 flex flex-col justify-center">
           <p className="text-xs text-gray-500 mb-2">Completion rate</p>
           <p className="text-2xl font-bold text-gray-800 mb-2">{overview.completionRate}%</p>
@@ -211,7 +211,7 @@ export default function AnalyticsPage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-5">
         {/* Completion trend */}
         <div className="bg-white border border-gray-200 rounded-xl p-5">
-          <h3 className="text-sm font-semibold text-gray-800 mb-4">Task Selesai — 7 Hari Terakhir</h3>
+          <h3 className="text-sm font-semibold text-gray-800 mb-4">Tasks Completed — Last 7 Days</h3>
           <BarChart
             data={completionTrend.map((t) => ({ label: fmt(t.date), value: t.count }))}
             maxValue={trendMax}
@@ -221,9 +221,9 @@ export default function AnalyticsPage() {
 
         {/* By priority */}
         <div className="bg-white border border-gray-200 rounded-xl p-5">
-          <h3 className="text-sm font-semibold text-gray-800 mb-4">Distribusi Prioritas</h3>
+          <h3 className="text-sm font-semibold text-gray-800 mb-4">Priority Distribution</h3>
           {byPriority.length === 0 ? (
-            <p className="text-sm text-gray-400 text-center py-8">Belum ada data</p>
+            <p className="text-sm text-gray-400 text-center py-8">No data yet</p>
           ) : (
             <div className="space-y-3">
               {byPriority.map((p) => (
@@ -247,7 +247,7 @@ export default function AnalyticsPage() {
       {/* Per division (only for all-scope) */}
       {perDivision.length > 0 && (
         <div className="bg-white border border-gray-200 rounded-xl p-5">
-          <h3 className="text-sm font-semibold text-gray-800 mb-4">Produktivitas per Divisi</h3>
+          <h3 className="text-sm font-semibold text-gray-800 mb-4">Productivity per Division</h3>
           <div className="space-y-3">
             {perDivision
               .sort((a, b) => b.total - a.total)
@@ -257,7 +257,7 @@ export default function AnalyticsPage() {
                   <div key={d.divisionName}>
                     <div className="flex items-center justify-between mb-1">
                       <span className="text-sm text-gray-700">{d.divisionName}</span>
-                      <span className="text-xs text-gray-500">{d.done}/{d.total} selesai ({rate}%)</span>
+                      <span className="text-xs text-gray-500">{d.done}/{d.total} done ({rate}%)</span>
                     </div>
                     <ProgressBar value={d.done} max={d.total} colorClass="bg-navy" />
                   </div>

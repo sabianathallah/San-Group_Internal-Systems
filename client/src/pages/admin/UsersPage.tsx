@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback, FormEvent } from 'react';
 import {
   Users, Plus, Search, X, Edit2, Trash2, Loader2,
   AlertCircle, ChevronLeft, ChevronRight, PowerOff, Power,
-  ShieldCheck, User as UserIcon, Layers, Shield,
+  ShieldCheck, Layers, Shield,
 } from 'lucide-react';
 import api from '@/lib/api';
 import { useAuthStore } from '@/stores/authStore';
@@ -46,11 +46,6 @@ const PRESET_COLORS = [
   '#2563eb','#db2777','#4f46e5','#0d9488','#7c2d12',
 ];
 
-const LEVEL_LABELS: Record<number, string> = {
-  1: 'Management', 2: 'Management', 3: 'Director',
-  4: 'Manager', 5: 'Supervisor', 6: 'Staff',
-};
-
 const LEVEL_COLORS: Record<number, string> = {
   1: 'bg-purple-100 text-purple-700',
   2: 'bg-blue-100 text-blue-700',
@@ -66,7 +61,7 @@ function initials(name: string) {
 }
 function formatDate(iso: string | null) {
   if (!iso) return '—';
-  return new Date(iso).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' });
+  return new Date(iso).toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric' });
 }
 function hexToRgba(hex: string, alpha: number) {
   const safe = hex?.startsWith('#') ? hex : '#64748b';
@@ -80,14 +75,6 @@ function slugify(str: string) {
 }
 
 // ── Shared UI ──────────────────────────────────────────────
-function LevelBadge({ level }: { level: number }) {
-  return (
-    <span className={cn('text-xs px-2 py-0.5 rounded-full font-medium', LEVEL_COLORS[level] ?? 'bg-gray-100 text-gray-600')}>
-      L{level} · {LEVEL_LABELS[level] ?? 'Unknown'}
-    </span>
-  );
-}
-
 function ColorPicker({ value, onChange }: { value: string; onChange: (c: string) => void }) {
   return (
     <div className="space-y-2">
@@ -132,12 +119,12 @@ function DeleteConfirm({ title, name, onCancel, onConfirm, loading }: {
       <div className="absolute inset-0 bg-black/40" onClick={onCancel} />
       <div className="relative bg-white rounded-xl shadow-xl w-full max-w-sm p-5 space-y-3">
         <h3 className="text-sm font-semibold text-gray-800">{title}</h3>
-        <p className="text-sm text-gray-600">Hapus <strong>{name}</strong>? Tindakan ini tidak dapat dibatalkan.</p>
+        <p className="text-sm text-gray-600">Delete <strong>{name}</strong>? This action cannot be undone.</p>
         <div className="flex justify-end gap-2 pt-1">
-          <button onClick={onCancel} className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded hover:bg-gray-50">Batal</button>
+          <button onClick={onCancel} className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded hover:bg-gray-50">Cancel</button>
           <button onClick={onConfirm} disabled={loading}
             className="flex items-center gap-1.5 px-4 py-2 text-sm text-white bg-red-500 hover:bg-red-600 rounded disabled:opacity-50">
-            {loading && <Loader2 size={13} className="animate-spin" />} Hapus
+            {loading && <Loader2 size={13} className="animate-spin" />} Delete
           </button>
         </div>
       </div>
@@ -166,14 +153,14 @@ function DivisionModal({ open, division, onClose, onSaved }: {
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    if (!form.name.trim()) { setError('Nama wajib diisi'); return; }
+    if (!form.name.trim()) { setError('Name is required'); return; }
     setSaving(true); setError('');
     try {
       const payload = { name: form.name.trim(), slug: form.slug.trim() || slugify(form.name), color: form.color, description: form.description.trim() || undefined };
       const res = division ? await api.patch(`/divisions/${division.id}`, payload) : await api.post('/divisions', payload);
       onSaved(res.data.data); onClose();
     } catch (err: unknown) {
-      setError((err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'Terjadi kesalahan');
+      setError((err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'An error occurred');
     } finally { setSaving(false); }
   }
 
@@ -183,11 +170,11 @@ function DivisionModal({ open, division, onClose, onSaved }: {
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
       <div className="relative bg-white rounded-xl shadow-xl w-full max-w-md">
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
-          <h2 className="text-sm font-semibold text-gray-800">{division ? 'Edit Divisi' : 'Tambah Divisi'}</h2>
+          <h2 className="text-sm font-semibold text-gray-800">{division ? 'Edit Division' : 'Add Division'}</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={16} /></button>
         </div>
         <form onSubmit={handleSubmit} className="p-5 space-y-4">
-          <Field label="Nama" required>
+          <Field label="Name" required>
             <input autoFocus type="text" value={form.name} placeholder="Finance"
               onChange={(e) => setForm((f) => ({ ...f, name: e.target.value, slug: division ? f.slug : slugify(e.target.value) }))}
               className={inputCls} />
@@ -197,21 +184,21 @@ function DivisionModal({ open, division, onClose, onSaved }: {
               onChange={(e) => setForm((f) => ({ ...f, slug: e.target.value }))}
               className={cn(inputCls, 'font-mono text-xs')} />
           </Field>
-          <Field label="Warna">
+          <Field label="Color">
             <ColorPicker value={form.color} onChange={(c) => setForm((f) => ({ ...f, color: c }))} />
           </Field>
-          <Field label="Deskripsi">
-            <textarea rows={2} value={form.description} placeholder="Deskripsi singkat…"
+          <Field label="Description">
+            <textarea rows={2} value={form.description} placeholder="Brief description…"
               onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
               className={cn(inputCls, 'resize-none')} />
           </Field>
           {error && <p className="flex items-center gap-1.5 text-xs text-red-500"><AlertCircle size={12} /> {error}</p>}
           <div className="flex justify-end gap-2 pt-1">
-            <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded hover:bg-gray-50">Batal</button>
+            <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded hover:bg-gray-50">Cancel</button>
             <button type="submit" disabled={saving}
               className="flex items-center gap-1.5 px-4 py-2 text-sm text-white bg-navy hover:bg-navy-light rounded disabled:opacity-50">
               {saving && <Loader2 size={13} className="animate-spin" />}
-              {division ? 'Simpan' : 'Buat Divisi'}
+              {division ? 'Save' : 'Create Division'}
             </button>
           </div>
         </form>
@@ -239,13 +226,13 @@ function RoleModal({ open, role, onClose, onSaved }: {
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    if (!form.name.trim()) { setError('Nama wajib diisi'); return; }
+    if (!form.name.trim()) { setError('Name is required'); return; }
     setSaving(true); setError('');
     try {
       const res = await api.patch(`/roles/${role!.id}`, { name: form.name.trim(), color: form.color });
       onSaved(res.data.data); onClose();
     } catch (err: unknown) {
-      setError((err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'Terjadi kesalahan');
+      setError((err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'An error occurred');
     } finally { setSaving(false); }
   }
 
@@ -259,20 +246,20 @@ function RoleModal({ open, role, onClose, onSaved }: {
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={16} /></button>
         </div>
         <form onSubmit={handleSubmit} className="p-5 space-y-4">
-          <Field label="Nama" required>
+          <Field label="Name" required>
             <input autoFocus type="text" value={form.name}
               onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
               className={inputCls} />
           </Field>
-          <Field label="Warna">
+          <Field label="Color">
             <ColorPicker value={form.color} onChange={(c) => setForm((f) => ({ ...f, color: c }))} />
           </Field>
           {error && <p className="flex items-center gap-1.5 text-xs text-red-500"><AlertCircle size={12} /> {error}</p>}
           <div className="flex justify-end gap-2 pt-1">
-            <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded hover:bg-gray-50">Batal</button>
+            <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded hover:bg-gray-50">Cancel</button>
             <button type="submit" disabled={saving}
               className="flex items-center gap-1.5 px-4 py-2 text-sm text-white bg-navy hover:bg-navy-light rounded disabled:opacity-50">
-              {saving && <Loader2 size={13} className="animate-spin" />} Simpan
+              {saving && <Loader2 size={13} className="animate-spin" />} Save
             </button>
           </div>
         </form>
@@ -323,8 +310,8 @@ function UserFormModal({ open, mode, user, roles, divisions, onClose, onSaved }:
     setSaving(true); setError('');
     try {
       if (mode === 'create') {
-        if (!createForm.roleId)     { setError('Pilih role'); setSaving(false); return; }
-        if (!createForm.divisionId) { setError('Pilih divisi'); setSaving(false); return; }
+        if (!createForm.roleId)     { setError('Please select a role'); setSaving(false); return; }
+        if (!createForm.divisionId) { setError('Please select a division'); setSaving(false); return; }
         const res = await api.post('/users', {
           fullName: createForm.fullName.trim(), email: createForm.email.trim(),
           username: createForm.username.trim(), password: createForm.password,
@@ -340,7 +327,7 @@ function UserFormModal({ open, mode, user, roles, divisions, onClose, onSaved }:
       }
       onClose();
     } catch (err: unknown) {
-      setError((err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'Terjadi kesalahan');
+      setError((err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'An error occurred');
     } finally { setSaving(false); }
   }
 
@@ -369,13 +356,13 @@ function UserFormModal({ open, mode, user, roles, divisions, onClose, onSaved }:
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
       <div className="relative bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto flex flex-col">
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 sticky top-0 bg-white">
-          <h2 className="text-sm font-semibold text-gray-800">{mode === 'create' ? 'Tambah User Baru' : 'Edit User'}</h2>
+          <h2 className="text-sm font-semibold text-gray-800">{mode === 'create' ? 'Add New User' : 'Edit User'}</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={16} /></button>
         </div>
         <form onSubmit={handleSubmit} className="flex flex-col gap-4 px-5 py-4">
           {mode === 'create' ? (
             <>
-              <Field label="Nama Lengkap" required>
+              <Field label="Full Name" required>
                 <input type="text" maxLength={100} placeholder="Budi Santoso" value={createForm.fullName}
                   onChange={(e) => setCreate((f) => ({ ...f, fullName: e.target.value }))} className={inputCls} />
               </Field>
@@ -391,10 +378,10 @@ function UserFormModal({ open, mode, user, roles, divisions, onClose, onSaved }:
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <Field label="Password" required>
-                  <input type="password" placeholder="Min. 8 karakter" value={createForm.password}
+                  <input type="password" placeholder="Min. 8 characters" value={createForm.password}
                     onChange={(e) => setCreate((f) => ({ ...f, password: e.target.value }))} className={inputCls} />
                 </Field>
-                <Field label="No. Telepon">
+                <Field label="Phone Number">
                   <input type="text" placeholder="08xxxxxxxx" value={createForm.phone}
                     onChange={(e) => setCreate((f) => ({ ...f, phone: e.target.value }))} className={inputCls} />
                 </Field>
@@ -402,14 +389,14 @@ function UserFormModal({ open, mode, user, roles, divisions, onClose, onSaved }:
               <div className="grid grid-cols-2 gap-4">
                 <Field label="Role" required>
                   <select value={createForm.roleId} onChange={(e) => setCreate((f) => ({ ...f, roleId: e.target.value }))} className={selectCls}>
-                    <option value="">-- Pilih role --</option>
+                    <option value="">-- Select role --</option>
                     {roles.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
                   </select>
                   {createForm.roleId && <RolePill roleId={createForm.roleId} />}
                 </Field>
-                <Field label="Divisi" required>
+                <Field label="Division" required>
                   <select value={createForm.divisionId} onChange={(e) => setCreate((f) => ({ ...f, divisionId: e.target.value }))} className={selectCls}>
-                    <option value="">-- Pilih divisi --</option>
+                    <option value="">-- Select division --</option>
                     {divisions.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
                   </select>
                   {createForm.divisionId && <DivPill divisionId={createForm.divisionId} />}
@@ -418,7 +405,7 @@ function UserFormModal({ open, mode, user, roles, divisions, onClose, onSaved }:
             </>
           ) : (
             <>
-              <Field label="Nama Lengkap" required>
+              <Field label="Full Name" required>
                 <input type="text" maxLength={100} value={editForm.fullName}
                   onChange={(e) => setEdit((f) => ({ ...f, fullName: e.target.value }))} className={inputCls} />
               </Field>
@@ -429,14 +416,14 @@ function UserFormModal({ open, mode, user, roles, divisions, onClose, onSaved }:
               <div className="grid grid-cols-2 gap-4">
                 <Field label="Role" required>
                   <select value={editForm.roleId} onChange={(e) => setEdit((f) => ({ ...f, roleId: e.target.value }))} className={selectCls}>
-                    <option value="">-- Pilih role --</option>
+                    <option value="">-- Select role --</option>
                     {roles.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
                   </select>
                   {editForm.roleId && <RolePill roleId={editForm.roleId} />}
                 </Field>
-                <Field label="Divisi" required>
+                <Field label="Division" required>
                   <select value={editForm.divisionId} onChange={(e) => setEdit((f) => ({ ...f, divisionId: e.target.value }))} className={selectCls}>
-                    <option value="">-- Pilih divisi --</option>
+                    <option value="">-- Select division --</option>
                     {divisions.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
                   </select>
                   {editForm.divisionId && <DivPill divisionId={editForm.divisionId} />}
@@ -446,11 +433,11 @@ function UserFormModal({ open, mode, user, roles, divisions, onClose, onSaved }:
           )}
           {error && <p className="flex items-center gap-1.5 text-xs text-danger"><AlertCircle size={12} /> {error}</p>}
           <div className="flex justify-end gap-2 pt-1 border-t border-gray-100">
-            <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded hover:bg-gray-50">Batal</button>
+            <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded hover:bg-gray-50">Cancel</button>
             <button type="submit" disabled={saving}
               className="flex items-center gap-1.5 px-4 py-2 text-sm text-white bg-navy hover:bg-navy-light rounded disabled:opacity-50">
               {saving && <Loader2 size={13} className="animate-spin" />}
-              {mode === 'create' ? 'Buat User' : 'Simpan'}
+              {mode === 'create' ? 'Create User' : 'Save'}
             </button>
           </div>
         </form>
@@ -505,9 +492,6 @@ export default function UsersPage() {
   // ── roles tab ──
   const [roleModal,     setRoleModal]     = useState(false);
   const [editingRole,   setEditingRole]   = useState<RoleOption | null>(null);
-  const [roleDelTarget, setRoleDelTarget] = useState<RoleOption | null>(null);
-  const [deletingRole,  setDeletingRole]  = useState(false);
-  const [roleDelError,  setRoleDelError]  = useState('');
 
   // users fetch
   useEffect(() => {
@@ -525,7 +509,7 @@ export default function UsersPage() {
       if (statusFilter) params.isActive   = statusFilter;
       const res = await api.get('/users', { params });
       setUsers(res.data.data); setMeta(res.data.meta);
-    } catch { setUsersError('Gagal memuat data. Coba lagi.'); }
+    } catch { setUsersError('Failed to load data. Try again.'); }
     finally  { setUsersLoading(false); }
   }, [debSearch, roleFilter, divFilter, statusFilter, page]);
 
@@ -539,17 +523,17 @@ export default function UsersPage() {
     setMeta((m) => ({ ...m, total: m.total + (users.find((u) => u.id === saved.id) ? 0 : 1) }));
   }
   async function handleToggle(u: UserRow) {
-    if (!confirm(`${u.isActive ? 'Nonaktifkan' : 'Aktifkan'} user "${u.fullName}"?`)) return;
+    if (!confirm(`${u.isActive ? 'Deactivate' : 'Activate'} user "${u.fullName}"?`)) return;
     setToggling(u.id);
     try { const res = await api.patch(`/users/${u.id}/toggle`); setUsers((p) => p.map((x) => x.id === u.id ? res.data.data : x)); }
-    catch (err: unknown) { alert((err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'Gagal'); }
+    catch (err: unknown) { alert((err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'Failed'); }
     finally { setToggling(null); }
   }
   async function handleDeleteUser(u: UserRow) {
-    if (!confirm(`Nonaktifkan user "${u.fullName}" secara permanen?`)) return;
+    if (!confirm(`Permanently deactivate user "${u.fullName}"?`)) return;
     setDeletingUsr(u.id);
     try { const res = await api.delete(`/users/${u.id}`); setUsers((p) => p.map((x) => x.id === u.id ? res.data.data : x)); }
-    catch (err: unknown) { alert((err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'Gagal'); }
+    catch (err: unknown) { alert((err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'Failed'); }
     finally { setDeletingUsr(null); }
   }
   function resetFilters() { setSearch(''); setRoleFilter(''); setDivFilter(''); setStatusFilter(''); setPage(1); }
@@ -563,7 +547,7 @@ export default function UsersPage() {
     if (!divDelTarget) return;
     setDeletingDiv(true); setDivDelError('');
     try { await api.delete(`/divisions/${divDelTarget.id}`); setDivisions((p) => p.filter((d) => d.id !== divDelTarget.id)); setDivDelTarget(null); }
-    catch (err: unknown) { setDivDelError((err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'Gagal'); }
+    catch (err: unknown) { setDivDelError((err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'Failed'); }
     finally { setDeletingDiv(false); }
   }
 
@@ -571,14 +555,6 @@ export default function UsersPage() {
   function handleRoleSaved(saved: RoleOption) {
     setRoles((prev) => { const i = prev.findIndex((r) => r.id === saved.id); if (i >= 0) { const n = [...prev]; n[i] = saved; return n; } return [saved, ...prev]; });
   }
-  async function handleDeleteRole() {
-    if (!roleDelTarget) return;
-    setDeletingRole(true); setRoleDelError('');
-    try { await api.delete(`/roles/${roleDelTarget.id}`); setRoles((p) => p.filter((r) => r.id !== roleDelTarget.id)); setRoleDelTarget(null); }
-    catch (err: unknown) { setRoleDelError((err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'Gagal'); }
-    finally { setDeletingRole(false); }
-  }
-
   const sortedRoles = [...roles].sort((a, b) => a.level - b.level || a.name.localeCompare(b.name));
 
   const TABS = [
@@ -592,21 +568,21 @@ export default function UsersPage() {
       {/* Header */}
       <div className="flex items-center justify-between mb-5">
         <div>
-          <h1 className="text-xl font-semibold text-gray-800">Manajemen Pengguna</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Kelola user, divisi, dan role organisasi SAN Group</p>
+          <h1 className="text-xl font-semibold text-gray-800">User Management</h1>
+          <p className="text-sm text-gray-500 mt-0.5">Manage users, divisions, and roles for SAN Group</p>
         </div>
         {activeTab === 'users' && (
           <button onClick={openCreateUser} className="flex items-center gap-1.5 px-3 py-2 text-sm text-white bg-navy hover:bg-navy-light rounded transition-colors">
-            <Plus size={15} /> Tambah User
+            <Plus size={15} /> Add User
           </button>
         )}
         {activeTab === 'divisions' && (
           <button onClick={() => { setEditingDiv(null); setDivModal(true); }} className="flex items-center gap-1.5 px-3 py-2 text-sm text-white bg-navy hover:bg-navy-light rounded transition-colors">
-            <Plus size={15} /> Tambah Divisi
+            <Plus size={15} /> Add Division
           </button>
         )}
         {activeTab === 'roles' && (
-          <span className="text-xs text-gray-400 italic">6 role sistem · edit nama & warna via ikon pensil</span>
+          <span className="text-xs text-gray-400 italic">6 system roles · edit name & color via the pencil icon</span>
         )}
       </div>
 
@@ -633,7 +609,7 @@ export default function UsersPage() {
           <div className="bg-white border border-gray-200 rounded-lg p-4 mb-4 flex flex-wrap items-center gap-3">
             <div className="relative flex-1 min-w-48">
               <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-              <input type="text" placeholder="Cari nama, email, username..." value={search}
+              <input type="text" placeholder="Search name, email, username..." value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="pl-8 pr-8 py-2 text-sm border border-gray-200 rounded w-full focus:outline-none focus:border-navy focus:ring-1 focus:ring-navy" />
               {search && (
@@ -642,19 +618,19 @@ export default function UsersPage() {
             </div>
             <select value={roleFilter} onChange={(e) => { setRoleFilter(e.target.value); setPage(1); }}
               className="py-2 px-3 text-sm border border-gray-200 rounded focus:outline-none focus:border-navy">
-              <option value="">Semua Role</option>
+              <option value="">All Roles</option>
               {roles.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
             </select>
             <select value={divFilter} onChange={(e) => { setDivFilter(e.target.value); setPage(1); }}
               className="py-2 px-3 text-sm border border-gray-200 rounded focus:outline-none focus:border-navy">
-              <option value="">Semua Divisi</option>
+              <option value="">All Divisions</option>
               {divisions.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
             </select>
             <select value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
               className="py-2 px-3 text-sm border border-gray-200 rounded focus:outline-none focus:border-navy">
-              <option value="">Semua Status</option>
-              <option value="true">Aktif</option>
-              <option value="false">Nonaktif</option>
+              <option value="">All Status</option>
+              <option value="true">Active</option>
+              <option value="false">Inactive</option>
             </select>
             {hasFilter && (
               <button onClick={resetFilters} className="flex items-center gap-1 text-xs text-gray-500 hover:text-danger px-2 py-1">
@@ -671,13 +647,13 @@ export default function UsersPage() {
               <div className="flex flex-col items-center justify-center py-16 text-center">
                 <AlertCircle size={32} className="text-danger mb-3" />
                 <p className="text-sm text-gray-600">{usersError}</p>
-                <button onClick={fetchUsers} className="mt-3 px-4 py-1.5 text-sm text-navy border border-navy rounded hover:bg-navy-50">Coba lagi</button>
+                <button onClick={fetchUsers} className="mt-3 px-4 py-1.5 text-sm text-navy border border-navy rounded hover:bg-navy-50">Try again</button>
               </div>
             ) : users.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-16 text-center">
                 <Users size={40} className="text-gray-300 mb-3" />
-                <p className="text-sm font-medium text-gray-600">{hasFilter ? 'Tidak ada user yang cocok' : 'Belum ada user'}</p>
-                {hasFilter && <button onClick={resetFilters} className="mt-2 text-xs text-navy hover:underline">Reset filter</button>}
+                <p className="text-sm font-medium text-gray-600">{hasFilter ? 'No matching users' : 'No users yet'}</p>
+                {hasFilter && <button onClick={resetFilters} className="mt-2 text-xs text-navy hover:underline">Reset filters</button>}
               </div>
             ) : (
               <div className="overflow-x-auto">
@@ -687,9 +663,9 @@ export default function UsersPage() {
                       <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">User</th>
                       <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Username</th>
                       <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
-                      <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Divisi</th>
+                      <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Division</th>
                       <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                      <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Login Terakhir</th>
+                      <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Last Login</th>
                       <th className="px-4 py-3" />
                     </tr>
                   </thead>
@@ -705,7 +681,7 @@ export default function UsersPage() {
                               <div className="min-w-0">
                                 <div className="flex items-center gap-1.5">
                                   <p className="text-sm font-medium text-gray-800 truncate">{u.fullName}</p>
-                                  {isMe && <span className="text-xs bg-navy-50 text-navy px-1.5 py-0.5 rounded">Anda</span>}
+                                  {isMe && <span className="text-xs bg-navy-50 text-navy px-1.5 py-0.5 rounded">You</span>}
                                 </div>
                                 <p className="text-xs text-gray-400 truncate">{u.email}</p>
                               </div>
@@ -735,7 +711,7 @@ export default function UsersPage() {
                           <td className="px-4 py-3">
                             <span className={cn('inline-block text-xs px-2 py-0.5 rounded-full font-medium',
                               u.isActive ? 'bg-success/10 text-success' : 'bg-gray-100 text-gray-500')}>
-                              {u.isActive ? 'Aktif' : 'Nonaktif'}
+                              {u.isActive ? 'Active' : 'Inactive'}
                             </span>
                           </td>
                           <td className="px-4 py-3 text-xs text-gray-400">{formatDate(u.lastLoginAt)}</td>
@@ -747,14 +723,14 @@ export default function UsersPage() {
                               </button>
                               {isSuperAdmin && !isMe && !isTopRole && (
                                 <button onClick={() => handleToggle(u)} disabled={toggling === u.id}
-                                  title={u.isActive ? 'Nonaktifkan' : 'Aktifkan'}
+                                  title={u.isActive ? 'Deactivate' : 'Activate'}
                                   className={cn('w-7 h-7 flex items-center justify-center rounded transition-colors',
                                     u.isActive ? 'text-gray-400 hover:text-warning hover:bg-warning/10' : 'text-gray-400 hover:text-success hover:bg-success/10')}>
                                   {toggling === u.id ? <Loader2 size={13} className="animate-spin" /> : u.isActive ? <PowerOff size={13} /> : <Power size={13} />}
                                 </button>
                               )}
                               {isSuperAdmin && !isMe && !isTopRole && (
-                                <button onClick={() => handleDeleteUser(u)} disabled={deletingUsr === u.id} title="Hapus"
+                                <button onClick={() => handleDeleteUser(u)} disabled={deletingUsr === u.id} title="Delete"
                                   className="w-7 h-7 flex items-center justify-center rounded text-gray-400 hover:text-danger hover:bg-danger/10 transition-colors">
                                   {deletingUsr === u.id ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}
                                 </button>
@@ -771,7 +747,7 @@ export default function UsersPage() {
             {!usersLoading && !usersError && meta.totalPages > 1 && (
               <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100 bg-gray-50/50">
                 <p className="text-xs text-gray-500">
-                  {(meta.page - 1) * meta.limit + 1}–{Math.min(meta.page * meta.limit, meta.total)} dari {meta.total} user
+                  {(meta.page - 1) * meta.limit + 1}–{Math.min(meta.page * meta.limit, meta.total)} of {meta.total} users
                 </p>
                 <div className="flex items-center gap-1">
                   <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={meta.page <= 1}
@@ -810,10 +786,10 @@ export default function UsersPage() {
           {divisions.length === 0 ? (
             <div className="bg-white border border-gray-200 rounded-xl flex flex-col items-center justify-center py-20 text-center">
               <Layers size={40} className="text-gray-200 mb-3" />
-              <p className="text-sm text-gray-500 mb-3">Belum ada divisi</p>
+              <p className="text-sm text-gray-500 mb-3">No divisions yet</p>
               <button onClick={() => { setEditingDiv(null); setDivModal(true); }}
                 className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-navy border border-navy rounded hover:bg-navy-50">
-                <Plus size={14} /> Tambah divisi pertama
+                <Plus size={14} /> Add your first division
               </button>
             </div>
           ) : (
@@ -842,7 +818,7 @@ export default function UsersPage() {
                             <Edit2 size={13} />
                           </button>
                           <button onClick={() => { setDivDelError(''); setDivDelTarget(d); }} disabled={userCount > 0}
-                            title={userCount > 0 ? 'Tidak dapat dihapus — masih ada user' : 'Hapus'}
+                            title={userCount > 0 ? 'Cannot delete — division still has users' : 'Delete'}
                             className={cn('w-7 h-7 flex items-center justify-center rounded transition-colors',
                               userCount > 0 ? 'text-gray-200 cursor-not-allowed' : 'text-gray-400 hover:text-red-500 hover:bg-red-50')}>
                             <Trash2 size={13} />
@@ -905,7 +881,7 @@ export default function UsersPage() {
       <RoleModal open={roleModal} role={editingRole}
         onClose={() => setRoleModal(false)} onSaved={handleRoleSaved} />
       {divDelTarget && (
-        <DeleteConfirm title="Hapus Divisi" name={divDelTarget.name}
+        <DeleteConfirm title="Delete Division" name={divDelTarget.name}
           onCancel={() => setDivDelTarget(null)} onConfirm={handleDeleteDiv} loading={deletingDiv} />
       )}
     </div>

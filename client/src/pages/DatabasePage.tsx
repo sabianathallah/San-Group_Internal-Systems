@@ -47,7 +47,7 @@ interface DbLink {
 const COLORS = ['#6366f1','#10b981','#f59e0b','#ef4444','#3b82f6','#8b5cf6','#ec4899','#14b8a6','#f97316','#64748b'];
 
 function extractErr(err: unknown): string {
-  return (err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'Terjadi kesalahan';
+  return (err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'An error occurred';
 }
 
 // ── Folder Modal ───────────────────────────────────────────
@@ -62,7 +62,7 @@ function FolderModal({ folder, onClose, onSaved }: {
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    if (!name.trim()) { setError('Nama folder wajib diisi'); return; }
+    if (!name.trim()) { setError('Folder name is required'); return; }
     setSaving(true); setError('');
     try {
       const payload = { name: name.trim(), icon: null, color, description: desc.trim() || null };
@@ -79,24 +79,24 @@ function FolderModal({ folder, onClose, onSaved }: {
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
       <div className="relative bg-white rounded-xl shadow-xl w-full max-w-sm">
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
-          <h2 className="text-sm font-semibold text-gray-800">{folder ? 'Edit Folder' : 'Folder Baru'}</h2>
+          <h2 className="text-sm font-semibold text-gray-800">{folder ? 'Edit Folder' : 'New Folder'}</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={16} /></button>
         </div>
         <form onSubmit={handleSubmit} className="p-5 space-y-4">
           <div>
-            <label className="block text-xs text-gray-500 mb-1">Nama folder</label>
+            <label className="block text-xs text-gray-500 mb-1">Folder name</label>
             <input autoFocus type="text" value={name} onChange={(e) => setName(e.target.value)}
-              placeholder="contoh: Dokumen HRD"
+              placeholder="e.g. HR Documents"
               className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-navy" />
           </div>
           <div>
-            <label className="block text-xs text-gray-500 mb-1">Deskripsi (opsional)</label>
+            <label className="block text-xs text-gray-500 mb-1">Description (optional)</label>
             <input type="text" value={desc} onChange={(e) => setDesc(e.target.value)}
-              placeholder="Keterangan singkat…"
+              placeholder="Brief description…"
               className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-navy" />
           </div>
           <div>
-            <label className="block text-xs text-gray-500 mb-2">Warna</label>
+            <label className="block text-xs text-gray-500 mb-2">Color</label>
             <div className="flex gap-2 flex-wrap">
               {COLORS.map((c) => (
                 <button key={c} type="button" onClick={() => setColor(c)}
@@ -107,10 +107,10 @@ function FolderModal({ folder, onClose, onSaved }: {
           </div>
           {error && <p className="text-xs text-red-500 flex items-center gap-1"><AlertCircle size={12} />{error}</p>}
           <div className="flex justify-end gap-2 pt-1">
-            <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50">Batal</button>
+            <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50">Cancel</button>
             <button type="submit" disabled={saving || !name.trim()}
               className="flex items-center gap-1.5 px-4 py-2 text-sm text-white bg-navy rounded-lg hover:bg-navy-light disabled:opacity-50">
-              {saving && <Loader2 size={13} className="animate-spin" />}{folder ? 'Simpan' : 'Buat'}
+              {saving && <Loader2 size={13} className="animate-spin" />}{folder ? 'Save' : 'Create'}
             </button>
           </div>
         </form>
@@ -131,8 +131,8 @@ function LinkModal({ link, folderId, onClose, onSaved }: {
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    if (!title.trim()) { setError('Nama wajib diisi'); return; }
-    if (!url.trim())   { setError('Link/URL wajib diisi'); return; }
+    if (!title.trim()) { setError('Name is required'); return; }
+    if (!url.trim())   { setError('Link/URL is required'); return; }
     setSaving(true); setError('');
     try {
       const payload = { title: title.trim(), url: url.trim(), description: desc.trim() || undefined, folderId };
@@ -149,35 +149,36 @@ function LinkModal({ link, folderId, onClose, onSaved }: {
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
       <div className="relative bg-white rounded-xl shadow-xl w-full max-w-sm">
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
-          <h2 className="text-sm font-semibold text-gray-800">{link ? 'Edit Link' : 'Tambah Link'}</h2>
+          <h2 className="text-sm font-semibold text-gray-800">{link ? 'Edit Link' : 'Add Link'}</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={16} /></button>
         </div>
         <form onSubmit={handleSubmit} className="p-5 space-y-4">
           <div>
-            <label className="block text-xs text-gray-500 mb-1">Nama tampilan</label>
+            <label className="block text-xs text-gray-500 mb-1">Display name</label>
             <input autoFocus type="text" value={title} onChange={(e) => setTitle(e.target.value)}
-              placeholder="contoh: Rekap Absensi Juni"
+              placeholder="e.g. Attendance Report June"
               className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-navy" />
-            <p className="text-[10px] text-gray-400 mt-1">Nama inilah yang ditampilkan, bukan URL-nya</p>
+            <p className="text-[10px] text-gray-400 mt-1">This name is shown to users, not the URL</p>
           </div>
           <div>
             <label className="block text-xs text-gray-500 mb-1">Link / URL</label>
+
             <input type="url" value={url} onChange={(e) => setUrl(e.target.value)}
               placeholder="https://drive.google.com/…"
               className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-navy" />
           </div>
           <div>
-            <label className="block text-xs text-gray-500 mb-1">Keterangan (opsional)</label>
+            <label className="block text-xs text-gray-500 mb-1">Notes (optional)</label>
             <input type="text" value={desc} onChange={(e) => setDesc(e.target.value)}
-              placeholder="Deskripsi singkat…"
+              placeholder="Brief description…"
               className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-navy" />
           </div>
           {error && <p className="text-xs text-red-500 flex items-center gap-1"><AlertCircle size={12} />{error}</p>}
           <div className="flex justify-end gap-2 pt-1">
-            <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50">Batal</button>
+            <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50">Cancel</button>
             <button type="submit" disabled={saving || !title.trim() || !url.trim()}
               className="flex items-center gap-1.5 px-4 py-2 text-sm text-white bg-navy rounded-lg hover:bg-navy-light disabled:opacity-50">
-              {saving && <Loader2 size={13} className="animate-spin" />}{link ? 'Simpan' : 'Tambah'}
+              {saving && <Loader2 size={13} className="animate-spin" />}{link ? 'Save' : 'Add'}
             </button>
           </div>
         </form>
@@ -204,7 +205,7 @@ function ShareFolderModal({ folderId, folderName, onClose }: {
     ]).then(([s, d]) => {
       setShares(s.data.data ?? []);
       setDivisions(d.data.data ?? []);
-    }).catch(() => setError('Gagal memuat data'))
+    }).catch(() => setError('Failed to load data'))
       .finally(() => setLoading(false));
   }, [folderId]);
 
@@ -243,42 +244,42 @@ function ShareFolderModal({ folderId, folderName, onClose }: {
       <div className="relative bg-white rounded-xl shadow-xl w-full max-w-md">
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
           <div>
-            <h2 className="text-sm font-semibold text-gray-800">Bagikan Folder</h2>
+            <h2 className="text-sm font-semibold text-gray-800">Share Folder</h2>
             <p className="text-xs text-gray-400 mt-0.5">{folderName}</p>
           </div>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={16} /></button>
         </div>
 
         <div className="p-5 space-y-4">
-          {/* Section: Tambah akses */}
+          {/* Section: Grant access */}
           <div>
-            <p className="text-xs text-gray-500 font-medium mb-2">Tambah akses</p>
+            <p className="text-xs text-gray-500 font-medium mb-2">Grant access</p>
             <div className="flex gap-2">
               <select value={selDiv} onChange={(e) => setSelDiv(e.target.value)}
                 className="flex-1 text-sm border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-navy">
-                <option value="">Pilih divisi…</option>
+                <option value="">Select division…</option>
                 {availableDivisions.map((d) => (
                   <option key={d.id} value={d.id}>{d.name}</option>
                 ))}
               </select>
               <button onClick={handleAdd} disabled={!selDiv || adding}
                 className="px-3 py-2 text-sm text-white bg-navy rounded-lg hover:bg-navy-light disabled:opacity-50 flex items-center gap-1.5">
-                {adding ? <Loader2 size={13} className="animate-spin" /> : <Plus size={13} />} Bagikan
+                {adding ? <Loader2 size={13} className="animate-spin" /> : <Plus size={13} />} Share
               </button>
             </div>
           </div>
 
           {error && <p className="text-xs text-red-500 flex items-center gap-1"><AlertCircle size={12} />{error}</p>}
 
-          {/* Section: Dibagikan ke */}
+          {/* Section: Shared with */}
           <div>
-            <p className="text-xs text-gray-500 font-medium mb-2">Dibagikan ke</p>
+            <p className="text-xs text-gray-500 font-medium mb-2">Shared with</p>
             {loading ? (
               <div className="flex justify-center py-4"><Loader2 size={18} className="animate-spin text-gray-300" /></div>
             ) : shares.length === 0 ? (
               <div className="text-center py-6">
                 <ShieldCheck size={28} className="text-gray-200 mx-auto mb-2" />
-                <p className="text-xs text-gray-400">Belum dibagikan ke siapapun</p>
+                <p className="text-xs text-gray-400">Not shared with anyone yet</p>
               </div>
             ) : (
               <div className="flex flex-wrap gap-2">
@@ -358,7 +359,7 @@ export default function DatabasePage() {
   }
 
   async function handleDeleteFolder(folder: DbFolder) {
-    if (!confirm(`Hapus folder "${folder.name}"? Semua link di dalamnya ikut terhapus.`)) return;
+    if (!confirm(`Delete folder "${folder.name}"? All links inside will also be deleted.`)) return;
     try {
       await api.delete(`/db-folders/${folder.id}`);
       setFolders((prev) => prev.filter((f) => f.id !== folder.id));
@@ -380,7 +381,7 @@ export default function DatabasePage() {
   }
 
   async function handleDeleteLink(link: DbLink) {
-    if (!confirm(`Hapus "${link.title}"?`)) return;
+    if (!confirm(`Delete "${link.title}"?`)) return;
     try {
       await api.delete(`/db-links/${link.id}`);
       setLinks((prev) => prev.filter((l) => l.id !== link.id));
@@ -397,12 +398,12 @@ export default function DatabasePage() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-lg font-semibold text-gray-900">Database Links</h1>
-            <p className="text-sm text-gray-500 mt-0.5">Direktori akses cepat — klik folder untuk membuka</p>
+            <p className="text-sm text-gray-500 mt-0.5">Quick access directory — click a folder to open</p>
           </div>
           {perms.db_link.manageFolder && (
             <button onClick={() => setFolderModal({ open: true })}
               className="flex items-center gap-1.5 px-4 py-2 text-sm text-white bg-navy hover:bg-navy-light rounded-lg transition-colors">
-              <Plus size={15} /> Folder Baru
+              <Plus size={15} /> New Folder
             </button>
           )}
         </div>
@@ -414,11 +415,11 @@ export default function DatabasePage() {
         ) : folders.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-24 gap-3 text-gray-400">
             <Folder size={40} className="text-gray-200" />
-            <p className="text-sm">Belum ada folder</p>
+            <p className="text-sm">No folders yet</p>
             {perms.db_link.manageFolder && (
               <button onClick={() => setFolderModal({ open: true })}
                 className="text-xs text-navy hover:underline flex items-center gap-1">
-                <Plus size={12} /> Buat folder pertama
+                <Plus size={12} /> Create your first folder
               </button>
             )}
           </div>
@@ -444,7 +445,7 @@ export default function DatabasePage() {
                     {perms.db_link.shareFolder && (
                       <button onClick={(e) => { e.stopPropagation(); setShareFolderId(folder.id); setShareFolderName(folder.name); }}
                         className="p-1.5 bg-white border border-gray-200 rounded-lg text-gray-400 hover:text-info shadow-sm"
-                        title="Bagikan folder">
+                        title="Share folder">
                         <Share2 size={11} />
                       </button>
                     )}
@@ -516,14 +517,14 @@ export default function DatabasePage() {
         <div className="flex items-center gap-2 flex-shrink-0">
           <div className="relative">
             <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
-            <input type="text" placeholder="Cari…" value={search} onChange={(e) => setSearch(e.target.value)}
+            <input type="text" placeholder="Search…" value={search} onChange={(e) => setSearch(e.target.value)}
               className="pl-7 pr-6 py-1.5 text-xs border border-gray-200 rounded-lg outline-none focus:border-navy w-32" />
             {search && <button onClick={() => setSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400"><X size={11} /></button>}
           </div>
           {perms.db_link.addLink && (
             <button onClick={() => setLinkModal({ open: true })}
               className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-white bg-navy hover:bg-navy-light rounded-lg transition-colors">
-              <Plus size={13} /> Tambah Link
+              <Plus size={13} /> Add Link
             </button>
           )}
         </div>
@@ -538,11 +539,11 @@ export default function DatabasePage() {
         ) : filteredLinks.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 gap-2 text-gray-400">
             <FileText size={32} className="text-gray-200" />
-            <p className="text-sm">{search ? 'Tidak ada hasil' : 'Folder ini masih kosong'}</p>
+            <p className="text-sm">{search ? 'No results found' : 'This folder is empty'}</p>
             {!search && perms.db_link.addLink && (
               <button onClick={() => setLinkModal({ open: true })}
                 className="text-xs text-navy hover:underline flex items-center gap-1 mt-1">
-                <Plus size={12} /> Tambah link pertama
+                <Plus size={12} /> Add your first link
               </button>
             )}
           </div>

@@ -31,7 +31,7 @@ export default function ChangePasswordModal({
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     if (form.newPassword !== form.confirmPassword) {
-      setError('Konfirmasi password tidak cocok');
+      setError('Password confirmation does not match');
       return;
     }
     setSaving(true);
@@ -43,7 +43,7 @@ export default function ChangePasswordModal({
       setTimeout(() => { logout(); navigate(ROUTES.LOGIN, { replace: true }); }, 2000);
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
-      setError(msg ?? 'Terjadi kesalahan');
+      setError(msg ?? 'An error occurred');
     } finally {
       setSaving(false);
     }
@@ -56,7 +56,7 @@ export default function ChangePasswordModal({
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
       <div className="relative bg-white rounded-lg shadow-lg w-full max-w-sm">
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200">
-          <h2 className="text-sm font-semibold text-gray-800">Ganti Password</h2>
+          <h2 className="text-sm font-semibold text-gray-800">Change Password</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
             <X size={16} />
           </button>
@@ -65,15 +65,15 @@ export default function ChangePasswordModal({
         {success ? (
           <div className="px-5 py-10 flex flex-col items-center text-center gap-3">
             <CheckCircle2 size={36} className="text-success" />
-            <p className="text-sm font-medium text-gray-800">Password berhasil diubah</p>
-            <p className="text-xs text-gray-500">Anda akan diarahkan ke halaman login...</p>
+            <p className="text-sm font-medium text-gray-800">Password changed successfully</p>
+            <p className="text-xs text-gray-500">You will be redirected to the login page...</p>
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="flex flex-col gap-4 px-5 py-4">
             {[
-              { key: 'oldPassword',     label: 'Password Lama',               placeholder: 'Password saat ini' },
-              { key: 'newPassword',     label: 'Password Baru',               placeholder: 'Min. 8 karakter, 1 kapital, 1 angka' },
-              { key: 'confirmPassword', label: 'Konfirmasi Password Baru',     placeholder: 'Ulangi password baru' },
+              { key: 'oldPassword',     label: 'Current Password',        placeholder: 'Your current password' },
+              { key: 'newPassword',     label: 'New Password',             placeholder: 'Min. 8 chars, 1 uppercase, 1 number' },
+              { key: 'confirmPassword', label: 'Confirm New Password',     placeholder: 'Repeat new password' },
             ].map(({ key, label, placeholder }) => (
               <div key={key}>
                 <label className="block text-xs font-medium text-gray-600 mb-1">
@@ -96,18 +96,18 @@ export default function ChangePasswordModal({
             )}
 
             <p className="text-xs text-gray-400">
-              Setelah password diubah, Anda akan otomatis logout dari semua perangkat.
+              After changing your password, you will be automatically logged out from all devices.
             </p>
 
             <div className="flex justify-end gap-2 border-t border-gray-100 pt-3">
               <button type="button" onClick={onClose}
                 className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded hover:bg-gray-50">
-                Batal
+                Cancel
               </button>
               <button type="submit" disabled={saving}
                 className="flex items-center gap-1.5 px-4 py-2 text-sm text-white bg-navy hover:bg-navy-light rounded disabled:opacity-50">
                 {saving && <Loader2 size={13} className="animate-spin" />}
-                Simpan
+                Save
               </button>
             </div>
           </form>

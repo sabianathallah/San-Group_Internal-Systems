@@ -31,14 +31,14 @@ function initials(name: string) {
 
 function fmt(iso: string | null) {
   if (!iso) return '—';
-  return new Date(iso).toLocaleDateString('id-ID', {
+  return new Date(iso).toLocaleDateString('en-US', {
     day: '2-digit', month: 'long', year: 'numeric',
   });
 }
 
 function fmtDatetime(iso: string | null) {
   if (!iso) return '—';
-  return new Date(iso).toLocaleString('id-ID', {
+  return new Date(iso).toLocaleString('en-US', {
     day: '2-digit', month: 'short', year: 'numeric',
     hour: '2-digit', minute: '2-digit',
   });
@@ -59,7 +59,7 @@ function AvatarUpload({
   async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 2 * 1024 * 1024) { setError('Ukuran file maksimal 2MB'); return; }
+    if (file.size > 2 * 1024 * 1024) { setError('Maximum file size is 2MB'); return; }
     setError('');
     setUploading(true);
     const form = new FormData();
@@ -70,7 +70,7 @@ function AvatarUpload({
       });
       onUpdated(res.data.data.avatar);
     } catch {
-      setError('Gagal mengupload avatar');
+      setError('Failed to upload avatar');
     } finally {
       setUploading(false);
       if (inputRef.current) inputRef.current.value = '';
@@ -90,14 +90,14 @@ function AvatarUpload({
           onClick={() => inputRef.current?.click()}
           disabled={uploading}
           className="absolute bottom-0 right-0 w-7 h-7 rounded-full bg-navy border-2 border-white flex items-center justify-center text-white hover:bg-navy-light transition-colors disabled:opacity-60"
-          title="Upload foto"
+          title="Upload photo"
         >
           {uploading ? <Loader2 size={12} className="animate-spin" /> : <Camera size={12} />}
         </button>
         <input ref={inputRef} type="file" accept="image/*" className="hidden" onChange={handleFile} />
       </div>
       {error && <p className="text-xs text-danger">{error}</p>}
-      <p className="text-xs text-gray-400">JPG, PNG, WebP — maks. 2MB</p>
+      <p className="text-xs text-gray-400">JPG, PNG, WebP — max. 2MB</p>
     </div>
   );
 }
@@ -138,7 +138,7 @@ function EditProfileForm({
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    if (!form.fullName.trim()) { setError('Nama lengkap tidak boleh kosong'); return; }
+    if (!form.fullName.trim()) { setError('Full name is required'); return; }
     setSaving(true); setError(''); setSaved(false);
     try {
       const res = await api.patch('/users/me', {
@@ -150,7 +150,7 @@ function EditProfileForm({
       setTimeout(() => setSaved(false), 3000);
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
-      setError(msg ?? 'Terjadi kesalahan');
+      setError(msg ?? 'An error occurred');
     } finally {
       setSaving(false);
     }
@@ -160,7 +160,7 @@ function EditProfileForm({
     <form onSubmit={handleSubmit} className="space-y-4">
       <div>
         <label className="block text-xs font-medium text-gray-600 mb-1">
-          Nama Lengkap <span className="text-danger">*</span>
+          Full Name <span className="text-danger">*</span>
         </label>
         <input
           type="text" maxLength={100}
@@ -171,11 +171,11 @@ function EditProfileForm({
       </div>
       <div>
         <label className="block text-xs font-medium text-gray-600 mb-1">
-          No. Telepon <span className="text-gray-400 font-normal">(opsional)</span>
+          Phone Number <span className="text-gray-400 font-normal">(optional)</span>
         </label>
         <input
           type="text"
-          placeholder="08xxxxxxxxxx"
+          placeholder="e.g. +62812345678"
           value={form.phone}
           onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
           className="w-full border border-gray-200 rounded px-3 py-2 text-sm focus:outline-none focus:border-navy focus:ring-1 focus:ring-navy"
@@ -192,11 +192,11 @@ function EditProfileForm({
         <button type="submit" disabled={saving}
           className="flex items-center gap-1.5 px-4 py-2 text-sm text-white bg-navy hover:bg-navy-light rounded disabled:opacity-50 transition-colors">
           {saving && <Loader2 size={13} className="animate-spin" />}
-          Simpan Perubahan
+          Save Changes
         </button>
         {saved && (
           <span className="flex items-center gap-1 text-xs text-success">
-            <CheckCircle2 size={13} /> Tersimpan
+            <CheckCircle2 size={13} /> Saved
           </span>
         )}
       </div>
@@ -216,13 +216,12 @@ export default function ProfilePage() {
   useEffect(() => {
     api.get('/auth/me')
       .then((res) => setProfile(res.data.data))
-      .catch(() => setError('Gagal memuat profil'))
+      .catch(() => setError('Failed to load profile'))
       .finally(() => setLoading(false));
   }, []);
 
   function handleProfileSaved(updated: FullProfile) {
     setProfile(updated);
-    // Sync name and avatar into authStore so header updates immediately
     updateStore({ fullName: updated.fullName, avatar: updated.avatar });
   }
 
@@ -243,10 +242,10 @@ export default function ProfilePage() {
     return (
       <div className="flex flex-col items-center justify-center py-20 text-center">
         <AlertCircle size={32} className="text-danger mb-3" />
-        <p className="text-sm text-gray-600">{error || 'Gagal memuat profil'}</p>
+        <p className="text-sm text-gray-600">{error || 'Failed to load profile'}</p>
         <button onClick={() => window.location.reload()}
           className="mt-3 px-4 py-1.5 text-sm text-navy border border-navy rounded hover:bg-navy-50">
-          Coba lagi
+          Try again
         </button>
       </div>
     );
@@ -256,8 +255,8 @@ export default function ProfilePage() {
     <div className="max-w-4xl">
       {/* Page header */}
       <div className="mb-6">
-        <h1 className="text-xl font-semibold text-gray-800">Profil Saya</h1>
-        <p className="text-sm text-gray-500 mt-0.5">Kelola informasi dan keamanan akun Anda</p>
+        <h1 className="text-xl font-semibold text-gray-800">My Profile</h1>
+        <p className="text-sm text-gray-500 mt-0.5">Manage your account information and security</p>
       </div>
 
       <div className="grid grid-cols-3 gap-5">
@@ -288,18 +287,18 @@ export default function ProfilePage() {
 
           {/* Account info */}
           <div className="bg-white border border-gray-200 rounded-lg p-4">
-            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Info Akun</h3>
-            <InfoRow icon={Calendar} label="Bergabung sejak" value={fmt(profile.createdAt)} />
-            <InfoRow icon={Clock}    label="Login terakhir"  value={fmtDatetime(profile.lastLoginAt)} />
+            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Account Info</h3>
+            <InfoRow icon={Calendar} label="Member since"  value={fmt(profile.createdAt)} />
+            <InfoRow icon={Clock}    label="Last login"    value={fmtDatetime(profile.lastLoginAt)} />
             <InfoRow
               icon={Shield}
-              label="Status akun"
+              label="Account status"
               value={
                 <span className={cn(
                   'inline-block text-xs px-2 py-0.5 rounded-full font-medium',
                   profile.isActive ? 'bg-success/10 text-success' : 'bg-gray-100 text-gray-500',
                 )}>
-                  {profile.isActive ? 'Aktif' : 'Nonaktif'}
+                  {profile.isActive ? 'Active' : 'Inactive'}
                 </span>
               }
             />
@@ -307,13 +306,13 @@ export default function ProfilePage() {
 
           {/* Security */}
           <div className="bg-white border border-gray-200 rounded-lg p-4">
-            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Keamanan</h3>
+            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Security</h3>
             <button
               onClick={() => setChangePwOpen(true)}
               className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm text-gray-700 border border-gray-200 rounded hover:bg-gray-50 hover:border-gray-300 transition-colors"
             >
               <KeyRound size={15} className="text-gray-400" />
-              Ganti Password
+              Change Password
             </button>
           </div>
         </div>
@@ -324,7 +323,7 @@ export default function ProfilePage() {
           <div className="bg-white border border-gray-200 rounded-lg p-5">
             <h2 className="text-sm font-semibold text-gray-800 mb-4 flex items-center gap-2">
               <User size={15} className="text-gray-400" />
-              Informasi Pribadi
+              Personal Information
             </h2>
             <EditProfileForm profile={profile} onSaved={handleProfileSaved} />
           </div>
@@ -333,10 +332,10 @@ export default function ProfilePage() {
           <div className="bg-white border border-gray-200 rounded-lg p-5">
             <h2 className="text-sm font-semibold text-gray-800 mb-1 flex items-center gap-2">
               <Shield size={15} className="text-gray-400" />
-              Detail Akun
+              Account Details
             </h2>
             <p className="text-xs text-gray-400 mb-3">
-              Informasi berikut dikelola oleh administrator dan tidak dapat diubah sendiri.
+              The following information is managed by the administrator and cannot be changed by yourself.
             </p>
             <div className="grid grid-cols-2 gap-x-6">
               <div>
@@ -344,12 +343,12 @@ export default function ProfilePage() {
                 <InfoRow icon={User}      label="Username" value={<span className="font-mono">@{profile.username}</span>} />
               </div>
               <div>
-                <InfoRow icon={Shield}    label="Role"     value={profile.role.name} />
-                <InfoRow icon={Building2} label="Divisi"   value={profile.division.name} />
+                <InfoRow icon={Shield}    label="Role"      value={profile.role.name} />
+                <InfoRow icon={Building2} label="Division"  value={profile.division.name} />
               </div>
             </div>
             {profile.phone && (
-              <InfoRow icon={Phone} label="No. Telepon" value={profile.phone} />
+              <InfoRow icon={Phone} label="Phone Number" value={profile.phone} />
             )}
           </div>
         </div>

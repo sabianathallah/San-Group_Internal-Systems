@@ -39,40 +39,40 @@ interface Meta {
 
 // ── Constants ──────────────────────────────────────────────
 const CATEGORY_TABS: { value: BulletinCategory | 'ALL'; label: string }[] = [
-  { value: 'ALL',          label: 'Semua'        },
-  { value: 'ANNOUNCEMENT', label: 'Pengumuman'   },
-  { value: 'HOLIDAY',      label: 'Hari Libur'   },
-  { value: 'MAINTENANCE',  label: 'Pemeliharaan' },
+  { value: 'ALL',          label: 'All'          },
+  { value: 'ANNOUNCEMENT', label: 'Announcement' },
+  { value: 'HOLIDAY',      label: 'Holiday'      },
+  { value: 'MAINTENANCE',  label: 'Maintenance'  },
   { value: 'EVENT',        label: 'Event'        },
-  { value: 'GENERAL',      label: 'Umum'         },
+  { value: 'GENERAL',      label: 'General'      },
 ];
 
 const CATEGORY_OPTS: { value: BulletinCategory; label: string }[] = CATEGORY_TABS.slice(1) as { value: BulletinCategory; label: string }[];
 
 const PRIORITY_OPTS: { value: BulletinPriority; label: string }[] = [
-  { value: 'URGENT',    label: 'Urgent'   },
-  { value: 'IMPORTANT', label: 'Penting'  },
-  { value: 'NORMAL',    label: 'Normal'   },
+  { value: 'URGENT',    label: 'Urgent'    },
+  { value: 'IMPORTANT', label: 'Important' },
+  { value: 'NORMAL',    label: 'Normal'    },
 ];
 
 // ── Helpers ────────────────────────────────────────────────
 function priorityConfig(p: BulletinPriority) {
   return {
-    URGENT:    { cls: 'bg-danger-light text-danger border-l-danger',     icon: AlertTriangle, label: 'Urgent'  },
-    IMPORTANT: { cls: 'bg-warning-light text-warning border-l-warning',  icon: Info,          label: 'Penting' },
-    NORMAL:    { cls: 'bg-gray-100 text-gray-500 border-l-gray-300',     icon: Info,          label: 'Normal'  },
+    URGENT:    { cls: 'bg-danger-light text-danger border-l-danger',     icon: AlertTriangle, label: 'Urgent'    },
+    IMPORTANT: { cls: 'bg-warning-light text-warning border-l-warning',  icon: Info,          label: 'Important' },
+    NORMAL:    { cls: 'bg-gray-100 text-gray-500 border-l-gray-300',     icon: Info,          label: 'Normal'    },
   }[p];
 }
 
 function categoryLabel(c: BulletinCategory) {
   return {
-    ANNOUNCEMENT: 'Pengumuman', HOLIDAY: 'Hari Libur',
-    MAINTENANCE: 'Pemeliharaan', EVENT: 'Event', GENERAL: 'Umum',
+    ANNOUNCEMENT: 'Announcement', HOLIDAY: 'Holiday',
+    MAINTENANCE: 'Maintenance', EVENT: 'Event', GENERAL: 'General',
   }[c];
 }
 
 function formatDate(iso: string) {
-  return new Date(iso).toLocaleDateString('id-ID', {
+  return new Date(iso).toLocaleDateString('en-US', {
     day: 'numeric', month: 'long', year: 'numeric',
   });
 }
@@ -110,7 +110,7 @@ export default function BulletinPage() {
       setBulletins(res.data.data ?? []);
       setMeta(res.data.meta ?? null);
     } catch {
-      setError('Gagal memuat bulletin.');
+      setError('Failed to load bulletins.');
     } finally {
       setLoading(false);
     }
@@ -124,7 +124,7 @@ export default function BulletinPage() {
   }, [searchInput]);
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Hapus bulletin ini?')) return;
+    if (!confirm('Delete this bulletin?')) return;
     try {
       await api.delete(`/bulletins/${id}`);
       if (selected?.id === id) setSelected(null);
@@ -141,7 +141,6 @@ export default function BulletinPage() {
 
   const openDetail = async (b: Bulletin) => {
     setSelected(b);
-    // Refresh from API so isRead is accurate (auto mark-as-read happens server-side)
     try {
       const res = await api.get(`/bulletins/${b.id}`);
       setSelected(res.data.data);
@@ -158,7 +157,7 @@ export default function BulletinPage() {
           <div>
             <h1 className="text-xl font-semibold text-gray-800">Bulletin</h1>
             <p className="text-sm text-gray-400 mt-0.5">
-              {meta ? `${meta.total} bulletin` : 'Papan pengumuman'}
+              {meta ? `${meta.total} bulletins` : 'Announcements board'}
             </p>
           </div>
           {perms.bulletin.create && (
@@ -166,7 +165,7 @@ export default function BulletinPage() {
               onClick={() => { setEditItem(null); setShowForm(true); }}
               className="flex items-center gap-1.5 h-9 px-3 bg-navy text-white text-sm font-medium rounded hover:bg-navy-light transition-colors"
             >
-              <Plus size={15} /> Buat
+              <Plus size={15} /> Create
             </button>
           )}
         </div>
@@ -176,7 +175,7 @@ export default function BulletinPage() {
           <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
           <input
             type="text"
-            placeholder="Cari bulletin..."
+            placeholder="Search bulletins..."
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
             className="w-full h-8 pl-8 pr-3 text-sm border border-gray-300 rounded bg-white placeholder:text-gray-400 focus:border-navy focus:outline-none focus:ring-2 focus:ring-navy-50"
@@ -211,7 +210,7 @@ export default function BulletinPage() {
             )}
           >
             {showDrafts ? <EyeOff size={12} /> : <Eye size={12} />}
-            {showDrafts ? 'Tampilkan draft' : 'Tampilkan draft'}
+            {showDrafts ? 'Hide drafts' : 'Show drafts'}
           </button>
         )}
 
@@ -251,8 +250,8 @@ export default function BulletinPage() {
         ) : (
           <div className="flex flex-col items-center justify-center h-full text-center p-8">
             <Megaphone size={40} className="text-gray-300 mb-3" />
-            <p className="text-sm font-medium text-gray-600">Pilih bulletin untuk dibaca</p>
-            <p className="text-xs text-gray-400 mt-1">Klik salah satu bulletin di sebelah kiri</p>
+            <p className="text-sm font-medium text-gray-600">Select a bulletin to read</p>
+            <p className="text-xs text-gray-400 mt-1">Click on any bulletin on the left</p>
           </div>
         )}
       </div>
@@ -307,10 +306,10 @@ function BulletinCard({ bulletin: b, isSelected, isAdmin, onClick, onEdit, onDel
               </span>
             )}
             {b.audienceType === 'DIVISION' && (
-              <span className="text-xs text-blue-500 bg-blue-50 px-1.5 py-0.5 rounded">Divisi</span>
+              <span className="text-xs text-blue-500 bg-blue-50 px-1.5 py-0.5 rounded">Division</span>
             )}
             {b.audienceType === 'CUSTOM' && (
-              <span className="text-xs text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded">Terbatas</span>
+              <span className="text-xs text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded">Limited</span>
             )}
           </div>
         </div>
@@ -321,7 +320,7 @@ function BulletinCard({ bulletin: b, isSelected, isAdmin, onClick, onEdit, onDel
         <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 flex items-center gap-1 transition-opacity">
           <button onClick={(e) => { e.stopPropagation(); onTogglePublish(); }}
             className="p-1 rounded hover:bg-white/80 text-gray-400 hover:text-gray-700 transition-colors"
-            title={b.isPublished ? 'Jadikan draft' : 'Publish'}
+            title={b.isPublished ? 'Unpublish' : 'Publish'}
           >
             {b.isPublished ? <EyeOff size={13} /> : <Eye size={13} />}
           </button>
@@ -370,7 +369,7 @@ function DetailPane({ bulletin: b, isAdmin, onEdit, onDelete, onTogglePublish }:
             </div>
             <h2 className="text-lg font-semibold text-gray-800 leading-snug">{b.title}</h2>
             <div className="flex items-center gap-3 mt-1.5 text-xs text-gray-400">
-              <span>Oleh {b.author.fullName}</span>
+              <span>By {b.author.fullName}</span>
               {b.publishedAt && (
                 <span className="flex items-center gap-1">
                   <Calendar size={11} /> {formatDate(b.publishedAt)}
@@ -378,10 +377,10 @@ function DetailPane({ bulletin: b, isAdmin, onEdit, onDelete, onTogglePublish }:
               )}
               {b.isRead && (
                 <span className="flex items-center gap-1 text-success">
-                  <CheckCircle2 size={11} /> Sudah dibaca
+                  <CheckCircle2 size={11} /> Read
                 </span>
               )}
-              <span>{b._count.readStatus} pembaca</span>
+              <span>{b._count.readStatus} readers</span>
             </div>
           </div>
 
@@ -415,7 +414,7 @@ function DetailPane({ bulletin: b, isAdmin, onEdit, onDelete, onTogglePublish }:
 
         {b.expiresAt && (
           <p className="mt-6 text-xs text-gray-400 border-t border-gray-100 pt-3">
-            Berlaku hingga: {formatDate(b.expiresAt)}
+            Valid until: {formatDate(b.expiresAt)}
           </p>
         )}
       </div>
@@ -456,10 +455,10 @@ function BulletinFormModal({ bulletin, onClose, onSaved }: {
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    if (!title.trim())   { setError('Judul wajib diisi'); return; }
-    if (!content.trim()) { setError('Konten wajib diisi'); return; }
+    if (!title.trim())   { setError('Title is required'); return; }
+    if (!content.trim()) { setError('Content is required'); return; }
     if (audienceType === 'CUSTOM' && selectedDivIds.length === 0) {
-      setError('Pilih minimal satu divisi untuk audience kustom'); return;
+      setError('Select at least one division for custom audience'); return;
     }
 
     setLoading(true);
@@ -484,7 +483,7 @@ function BulletinFormModal({ bulletin, onClose, onSaved }: {
     } catch (err: unknown) {
       const msg =
         (err as { response?: { data?: { message?: string } } })?.response?.data?.message
-        ?? 'Terjadi kesalahan';
+        ?? 'An error occurred';
       setError(msg);
     } finally {
       setLoading(false);
@@ -498,7 +497,7 @@ function BulletinFormModal({ bulletin, onClose, onSaved }: {
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 flex-shrink-0">
           <h2 className="text-md font-semibold text-gray-800">
-            {isEdit ? 'Edit Bulletin' : 'Buat Bulletin'}
+            {isEdit ? 'Edit Bulletin' : 'Create Bulletin'}
           </h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
             <X size={18} />
@@ -514,17 +513,17 @@ function BulletinFormModal({ bulletin, onClose, onSaved }: {
           )}
 
           <div className="space-y-1">
-            <label className="block text-sm font-medium text-gray-700">Judul *</label>
+            <label className="block text-sm font-medium text-gray-700">Title *</label>
             <input type="text" value={title} onChange={(e) => setTitle(e.target.value)}
-              placeholder="Judul bulletin..."
+              placeholder="Bulletin title..."
               className="w-full h-9 px-3 text-sm border border-gray-300 rounded bg-white placeholder:text-gray-400 focus:border-navy focus:outline-none focus:ring-2 focus:ring-navy-50"
             />
           </div>
 
           <div className="space-y-1">
-            <label className="block text-sm font-medium text-gray-700">Konten *</label>
+            <label className="block text-sm font-medium text-gray-700">Content *</label>
             <textarea value={content} onChange={(e) => setContent(e.target.value)}
-              placeholder="Isi pengumuman..."
+              placeholder="Announcement content..."
               rows={8}
               className="w-full px-3 py-2 text-sm border border-gray-300 rounded bg-white placeholder:text-gray-400 focus:border-navy focus:outline-none focus:ring-2 focus:ring-navy-50 resize-none"
             />
@@ -532,7 +531,7 @@ function BulletinFormModal({ bulletin, onClose, onSaved }: {
 
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
-              <label className="block text-sm font-medium text-gray-700">Kategori</label>
+              <label className="block text-sm font-medium text-gray-700">Category</label>
               <select value={category} onChange={(e) => setCategory(e.target.value as BulletinCategory)}
                 className="w-full h-9 px-3 text-sm border border-gray-300 rounded bg-white focus:border-navy focus:outline-none focus:ring-2 focus:ring-navy-50"
               >
@@ -540,7 +539,7 @@ function BulletinFormModal({ bulletin, onClose, onSaved }: {
               </select>
             </div>
             <div className="space-y-1">
-              <label className="block text-sm font-medium text-gray-700">Prioritas</label>
+              <label className="block text-sm font-medium text-gray-700">Priority</label>
               <select value={priority} onChange={(e) => setPriority(e.target.value as BulletinPriority)}
                 className="w-full h-9 px-3 text-sm border border-gray-300 rounded bg-white focus:border-navy focus:outline-none focus:ring-2 focus:ring-navy-50"
               >
@@ -553,9 +552,9 @@ function BulletinFormModal({ bulletin, onClose, onSaved }: {
             <label className="block text-sm font-medium text-gray-700">Audience</label>
             <div className="flex gap-2">
               {([
-                { value: 'ALL'      as AudienceType, label: 'Semua'       },
-                { value: 'DIVISION' as AudienceType, label: 'Divisi Saya' },
-                { value: 'CUSTOM'   as AudienceType, label: 'Pilih Divisi' },
+                { value: 'ALL'      as AudienceType, label: 'Everyone'       },
+                { value: 'DIVISION' as AudienceType, label: 'My Division'    },
+                { value: 'CUSTOM'   as AudienceType, label: 'Select Divisions' },
               ] as { value: AudienceType; label: string }[]).map((opt) => (
                 <button
                   key={opt.value}
@@ -576,7 +575,7 @@ function BulletinFormModal({ bulletin, onClose, onSaved }: {
 
           {audienceType === 'CUSTOM' && (
             <div className="space-y-1">
-              <label className="block text-sm font-medium text-gray-700">Pilih Divisi</label>
+              <label className="block text-sm font-medium text-gray-700">Select Divisions</label>
               <div className="flex flex-wrap gap-1.5 p-2 border border-gray-300 rounded bg-white max-h-28 overflow-y-auto">
                 {divisions.map((div) => (
                   <button
@@ -595,7 +594,7 @@ function BulletinFormModal({ bulletin, onClose, onSaved }: {
                   </button>
                 ))}
                 {divisions.length === 0 && (
-                  <span className="text-xs text-gray-400 p-1">Memuat divisi...</span>
+                  <span className="text-xs text-gray-400 p-1">Loading divisions...</span>
                 )}
               </div>
             </div>
@@ -603,7 +602,7 @@ function BulletinFormModal({ bulletin, onClose, onSaved }: {
 
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
-              <label className="block text-sm font-medium text-gray-700">Berlaku hingga</label>
+              <label className="block text-sm font-medium text-gray-700">Valid until</label>
               <input type="date" value={expiresAt} onChange={(e) => setExpiresAt(e.target.value)}
                 className="w-full h-9 px-3 text-sm border border-gray-300 rounded bg-white focus:border-navy focus:outline-none focus:ring-2 focus:ring-navy-50"
               />
@@ -613,7 +612,7 @@ function BulletinFormModal({ bulletin, onClose, onSaved }: {
                 <input type="checkbox" checked={published} onChange={(e) => setPublished(e.target.checked)}
                   className="w-4 h-4 accent-navy rounded"
                 />
-                <span className="text-sm text-gray-700">Publish sekarang</span>
+                <span className="text-sm text-gray-700">Publish now</span>
               </label>
             </div>
           </div>
@@ -624,14 +623,14 @@ function BulletinFormModal({ bulletin, onClose, onSaved }: {
           <button type="button" onClick={onClose}
             className="h-9 px-4 text-sm text-gray-700 border border-gray-300 rounded hover:bg-gray-50 transition-colors"
           >
-            Batal
+            Cancel
           </button>
           <button onClick={handleSubmit as unknown as React.MouseEventHandler}
             disabled={loading}
             className="h-9 px-5 text-sm font-medium bg-navy text-white rounded hover:bg-navy-light disabled:opacity-60 transition-colors flex items-center gap-2"
           >
             {loading && <Loader2 size={14} className="animate-spin" />}
-            {isEdit ? 'Simpan' : 'Buat Bulletin'}
+            {isEdit ? 'Save' : 'Create Bulletin'}
           </button>
         </div>
       </div>
@@ -657,13 +656,13 @@ function EmptyState({ isAdmin, canCreate, onAdd }: { isAdmin: boolean; canCreate
   return (
     <div className="flex flex-col items-center justify-center py-16 text-center">
       <Megaphone size={36} className="text-gray-300 mb-3" />
-      <p className="text-sm font-medium text-gray-600">Belum ada bulletin</p>
-      <p className="text-xs text-gray-400 mt-1">Pengumuman dari manajemen akan tampil di sini.</p>
+      <p className="text-sm font-medium text-gray-600">No bulletins yet</p>
+      <p className="text-xs text-gray-400 mt-1">Announcements from management will appear here.</p>
       {(canCreate ?? isAdmin) && (
         <button onClick={onAdd}
           className="mt-4 flex items-center gap-1.5 h-8 px-4 text-sm font-medium text-white bg-navy rounded hover:bg-navy-light transition-colors"
         >
-          <Plus size={14} /> Buat Bulletin
+          <Plus size={14} /> Create Bulletin
         </button>
       )}
     </div>
@@ -676,7 +675,7 @@ function ErrorState({ message, onRetry }: { message: string; onRetry: () => void
       <AlertTriangle size={28} className="text-danger mb-3" />
       <p className="text-sm text-gray-600">{message}</p>
       <button onClick={onRetry} className="mt-3 text-sm text-info hover:underline">
-        Coba lagi
+        Try again
       </button>
     </div>
   );

@@ -100,7 +100,7 @@ function DivisionModal({
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    if (!form.name.trim()) { setError('Nama wajib diisi'); return; }
+    if (!form.name.trim()) { setError('Name is required'); return; }
     setSaving(true); setError('');
     try {
       const payload = {
@@ -119,7 +119,7 @@ function DivisionModal({
       onClose();
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
-      setError(msg ?? 'Terjadi kesalahan');
+      setError(msg ?? 'An error occurred');
     } finally {
       setSaving(false);
     }
@@ -133,14 +133,14 @@ function DivisionModal({
       <div className="relative bg-white rounded-lg shadow-lg w-full max-w-md">
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200">
           <h2 className="text-sm font-semibold text-gray-800">
-            {division ? 'Edit Divisi' : 'Tambah Divisi'}
+            {division ? 'Edit Division' : 'Add Division'}
           </h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={16} /></button>
         </div>
 
         <form onSubmit={handleSubmit} className="p-5 space-y-4">
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Nama <span className="text-red-500">*</span></label>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Name <span className="text-red-500">*</span></label>
             <input
               autoFocus type="text" value={form.name}
               onChange={(e) => handleNameChange(e.target.value)}
@@ -160,16 +160,16 @@ function DivisionModal({
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-2">Warna</label>
+            <label className="block text-xs font-medium text-gray-600 mb-2">Color</label>
             <ColorPicker value={form.color} onChange={(c) => setForm((f) => ({ ...f, color: c }))} />
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Deskripsi</label>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Description</label>
             <textarea
               rows={2} value={form.description}
               onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-              placeholder="Deskripsi singkat divisi…"
+              placeholder="Brief description of the division…"
               className="w-full border border-gray-200 rounded px-3 py-2 text-sm focus:outline-none focus:border-navy resize-none"
             />
           </div>
@@ -183,12 +183,12 @@ function DivisionModal({
           <div className="flex justify-end gap-2 pt-1">
             <button type="button" onClick={onClose}
               className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded hover:bg-gray-50">
-              Batal
+              Cancel
             </button>
             <button type="submit" disabled={saving}
               className="flex items-center gap-1.5 px-4 py-2 text-sm text-white bg-navy hover:bg-navy-light rounded disabled:opacity-50">
               {saving && <Loader2 size={13} className="animate-spin" />}
-              {division ? 'Simpan' : 'Buat Divisi'}
+              {division ? 'Save' : 'Create Division'}
             </button>
           </div>
         </form>
@@ -207,18 +207,18 @@ function DeleteConfirm({
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/40" onClick={onCancel} />
       <div className="relative bg-white rounded-lg shadow-lg w-full max-w-sm p-5 space-y-3">
-        <h3 className="text-sm font-semibold text-gray-800">Hapus Divisi</h3>
+        <h3 className="text-sm font-semibold text-gray-800">Delete Division</h3>
         <p className="text-sm text-gray-600">
-          Hapus divisi <strong>{division.name}</strong>? Tindakan ini tidak dapat dibatalkan.
+          Delete division <strong>{division.name}</strong>? This action cannot be undone.
         </p>
         <div className="flex justify-end gap-2 pt-1">
           <button onClick={onCancel} className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded hover:bg-gray-50">
-            Batal
+            Cancel
           </button>
           <button onClick={onConfirm} disabled={loading}
             className="flex items-center gap-1.5 px-4 py-2 text-sm text-white bg-red-500 hover:bg-red-600 rounded disabled:opacity-50">
             {loading && <Loader2 size={13} className="animate-spin" />}
-            Hapus
+            Delete
           </button>
         </div>
       </div>
@@ -245,7 +245,7 @@ export default function DivisionsPage() {
       const res = await api.get('/divisions');
       setDivisions(res.data.data ?? []);
     } catch {
-      setError('Gagal memuat divisi.');
+      setError('Failed to load divisions.');
     } finally {
       setLoading(false);
     }
@@ -273,7 +273,7 @@ export default function DivisionsPage() {
       setDeleteTarget(null);
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
-      setDeleteError(msg ?? 'Gagal menghapus divisi');
+      setDeleteError(msg ?? 'Failed to delete division');
     } finally {
       setDeleting(false);
     }
@@ -284,14 +284,14 @@ export default function DivisionsPage() {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-xl font-semibold text-gray-800">Manajemen Divisi</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Kelola divisi organisasi SAN Group</p>
+          <h1 className="text-xl font-semibold text-gray-800">Division Management</h1>
+          <p className="text-sm text-gray-500 mt-0.5">Manage divisions for SAN Group</p>
         </div>
         <button
           onClick={openCreate}
           className="flex items-center gap-1.5 px-3 py-2 text-sm text-white bg-navy hover:bg-navy-light rounded transition-colors"
         >
-          <Plus size={15} /> Tambah Divisi
+          <Plus size={15} /> Add Division
         </button>
       </div>
 
@@ -313,20 +313,20 @@ export default function DivisionsPage() {
             <AlertCircle size={32} className="text-red-400 mb-3" />
             <p className="text-sm text-gray-600">{error}</p>
             <button onClick={load} className="mt-3 px-4 py-1.5 text-sm text-navy border border-navy rounded">
-              Coba lagi
+              Try again
             </button>
           </div>
         ) : divisions.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-center">
             <Layers size={40} className="text-gray-200 mb-3" />
-            <p className="text-sm text-gray-500">Belum ada divisi</p>
+            <p className="text-sm text-gray-500">No divisions yet</p>
           </div>
         ) : (
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-gray-100 bg-gray-50">
-                <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider w-10">Warna</th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Nama</th>
+                <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider w-10">Color</th>
+                <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
                 <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Slug</th>
                 <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Users</th>
                 <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Roles</th>
@@ -362,7 +362,7 @@ export default function DivisionsPage() {
                       <div className="flex items-center justify-end gap-1">
                         <button
                           onClick={() => openEdit(d)}
-                          title="Edit divisi"
+                          title="Edit division"
                           className="w-7 h-7 flex items-center justify-center rounded text-gray-400 hover:text-navy hover:bg-navy-50 transition-colors"
                         >
                           <Edit2 size={13} />
@@ -370,7 +370,7 @@ export default function DivisionsPage() {
                         <button
                           onClick={() => { setDeleteError(''); setDeleteTarget(d); }}
                           disabled={userCount > 0}
-                          title={userCount > 0 ? 'Tidak dapat dihapus — masih ada user' : 'Hapus divisi'}
+                          title={userCount > 0 ? 'Cannot delete — division still has users' : 'Delete division'}
                           className={cn(
                             'w-7 h-7 flex items-center justify-center rounded transition-colors',
                             userCount > 0
