@@ -154,6 +154,7 @@ model User {
   databaseFolders    DatabaseFolder[]
   taskComments       TaskComment[]
   grantedShares      ResourceShare[]
+  auditLogs          AuditLog[]
 
   @@index([email])
   @@index([username])
@@ -456,6 +457,22 @@ model ResourceShare {
   @@index([resourceType, resourceId])
   @@index([grantedById])
   @@map("resource_shares")
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  action     String
+  entity     String
+  entityId   String?
+  detail     Json?
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+
+  @@index([userId])
+  @@index([entity])
+  @@index([createdAt])
+  @@map("audit_logs")
 }
 
 // ============================================================

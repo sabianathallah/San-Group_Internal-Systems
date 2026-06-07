@@ -11,6 +11,7 @@ import {
 } from '@/services/user.service';
 import { successResponse } from '@/helpers/response';
 import { AuthRequest } from '@/types';
+import { logAction } from '@/services/audit.service';
 
 export async function listUsers(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
@@ -33,6 +34,7 @@ export async function getUserById(req: AuthRequest, res: Response, next: NextFun
 export async function createUser(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
     const user = await createUserService(req.body);
+    logAction({ action: 'CREATE', entity: 'user', entityId: user.id, detail: { username: user.username }, userId: req.user!.userId });
     successResponse(res, user, 'User berhasil dibuat', 201);
   } catch (err) {
     next(err);
@@ -42,6 +44,7 @@ export async function createUser(req: AuthRequest, res: Response, next: NextFunc
 export async function updateUser(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
     const user = await updateUserService(String(req.params.id), req.body);
+    logAction({ action: 'UPDATE', entity: 'user', entityId: user.id, detail: { username: user.username }, userId: req.user!.userId });
     successResponse(res, user, 'User berhasil diperbarui');
   } catch (err) {
     next(err);

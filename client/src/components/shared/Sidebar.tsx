@@ -9,9 +9,12 @@ import {
   Lock,
   ChevronLeft,
   ChevronRight,
+  BarChart3,
+  ClipboardList,
 } from 'lucide-react';
 import { useUiStore } from '@/stores/uiStore';
 import { useAuthStore } from '@/stores/authStore';
+import { usePermStore } from '@/stores/permStore';
 import { ROUTES } from '@/lib/constants';
 import { cn } from '@/lib/cn';
 
@@ -30,16 +33,19 @@ const mainNav: NavItem[] = [
 ];
 
 const adminNav: NavItem[] = [
-  { label: 'Manage Users', to: ROUTES.ADMIN_USERS,       icon: Users },
-  { label: 'Permissions',  to: ROUTES.ADMIN_PERMISSIONS, icon: Lock  },
+  { label: 'Manage Users', to: ROUTES.ADMIN_USERS,       icon: Users         },
+  { label: 'Permissions',  to: ROUTES.ADMIN_PERMISSIONS, icon: Lock          },
+  { label: 'Audit Log',    to: ROUTES.ADMIN_AUDIT_LOG,   icon: ClipboardList },
 ];
 
 export default function Sidebar() {
   const open   = useUiStore((s) => s.sidebarOpen);
   const toggle = useUiStore((s) => s.toggleSidebar);
   const user   = useAuthStore((s) => s.user);
+  const perms  = usePermStore((s) => s.perms);
 
-  const isAdmin = (user?.role?.level ?? 99) <= 2;
+  const isAdmin    = (user?.role?.level ?? 99) <= 2;
+  const canAnalytics = perms.analytics?.view !== 'none';
 
   return (
     <aside
@@ -76,6 +82,10 @@ export default function Sidebar() {
         {mainNav.map((item) => (
           <SidebarLink key={item.to} item={item} open={open} />
         ))}
+
+        {canAnalytics && (
+          <SidebarLink item={{ label: 'Analytics', to: ROUTES.ANALYTICS, icon: BarChart3 }} open={open} />
+        )}
 
         {isAdmin && (
           <>

@@ -10,4 +10,6 @@ export const ROUTES = {
   ADMIN_DIVISIONS:    '/admin/divisions',
   ADMIN_ROLES:        '/admin/roles',
   ADMIN_PERMISSIONS:  '/admin/permissions',
+  ANALYTICS:          '/analytics',
+  ADMIN_AUDIT_LOG:    '/admin/audit-log',
 } as const;

@@ -1,6 +1,7 @@
 import { Response, NextFunction } from 'express';
 import { AuthRequest } from '@/types';
 import { successResponse } from '@/helpers/response';
+import { logAction } from '@/services/audit.service';
 import {
   listTasksService, listTeamTasksService,
   getTaskByIdService, createTaskService, updateTaskService, deleteTaskService,
@@ -55,6 +56,7 @@ export async function getTaskById(req: AuthRequest, res: Response, next: NextFun
 export async function createTask(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
     const task = await createTaskService(req.user!.userId, req.body);
+    logAction({ action: 'CREATE', entity: 'task', entityId: task.id, detail: { title: task.title }, userId: req.user!.userId });
     successResponse(res, task, 'Task berhasil dibuat', 201);
   } catch (err) { next(err); }
 }
@@ -64,6 +66,7 @@ export async function updateTask(req: AuthRequest, res: Response, next: NextFunc
     const { userId } = req.user!;
     const permScope = req.permScope ?? 'own';
     const task = await updateTaskService(String(req.params.id), userId, permScope, req.body);
+    logAction({ action: 'UPDATE', entity: 'task', entityId: task.id, detail: { title: task.title }, userId });
     successResponse(res, task, 'Task berhasil diperbarui');
   } catch (err) { next(err); }
 }
@@ -72,7 +75,9 @@ export async function deleteTask(req: AuthRequest, res: Response, next: NextFunc
   try {
     const { userId } = req.user!;
     const permScope = req.permScope ?? 'own';
-    await deleteTaskService(String(req.params.id), userId, permScope);
+    const taskId = String(req.params.id);
+    await deleteTaskService(taskId, userId, permScope);
+    logAction({ action: 'DELETE', entity: 'task', entityId: taskId, userId });
     successResponse(res, null, 'Task berhasil dihapus');
   } catch (err) { next(err); }
 }

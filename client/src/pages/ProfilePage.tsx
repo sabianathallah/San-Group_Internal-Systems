@@ -270,7 +270,7 @@ export default function ProfilePage() {
               <p className="text-sm font-semibold text-gray-800">{profile.fullName}</p>
               <p className="text-xs text-gray-400 mt-0.5">@{profile.username}</p>
             </div>
-            <div className="flex flex-col gap-1.5 w-full">
+            <div className="flex flex-col items-center gap-1.5 w-full">
               <span
                 className="text-xs font-medium px-2.5 py-1 rounded-full text-center text-white"
                 style={{ backgroundColor: profile.role.color }}
@@ -278,8 +278,8 @@ export default function ProfilePage() {
                 {profile.role.name}
               </span>
               <span
-                className="text-xs font-medium px-2.5 py-1 rounded-full text-center text-white"
-                style={{ backgroundColor: profile.division.color }}
+                className="text-xs font-medium px-2.5 py-1 rounded-full text-center"
+                style={{ backgroundColor: profile.division.color + '22', color: profile.division.color }}
               >
                 {profile.division.name}
               </span>

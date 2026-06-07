@@ -9,6 +9,7 @@ import {
 import { prisma } from '@/config/database';
 import { AppError } from '@/middlewares/errorHandler.middleware';
 import { PermissionConfig } from '@/types/permissions';
+import { logAction } from '@/services/audit.service';
 
 export async function listRolesWithPermissions(
   _req: AuthRequest, res: Response, next: NextFunction,
@@ -38,6 +39,7 @@ export async function updateRolePermissions(
     const roleId = String(req.params.roleId);
     const permissions = req.body as PermissionConfig;
     const record = await updatePermissionsForRole(roleId, permissions);
+    logAction({ action: 'UPDATE', entity: 'permission', entityId: roleId, userId: req.user!.userId });
     successResponse(res, record, 'Permission berhasil diperbarui');
   } catch (err) { next(err); }
 }

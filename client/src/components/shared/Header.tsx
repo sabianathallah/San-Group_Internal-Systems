@@ -2,7 +2,7 @@ import { useRef, useState, useEffect } from 'react';
 import { useLocation, useNavigate, Link } from 'react-router-dom';
 import {
   Menu, Bell, ChevronDown, LogOut, KeyRound, ChevronRight,
-  Loader2, Clock, Megaphone, ShieldAlert, Info, CheckCircle2, User,
+  Loader2, Clock, Megaphone, ShieldAlert, Info, CheckCircle2, User, Search,
 } from 'lucide-react';
 import { useUiStore } from '@/stores/uiStore';
 import { useAuthStore } from '@/stores/authStore';
@@ -14,13 +14,16 @@ import { cn } from '@/lib/cn';
 import api from '@/lib/api';
 
 const BREADCRUMB_MAP: Record<string, string> = {
-  '/dashboard':   'Dashboard',
-  '/tasks':       'Tasks',
-  '/bulletin':    'Bulletin',
-  '/notes':       'Notes',
-  '/database':    'DB Links',
-  '/profile':     'Profil Saya',
-  '/admin/users': 'Manage Users',
+  '/dashboard':          'Dashboard',
+  '/tasks':              'Tasks',
+  '/bulletin':           'Bulletin',
+  '/notes':              'Notes',
+  '/database':           'DB Links',
+  '/profile':            'Profil Saya',
+  '/analytics':          'Analytics',
+  '/admin/users':        'Manage Users',
+  '/admin/permissions':  'Permissions',
+  '/admin/audit-log':    'Audit Log',
 };
 
 function useBreadcrumbs() {
@@ -56,7 +59,7 @@ function notifAge(iso: string) {
   return `${Math.floor(h / 24)} hari lalu`;
 }
 
-export default function Header() {
+export default function Header({ onSearchClick }: { onSearchClick?: () => void }) {
   const toggle  = useUiStore((s) => s.toggleSidebar);
   const user    = useAuthStore((s) => s.user);
   const logout  = useAuthStore((s) => s.logout);
@@ -112,6 +115,22 @@ export default function Header() {
 
         {/* Right */}
         <div className="flex items-center gap-1">
+          {/* Search trigger */}
+          <button
+            onClick={onSearchClick}
+            className="hidden sm:flex items-center gap-2 px-3 py-1.5 text-sm text-gray-400 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors mr-1"
+          >
+            <Search size={13} />
+            <span>Cari...</span>
+            <kbd className="text-xs bg-white px-1.5 py-0.5 rounded border border-gray-200 font-mono ml-2">⌘K</kbd>
+          </button>
+          <button
+            onClick={onSearchClick}
+            className="sm:hidden w-8 h-8 flex items-center justify-center rounded hover:bg-gray-100 transition-colors text-gray-500"
+          >
+            <Search size={16} />
+          </button>
+
           {/* Bell */}
           <div ref={notifRef} className="relative">
             <button onClick={() => { setNotifOpen((p) => !p); setUserMenuOpen(false); }}

@@ -19,8 +19,11 @@ interface DbLinkPerms {
 interface NotePerms {
   view: Scope; create: boolean; edit: Scope; delete: Scope;
 }
+interface AnalyticsPerms { view: Scope; }
+interface AuditLogPerms  { view: Scope; }
 interface PermissionConfig {
-  task: TaskPerms; bulletin: BulletinPerms; db_link: DbLinkPerms; note: NotePerms;
+  task: TaskPerms; bulletin: BulletinPerms; db_link: DbLinkPerms;
+  note: NotePerms; analytics: AnalyticsPerms; audit_log: AuditLogPerms;
 }
 
 interface RoleWithPerms {
@@ -457,6 +460,30 @@ export default function PermissionPage() {
                     value={perms.note?.delete ?? 'own'}
                     options={EDIT_SCOPE_OPTS}
                     onChange={(v) => update('note', 'delete', v)}
+                    disabled={isSuperAdmin}
+                  />
+                </PermRow>
+              </Section>
+
+              {/* Analytics */}
+              <Section title="Analytics">
+                <PermRow label="Lihat analytics">
+                  <ScopeSelector
+                    value={perms.analytics?.view ?? 'none'}
+                    options={VIEW_SCOPE_OPTS}
+                    onChange={(v) => update('analytics', 'view', v)}
+                    disabled={isSuperAdmin}
+                  />
+                </PermRow>
+              </Section>
+
+              {/* Audit Log */}
+              <Section title="Audit Log">
+                <PermRow label="Lihat audit log">
+                  <ScopeSelector
+                    value={perms.audit_log?.view ?? 'none'}
+                    options={VIEW_SCOPE_OPTS}
+                    onChange={(v) => update('audit_log', 'view', v)}
                     disabled={isSuperAdmin}
                   />
                 </PermRow>

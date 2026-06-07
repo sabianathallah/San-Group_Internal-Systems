@@ -20,6 +20,9 @@ import divisionRoutes from '@/routes/division.routes';
 import roleRoutes from '@/routes/role.routes';
 import permissionRoutes from '@/routes/permission.routes';
 import shareRoutes from '@/routes/share.routes';
+import searchRoutes from '@/routes/search.routes';
+import analyticsRoutes from '@/routes/analytics.routes';
+import auditRoutes from '@/routes/audit.routes';
 
 const app = express();
 
@@ -76,6 +79,9 @@ app.use('/api/divisions', divisionRoutes);
 app.use('/api/roles', roleRoutes);
 app.use('/api/permissions', permissionRoutes);
 app.use('/api/shares', shareRoutes);
+app.use('/api/search', searchRoutes);
+app.use('/api/analytics', analyticsRoutes);
+app.use('/api/audit-logs', auditRoutes);
 
 // ── Error Handling ─────────────────────────────────────────
 app.use(notFound);
