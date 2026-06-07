@@ -53,7 +53,10 @@ export async function getPermissionsForRole(
     return defaults;
   }
 
-  const permissions = record.permissions as unknown as PermissionConfig;
+  // Merge saved permissions with defaults to fill any missing feature keys
+  const defaults = DEFAULT_PERMISSIONS[roleLevel] ?? DEFAULT_PERMISSIONS[6];
+  const saved = record.permissions as unknown as Partial<PermissionConfig>;
+  const permissions: PermissionConfig = { ...defaults, ...saved };
   setCache(roleId, permissions);
   return permissions;
 }
@@ -90,11 +93,14 @@ export async function getRolesWithPermissions() {
   });
 
   return roles.map((role) => {
+    const defaults = DEFAULT_PERMISSIONS[role.level] ?? DEFAULT_PERMISSIONS[6];
     let permissions: PermissionConfig;
     if (role.rolePermission && Object.keys(role.rolePermission.permissions as object).length > 0) {
-      permissions = role.rolePermission.permissions as unknown as PermissionConfig;
+      // Merge saved with defaults so new feature keys (e.g. 'note') auto-fill
+      const saved = role.rolePermission.permissions as unknown as Partial<PermissionConfig>;
+      permissions = { ...defaults, ...saved };
     } else {
-      permissions = DEFAULT_PERMISSIONS[role.level] ?? DEFAULT_PERMISSIONS[6];
+      permissions = defaults;
     }
     return {
       id:          role.id,

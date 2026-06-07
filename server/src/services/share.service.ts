@@ -33,7 +33,7 @@ export async function shareResource(
   });
 
   // Send notifications when sharing with a division
-  if (targetType === 'division') {
+  if (targetType === 'DIVISION' || targetType === 'division') {
     const users = await prisma.user.findMany({
       where: { divisionId: targetId, id: { not: grantedById } },
       select: { id: true },
@@ -61,19 +61,8 @@ export async function shareResource(
   return share;
 }
 
-export async function revokeShare(
-  resourceType: string,
-  resourceId: string,
-  targetType: string,
-  targetId: string,
-) {
-  const share = await prisma.resourceShare.findUnique({
-    where: {
-      resourceType_resourceId_targetType_targetId: {
-        resourceType, resourceId, targetType, targetId,
-      },
-    },
-  });
+export async function revokeShareById(shareId: string) {
+  const share = await prisma.resourceShare.findUnique({ where: { id: shareId } });
   if (!share) throw new AppError('Share tidak ditemukan', 404);
-  await prisma.resourceShare.delete({ where: { id: share.id } });
+  await prisma.resourceShare.delete({ where: { id: shareId } });
 }

@@ -3,16 +3,15 @@ import { authenticate } from '@/middlewares/auth.middleware';
 import { listShares, createShare, deleteShare } from '@/controllers/share.controller';
 
 const router = Router();
-
 router.use(authenticate);
 
-// GET    /api/shares/:resourceType/:resourceId
-router.get('/:resourceType/:resourceId', listShares);
+// GET  /api/shares?resourceType=FOLDER&resourceId=xxx
+router.get('/', listShares);
 
-// POST   /api/shares/:resourceType/:resourceId  — body: { targetType, targetId }
-router.post('/:resourceType/:resourceId', createShare);
+// POST /api/shares  — body: { resourceType, resourceId, targetType, targetId }
+router.post('/', createShare);
 
-// DELETE /api/shares/:resourceType/:resourceId  — body: { targetType, targetId }
-router.delete('/:resourceType/:resourceId', deleteShare);
+// DELETE /api/shares/:id
+router.delete('/:id', deleteShare);
 
 export default router;
