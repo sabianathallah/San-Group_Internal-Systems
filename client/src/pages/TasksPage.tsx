@@ -2097,7 +2097,7 @@ export default function TasksPage() {
 
   // My Day greeting
   const greetingHour = new Date().getHours();
-  const greeting = greetingHour < 11 ? 'Selamat pagi' : greetingHour < 15 ? 'Selamat siang' : greetingHour < 18 ? 'Selamat sore' : 'Selamat malam';
+  const greeting = greetingHour < 11 ? 'Good morning' : greetingHour < 15 ? 'Good afternoon' : greetingHour < 18 ? 'Good evening' : 'Good night';
   const todayStr = new Date().toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
 
   return (
