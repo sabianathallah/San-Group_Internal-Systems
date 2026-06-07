@@ -220,24 +220,21 @@ function DivisionModal({ open, division, onClose, onSaved }: {
   );
 }
 
-// ── Role Modal ─────────────────────────────────────────────
-interface RoleForm { name: string; slug: string; color: string; level: number; divisionId: string; }
-const EMPTY_ROLE: RoleForm = { name: '', slug: '', color: '#334155', level: 6, divisionId: '' };
+// ── Role Modal (edit name & color only) ────────────────────
+interface RoleForm { name: string; color: string; }
 
-function RoleModal({ open, role, divisions, onClose, onSaved }: {
-  open: boolean; role: RoleOption | null; divisions: DivisionOption[];
+function RoleModal({ open, role, onClose, onSaved }: {
+  open: boolean; role: RoleOption | null;
   onClose: () => void; onSaved: (r: RoleOption) => void;
 }) {
-  const [form, setForm]     = useState<RoleForm>(EMPTY_ROLE);
+  const [form, setForm]     = useState<RoleForm>({ name: '', color: '#334155' });
   const [saving, setSaving] = useState(false);
   const [error, setError]   = useState('');
 
   useEffect(() => {
-    if (!open) return;
+    if (!open || !role) return;
     setError('');
-    setForm(role
-      ? { name: role.name, slug: role.slug, color: role.color, level: role.level, divisionId: role.division?.id ?? '' }
-      : EMPTY_ROLE);
+    setForm({ name: role.name, color: role.color });
   }, [open, role]);
 
   async function handleSubmit(e: FormEvent) {
@@ -245,47 +242,28 @@ function RoleModal({ open, role, divisions, onClose, onSaved }: {
     if (!form.name.trim()) { setError('Nama wajib diisi'); return; }
     setSaving(true); setError('');
     try {
-      const payload = { name: form.name.trim(), slug: form.slug.trim() || slugify(form.name), color: form.color, level: form.level, divisionId: form.divisionId || undefined };
-      const res = role ? await api.patch(`/roles/${role.id}`, payload) : await api.post('/roles', payload);
+      const res = await api.patch(`/roles/${role!.id}`, { name: form.name.trim(), color: form.color });
       onSaved(res.data.data); onClose();
     } catch (err: unknown) {
       setError((err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'Terjadi kesalahan');
     } finally { setSaving(false); }
   }
 
-  if (!open) return null;
+  if (!open || !role) return null;
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
-      <div className="relative bg-white rounded-xl shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 sticky top-0 bg-white">
-          <h2 className="text-sm font-semibold text-gray-800">{role ? 'Edit Role' : 'Tambah Role'}</h2>
+      <div className="relative bg-white rounded-xl shadow-xl w-full max-w-sm">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+          <h2 className="text-sm font-semibold text-gray-800">Edit Role · L{role.level}</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={16} /></button>
         </div>
         <form onSubmit={handleSubmit} className="p-5 space-y-4">
           <Field label="Nama" required>
-            <input autoFocus type="text" value={form.name} placeholder="Finance Manager"
-              onChange={(e) => setForm((f) => ({ ...f, name: e.target.value, slug: role ? f.slug : slugify(e.target.value) }))}
+            <input autoFocus type="text" value={form.name}
+              onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
               className={inputCls} />
           </Field>
-          <Field label="Slug">
-            <input type="text" value={form.slug} placeholder="finance-manager"
-              onChange={(e) => setForm((f) => ({ ...f, slug: e.target.value }))}
-              className={cn(inputCls, 'font-mono text-xs')} />
-          </Field>
-          <div className="grid grid-cols-2 gap-4">
-            <Field label="Level">
-              <select value={form.level} onChange={(e) => setForm((f) => ({ ...f, level: Number(e.target.value) }))} className={selectCls}>
-                {[1, 2, 3, 4, 5, 6].map((l) => <option key={l} value={l}>L{l} · {LEVEL_LABELS[l]}</option>)}
-              </select>
-            </Field>
-            <Field label="Divisi">
-              <select value={form.divisionId} onChange={(e) => setForm((f) => ({ ...f, divisionId: e.target.value }))} className={selectCls}>
-                <option value="">— Tidak terkait —</option>
-                {divisions.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
-              </select>
-            </Field>
-          </div>
           <Field label="Warna">
             <ColorPicker value={form.color} onChange={(c) => setForm((f) => ({ ...f, color: c }))} />
           </Field>
@@ -294,8 +272,7 @@ function RoleModal({ open, role, divisions, onClose, onSaved }: {
             <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded hover:bg-gray-50">Batal</button>
             <button type="submit" disabled={saving}
               className="flex items-center gap-1.5 px-4 py-2 text-sm text-white bg-navy hover:bg-navy-light rounded disabled:opacity-50">
-              {saving && <Loader2 size={13} className="animate-spin" />}
-              {role ? 'Simpan' : 'Buat Role'}
+              {saving && <Loader2 size={13} className="animate-spin" />} Simpan
             </button>
           </div>
         </form>
@@ -629,9 +606,7 @@ export default function UsersPage() {
           </button>
         )}
         {activeTab === 'roles' && (
-          <button onClick={() => { setEditingRole(null); setRoleModal(true); }} className="flex items-center gap-1.5 px-3 py-2 text-sm text-white bg-navy hover:bg-navy-light rounded transition-colors">
-            <Plus size={15} /> Tambah Role
-          </button>
+          <span className="text-xs text-gray-400 italic">6 role sistem · edit nama & warna via ikon pensil</span>
         )}
       </div>
 
@@ -738,12 +713,16 @@ export default function UsersPage() {
                           </td>
                           <td className="px-4 py-3 text-sm text-gray-600 font-mono">{u.username}</td>
                           <td className="px-4 py-3">
-                            <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium text-white"
-                              style={{ backgroundColor: u.role?.color ?? '#64748b' }}>
-                              {(u.role?.level ?? 99) <= 1 && <ShieldCheck size={10} />}
-                              {(u.role?.level ?? 99) === 2 && <UserIcon size={10} />}
-                              {u.role?.name ?? '—'}
-                            </span>
+                            <div className="flex flex-col gap-0.5">
+                              <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium text-white w-fit"
+                                style={{ backgroundColor: u.role?.color ?? '#64748b' }}>
+                                {(u.role?.level ?? 99) <= 1 && <ShieldCheck size={10} />}
+                                {u.role?.name ?? '—'}
+                              </span>
+                              {u.division && (
+                                <span className="text-xs text-gray-400 pl-1">· {u.division.name}</span>
+                              )}
+                            </div>
                           </td>
                           <td className="px-4 py-3">
                             {u.division ? (
@@ -887,70 +866,35 @@ export default function UsersPage() {
 
       {/* ── Roles Tab ── */}
       {activeTab === 'roles' && (
-        <>
-          {roleDelError && (
-            <div className="flex items-center gap-2 mb-4 px-4 py-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-600">
-              <AlertCircle size={14} /> {roleDelError}
-              <button onClick={() => setRoleDelError('')} className="ml-auto"><X size={13} /></button>
-            </div>
-          )}
-          {sortedRoles.length === 0 ? (
-            <div className="bg-white border border-gray-200 rounded-xl flex flex-col items-center justify-center py-20 text-center">
-              <Shield size={40} className="text-gray-200 mb-3" />
-              <p className="text-sm text-gray-500 mb-3">Belum ada role</p>
-              <button onClick={() => { setEditingRole(null); setRoleModal(true); }}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-navy border border-navy rounded hover:bg-navy-50">
-                <Plus size={14} /> Tambah role pertama
-              </button>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
-              {sortedRoles.map((r) => {
-                const userCount = r._count?.users ?? 0;
-                return (
-                  <div key={r.id} className="bg-white border border-gray-200 rounded-xl p-4 hover:shadow-md transition-shadow">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex items-center gap-3 min-w-0">
-                        <div className="w-9 h-9 rounded-full flex-shrink-0 flex items-center justify-center text-white text-xs font-bold"
-                          style={{ backgroundColor: r.color }}>
-                          L{r.level}
-                        </div>
-                        <div className="min-w-0">
-                          <p className="font-semibold text-gray-800 text-sm truncate">{r.name}</p>
-                          <p className="text-xs font-mono text-gray-400 truncate">{r.slug}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-0.5 flex-shrink-0">
-                        <button onClick={() => { setEditingRole(r); setRoleModal(true); }}
-                          className="w-7 h-7 flex items-center justify-center rounded text-gray-400 hover:text-navy hover:bg-navy-50 transition-colors">
-                          <Edit2 size={13} />
-                        </button>
-                        <button onClick={() => { setRoleDelError(''); setRoleDelTarget(r); }} disabled={userCount > 0}
-                          title={userCount > 0 ? 'Tidak dapat dihapus — masih ada user' : 'Hapus'}
-                          className={cn('w-7 h-7 flex items-center justify-center rounded transition-colors',
-                            userCount > 0 ? 'text-gray-200 cursor-not-allowed' : 'text-gray-400 hover:text-red-500 hover:bg-red-50')}>
-                          <Trash2 size={13} />
-                        </button>
-                      </div>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-2 mt-3">
-                      <LevelBadge level={r.level} />
-                      {r.division && (
-                        <span className="text-xs px-2 py-0.5 rounded-full font-medium"
-                          style={{ backgroundColor: r.division.color + '26', color: r.division.color }}>
-                          {r.division.name}
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-xs text-gray-400 mt-2 flex items-center gap-1">
-                      <Users size={11} /> {userCount} user
-                    </p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+          {sortedRoles.map((r) => {
+            const userCount = r._count?.users ?? 0;
+            return (
+              <div key={r.id} className="bg-white border border-gray-200 rounded-xl overflow-hidden hover:shadow-sm transition-shadow">
+                <div className="h-1" style={{ backgroundColor: r.color }} />
+                <div className="p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className={cn('text-xs font-semibold px-2 py-0.5 rounded-full', LEVEL_COLORS[r.level] ?? 'bg-gray-100 text-gray-600')}>
+                      L{r.level}
+                    </span>
+                    <span className="text-xs text-gray-400 flex items-center gap-1">
+                      <Users size={11} /> {userCount}
+                    </span>
                   </div>
-                );
-              })}
-            </div>
-          )}
-        </>
+                  <div className="flex items-center gap-2">
+                    <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: r.color }} />
+                    <p className="text-sm font-semibold text-gray-800 truncate">{r.name}</p>
+                    <button onClick={() => { setEditingRole(r); setRoleModal(true); }}
+                      className="ml-auto w-6 h-6 flex items-center justify-center rounded text-gray-300 hover:text-navy hover:bg-navy-50 transition-colors flex-shrink-0">
+                      <Edit2 size={11} />
+                    </button>
+                  </div>
+                  <p className="text-xs font-mono text-gray-400 mt-1">{r.slug}</p>
+                </div>
+              </div>
+            );
+          })}
+        </div>
       )}
 
       {/* Modals */}
@@ -958,15 +902,11 @@ export default function UsersPage() {
         onClose={() => setUserModal(false)} onSaved={handleUserSaved} />
       <DivisionModal open={divModal} division={editingDiv}
         onClose={() => setDivModal(false)} onSaved={handleDivSaved} />
-      <RoleModal open={roleModal} role={editingRole} divisions={divisions}
+      <RoleModal open={roleModal} role={editingRole}
         onClose={() => setRoleModal(false)} onSaved={handleRoleSaved} />
       {divDelTarget && (
         <DeleteConfirm title="Hapus Divisi" name={divDelTarget.name}
           onCancel={() => setDivDelTarget(null)} onConfirm={handleDeleteDiv} loading={deletingDiv} />
-      )}
-      {roleDelTarget && (
-        <DeleteConfirm title="Hapus Role" name={roleDelTarget.name}
-          onCancel={() => setRoleDelTarget(null)} onConfirm={handleDeleteRole} loading={deletingRole} />
       )}
     </div>
   );
