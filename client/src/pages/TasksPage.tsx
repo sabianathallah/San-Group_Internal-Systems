@@ -1933,12 +1933,12 @@ export default function TasksPage() {
       .catch(() => {});
   }, [loadLists, loadPendingCount]);
 
-  // Open task from navigation state
+  // Open task from navigation state (e.g. from command palette)
   useEffect(() => {
     const state = location.state as { selectedTaskId?: string } | null;
     if (state?.selectedTaskId) {
       setSelectedId(state.selectedTaskId);
-      setSidebarView('all');
+      setSidebarView(defaultView);
       window.history.replaceState({}, '');
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps

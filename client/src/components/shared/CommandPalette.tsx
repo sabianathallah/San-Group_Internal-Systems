@@ -112,9 +112,9 @@ export default function CommandPalette({ open, onClose }: Props) {
   const [activeIdx,setActiveIdx]= useState(0);
 
   // Flatten results for keyboard nav
-  const flat: { result: AnyResult; href: string }[] = [];
+  const flat: { result: AnyResult; href: string; state?: Record<string, unknown> }[] = [];
   if (results) {
-    results.tasks.forEach((t)     => flat.push({ result: t, href: `/tasks` }));
+    results.tasks.forEach((t)     => flat.push({ result: t, href: `/tasks`, state: { selectedTaskId: t.id } }));
     results.bulletins.forEach((b) => flat.push({ result: b, href: `/bulletin` }));
     results.notes.forEach((n)     => flat.push({ result: n, href: `/notes` }));
     results.files.forEach((f)     => flat.push({ result: f, href: f.type === 'link' && f.url ? f.url : '/database' }));
@@ -151,11 +151,11 @@ export default function CommandPalette({ open, onClose }: Props) {
     }
   }, [open]);
 
-  function handleNavigate(href: string, result: AnyResult) {
+  function handleNavigate(href: string, result: AnyResult, state?: Record<string, unknown>) {
     if (result.type === 'link' && 'url' in result && result.url) {
       window.open(result.url, '_blank');
     } else {
-      navigate(href);
+      navigate(href, state ? { state } : undefined);
     }
     onClose();
   }
@@ -164,7 +164,7 @@ export default function CommandPalette({ open, onClose }: Props) {
     if (e.key === 'ArrowDown') { e.preventDefault(); setActiveIdx((i) => Math.min(i + 1, flat.length - 1)); }
     if (e.key === 'ArrowUp')   { e.preventDefault(); setActiveIdx((i) => Math.max(i - 1, 0)); }
     if (e.key === 'Enter' && flat[activeIdx]) {
-      handleNavigate(flat[activeIdx].href, flat[activeIdx].result);
+      handleNavigate(flat[activeIdx].href, flat[activeIdx].result, flat[activeIdx].state);
     }
     if (e.key === 'Escape') onClose();
   }
@@ -232,7 +232,7 @@ export default function CommandPalette({ open, onClose }: Props) {
                     {results!.tasks.map((t) => {
                       const idx = cursor++;
                       return <ResultItem key={t.id} result={t} active={activeIdx === idx}
-                        onClick={() => handleNavigate('/tasks', t)} />;
+                        onClick={() => handleNavigate('/tasks', t, { selectedTaskId: t.id })} />;
                     })}
                   </>
                 )}
