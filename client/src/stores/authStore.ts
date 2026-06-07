@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { usePermStore } from '@/stores/permStore';
 
 export interface UserRole {
   id:    string;
@@ -56,6 +57,7 @@ export const useAuthStore = create<AuthState>()(
       logout: () => {
         localStorage.removeItem('access_token');
         set({ user: null, token: null, isAuthenticated: false });
+        usePermStore.getState().clear();
       },
 
       setToken: (token) => {

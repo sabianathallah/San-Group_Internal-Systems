@@ -488,3 +488,76 @@ export async function pendingCountService(userId: string): Promise<number> {
     where: { assignedToId: userId, assignmentStatus: AssignmentStatus.PENDING },
   });
 }
+
+// ── Task stats (role-aware) ────────────────────────────────
+export async function getTaskStatsService(
+  userId: string,
+  roleLevel: number,
+  divisionId: string | undefined,
+) {
+  const weekAgo = new Date();
+  weekAgo.setDate(weekAgo.getDate() - 7);
+
+  // Personal stats — tasks owned or assigned to me
+  const personalWhere: Prisma.TaskWhereInput = {
+    parentTaskId: null,
+    OR: [{ userId }, { assignedToId: userId }],
+  };
+
+  const [pTodo, pInProgress, pDoneWeek, pAssigned] = await prisma.$transaction([
+    prisma.task.count({ where: { ...personalWhere, status: TaskStatus.TODO } }),
+    prisma.task.count({ where: { ...personalWhere, status: TaskStatus.IN_PROGRESS } }),
+    prisma.task.count({ where: { ...personalWhere, status: TaskStatus.DONE, completedAt: { gte: weekAgo } } }),
+    prisma.task.count({ where: { assignedToId: userId, assignmentStatus: AssignmentStatus.PENDING } }),
+  ]);
+
+  const personal = { todo: pTodo, inProgress: pInProgress, done: pDoneWeek, assigned: pAssigned };
+
+  // Team stats — for supervisors, managers, directors, admins (roleLevel <= 5)
+  let team: { total: number; done: number; inProgress: number; memberCount: number } | null = null;
+  if (roleLevel <= 5) {
+    let userIds: string[];
+    if (canManage(roleLevel)) {
+      // Admin/SuperAdmin: all users except self
+      const users = await prisma.user.findMany({ where: { id: { not: userId } }, select: { id: true } });
+      userIds = users.map((u) => u.id);
+    } else {
+      // Supervisor/Manager/Director: same division, lower-level staff (higher level number)
+      const users = await prisma.user.findMany({
+        where: {
+          divisionId: divisionId ?? '',
+          id: { not: userId },
+          role: { level: { gt: roleLevel } },
+        },
+        select: { id: true },
+      });
+      userIds = users.map((u) => u.id);
+    }
+
+    const memberCount = userIds.length;
+    if (memberCount > 0) {
+      const teamWhere: Prisma.TaskWhereInput = { userId: { in: userIds }, parentTaskId: null, isPrivate: false };
+      const [tTotal, tDone, tInProgress] = await prisma.$transaction([
+        prisma.task.count({ where: teamWhere }),
+        prisma.task.count({ where: { ...teamWhere, status: TaskStatus.DONE } }),
+        prisma.task.count({ where: { ...teamWhere, status: TaskStatus.IN_PROGRESS } }),
+      ]);
+      team = { total: tTotal, done: tDone, inProgress: tInProgress, memberCount };
+    } else {
+      team = { total: 0, done: 0, inProgress: 0, memberCount: 0 };
+    }
+  }
+
+  // System stats — for Admin/SuperAdmin (roleLevel <= 2)
+  let system: { totalUsers: number; totalTasks: number; totalBulletins: number } | null = null;
+  if (roleLevel <= 2) {
+    const [totalUsers, totalTasks, totalBulletins] = await prisma.$transaction([
+      prisma.user.count(),
+      prisma.task.count({ where: { parentTaskId: null } }),
+      prisma.bulletin.count(),
+    ]);
+    system = { totalUsers, totalTasks, totalBulletins };
+  }
+
+  return { personal, team, system };
+}

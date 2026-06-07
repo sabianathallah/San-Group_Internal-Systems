@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import api from '@/lib/api';
 import { useAuthStore } from '@/stores/authStore';
+import { usePermStore } from '@/stores/permStore';
 import { cn } from '@/lib/cn';
 
 // ── Types ──────────────────────────────────────────────────
@@ -308,6 +309,7 @@ function ShareFolderModal({ folderId, folderName, onClose }: {
 export default function DatabasePage() {
   const { user } = useAuthStore();
   const isAdmin = (user?.role?.level ?? 99) <= 2;
+  const { perms } = usePermStore();
 
   const [folders,        setFolders]        = useState<DbFolder[]>([]);
   const [loadingFolders, setLoadingFolders] = useState(true);
@@ -397,7 +399,7 @@ export default function DatabasePage() {
             <h1 className="text-lg font-semibold text-gray-900">Database Links</h1>
             <p className="text-sm text-gray-500 mt-0.5">Direktori akses cepat — klik folder untuk membuka</p>
           </div>
-          {isAdmin && (
+          {perms.db_link.manageFolder && (
             <button onClick={() => setFolderModal({ open: true })}
               className="flex items-center gap-1.5 px-4 py-2 text-sm text-white bg-navy hover:bg-navy-light rounded-lg transition-colors">
               <Plus size={15} /> Folder Baru
@@ -413,7 +415,7 @@ export default function DatabasePage() {
           <div className="flex flex-col items-center justify-center py-24 gap-3 text-gray-400">
             <Folder size={40} className="text-gray-200" />
             <p className="text-sm">Belum ada folder</p>
-            {isAdmin && (
+            {perms.db_link.manageFolder && (
               <button onClick={() => setFolderModal({ open: true })}
                 className="text-xs text-navy hover:underline flex items-center gap-1">
                 <Plus size={12} /> Buat folder pertama
@@ -437,21 +439,27 @@ export default function DatabasePage() {
                     <p className="text-[11px] text-gray-400">{folder._count.links} item</p>
                   </div>
                 </button>
-                {isAdmin && (
+                {(perms.db_link.manageFolder || perms.db_link.shareFolder) && (
                   <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button onClick={(e) => { e.stopPropagation(); setShareFolderId(folder.id); setShareFolderName(folder.name); }}
-                      className="p-1.5 bg-white border border-gray-200 rounded-lg text-gray-400 hover:text-info shadow-sm"
-                      title="Bagikan folder">
-                      <Share2 size={11} />
-                    </button>
-                    <button onClick={(e) => { e.stopPropagation(); setFolderModal({ open: true, folder }); }}
-                      className="p-1.5 bg-white border border-gray-200 rounded-lg text-gray-400 hover:text-navy shadow-sm">
-                      <Edit2 size={11} />
-                    </button>
-                    <button onClick={(e) => { e.stopPropagation(); handleDeleteFolder(folder); }}
-                      className="p-1.5 bg-white border border-gray-200 rounded-lg text-gray-400 hover:text-red-500 shadow-sm">
-                      <Trash2 size={11} />
-                    </button>
+                    {perms.db_link.shareFolder && (
+                      <button onClick={(e) => { e.stopPropagation(); setShareFolderId(folder.id); setShareFolderName(folder.name); }}
+                        className="p-1.5 bg-white border border-gray-200 rounded-lg text-gray-400 hover:text-info shadow-sm"
+                        title="Bagikan folder">
+                        <Share2 size={11} />
+                      </button>
+                    )}
+                    {perms.db_link.manageFolder && (
+                      <button onClick={(e) => { e.stopPropagation(); setFolderModal({ open: true, folder }); }}
+                        className="p-1.5 bg-white border border-gray-200 rounded-lg text-gray-400 hover:text-navy shadow-sm">
+                        <Edit2 size={11} />
+                      </button>
+                    )}
+                    {perms.db_link.manageFolder && (
+                      <button onClick={(e) => { e.stopPropagation(); handleDeleteFolder(folder); }}
+                        className="p-1.5 bg-white border border-gray-200 rounded-lg text-gray-400 hover:text-red-500 shadow-sm">
+                        <Trash2 size={11} />
+                      </button>
+                    )}
                   </div>
                 )}
                 {/* Division badge */}
@@ -512,10 +520,12 @@ export default function DatabasePage() {
               className="pl-7 pr-6 py-1.5 text-xs border border-gray-200 rounded-lg outline-none focus:border-navy w-32" />
             {search && <button onClick={() => setSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400"><X size={11} /></button>}
           </div>
-          <button onClick={() => setLinkModal({ open: true })}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-white bg-navy hover:bg-navy-light rounded-lg transition-colors">
-            <Plus size={13} /> Tambah Link
-          </button>
+          {perms.db_link.addLink && (
+            <button onClick={() => setLinkModal({ open: true })}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-white bg-navy hover:bg-navy-light rounded-lg transition-colors">
+              <Plus size={13} /> Tambah Link
+            </button>
+          )}
         </div>
       </div>
 
@@ -529,7 +539,7 @@ export default function DatabasePage() {
           <div className="flex flex-col items-center justify-center py-16 gap-2 text-gray-400">
             <FileText size={32} className="text-gray-200" />
             <p className="text-sm">{search ? 'Tidak ada hasil' : 'Folder ini masih kosong'}</p>
-            {!search && (
+            {!search && perms.db_link.addLink && (
               <button onClick={() => setLinkModal({ open: true })}
                 className="text-xs text-navy hover:underline flex items-center gap-1 mt-1">
                 <Plus size={12} /> Tambah link pertama
@@ -561,11 +571,13 @@ export default function DatabasePage() {
                 <div className="flex items-center gap-1.5 flex-shrink-0">
                   <span className="text-[10px] text-gray-300 hidden sm:block">{link.createdBy.fullName}</span>
                   <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button onClick={() => setLinkModal({ open: true, link })}
-                      className="p-1.5 text-gray-400 hover:text-navy hover:bg-navy/5 rounded-lg">
-                      <Edit2 size={12} />
-                    </button>
-                    {(isAdmin || link.createdBy.id === user?.id) && (
+                    {perms.db_link.manageFolder && (
+                      <button onClick={() => setLinkModal({ open: true, link })}
+                        className="p-1.5 text-gray-400 hover:text-navy hover:bg-navy/5 rounded-lg">
+                        <Edit2 size={12} />
+                      </button>
+                    )}
+                    {perms.db_link.manageFolder && (isAdmin || link.createdBy.id === user?.id) && (
                       <button onClick={() => handleDeleteLink(link)}
                         className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg">
                         <Trash2 size={12} />

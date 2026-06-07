@@ -1,5 +1,8 @@
-import { Router } from 'express';
+import { Router, Response, NextFunction } from 'express';
 import { authenticate, authorizeLevel } from '@/middlewares/auth.middleware';
+import { AuthRequest } from '@/types';
+import { successResponse } from '@/helpers/response';
+import { getPermissionsForRole } from '@/services/permission.service';
 import {
   listRolesWithPermissions,
   getRolePermissions,
@@ -7,6 +10,15 @@ import {
 } from '@/controllers/permission.controller';
 
 const router = Router();
+
+// GET /api/permissions/me — returns current user's permissions (all authenticated users)
+router.get('/me', authenticate, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { roleId, roleLevel } = req.user!;
+    const perms = await getPermissionsForRole(roleId, roleLevel);
+    successResponse(res, perms, 'Permission berhasil diambil');
+  } catch (err) { next(err); }
+});
 
 router.use(authenticate, authorizeLevel(2));
 

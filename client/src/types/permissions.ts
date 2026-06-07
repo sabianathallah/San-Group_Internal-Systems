@@ -1,0 +1,28 @@
+export type Scope = 'none' | 'own' | 'division' | 'all';
+export type AudienceScope = 'none' | 'division' | 'all';
+
+export interface TaskPerms {
+  view: Scope; create: boolean; edit: Scope; delete: Scope; viewPrivate: boolean;
+}
+export interface BulletinPerms {
+  view: boolean; create: boolean; audienceScope: AudienceScope; edit: Scope; delete: Scope;
+}
+export interface DbLinkPerms {
+  view: Scope; addLink: boolean; manageFolder: boolean; shareFolder: boolean;
+}
+export interface NotePerms {
+  view: Scope; create: boolean; edit: Scope; delete: Scope;
+}
+export interface PermissionConfig {
+  task: TaskPerms;
+  bulletin: BulletinPerms;
+  db_link: DbLinkPerms;
+  note: NotePerms;
+}
+
+export const DEFAULT_PERMS: PermissionConfig = {
+  task:     { view: 'own', create: true, edit: 'own', delete: 'own', viewPrivate: false },
+  bulletin: { view: true, create: false, audienceScope: 'none', edit: 'none', delete: 'none' },
+  db_link:  { view: 'own', addLink: false, manageFolder: false, shareFolder: false },
+  note:     { view: 'own', create: true, edit: 'own', delete: 'own' },
+};

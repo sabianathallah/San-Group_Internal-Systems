@@ -4,6 +4,8 @@ import {
   ArrowRight, CheckCircle2, Circle,
   Loader2, Sun, ChevronDown, ChevronRight,
   Plus, ExternalLink, Pin,
+  ClipboardList, TrendingUp, Activity,
+  BarChart3, Shield, UserCheck,
 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/stores/authStore';
@@ -58,6 +60,12 @@ interface Bulletin {
   category:    string;
   publishedAt: string | null;
   isRead:      boolean;
+}
+
+interface TaskStats {
+  personal: { todo: number; inProgress: number; done: number; assigned: number };
+  team:     { total: number; done: number; inProgress: number; memberCount: number } | null;
+  system:   { totalUsers: number; totalTasks: number; totalBulletins: number } | null;
 }
 
 // ── Config ─────────────────────────────────────────────────
@@ -115,6 +123,37 @@ function ProgressRing({ done, total, size = 56 }: { done: number; total: number;
   );
 }
 
+// ── Stat Card ──────────────────────────────────────────────
+function StatCard({
+  icon: Icon, label, value, sub, color, loading,
+}: {
+  icon:     React.ElementType;
+  label:    string;
+  value:    number | string;
+  sub?:     string;
+  color:    string;
+  loading?: boolean;
+}) {
+  return (
+    <div className={cn('rounded-xl p-4 flex items-center gap-3 shadow-sm border', color)}>
+      <div className="flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center bg-white/30">
+        <Icon size={18} />
+      </div>
+      <div className="min-w-0">
+        <p className="text-[11px] font-medium opacity-80 truncate">{label}</p>
+        {loading ? (
+          <div className="h-5 w-10 rounded bg-white/30 animate-pulse mt-0.5" />
+        ) : (
+          <p className="text-xl font-bold leading-tight">{value}</p>
+        )}
+        {sub && !loading && (
+          <p className="text-[10px] opacity-70 mt-0.5">{sub}</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── Task Row ───────────────────────────────────────────────
 function TaskRow({ task, onNavigate }: { task: Task; onNavigate: (id: string) => void }) {
   const isDone     = task.status === 'DONE';
@@ -124,7 +163,6 @@ function TaskRow({ task, onNavigate }: { task: Task; onNavigate: (id: string) =>
     ? relativeDate(task.dueDate)
     : { label: '', overdue: false };
 
-  // Status indicator dot (read-only, no checkbox)
   const dotColor = isDone ? '#22c55e' : isPending ? '#f59e0b' : isProgress ? '#3b82f6' : '#d1d5db';
 
   return (
@@ -135,7 +173,6 @@ function TaskRow({ task, onNavigate }: { task: Task; onNavigate: (id: string) =>
         'hover:bg-gray-50/70 transition-colors',
       )}
     >
-      {/* Status dot — read only */}
       <span
         className="flex-shrink-0 w-4 h-4 rounded-full border-2 flex items-center justify-center"
         style={{ borderColor: dotColor, backgroundColor: isDone ? dotColor : 'transparent' }}
@@ -145,7 +182,6 @@ function TaskRow({ task, onNavigate }: { task: Task; onNavigate: (id: string) =>
         {isPending && <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: dotColor }} />}
       </span>
 
-      {/* Title + meta */}
       <div className="flex-1 min-w-0">
         <p className={cn('text-sm text-gray-800 truncate', isDone && 'line-through text-gray-400')}>
           {task.title}
@@ -168,7 +204,6 @@ function TaskRow({ task, onNavigate }: { task: Task; onNavigate: (id: string) =>
         </div>
       </div>
 
-      {/* Priority star */}
       <Star
         size={13}
         className={cn('flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity', PRIORITY_COLOR[task.priority])}
@@ -251,11 +286,207 @@ function QuickAddTask({ onAdded }: { onAdded: (task: Task) => void }) {
   );
 }
 
+// ── Role Stats Section ─────────────────────────────────────
+function RoleStatsSection({ stats, statsLoading, roleLevel }: {
+  stats:        TaskStats | null;
+  statsLoading: boolean;
+  roleLevel:    number;
+}) {
+  const teamDonePct = stats?.team && stats.team.total > 0
+    ? Math.round((stats.team.done / stats.team.total) * 100)
+    : 0;
+
+  return (
+    <div className="px-4 pt-3 pb-4 bg-white border-b border-gray-100">
+      {/* Personal stats — always visible */}
+      <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2">
+        Tugas Saya
+      </p>
+      <div className="grid grid-cols-2 gap-2">
+        <StatCard
+          icon={ClipboardList}
+          label="To Do"
+          value={stats?.personal.todo ?? 0}
+          color="bg-blue-50 text-blue-700 border-blue-100"
+          loading={statsLoading}
+        />
+        <StatCard
+          icon={Activity}
+          label="Sedang Berjalan"
+          value={stats?.personal.inProgress ?? 0}
+          color="bg-amber-50 text-amber-700 border-amber-100"
+          loading={statsLoading}
+        />
+        <StatCard
+          icon={CheckCircle2}
+          label="Selesai Minggu Ini"
+          value={stats?.personal.done ?? 0}
+          color="bg-green-50 text-green-700 border-green-100"
+          loading={statsLoading}
+        />
+        <StatCard
+          icon={UserCheck}
+          label="Menunggu Konfirmasi"
+          value={stats?.personal.assigned ?? 0}
+          color="bg-orange-50 text-orange-700 border-orange-100"
+          loading={statsLoading}
+        />
+      </div>
+
+      {/* Team stats — for Supervisor/Manager/Director/Admin (level <= 5) */}
+      {roleLevel <= 5 && (
+        <div className="mt-3">
+          <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2">
+            Tim Saya
+          </p>
+          <div className="rounded-xl border border-indigo-100 bg-indigo-50 p-3">
+            {statsLoading ? (
+              <div className="flex gap-3">
+                {[1,2,3].map((i) => <div key={i} className="flex-1 h-10 rounded-lg bg-white/50 animate-pulse" />)}
+              </div>
+            ) : stats?.team ? (
+              <div className="flex items-center gap-3">
+                <div className="flex-1 text-center">
+                  <p className="text-xl font-bold text-indigo-700">{stats.team.total}</p>
+                  <p className="text-[10px] text-indigo-500">Total Task</p>
+                </div>
+                <div className="w-px h-8 bg-indigo-200" />
+                <div className="flex-1 text-center">
+                  <p className="text-xl font-bold text-indigo-700">{teamDonePct}%</p>
+                  <p className="text-[10px] text-indigo-500">Selesai</p>
+                </div>
+                <div className="w-px h-8 bg-indigo-200" />
+                <div className="flex-1 text-center">
+                  <p className="text-xl font-bold text-indigo-700">{stats.team.memberCount}</p>
+                  <p className="text-[10px] text-indigo-500">Anggota</p>
+                </div>
+              </div>
+            ) : (
+              <p className="text-xs text-indigo-400 text-center py-2">Tidak ada data tim</p>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Division stats — for Director (level <= 3) shown as sub-label in team card */}
+      {roleLevel <= 3 && roleLevel > 2 && (
+        <div className="mt-3">
+          <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2">
+            Divisi
+          </p>
+          <div className="rounded-xl border border-violet-100 bg-violet-50 p-3 flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-violet-200 flex items-center justify-center flex-shrink-0">
+              <BarChart3 size={15} className="text-violet-700" />
+            </div>
+            {statsLoading ? (
+              <div className="flex-1 h-8 rounded-lg bg-white/50 animate-pulse" />
+            ) : (
+              <div className="flex-1">
+                <p className="text-sm font-semibold text-violet-800">
+                  {stats?.team ? `${teamDonePct}% completion rate` : '—'}
+                </p>
+                <p className="text-[10px] text-violet-500">
+                  {stats?.team ? `${stats.team.done} dari ${stats.team.total} task selesai` : 'Memuat data…'}
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* System stats — for Admin/SuperAdmin (level <= 2) */}
+      {roleLevel <= 2 && stats?.system && (
+        <div className="mt-3">
+          <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2">
+            Sistem
+          </p>
+          <div className="grid grid-cols-3 gap-2">
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-center">
+              <p className="text-lg font-bold text-slate-700">
+                {statsLoading ? '—' : stats.system.totalUsers}
+              </p>
+              <p className="text-[10px] text-slate-500">Pengguna</p>
+            </div>
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-center">
+              <p className="text-lg font-bold text-slate-700">
+                {statsLoading ? '—' : stats.system.totalTasks}
+              </p>
+              <p className="text-[10px] text-slate-500">Task</p>
+            </div>
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-center">
+              <p className="text-lg font-bold text-slate-700">
+                {statsLoading ? '—' : stats.system.totalBulletins}
+              </p>
+              <p className="text-[10px] text-slate-500">Bulletin</p>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Quick Actions ──────────────────────────────────────────
+function QuickActionsSection({ roleLevel }: { roleLevel: number }) {
+  const navigate = useNavigate();
+
+  const actions: { label: string; to?: string; onClick?: () => void; icon: React.ElementType }[] = [
+    { label: 'Manajemen Tugas',    to: ROUTES.TASKS,    icon: ClipboardList },
+    { label: 'Catatan Saya',       to: ROUTES.NOTES,    icon: Pin },
+    { label: 'Papan Pengumuman',   to: ROUTES.BULLETIN, icon: Megaphone },
+    { label: 'Database Links',     to: ROUTES.DATABASE, icon: ExternalLink },
+  ];
+
+  if (roleLevel <= 4) {
+    actions.push({ label: 'Team Tasks', onClick: () => navigate(ROUTES.TASKS, { state: { view: 'team' } }), icon: Users });
+  }
+  if (roleLevel <= 2) {
+    actions.push({ label: 'Kelola Pengguna',  to: ROUTES.ADMIN_USERS,       icon: Users });
+    actions.push({ label: 'Permissions',      to: ROUTES.ADMIN_PERMISSIONS, icon: Shield });
+  }
+
+  return (
+    <div className="bg-white px-4 py-3">
+      <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2">Menu Cepat</p>
+      <div className="space-y-0.5">
+        {actions.map((a) =>
+          a.to ? (
+            <Link
+              key={a.label}
+              to={a.to}
+              className="flex items-center justify-between px-2 py-2 rounded text-xs text-gray-600 hover:bg-gray-50 hover:text-navy transition-colors group"
+            >
+              <span className="flex items-center gap-2">
+                <a.icon size={12} className="text-gray-400 group-hover:text-navy" />
+                {a.label}
+              </span>
+              <ExternalLink size={10} className="text-gray-300 group-hover:text-navy opacity-0 group-hover:opacity-100 transition-all" />
+            </Link>
+          ) : (
+            <button
+              key={a.label}
+              onClick={a.onClick}
+              className="flex items-center justify-between w-full px-2 py-2 rounded text-xs text-gray-600 hover:bg-gray-50 hover:text-navy transition-colors group"
+            >
+              <span className="flex items-center gap-2">
+                <a.icon size={12} className="text-gray-400 group-hover:text-navy" />
+                {a.label}
+              </span>
+              <ExternalLink size={10} className="text-gray-300 group-hover:text-navy opacity-0 group-hover:opacity-100 transition-all" />
+            </button>
+          ),
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── Main ───────────────────────────────────────────────────
 export default function DashboardPage() {
   const user      = useAuthStore((s) => s.user);
   const navigate  = useNavigate();
-  const isAdmin   = (user?.role?.level ?? 99) <= 2;
+  const roleLevel = user?.role?.level ?? 99;
+  const isAdmin   = roleLevel <= 2;
 
   // ── Shared task store ──
   const allTasks    = useTaskStore((s) => s.tasks);
@@ -269,17 +500,26 @@ export default function DashboardPage() {
   // ── Shared note store ──
   const allNotes = useNoteStore((s) => s.notes);
 
-  const [bulletins,   setBulletins]   = useState<Bulletin[]>([]);
-  const [activeUsers, setActiveUsers] = useState(0);
-  const [showDone,    setShowDone]    = useState(false);
+  const [bulletins,    setBulletins]    = useState<Bulletin[]>([]);
+  const [activeUsers,  setActiveUsers]  = useState(0);
+  const [showDone,     setShowDone]     = useState(false);
+  const [stats,        setStats]        = useState<TaskStats | null>(null);
+  const [statsLoading, setStatsLoading] = useState(true);
 
   // Single mount effect — fetch all dashboard data once
   useEffect(() => {
     useTaskStore.getState().fetchTasks();
     useNoteStore.getState().fetchNotes();
+
     api.get('/bulletins', { params: { limit: 50 } })
       .then((r) => setBulletins(r.data.data ?? []))
       .catch(() => {});
+
+    api.get('/tasks/stats')
+      .then((r) => setStats(r.data.data ?? null))
+      .catch(() => {})
+      .finally(() => setStatsLoading(false));
+
     if (isAdmin) {
       api.get('/users', { params: { isActive: 'true', limit: 1 } })
         .then((r) => setActiveUsers(r.data.meta?.total ?? 0))
@@ -336,6 +576,14 @@ export default function DashboardPage() {
                   ? 'Semua My Day selesai!'
                   : `${active.length} tugas My Day menunggu`}
             </p>
+            {/* Role badge */}
+            {user?.role && (
+              <span className="inline-flex items-center gap-1 mt-2 text-[10px] font-medium text-white/60 bg-white/10 px-2 py-0.5 rounded-full">
+                <TrendingUp size={9} />
+                {user.role.name}
+                {user.division?.name && ` · ${user.division.name}`}
+              </span>
+            )}
           </div>
 
           {/* Progress ring */}
@@ -368,6 +616,13 @@ export default function DashboardPage() {
               icon={Users}
               label={`${activeUsers} staff aktif`}
               active={false}
+            />
+          )}
+          {stats?.personal.assigned !== undefined && stats.personal.assigned > 0 && (
+            <StatChip
+              icon={UserCheck}
+              label={`${stats.personal.assigned} menunggu konfirmasi`}
+              active
             />
           )}
         </div>
@@ -445,7 +700,10 @@ export default function DashboardPage() {
         </div>
 
         {/* ── Right Panel (1/3) ── */}
-        <div className="col-span-1 flex flex-col gap-0">
+        <div className="col-span-1 flex flex-col gap-0 overflow-y-auto">
+
+          {/* Role-based stats cards */}
+          <RoleStatsSection stats={stats} statsLoading={statsLoading} roleLevel={roleLevel} />
 
           {/* Bulletin terbaru */}
           <div className="flex-1 border-b border-gray-100">
@@ -472,12 +730,11 @@ export default function DashboardPage() {
                 </div>
               ) : (
                 <ul>
-                  {bulletins.slice(0, 6).map((b) => (
+                  {bulletins.slice(0, 5).map((b) => (
                     <li
                       key={b.id}
                       className="flex items-start gap-3 px-4 py-3 border-b border-gray-50 last:border-0 hover:bg-gray-50/60 transition-colors"
                     >
-                      {/* Unread dot */}
                       <div className="flex-shrink-0 mt-1.5">
                         {!b.isRead
                           ? <span className="block w-1.5 h-1.5 rounded-full bg-navy" />
@@ -568,18 +825,7 @@ export default function DashboardPage() {
           </div>
 
           {/* Quick nav */}
-          <div className="bg-white px-4 py-3">
-            <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2">Menu Cepat</p>
-            <div className="space-y-0.5">
-              <NavLink to={ROUTES.TASKS}   label="Manajemen Tugas"   />
-              <NavLink to={ROUTES.NOTES}   label="Catatan Saya"      />
-              <NavLink to={ROUTES.BULLETIN} label="Papan Pengumuman" />
-              <NavLink to={ROUTES.DATABASE} label="Database Links"   />
-              {isAdmin && (
-                <NavLink to={ROUTES.ADMIN_USERS} label="Kelola Pengguna" />
-              )}
-            </div>
-          </div>
+          <QuickActionsSection roleLevel={roleLevel} />
         </div>
       </div>
     </div>
@@ -603,18 +849,6 @@ function StatChip({ icon: Icon, label, active, danger }: {
       <Icon size={11} />
       {label}
     </div>
-  );
-}
-
-function NavLink({ to, label }: { to: string; label: string }) {
-  return (
-    <Link
-      to={to}
-      className="flex items-center justify-between px-2 py-2 rounded text-xs text-gray-600 hover:bg-gray-50 hover:text-navy transition-colors group"
-    >
-      {label}
-      <ExternalLink size={10} className="text-gray-300 group-hover:text-navy opacity-0 group-hover:opacity-100 transition-all" />
-    </Link>
   );
 }
 

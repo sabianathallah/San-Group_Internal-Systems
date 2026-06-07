@@ -14,6 +14,7 @@ import {
 import { useLocation } from 'react-router-dom';
 import api from '@/lib/api';
 import { useAuthStore } from '@/stores/authStore';
+import { usePermStore } from '@/stores/permStore';
 import { cn } from '@/lib/cn';
 
 // ── Types ──────────────────────────────────────────────────
@@ -1867,10 +1868,16 @@ function exportToCSV(tasks: Task[], filename: string) {
 // ── Main Page ──────────────────────────────────────────────
 export default function TasksPage() {
   const { user } = useAuthStore();
+  const { perms } = usePermStore();
   const canSeeTeam = (user?.role?.level ?? 99) <= 4;
   const location   = useLocation();
 
-  const [sidebarView,  setSidebarView]  = useState<SidebarView>('all');
+  const defaultView: SidebarView = (() => {
+    const level = user?.role?.level ?? 99;
+    if (level <= 4) return 'team';   // Manager/Director/Admin — start on Team Tasks
+    return 'my_day';                  // Supervisor/Staff — start on My Day
+  })();
+  const [sidebarView,  setSidebarView]  = useState<SidebarView>(defaultView);
   const [viewMode,     setViewMode]     = useState<ViewMode>('list');
   const [groupBy,      setGroupBy]      = useState<GroupBy>('status');
   const [showDone,     setShowDone]     = useState(false);
@@ -2254,10 +2261,12 @@ export default function TasksPage() {
           )}
           {!loading && <span className="text-xs text-gray-400">{doneCount}/{filteredTasks.length} selesai</span>}
 
-          <button onClick={() => setShowCreate(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-navy hover:bg-navy-light rounded-lg">
-            <Plus size={13} /> Task Baru
-          </button>
+          {perms.task.create && (
+            <button onClick={() => setShowCreate(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-navy hover:bg-navy-light rounded-lg">
+              <Plus size={13} /> Task Baru
+            </button>
+          )}
         </div>
 
         {/* Filter panel */}

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Navigate, Outlet } from 'react-router-dom';
 import { useAuthStore } from '@/stores/authStore';
+import { usePermStore } from '@/stores/permStore';
 import { ROUTES } from '@/lib/constants';
 import Sidebar from '@/components/shared/Sidebar';
 import Header from '@/components/shared/Header';
@@ -8,6 +9,7 @@ import Header from '@/components/shared/Header';
 export default function DashboardLayout() {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const [hasHydrated, setHasHydrated] = useState(useAuthStore.persist.hasHydrated());
+  const fetchPerms = usePermStore((s) => s.fetch);
 
   useEffect(() => {
     setHasHydrated(useAuthStore.persist.hasHydrated());
@@ -15,6 +17,12 @@ export default function DashboardLayout() {
       setHasHydrated(true);
     });
   }, []);
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      fetchPerms();
+    }
+  }, [isAuthenticated, fetchPerms]);
 
   if (!hasHydrated) {
     return null;

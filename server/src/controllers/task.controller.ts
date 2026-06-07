@@ -6,7 +6,7 @@ import {
   getTaskByIdService, createTaskService, updateTaskService, deleteTaskService,
   acceptTaskService, rejectTaskService,
   listCommentsService, addCommentService, deleteCommentService,
-  addLinkService, deleteLinkService, pendingCountService,
+  addLinkService, deleteLinkService, pendingCountService, getTaskStatsService,
 } from '@/services/task.service';
 
 export async function listTasks(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
@@ -31,6 +31,14 @@ export async function getPendingCount(req: AuthRequest, res: Response, next: Nex
   try {
     const count = await pendingCountService(req.user!.userId);
     successResponse(res, { count }, 'Pending count berhasil diambil');
+  } catch (err) { next(err); }
+}
+
+export async function getTaskStats(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { userId, roleLevel, divisionId } = req.user!;
+    const stats = await getTaskStatsService(userId, roleLevel, divisionId);
+    successResponse(res, stats, 'Task stats berhasil diambil');
   } catch (err) { next(err); }
 }
 

@@ -6,6 +6,7 @@ import {
 import api from '@/lib/api';
 import { cn } from '@/lib/cn';
 import { useNoteStore, Note, NoteColor } from '@/stores/noteStore';
+import { usePermStore } from '@/stores/permStore';
 
 // ── Color Config ───────────────────────────────────────────
 const COLOR_MAP: Record<NoteColor, { bg: string; border: string; dot: string }> = {
@@ -287,6 +288,7 @@ function NoteCard({
 // ── Main Page ──────────────────────────────────────────────
 export default function NotesPage() {
   const { notes: allNotes, loading, error, fetchNotes, addNote, updateNote, removeNote } = useNoteStore();
+  const { perms } = usePermStore();
   const [search, setSearch]               = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [colorFilter, setColorFilter]     = useState<NoteColor | ''>('');
@@ -350,13 +352,15 @@ export default function NotesPage() {
           <h1 className="text-xl font-semibold text-gray-800">Notes</h1>
           <p className="text-sm text-gray-500 mt-0.5">Catatan pribadi & referensi cepat</p>
         </div>
-        <button
-          onClick={openCreate}
-          className="flex items-center gap-1.5 px-3 py-2 text-sm text-white bg-navy hover:bg-navy-light rounded transition-colors"
-        >
-          <Plus size={15} />
-          Note Baru
-        </button>
+        {perms.note.create && (
+          <button
+            onClick={openCreate}
+            className="flex items-center gap-1.5 px-3 py-2 text-sm text-white bg-navy hover:bg-navy-light rounded transition-colors"
+          >
+            <Plus size={15} />
+            Note Baru
+          </button>
+        )}
       </div>
 
       {/* Toolbar */}

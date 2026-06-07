@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import api from '@/lib/api';
 import { useAuthStore } from '@/stores/authStore';
+import { usePermStore } from '@/stores/permStore';
 import { cn } from '@/lib/cn';
 
 // ── Types ──────────────────────────────────────────────────
@@ -80,6 +81,7 @@ function formatDate(iso: string) {
 export default function BulletinPage() {
   const user = useAuthStore((s) => s.user);
   const isAdmin = (user?.role?.level ?? 99) <= 2;
+  const { perms } = usePermStore();
 
   const [bulletins, setBulletins] = useState<Bulletin[]>([]);
   const [meta,      setMeta]      = useState<Meta | null>(null);
@@ -159,7 +161,7 @@ export default function BulletinPage() {
               {meta ? `${meta.total} bulletin` : 'Papan pengumuman'}
             </p>
           </div>
-          {isAdmin && (
+          {perms.bulletin.create && (
             <button
               onClick={() => { setEditItem(null); setShowForm(true); }}
               className="flex items-center gap-1.5 h-9 px-3 bg-navy text-white text-sm font-medium rounded hover:bg-navy-light transition-colors"
@@ -220,7 +222,7 @@ export default function BulletinPage() {
           ) : error ? (
             <ErrorState message={error} onRetry={fetchBulletins} />
           ) : bulletins.length === 0 ? (
-            <EmptyState isAdmin={isAdmin} onAdd={() => { setEditItem(null); setShowForm(true); }} />
+            <EmptyState isAdmin={isAdmin} canCreate={perms.bulletin.create} onAdd={() => { setEditItem(null); setShowForm(true); }} />
           ) : (
             bulletins.map((b) => (
               <BulletinCard
@@ -651,13 +653,13 @@ function SkeletonList() {
   );
 }
 
-function EmptyState({ isAdmin, onAdd }: { isAdmin: boolean; onAdd: () => void }) {
+function EmptyState({ isAdmin, canCreate, onAdd }: { isAdmin: boolean; canCreate?: boolean; onAdd: () => void }) {
   return (
     <div className="flex flex-col items-center justify-center py-16 text-center">
       <Megaphone size={36} className="text-gray-300 mb-3" />
       <p className="text-sm font-medium text-gray-600">Belum ada bulletin</p>
       <p className="text-xs text-gray-400 mt-1">Pengumuman dari manajemen akan tampil di sini.</p>
-      {isAdmin && (
+      {(canCreate ?? isAdmin) && (
         <button onClick={onAdd}
           className="mt-4 flex items-center gap-1.5 h-8 px-4 text-sm font-medium text-white bg-navy rounded hover:bg-navy-light transition-colors"
         >
