@@ -165,6 +165,7 @@ export default function PermissionPage() {
       })
       .catch(() => setError('Failed to load permission data'))
       .finally(() => setLoading(false));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   function handleSelectRole(role: RoleWithPerms) {

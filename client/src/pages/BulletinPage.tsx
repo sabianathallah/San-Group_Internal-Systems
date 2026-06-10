@@ -1,4 +1,4 @@
-import { useEffect, useState, FormEvent } from 'react';
+import { useCallback, useEffect, useState, FormEvent } from 'react';
 import {
   Megaphone, Plus, Search, X,
   AlertTriangle, Info, Calendar, Eye, EyeOff,
@@ -97,7 +97,7 @@ export default function BulletinPage() {
   const [showForm, setShowForm] = useState(false);
   const [editItem, setEditItem] = useState<Bulletin | null>(null);
 
-  const fetchBulletins = async () => {
+  const fetchBulletins = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -114,9 +114,9 @@ export default function BulletinPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [category, search, isAdmin, showDrafts]);
 
-  useEffect(() => { fetchBulletins(); }, [category, search, showDrafts]);
+  useEffect(() => { fetchBulletins(); }, [fetchBulletins]);
 
   useEffect(() => {
     const t = setTimeout(() => setSearch(searchInput), 400);

@@ -71,8 +71,8 @@ const EMPTY_FILTER: FilterState = {
 
 // ── Constants ──────────────────────────────────────────────
 const STATUS_CONFIG: Record<TaskStatus, { label: string; icon: React.ElementType; color: string; bg: string }> = {
-  TODO:        { label: 'Undone',      icon: Circle,       color: 'text-gray-400',  bg: 'bg-gray-100'  },
-  IN_PROGRESS: { label: 'On Progress', icon: Clock,        color: 'text-blue-500',  bg: 'bg-blue-50'   },
+  TODO:        { label: 'To Do',       icon: Circle,       color: 'text-gray-400',  bg: 'bg-gray-100'  },
+  IN_PROGRESS: { label: 'In Progress', icon: Clock,        color: 'text-blue-500',  bg: 'bg-blue-50'   },
   DONE:        { label: 'Done',        icon: CheckCircle2, color: 'text-green-500', bg: 'bg-green-50'  },
 };
 
@@ -97,7 +97,7 @@ const VIEW_LABELS: Record<string, string> = {
 // ── Markdown renderer ──────────────────────────────────────
 function renderMarkdown(text: string): string {
   if (!text) return '';
-  let html = text
+  const html = text
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
     // headings
     .replace(/^### (.+)$/gm, '<h3 style="font-size:1em;font-weight:700;margin:6px 0 2px">$1</h3>')
@@ -105,7 +105,7 @@ function renderMarkdown(text: string): string {
     .replace(/^# (.+)$/gm,   '<h1 style="font-size:1.2em;font-weight:700;margin:10px 0 2px">$1</h1>')
     // bold / italic / code
     .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-    .replace(/\_(.+?)\_/g,   '<em>$1</em>')
+    .replace(/_(.+?)_/g,   '<em>$1</em>')
     .replace(/`(.+?)`/g,     '<code style="background:#f1f5f9;padding:1px 4px;border-radius:3px;font-size:.85em">$1</code>')
     // links
     .replace(/\[(.+?)\]\((.+?)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer" style="color:#3b82f6;text-decoration:underline">$1</a>')
@@ -604,12 +604,17 @@ function BoardView({ tasks, selectedId, onSelect, onToggle, onDelete, onCreated,
 
   const groups = groupTasks(tasks, groupBy);
 
-  async function quickAdd(status: string) {
+  async function quickAdd(groupKey: string) {
     if (!newTitle.trim()) { setAddingTo(null); return; }
     setAdding(true);
     try {
-      const taskStatus: TaskStatus = status === 'DONE' ? 'DONE' : status === 'IN_PROGRESS' ? 'IN_PROGRESS' : 'TODO';
-      const res = await api.post('/tasks', { title: newTitle.trim(), status: taskStatus, priority: 'MEDIUM' });
+      const payload: Record<string, unknown> = { title: newTitle.trim(), priority: 'MEDIUM', status: 'TODO' };
+      if (groupBy === 'status') {
+        payload.status = groupKey as TaskStatus;
+      } else if (groupBy === 'priority') {
+        payload.priority = groupKey;
+      }
+      const res = await api.post('/tasks', payload);
       onCreated(res.data.data);
       setNewTitle(''); setAddingTo(null);
     } catch { /* silent */ } finally { setAdding(false); }
@@ -1387,24 +1392,34 @@ function TaskDetailPanel({
 
             <div className="flex items-center gap-3 px-1 py-2 rounded hover:bg-gray-50">
               <div className="flex items-center gap-2 w-24 flex-shrink-0">
-                <Sun size={13} className={task.category === 'MY_DAY' ? 'text-amber-400' : 'text-gray-400'} />
-                <span className="text-xs text-gray-400">My Day</span>
+                <Star size={13} className="text-gray-400" />
+                <span className="text-xs text-gray-400">Category</span>
               </div>
-              <button onClick={() => patch({ category: task.category === 'MY_DAY' ? 'NONE' : 'MY_DAY' })}
-                className={cn('w-8 h-4 rounded-full transition-colors relative flex-shrink-0', task.category === 'MY_DAY' ? 'bg-amber-400' : 'bg-gray-200')}>
-                <span className={cn('absolute top-0.5 w-3 h-3 bg-white rounded-full shadow transition-all', task.category === 'MY_DAY' ? 'left-4' : 'left-0.5')} />
-              </button>
-            </div>
-
-            <div className="flex items-center gap-3 px-1 py-2 rounded hover:bg-gray-50">
-              <div className="flex items-center gap-2 w-24 flex-shrink-0">
-                <Star size={13} className={task.category === 'IMPORTANT' ? 'text-yellow-400' : 'text-gray-400'} />
-                <span className="text-xs text-gray-400">Important</span>
+              <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-0.5">
+                {([
+                  { value: 'NONE',      label: 'None',      icon: null },
+                  { value: 'MY_DAY',    label: 'My Day',    icon: Sun  },
+                  { value: 'IMPORTANT', label: 'Important', icon: Star },
+                ] as { value: string; label: string; icon: React.ElementType | null }[]).map(({ value, label, icon: Icon }) => (
+                  <button
+                    key={value}
+                    onClick={() => patch({ category: value })}
+                    className={cn(
+                      'flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium transition-colors',
+                      task.category === value
+                        ? value === 'MY_DAY'
+                          ? 'bg-white text-amber-500 shadow-sm'
+                          : value === 'IMPORTANT'
+                            ? 'bg-white text-yellow-500 shadow-sm'
+                            : 'bg-white text-gray-600 shadow-sm'
+                        : 'text-gray-400 hover:text-gray-600',
+                    )}
+                  >
+                    {Icon && <Icon size={11} />}
+                    {label}
+                  </button>
+                ))}
               </div>
-              <button onClick={() => patch({ category: task.category === 'IMPORTANT' ? 'NONE' : 'IMPORTANT' })}
-                className={cn('w-8 h-4 rounded-full transition-colors relative flex-shrink-0', task.category === 'IMPORTANT' ? 'bg-yellow-400' : 'bg-gray-200')}>
-                <span className={cn('absolute top-0.5 w-3 h-3 bg-white rounded-full shadow transition-all', task.category === 'IMPORTANT' ? 'left-4' : 'left-0.5')} />
-              </button>
             </div>
 
             <div className="flex items-center gap-3 px-1 py-2 rounded hover:bg-gray-50">
@@ -1479,7 +1494,7 @@ function TaskDetailPanel({
                   )}
                   {!subInput && (
                     <button onClick={() => setSubInput(true)} className="flex items-center gap-1 text-[11px] text-gray-400 hover:text-navy ml-2">
-                      <Plus size={12} /> Tambah
+                      <Plus size={12} /> Add
                     </button>
                   )}
                 </div>
@@ -1751,12 +1766,12 @@ function NewListModal({ onClose, onCreated }: {
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={16} /></button>
         </div>
         <form onSubmit={handleSubmit} className="p-5 space-y-4">
-          <input autoFocus type="text" placeholder="Nama list…" value={name} onChange={(e) => setName(e.target.value)}
+          <input autoFocus type="text" placeholder="List name…" value={name} onChange={(e) => setName(e.target.value)}
             className="w-full text-sm border border-gray-200 rounded px-3 py-2 outline-none focus:border-navy" />
-          <input type="text" placeholder="Emoji icon (opsional)" value={icon} onChange={(e) => setIcon(e.target.value)}
+          <input type="text" placeholder="Emoji icon (optional)" value={icon} onChange={(e) => setIcon(e.target.value)}
             className="w-full text-sm border border-gray-200 rounded px-3 py-2 outline-none focus:border-navy" />
           <div>
-            <p className="text-xs text-gray-500 mb-2">Warna</p>
+            <p className="text-xs text-gray-500 mb-2">Color</p>
             <div className="flex gap-2 flex-wrap">
               {COLORS.map((c) => (
                 <button key={c} type="button" onClick={() => setColor(c)}
@@ -1766,10 +1781,10 @@ function NewListModal({ onClose, onCreated }: {
             </div>
           </div>
           <div className="flex justify-end gap-2">
-            <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded hover:bg-gray-50">Batal</button>
+            <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded hover:bg-gray-50">Cancel</button>
             <button type="submit" disabled={saving || !name.trim()}
               className="flex items-center gap-1.5 px-4 py-2 text-sm text-white bg-navy rounded hover:bg-navy-light disabled:opacity-50">
-              {saving && <Loader2 size={13} className="animate-spin" />} Buat List
+              {saving && <Loader2 size={13} className="animate-spin" />} Create List
             </button>
           </div>
         </form>
@@ -1788,22 +1803,22 @@ function DivisionFolderGrid({
   if (loading) return (
     <div className="flex flex-col items-center justify-center flex-1 gap-2">
       <Loader2 size={24} className="animate-spin text-gray-300" />
-      <p className="text-sm text-gray-400">Memuat divisi…</p>
+      <p className="text-sm text-gray-400">Loading divisions…</p>
     </div>
   );
 
   if (!divisions.length) return (
     <div className="flex flex-col items-center justify-center flex-1 gap-3 text-gray-400">
       <Building2 size={32} className="text-gray-200" />
-      <p className="text-sm">Tidak ada divisi tersedia</p>
+      <p className="text-sm">No divisions available</p>
     </div>
   );
 
   return (
     <div className="flex-1 overflow-y-auto p-6">
       <div className="mb-6">
-        <h2 className="text-base font-semibold text-gray-800">Pilih Divisi</h2>
-        <p className="text-xs text-gray-400 mt-0.5">Klik divisi untuk melihat task-task di dalamnya</p>
+        <h2 className="text-base font-semibold text-gray-800">Select Division</h2>
+        <p className="text-xs text-gray-400 mt-0.5">Click a division to view its tasks</p>
       </div>
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
         {divisions.map((div) => (
@@ -1829,12 +1844,12 @@ function DivisionFolderGrid({
                   className="inline-block mt-2 text-[10px] font-semibold text-white px-1.5 py-0.5 rounded-full"
                   style={{ backgroundColor: div.color ?? '#6366f1' }}
                 >
-                  Divisi Saya
+                  My Division
                 </span>
               )}
               <div className="mt-3 flex items-center gap-1 text-[10px] text-gray-300 group-hover:text-gray-400 transition-colors">
                 <FolderOpen size={11} />
-                <span>Buka</span>
+                <span>Open</span>
               </div>
             </div>
           </button>
@@ -2073,7 +2088,7 @@ export default function TasksPage() {
   }, [handleToggle, confirmMyDayDone]);
 
   const handleDelete = useCallback(async (id: string) => {
-    if (!confirm('Hapus task ini?')) return;
+    if (!confirm('Delete this task?')) return;
     handleTaskDeleted(id);
     try { await api.delete(`/tasks/${id}`); } catch { loadTasks(); }
   }, [handleTaskDeleted, loadTasks]);
@@ -2211,7 +2226,7 @@ export default function TasksPage() {
           {/* Search */}
           <div className="relative">
             <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
-            <input type="text" placeholder="Cari…" value={search} onChange={(e) => setSearch(e.target.value)}
+            <input type="text" placeholder="Search…" value={search} onChange={(e) => setSearch(e.target.value)}
               className="pl-7 pr-6 py-1.5 text-xs border border-gray-200 rounded-lg outline-none focus:border-navy w-36" />
             {search && <button onClick={() => setSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400"><X size={11} /></button>}
           </div>
@@ -2256,15 +2271,15 @@ export default function TasksPage() {
                 showDone ? 'border-navy text-navy bg-navy/5' : 'border-gray-200 text-gray-400 hover:border-gray-300')}
             >
               {showDone ? <Eye size={12} /> : <EyeOff size={12} />}
-              {showDone ? 'Sembunyikan selesai' : `Tampilkan selesai (${totalDone})`}
+              {showDone ? 'Hide done' : `Show done (${totalDone})`}
             </button>
           )}
-          {!loading && <span className="text-xs text-gray-400">{doneCount}/{filteredTasks.length} selesai</span>}
+          {!loading && <span className="text-xs text-gray-400">{doneCount}/{filteredTasks.length} done</span>}
 
           {perms.task.create && (
             <button onClick={() => setShowCreate(true)}
               className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-navy hover:bg-navy-light rounded-lg">
-              <Plus size={13} /> Task Baru
+              <Plus size={13} /> New Task
             </button>
           )}
         </div>
@@ -2287,15 +2302,15 @@ export default function TasksPage() {
             ) : loading ? (
               <div className="flex flex-col items-center justify-center flex-1 gap-2">
                 <Loader2 size={24} className="animate-spin text-gray-300" />
-                <p className="text-sm text-gray-400">Memuat tasks…</p>
+                <p className="text-sm text-gray-400">Loading tasks…</p>
               </div>
             ) : filteredTasks.length === 0 ? (
               <div className="flex flex-col items-center justify-center flex-1 gap-3 text-gray-400">
                 <LayoutList size={32} className="text-gray-200" />
-                <p className="text-sm">Belum ada task di sini</p>
+                <p className="text-sm">No tasks here</p>
                 <button onClick={() => setShowCreate(true)}
                   className="flex items-center gap-1.5 text-xs text-navy hover:underline">
-                  <Plus size={12} /> Buat task pertama
+                  <Plus size={12} /> Create first task
                 </button>
               </div>
             ) : sidebarView === 'planned' ? (

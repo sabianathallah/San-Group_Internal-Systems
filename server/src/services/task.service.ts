@@ -77,7 +77,7 @@ export async function listTasksService(
     base.userId   = userId;
     base.category = TaskCategory.IMPORTANT;
   } else if (view === 'planned') {
-    base.userId  = userId;
+    andConditions.push({ OR: [{ userId }, { assignedToId: userId }] });
     base.dueDate = { not: null };
     base.status  = { not: TaskStatus.DONE };
   } else if (view === 'list' && typeof query.listId === 'string') {
