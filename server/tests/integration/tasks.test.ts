@@ -53,13 +53,16 @@ describe('POST /api/tasks', () => {
         description: 'Deskripsi panjang',
         status: 'IN_PROGRESS',
         priority: 'URGENT',
-        category: 'IMPORTANT',
+        isImportant: true,
+        myDay: true,
         dueDate: new Date(Date.now() + 86400000).toISOString(),
         assignedToId: staffId,
       });
 
     expect(res.status).toBe(201);
     expect(res.body.data.status).toBe('IN_PROGRESS');
+    expect(res.body.data.isImportant).toBe(true);
+    expect(res.body.data.myDayDate).toBeTruthy();
     expect(res.body.data.assignee.id).toBe(staffId);
   });
 

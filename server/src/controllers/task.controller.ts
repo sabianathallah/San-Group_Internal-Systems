@@ -8,6 +8,7 @@ import {
   acceptTaskService, rejectTaskService,
   listCommentsService, addCommentService, deleteCommentService,
   addLinkService, deleteLinkService, pendingCountService, getTaskStatsService,
+  myDaySuggestionsService,
 } from '@/services/task.service';
 
 export async function listTasks(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
@@ -35,6 +36,13 @@ export async function getPendingCount(req: AuthRequest, res: Response, next: Nex
   } catch (err) { next(err); }
 }
 
+export async function getMyDaySuggestions(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const tasks = await myDaySuggestionsService(req.user!.userId);
+    successResponse(res, tasks, 'Saran My Day berhasil diambil');
+  } catch (err) { next(err); }
+}
+
 export async function getTaskStats(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
     const { userId, roleLevel, divisionId } = req.user!;
@@ -45,10 +53,10 @@ export async function getTaskStats(req: AuthRequest, res: Response, next: NextFu
 
 export async function getTaskById(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
-    const { userId } = req.user!;
+    const { userId, divisionId } = req.user!;
     const permScope   = req.permScope  ?? 'own';
     const viewPrivate = req.viewPrivate ?? false;
-    const task = await getTaskByIdService(String(req.params.id), userId, permScope, viewPrivate);
+    const task = await getTaskByIdService(String(req.params.id), userId, permScope, viewPrivate, divisionId);
     successResponse(res, task, 'Detail task berhasil diambil');
   } catch (err) { next(err); }
 }

@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import {
-  listTasks, listTeamTasks, getPendingCount, getTaskStats,
+  listTasks, listTeamTasks, getPendingCount, getTaskStats, getMyDaySuggestions,
   getTaskById, createTask, updateTask, deleteTask,
   acceptTask, rejectTask,
   listComments, addComment, deleteComment,
@@ -22,6 +22,7 @@ router.use(authenticate);
 router.get('/team',          listTeamTasks);
 router.get('/pending-count', getPendingCount);
 router.get('/stats',         getTaskStats);
+router.get('/suggestions',   checkPerm('task', 'view'), getMyDaySuggestions);
 
 router.get('/',    checkPerm('task', 'view'),   validate(taskFilterSchema, ['query']), listTasks);
 router.post('/',   checkPerm('task', 'create'), validate(createTaskSchema), createTask);

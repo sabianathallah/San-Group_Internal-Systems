@@ -6,6 +6,7 @@ import { ROUTES } from '@/lib/constants';
 import Sidebar from '@/components/shared/Sidebar';
 import Header from '@/components/shared/Header';
 import CommandPalette from '@/components/shared/CommandPalette';
+import Toasts from '@/components/shared/Toasts';
 
 export default function DashboardLayout() {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
@@ -59,6 +60,7 @@ export default function DashboardLayout() {
       </div>
 
       <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
+      <Toasts />
     </div>
   );
 }

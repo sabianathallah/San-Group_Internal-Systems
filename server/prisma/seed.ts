@@ -1,5 +1,5 @@
 import {
-  PrismaClient, TaskStatus, TaskPriority, TaskCategory,
+  PrismaClient, TaskStatus, TaskPriority, TaskVisibility,
   BulletinCategory, BulletinPriority, NotificationType, AssignmentStatus,
 } from '@prisma/client';
 import bcrypt from 'bcryptjs';
@@ -9,11 +9,24 @@ const prisma = new PrismaClient();
 const hash = (pw: string) => bcrypt.hash(pw, 12);
 const days = (n: number) => new Date(Date.now() + n * 86_400_000);
 
-/** Look up role id by slug — roles are seeded via migration SQL */
-async function getRoleId(slug: string): Promise<string> {
-  const role = await prisma.role.findUnique({ where: { slug } });
-  if (!role) throw new Error(`Role slug '${slug}' not found. Run the migration first.`);
-  return role.id;
+/** Tanggal Jakarta sebagai UTC-midnight Date — format yang dipakai kolom myDayDate (@db.Date). */
+const jakartaDate = (offsetDays = 0) => {
+  const d = new Date(Date.now() + 7 * 3_600_000 + offsetDays * 86_400_000);
+  return new Date(d.toISOString().slice(0, 10));
+};
+
+/**
+ * Look up role id — roles are dynamic (manageable via admin UI), so try the
+ * candidate slugs first, then fall back to any role at the given level.
+ */
+async function getRoleId(slugCandidates: string[], fallbackLevel: number): Promise<string> {
+  for (const slug of slugCandidates) {
+    const role = await prisma.role.findUnique({ where: { slug } });
+    if (role) return role.id;
+  }
+  const byLevel = await prisma.role.findFirst({ where: { level: fallbackLevel }, orderBy: { position: 'asc' } });
+  if (byLevel) return byLevel.id;
+  throw new Error(`No role found for slugs [${slugCandidates.join(', ')}] or level ${fallbackLevel}.`);
 }
 
 /** Look up division id by slug — divisions are seeded via migration SQL */
@@ -31,12 +44,12 @@ async function main() {
     roleSuper, rolePM, roleHR, roleFinance, roleChief, roleDirector,
     divManagement, divProperty, divHR, divFinance, divEngineering, divRetail,
   ] = await Promise.all([
-    getRoleId('SUPER_ADMIN'),
-    getRoleId('PROPERTY_MANAGER'),
-    getRoleId('HR_MANAGER'),
-    getRoleId('FINANCE_MANAGER'),
-    getRoleId('CHIEF_ENGINEER'),
-    getRoleId('DIRECTOR'),
+    getRoleId(['SUPER_ADMIN'], 1),
+    getRoleId(['PROPERTY_MANAGER', 'KEPALA_DIVISI'], 4),
+    getRoleId(['HR_MANAGER', 'KEPALA_DIVISI'], 4),
+    getRoleId(['FINANCE_MANAGER', 'KEPALA_DIVISI'], 4),
+    getRoleId(['CHIEF_ENGINEER', 'KEPALA_UNIT'], 5),
+    getRoleId(['DIRECTOR', 'DIREKTUR'], 2),
     getDivisionId('MANAGEMENT'),
     getDivisionId('PROPERTY'),
     getDivisionId('HR'),
@@ -126,90 +139,157 @@ async function main() {
   console.log('✅ Task lists created');
 
   // ── Tasks ──────────────────────────────────────────────────
+  // Model personal-first:
+  //   visibility : PRIVATE = "Hanya Saya" (default) | DIVISION | PUBLIC
+  //   isPrivate  : "Rahasia" — disembunyikan juga dari atasan (tetap dihitung statistik)
+  //   myDayDate  : tanggal task masuk My Day (reset harian)
+  //   isImportant: flag bintang, independen dari My Day
+
+  // 1) Assignment ACCEPTED + di My Day hari ini + subtasks + link + komentar
+  //    Dibagikan ke divisi creator (muncul di All Tasks → Per Divisi → Management)
   const taskAudit = await prisma.task.create({ data: {
     title: 'Audit Laporan Keuangan Q1 2026',
-    description: 'Review menyeluruh laporan keuangan Q1 sebelum diserahkan ke owner.',
-    status: TaskStatus.IN_PROGRESS, priority: TaskPriority.URGENT, category: TaskCategory.MY_DAY,
-    dueDate: days(0), isPrivate: false,
+    description: 'Review menyeluruh laporan keuangan Q1 sebelum diserahkan ke owner.\n\n**Fokus:**\n- Neraca\n- Arus kas\n- Laba rugi',
+    status: TaskStatus.IN_PROGRESS, priority: TaskPriority.URGENT,
+    isImportant: true, myDayDate: jakartaDate(0),
+    dueDate: days(0), visibility: TaskVisibility.DIVISION,
     assignmentStatus: AssignmentStatus.ACCEPTED,
     userId: admin.id, assignedToId: finance.id, listId: listKeuangan.id, position: 0,
   }});
-
-  await prisma.task.create({ data: { title: 'Review neraca keuangan', status: TaskStatus.DONE, priority: TaskPriority.HIGH, category: TaskCategory.MY_DAY, completedAt: days(-1), userId: finance.id, parentTaskId: taskAudit.id, position: 0 }});
-  await prisma.task.create({ data: { title: 'Cek laporan arus kas', status: TaskStatus.DONE, priority: TaskPriority.HIGH, category: TaskCategory.MY_DAY, completedAt: days(-1), userId: finance.id, parentTaskId: taskAudit.id, position: 1 }});
-  await prisma.task.create({ data: { title: 'Validasi laporan laba rugi', status: TaskStatus.IN_PROGRESS, priority: TaskPriority.HIGH, category: TaskCategory.MY_DAY, dueDate: days(0), userId: finance.id, parentTaskId: taskAudit.id, position: 2 }});
-  await prisma.task.create({ data: { title: 'Presentasi hasil audit ke manajemen', status: TaskStatus.TODO, priority: TaskPriority.MEDIUM, category: TaskCategory.PLANNED, dueDate: days(2), userId: finance.id, parentTaskId: taskAudit.id, position: 3 }});
-
+  await prisma.task.create({ data: { title: 'Review neraca keuangan', status: TaskStatus.DONE, priority: TaskPriority.HIGH, completedAt: days(-1), userId: finance.id, parentTaskId: taskAudit.id, position: 0 }});
+  await prisma.task.create({ data: { title: 'Cek laporan arus kas', status: TaskStatus.DONE, priority: TaskPriority.HIGH, completedAt: days(-1), userId: finance.id, parentTaskId: taskAudit.id, position: 1 }});
+  await prisma.task.create({ data: { title: 'Validasi laporan laba rugi', status: TaskStatus.IN_PROGRESS, priority: TaskPriority.HIGH, dueDate: days(0), userId: finance.id, parentTaskId: taskAudit.id, position: 2 }});
+  await prisma.task.create({ data: { title: 'Presentasi hasil audit ke manajemen', status: TaskStatus.TODO, priority: TaskPriority.MEDIUM, dueDate: days(2), userId: finance.id, parentTaskId: taskAudit.id, position: 3 }});
   await prisma.taskLink.create({ data: { url: 'https://docs.google.com/spreadsheets', title: 'Spreadsheet Laporan Q1 2026', taskId: taskAudit.id }});
   await prisma.taskComment.create({ data: { content: 'Data Q1 sudah dikompilasi. Neraca dan arus kas selesai, tinggal laba rugi.', taskId: taskAudit.id, userId: finance.id }});
   await prisma.taskComment.create({ data: { content: 'Pastikan sudah include depresiasi aset Tower B. Jangan sampai kelewat.', taskId: taskAudit.id, userId: admin.id }});
 
+  // 2) Assignment PENDING — banner Accept/Reject di assignee, circle terkunci
   const taskLift = await prisma.task.create({ data: {
     title: 'Koordinasi Pemeliharaan Lift Tower B',
     description: 'Jadwalkan pemeliharaan rutin 3 unit lift Tower B bersama vendor.',
-    status: TaskStatus.TODO, priority: TaskPriority.HIGH, category: TaskCategory.MY_DAY,
-    dueDate: days(1), isPrivate: false,
+    status: TaskStatus.TODO, priority: TaskPriority.HIGH,
+    dueDate: days(1), visibility: TaskVisibility.PRIVATE,
     assignmentStatus: AssignmentStatus.PENDING,
     userId: admin.id, assignedToId: engineer.id, position: 0,
   }});
-  await prisma.task.create({ data: { title: 'Hubungi vendor lift untuk jadwal', status: TaskStatus.TODO, priority: TaskPriority.HIGH, category: TaskCategory.MY_DAY, userId: engineer.id, parentTaskId: taskLift.id, position: 0 }});
-  await prisma.task.create({ data: { title: 'Konfirmasi jadwal ke manajemen gedung', status: TaskStatus.TODO, priority: TaskPriority.MEDIUM, category: TaskCategory.PLANNED, userId: engineer.id, parentTaskId: taskLift.id, position: 1 }});
+  await prisma.task.create({ data: { title: 'Hubungi vendor lift untuk jadwal', status: TaskStatus.TODO, priority: TaskPriority.HIGH, userId: engineer.id, parentTaskId: taskLift.id, position: 0 }});
+  await prisma.task.create({ data: { title: 'Konfirmasi jadwal ke manajemen gedung', status: TaskStatus.TODO, priority: TaskPriority.MEDIUM, userId: engineer.id, parentTaskId: taskLift.id, position: 1 }});
 
+  // 3) Important + My Day sekaligus (sekarang bisa, dua flag independen)
   const taskOnboard = await prisma.task.create({ data: {
     title: 'Onboarding 3 Staff Baru Divisi Property',
-    description: 'Persiapkan semua kebutuhan onboarding untuk 3 staff baru yang bergabung tanggal 10 Juni.',
-    status: TaskStatus.IN_PROGRESS, priority: TaskPriority.HIGH, category: TaskCategory.IMPORTANT,
-    dueDate: days(4), isPrivate: false,
+    description: 'Persiapkan semua kebutuhan onboarding untuk 3 staff baru yang bergabung tanggal 15 Juni.',
+    status: TaskStatus.IN_PROGRESS, priority: TaskPriority.HIGH,
+    isImportant: true, myDayDate: jakartaDate(0),
+    dueDate: days(3), visibility: TaskVisibility.DIVISION,
     assignmentStatus: AssignmentStatus.ACCEPTED,
     userId: admin.id, assignedToId: hr.id, listId: listRekrutmen.id, position: 0,
   }});
-  await prisma.task.create({ data: { title: 'Siapkan kontrak kerja dan NDA', status: TaskStatus.DONE, priority: TaskPriority.HIGH, category: TaskCategory.IMPORTANT, completedAt: days(-1), userId: hr.id, parentTaskId: taskOnboard.id, position: 0 }});
-  await prisma.task.create({ data: { title: 'Buat akun email dan akses sistem', status: TaskStatus.IN_PROGRESS, priority: TaskPriority.HIGH, category: TaskCategory.IMPORTANT, dueDate: days(2), userId: hr.id, parentTaskId: taskOnboard.id, position: 1 }});
-  await prisma.task.create({ data: { title: 'Jadwalkan sesi orientasi dan tour gedung', status: TaskStatus.TODO, priority: TaskPriority.MEDIUM, category: TaskCategory.PLANNED, dueDate: days(4), userId: hr.id, parentTaskId: taskOnboard.id, position: 2 }});
+  await prisma.task.create({ data: { title: 'Siapkan kontrak kerja dan NDA', status: TaskStatus.DONE, priority: TaskPriority.HIGH, completedAt: days(-1), userId: hr.id, parentTaskId: taskOnboard.id, position: 0 }});
+  await prisma.task.create({ data: { title: 'Buat akun email dan akses sistem', status: TaskStatus.IN_PROGRESS, priority: TaskPriority.HIGH, dueDate: days(2), userId: hr.id, parentTaskId: taskOnboard.id, position: 1 }});
+  await prisma.task.create({ data: { title: 'Jadwalkan sesi orientasi dan tour gedung', status: TaskStatus.TODO, priority: TaskPriority.MEDIUM, dueDate: days(3), userId: hr.id, parentTaskId: taskOnboard.id, position: 2 }});
   await prisma.taskComment.create({ data: { content: 'Kontrak sudah ditandatangani ketiganya. Sekarang proses akun sistem.', taskId: taskOnboard.id, userId: hr.id }});
 
+  // 4) Assignment REJECTED — banner merah dengan alasan penolakan di creator
+  await prisma.task.create({ data: {
+    title: 'Rekap Lembur Karyawan Bulan Mei',
+    description: 'Kompilasi data lembur seluruh divisi untuk payroll Juni.',
+    status: TaskStatus.TODO, priority: TaskPriority.MEDIUM,
+    dueDate: days(2), visibility: TaskVisibility.PRIVATE,
+    assignmentStatus: AssignmentStatus.REJECTED,
+    assignmentNote: 'Mohon maaf, minggu ini saya full di onboarding staff baru. Usul dialihkan ke tim payroll.',
+    userId: admin.id, assignedToId: null, position: 1,
+  }});
+
+  // 5) PENDING lintas divisi — director assign ke admin
   await prisma.task.create({ data: {
     title: 'Review Kontrak Sewa Tenant Baru Lantai 12',
     description: 'Tenant baru akan menempati lantai 12 per 1 Juli.',
-    status: TaskStatus.TODO, priority: TaskPriority.MEDIUM, category: TaskCategory.IMPORTANT,
-    dueDate: days(5), isPrivate: false,
+    status: TaskStatus.TODO, priority: TaskPriority.MEDIUM,
+    dueDate: days(5), visibility: TaskVisibility.PRIVATE,
     assignmentStatus: AssignmentStatus.PENDING,
     userId: director.id, assignedToId: admin.id, position: 0,
   }});
 
+  // 6) RAHASIA — isPrivate: tersembunyi dari atasan, tetap dihitung statistik
   await prisma.task.create({ data: {
     title: 'Draft Proyeksi Cash Flow Q3 2026',
-    status: TaskStatus.IN_PROGRESS, priority: TaskPriority.MEDIUM, category: TaskCategory.MY_DAY,
-    dueDate: days(3), isPrivate: true,
+    description: 'Masih draft kasar, belum siap dilihat siapapun.',
+    status: TaskStatus.IN_PROGRESS, priority: TaskPriority.MEDIUM,
+    myDayDate: jakartaDate(0),
+    dueDate: days(3), isPrivate: true, visibility: TaskVisibility.PRIVATE,
     userId: finance.id, position: 0,
   }});
 
+  // 7) Task pribadi default ("Hanya Saya") — contoh paling umum
   await prisma.task.create({ data: {
-    title: 'Update SOP Prosedur Evakuasi Darurat',
-    status: TaskStatus.DONE, priority: TaskPriority.MEDIUM, category: TaskCategory.PLANNED,
-    completedAt: days(-2), isPrivate: false,
-    userId: pm.id, listId: listRenovasi.id, position: 0,
+    title: 'Follow up invoice vendor AC',
+    status: TaskStatus.TODO, priority: TaskPriority.MEDIUM,
+    dueDate: days(1), visibility: TaskVisibility.PRIVATE,
+    userId: finance.id, position: 1,
+  }});
+  await prisma.task.create({ data: {
+    title: 'Negosiasi kontrak vendor parkir 2027',
+    status: TaskStatus.TODO, priority: TaskPriority.LOW,
+    dueDate: days(12), visibility: TaskVisibility.PRIVATE,
+    userId: pm.id, position: 2,
   }});
 
-  const taskCat = await prisma.task.create({ data: {
-    title: 'Pengecatan Ulang Lobby dan Koridor Tower A',
-    description: 'Pengecatan ulang area lobby lantai 1 dan koridor lantai 2-5.',
-    status: TaskStatus.IN_PROGRESS, priority: TaskPriority.MEDIUM, category: TaskCategory.PLANNED,
-    dueDate: days(6), isPrivate: false,
-    assignmentStatus: AssignmentStatus.ACCEPTED,
-    userId: pm.id, assignedToId: engineer.id, listId: listRenovasi.id, position: 1,
+  // 8) Carry-over My Day kemarin yang belum selesai → muncul di panel Suggestions
+  await prisma.task.create({ data: {
+    title: 'Servis pompa air rooftop Tower A',
+    status: TaskStatus.IN_PROGRESS, priority: TaskPriority.HIGH,
+    myDayDate: jakartaDate(-1),
+    dueDate: days(0), visibility: TaskVisibility.PRIVATE,
+    userId: engineer.id, position: 0,
   }});
-  await prisma.task.create({ data: { title: 'Finalisasi pilihan warna dengan manajemen', status: TaskStatus.DONE, priority: TaskPriority.MEDIUM, category: TaskCategory.PLANNED, completedAt: days(-1), userId: engineer.id, parentTaskId: taskCat.id, position: 0 }});
-  await prisma.task.create({ data: { title: 'Pembelian material cat dan alat', status: TaskStatus.IN_PROGRESS, priority: TaskPriority.HIGH, category: TaskCategory.PLANNED, dueDate: days(1), userId: engineer.id, parentTaskId: taskCat.id, position: 1 }});
-  await prisma.task.create({ data: { title: 'Pelaksanaan pengecatan', status: TaskStatus.TODO, priority: TaskPriority.MEDIUM, category: TaskCategory.PLANNED, dueDate: days(5), userId: engineer.id, parentTaskId: taskCat.id, position: 2 }});
 
+  // 9) Overdue + Important → muncul di Suggestions, bucket Overdue, dan calendar merah
   await prisma.task.create({ data: {
     title: 'Kirim Laporan Utilitas ke Owner',
     description: 'Laporan konsumsi listrik, air, dan gas bulan Mei 2026.',
-    status: TaskStatus.TODO, priority: TaskPriority.URGENT, category: TaskCategory.IMPORTANT,
-    dueDate: days(-2), isPrivate: false,
+    status: TaskStatus.TODO, priority: TaskPriority.URGENT,
+    isImportant: true,
+    dueDate: days(-2), visibility: TaskVisibility.PRIVATE,
     userId: admin.id, position: 3,
   }});
+
+  // 10) PUBLIC — muncul di All Tasks → Semua Staff untuk seluruh karyawan
+  await prisma.task.create({ data: {
+    title: 'Pengumpulan Data BPJS Seluruh Karyawan',
+    description: 'Seluruh karyawan harap submit data BPJS terbaru ke HR sebelum 20 Juni.\n\nForm: [Link Google Form](https://forms.google.com)',
+    status: TaskStatus.IN_PROGRESS, priority: TaskPriority.HIGH,
+    dueDate: days(8), visibility: TaskVisibility.PUBLIC,
+    userId: hr.id, position: 1,
+  }});
+  await prisma.task.create({ data: {
+    title: 'Sosialisasi Sistem Internal SAN Group',
+    description: 'Demo penggunaan task management, bulletin, dan database link ke semua divisi.',
+    status: TaskStatus.DONE, priority: TaskPriority.MEDIUM,
+    completedAt: days(-3),
+    visibility: TaskVisibility.PUBLIC,
+    userId: admin.id, position: 4,
+  }});
+
+  // 11) DIVISION — proyek renovasi milik PM, dibagikan ke divisi Property
+  await prisma.task.create({ data: {
+    title: 'Update SOP Prosedur Evakuasi Darurat',
+    status: TaskStatus.DONE, priority: TaskPriority.MEDIUM,
+    completedAt: days(-2), visibility: TaskVisibility.DIVISION,
+    userId: pm.id, listId: listRenovasi.id, position: 0,
+  }});
+  const taskCat = await prisma.task.create({ data: {
+    title: 'Pengecatan Ulang Lobby dan Koridor Tower A',
+    description: 'Pengecatan ulang area lobby lantai 1 dan koridor lantai 2-5.',
+    status: TaskStatus.IN_PROGRESS, priority: TaskPriority.MEDIUM,
+    dueDate: days(6), visibility: TaskVisibility.DIVISION,
+    assignmentStatus: AssignmentStatus.ACCEPTED,
+    userId: pm.id, assignedToId: engineer.id, listId: listRenovasi.id, position: 1,
+  }});
+  await prisma.task.create({ data: { title: 'Finalisasi pilihan warna dengan manajemen', status: TaskStatus.DONE, priority: TaskPriority.MEDIUM, completedAt: days(-1), userId: engineer.id, parentTaskId: taskCat.id, position: 0 }});
+  await prisma.task.create({ data: { title: 'Pembelian material cat dan alat', status: TaskStatus.IN_PROGRESS, priority: TaskPriority.HIGH, dueDate: days(1), userId: engineer.id, parentTaskId: taskCat.id, position: 1 }});
+  await prisma.task.create({ data: { title: 'Pelaksanaan pengecatan', status: TaskStatus.TODO, priority: TaskPriority.MEDIUM, dueDate: days(5), userId: engineer.id, parentTaskId: taskCat.id, position: 2 }});
   console.log('✅ Tasks, subtasks, links & comments created');
 
   // ── Sticky Notes ───────────────────────────────────────────
@@ -306,6 +386,7 @@ async function main() {
     { type: NotificationType.TASK_ASSIGNED,  title: 'Task Baru Ditugaskan', message: 'Super Admin menugaskan kamu: "Koordinasi Pemeliharaan Lift Tower B". Due besok.', link: '/tasks', isRead: false, userId: engineer.id, actorId: admin.id   },
     { type: NotificationType.TASK_ASSIGNED,  title: 'Task Baru Ditugaskan', message: 'Andi Pratama menugaskan kamu: "Review Kontrak Sewa Tenant Baru Lantai 12".', link: '/tasks', isRead: false, userId: admin.id,    actorId: director.id },
     { type: NotificationType.TASK_ASSIGNED,  title: 'Task Diterima',        message: 'Sari Dewi menerima task "Onboarding 3 Staff Baru Divisi Property".', link: '/tasks', isRead: false, userId: admin.id,    actorId: hr.id      },
+    { type: NotificationType.TASK_ASSIGNED,  title: 'Task Ditolak',         message: 'Sari Dewi menolak task "Rekap Lembur Karyawan Bulan Mei": Mohon maaf, minggu ini saya full di onboarding staff baru.', link: '/tasks', isRead: false, userId: admin.id, actorId: hr.id },
     { type: NotificationType.BULLETIN_URGENT, title: 'Pengumuman Urgent',   message: 'Dimas Wijaya memposting: "Pemeliharaan Lift Tower A — Sabtu 7 Juni 2026".', link: '/bulletin', isRead: false, userId: admin.id, actorId: pm.id  },
     { type: NotificationType.SYSTEM,         title: 'Selamat Datang',       message: 'Akun kamu sudah aktif. Mulai kelola tugas dan baca pengumuman.', link: '/dashboard', isRead: true, userId: finance.id, actorId: null },
     { type: NotificationType.TASK_COMPLETED, title: 'Task Selesai',         message: 'Reza Maulana menyelesaikan subtask "Finalisasi pilihan warna dengan manajemen".', link: '/tasks', isRead: false, userId: pm.id, actorId: engineer.id },

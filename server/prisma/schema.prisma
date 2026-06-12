@@ -24,14 +24,6 @@ enum TaskPriority {
   URGENT
 }
 
-enum TaskCategory {
-  NONE
-  MY_DAY
-  IMPORTANT
-  PLANNED
-  CUSTOM
-}
-
 enum AssignmentStatus {
   PENDING
   ACCEPTED
@@ -198,11 +190,12 @@ model Task {
   description String?
   status      TaskStatus   @default(TODO)
   priority    TaskPriority @default(MEDIUM)
-  category    TaskCategory @default(NONE)
+  isImportant Boolean      @default(false)
+  myDayDate   DateTime?    @db.Date
   dueDate          DateTime?
   completedAt      DateTime?
   isPrivate        Boolean           @default(false)
-  visibility       TaskVisibility    @default(DIVISION)
+  visibility       TaskVisibility    @default(PRIVATE)
   assignmentStatus AssignmentStatus?
   assignmentNote   String?
   position         Int               @default(0)
@@ -233,6 +226,8 @@ model Task {
   @@index([status])
   @@index([priority])
   @@index([dueDate])
+  @@index([myDayDate])
+  @@index([isImportant])
 }
 
 model TaskAttachment {

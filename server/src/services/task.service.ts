@@ -1,4 +1,4 @@
-import { Prisma, TaskStatus, TaskPriority, TaskCategory, AssignmentStatus, NotificationType, TaskVisibility } from '@prisma/client';
+import { Prisma, TaskStatus, TaskPriority, AssignmentStatus, NotificationType, TaskVisibility } from '@prisma/client';
 import { ParsedQs } from 'qs';
 import { prisma } from '@/config/database';
 import { parsePagination, buildMeta } from '@/helpers/pagination';
@@ -10,12 +10,26 @@ function canManage(roleLevel: number): boolean {
   return roleLevel <= 2;
 }
 
+// ── Business timezone helpers (Asia/Jakarta, UTC+7) ────────
+/** Today's date in Jakarta as a UTC-midnight Date — matches how @db.Date columns are stored/compared. */
+function jakartaToday(offsetDays = 0): Date {
+  const d = new Date(Date.now() + 7 * 3_600_000 + offsetDays * 86_400_000);
+  return new Date(d.toISOString().slice(0, 10));
+}
+
+/** The real instant of Jakarta midnight (for comparing against full dueDate timestamps). */
+function jakartaStartOfDay(offsetDays = 0): Date {
+  const d = new Date(Date.now() + 7 * 3_600_000 + offsetDays * 86_400_000);
+  return new Date(`${d.toISOString().slice(0, 10)}T00:00:00+07:00`);
+}
+
 // ── Select shapes ──────────────────────────────────────────
 const USER_MINI = { id: true, fullName: true, avatar: true } as const;
 
 const TASK_SELECT = {
   id: true, title: true, description: true, status: true, priority: true,
-  category: true, dueDate: true, completedAt: true, isPrivate: true, visibility: true,
+  isImportant: true, myDayDate: true,
+  dueDate: true, completedAt: true, isPrivate: true, visibility: true,
   assignmentStatus: true, assignmentNote: true, position: true,
   createdAt: true, updatedAt: true,
   creator:  { select: USER_MINI },
@@ -68,14 +82,32 @@ export async function listTasksService(
   const base: Prisma.TaskWhereInput = { parentTaskId: null };
   const andConditions: Prisma.TaskWhereInput[] = [];
 
-  if (view === 'my_day') {
-    base.category = TaskCategory.MY_DAY;
+  if (view === 'mine') {
+    // My Tasks — strictly the user's own (created or assigned), any visibility
+    andConditions.push({ OR: [{ userId }, { assignedToId: userId }] });
+  } else if (view === 'browse') {
+    // Workspace browse — only tasks explicitly shared by their creators.
+    // PUBLIC is visible to everyone; DIVISION only within the creator's division.
+    // Rahasia (isPrivate) tasks never appear here.
+    base.isPrivate = false;
+    const sharedOr: Prisma.TaskWhereInput[] = [{ visibility: TaskVisibility.PUBLIC }];
+    if (permScope === 'all') {
+      sharedOr.push({ visibility: TaskVisibility.DIVISION });
+    } else if (permScope === 'division') {
+      sharedOr.push({ visibility: TaskVisibility.DIVISION, creator: { divisionId: divisionId ?? '' } });
+    }
+    andConditions.push({ OR: sharedOr });
+    if (typeof query.divisionId === 'string') {
+      andConditions.push({ creator: { divisionId: query.divisionId } });
+    }
+  } else if (view === 'my_day') {
+    base.myDayDate = jakartaToday();
     andConditions.push({ OR: [{ userId }, { assignedToId: userId }] });
   } else if (view === 'assigned') {
     base.assignedToId = userId;
   } else if (view === 'important') {
-    base.userId   = userId;
-    base.category = TaskCategory.IMPORTANT;
+    base.isImportant = true;
+    andConditions.push({ OR: [{ userId }, { assignedToId: userId }] });
   } else if (view === 'planned') {
     andConditions.push({ OR: [{ userId }, { assignedToId: userId }] });
     base.dueDate = { not: null };
@@ -191,11 +223,14 @@ export async function listTeamTasksService(
 // ── Get single task ────────────────────────────────────────
 export async function getTaskByIdService(
   id: string, userId: string, permScope: string, viewPrivate: boolean,
+  divisionId?: string,
 ) {
   const task = await prisma.task.findUnique({
     where: { id },
     select: {
       ...TASK_SELECT,
+      visibility: true,
+      creator: { select: { ...USER_MINI, divisionId: true } },
       subTasks: { select: TASK_SELECT },
     },
   });
@@ -206,6 +241,14 @@ export async function getTaskByIdService(
 
   if (permScope === 'own' && !isOwner) throw new AppError('Akses ditolak', 403);
 
+  // Mirror the list view's 'division' filter: non-owners only see
+  // DIVISION/PUBLIC tasks created within their own division
+  if (permScope === 'division' && !isOwner) {
+    const sameDivision = !!divisionId && task.creator.divisionId === divisionId;
+    const visibleEnough = task.visibility !== TaskVisibility.PRIVATE;
+    if (!sameDivision || !visibleEnough) throw new AppError('Akses ditolak', 403);
+  }
+
   if (!viewPrivate && task.isPrivate && !isOwner) throw new AppError('Akses ditolak', 403);
 
   return task;
@@ -214,12 +257,15 @@ export async function getTaskByIdService(
 // ── Create task ────────────────────────────────────────────
 export async function createTaskService(userId: string, data: {
   title: string; description?: string; status?: TaskStatus;
-  priority?: TaskPriority; category?: TaskCategory;
+  priority?: TaskPriority; isImportant?: boolean; myDay?: boolean;
   dueDate?: string | null; assignedToId?: string | null;
   listId?: string | null; parentTaskId?: string | null; isPrivate?: boolean;
   visibility?: TaskVisibility;
 }) {
   const isAssigned = !!data.assignedToId;
+
+  // Rahasia implies not shared — a secret task can't sit in the workspace
+  if (data.isPrivate) data.visibility = TaskVisibility.PRIVATE;
 
   const task = await prisma.task.create({
     data: {
@@ -227,13 +273,15 @@ export async function createTaskService(userId: string, data: {
       description:      data.description,
       status:           data.status       ?? TaskStatus.TODO,
       priority:         data.priority     ?? TaskPriority.MEDIUM,
-      category:         data.category     ?? TaskCategory.NONE,
+      isImportant:      data.isImportant  ?? false,
+      myDayDate:        data.myDay ? jakartaToday() : null,
       dueDate:          data.dueDate      ? new Date(data.dueDate) : null,
       assignedToId:     data.assignedToId ?? null,
       listId:           data.listId       ?? null,
       parentTaskId:     data.parentTaskId ?? null,
       isPrivate:        data.isPrivate    ?? false,
-      visibility:       data.visibility   ?? TaskVisibility.DIVISION,
+      // Personal-first: tasks are "My Task" unless the creator shares them
+      visibility:       data.visibility   ?? TaskVisibility.PRIVATE,
       assignmentStatus: isAssigned ? AssignmentStatus.PENDING : null,
       userId,
     },
@@ -257,7 +305,7 @@ export async function createTaskService(userId: string, data: {
 // ── Update task ────────────────────────────────────────────
 export async function updateTaskService(id: string, userId: string, permScope: string, data: {
   title?: string; description?: string | null; status?: TaskStatus;
-  priority?: TaskPriority; category?: TaskCategory;
+  priority?: TaskPriority; isImportant?: boolean; myDay?: boolean;
   dueDate?: string | null; assignedToId?: string | null;
   listId?: string | null; parentTaskId?: string | null; isPrivate?: boolean;
   visibility?: TaskVisibility;
@@ -284,6 +332,11 @@ export async function updateTaskService(id: string, userId: string, permScope: s
     }
   }
 
+  // Rahasia dan sharing saling eksklusif:
+  // menyalakan Rahasia menarik task kembali ke PRIVATE; membagikan mematikan Rahasia
+  if (data.isPrivate === true) data.visibility = TaskVisibility.PRIVATE;
+  else if (data.visibility && data.visibility !== TaskVisibility.PRIVATE) data.isPrivate = false;
+
   const completedAt =
     data.status === TaskStatus.DONE ? new Date() :
     data.status !== undefined ? null : undefined;
@@ -300,7 +353,8 @@ export async function updateTaskService(id: string, userId: string, permScope: s
       ...(data.description      !== undefined && { description: data.description }),
       ...(data.status           !== undefined && { status: data.status }),
       ...(data.priority         !== undefined && { priority: data.priority }),
-      ...(data.category         !== undefined && { category: data.category }),
+      ...(data.isImportant      !== undefined && { isImportant: data.isImportant }),
+      ...(data.myDay            !== undefined && { myDayDate: data.myDay ? jakartaToday() : null }),
       ...(data.dueDate          !== undefined && { dueDate: data.dueDate ? new Date(data.dueDate) : null }),
       ...(data.assignedToId     !== undefined && { assignedToId: data.assignedToId }),
       ...(data.listId           !== undefined && { listId: data.listId }),
@@ -482,6 +536,35 @@ export async function deleteLinkService(linkId: string, taskId: string, userId: 
   await prisma.taskLink.delete({ where: { id: linkId } });
 }
 
+// ── My Day suggestions ─────────────────────────────────────
+// Candidates for today's My Day: overdue, due today, or carried over
+// from yesterday's unfinished My Day. Excludes tasks already in today's My Day.
+export async function myDaySuggestionsService(userId: string) {
+  const today     = jakartaToday();
+  const yesterday = jakartaToday(-1);
+  const tomorrow  = jakartaStartOfDay(1);
+
+  return prisma.task.findMany({
+    where: {
+      parentTaskId: null,
+      status: { not: TaskStatus.DONE },
+      OR: [{ userId }, { assignedToId: userId }],
+      AND: [
+        { OR: [{ myDayDate: null }, { myDayDate: { not: today } }] },
+        {
+          OR: [
+            { dueDate: { not: null, lt: tomorrow } },
+            { myDayDate: yesterday },
+          ],
+        },
+      ],
+    },
+    select: TASK_SELECT,
+    orderBy: [{ dueDate: 'asc' }, { priority: 'desc' }],
+    take: 20,
+  });
+}
+
 // ── Pending count ──────────────────────────────────────────
 export async function pendingCountService(userId: string): Promise<number> {
   return prisma.task.count({
@@ -536,7 +619,8 @@ export async function getTaskStatsService(
 
     const memberCount = userIds.length;
     if (memberCount > 0) {
-      const teamWhere: Prisma.TaskWhereInput = { userId: { in: userIds }, parentTaskId: null, isPrivate: false };
+      // Counts include Rahasia tasks (performance metric) — only their contents stay hidden
+      const teamWhere: Prisma.TaskWhereInput = { userId: { in: userIds }, parentTaskId: null };
       const [tTotal, tDone, tInProgress] = await prisma.$transaction([
         prisma.task.count({ where: teamWhere }),
         prisma.task.count({ where: { ...teamWhere, status: TaskStatus.DONE } }),

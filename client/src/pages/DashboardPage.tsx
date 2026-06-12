@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/stores/authStore';
-import { useTaskStore, Task } from '@/stores/taskStore';
+import { useTaskStore, Task, isInMyDay } from '@/stores/taskStore';
 import { useNoteStore } from '@/stores/noteStore';
 import { ROUTES } from '@/lib/constants';
 import api from '@/lib/api';
@@ -231,7 +231,7 @@ function QuickAddTask({ onAdded }: { onAdded: (task: Task) => void }) {
     if (!title.trim()) return;
     setSaving(true);
     try {
-      const res = await api.post('/tasks', { title: title.trim(), status: 'TODO', priority: 'MEDIUM', category: 'MY_DAY' });
+      const res = await api.post('/tasks', { title: title.trim(), status: 'TODO', priority: 'MEDIUM', myDay: true });
       onAdded(res.data.data);
       setTitle('');
       setActive(false);
@@ -532,9 +532,9 @@ export default function DashboardPage() {
     addTask(task);
   }
 
-  // Derived — dashboard hanya tampilkan MY_DAY tasks
+  // Derived — dashboard hanya tampilkan tasks di My Day hari ini
   const now = new Date(); now.setHours(0, 0, 0, 0);
-  const myDayTasks = allTasks.filter((t) => t.category === 'MY_DAY');
+  const myDayTasks = allTasks.filter(isInMyDay);
   const active  = myDayTasks.filter((t) => t.status !== 'DONE');
   const done    = myDayTasks.filter((t) => t.status === 'DONE');
   const overdue = active.filter((t) => t.dueDate && new Date(t.dueDate) < now);

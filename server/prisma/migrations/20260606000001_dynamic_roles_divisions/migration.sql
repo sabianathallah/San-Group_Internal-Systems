@@ -112,6 +112,49 @@ ALTER TABLE "User" DROP COLUMN "division";
 DROP INDEX IF EXISTS "User_role_idx";
 DROP INDEX IF EXISTS "User_division_idx";
 
+-- Restructure Database section: folder-based links replace the old enum-divided flat list.
+-- (Historically applied via `prisma db push`; recorded here so the chain replays on fresh DBs.
+--  Also required before DROP TYPE "Division" — the old DatabaseLink.division column depends on it.)
+CREATE TABLE IF NOT EXISTS "DatabaseFolder" (
+    "id" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "icon" TEXT,
+    "color" TEXT NOT NULL DEFAULT '#6366f1',
+    "description" TEXT,
+    "position" INTEGER NOT NULL DEFAULT 0,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "createdById" TEXT NOT NULL,
+
+    CONSTRAINT "DatabaseFolder_pkey" PRIMARY KEY ("id")
+);
+CREATE INDEX IF NOT EXISTS "DatabaseFolder_createdById_idx" ON "DatabaseFolder"("createdById");
+DO $$ BEGIN
+    ALTER TABLE "DatabaseFolder" ADD CONSTRAINT "DatabaseFolder_createdById_fkey"
+        FOREIGN KEY ("createdById") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DROP TABLE IF EXISTS "DatabaseLink";
+CREATE TABLE "DatabaseLink" (
+    "id" TEXT NOT NULL,
+    "title" TEXT NOT NULL,
+    "url" TEXT NOT NULL,
+    "description" TEXT,
+    "position" INTEGER NOT NULL DEFAULT 0,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "folderId" TEXT NOT NULL,
+    "createdById" TEXT NOT NULL,
+
+    CONSTRAINT "DatabaseLink_pkey" PRIMARY KEY ("id")
+);
+CREATE INDEX "DatabaseLink_folderId_idx" ON "DatabaseLink"("folderId");
+CREATE INDEX "DatabaseLink_createdById_idx" ON "DatabaseLink"("createdById");
+ALTER TABLE "DatabaseLink" ADD CONSTRAINT "DatabaseLink_folderId_fkey"
+    FOREIGN KEY ("folderId") REFERENCES "DatabaseFolder"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "DatabaseLink" ADD CONSTRAINT "DatabaseLink_createdById_fkey"
+    FOREIGN KEY ("createdById") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
 -- Drop old enums (now safe since columns are gone)
 DROP TYPE IF EXISTS "Role";
 DROP TYPE IF EXISTS "Division";

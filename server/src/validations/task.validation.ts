@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { TaskStatus, TaskPriority, TaskCategory } from '@prisma/client';
+import { TaskStatus, TaskPriority, TaskVisibility } from '@prisma/client';
 
 export const createTaskSchema = z.object({
   body: z.object({
@@ -7,12 +7,14 @@ export const createTaskSchema = z.object({
     description:  z.string().max(2000).optional(),
     status:       z.nativeEnum(TaskStatus).optional(),
     priority:     z.nativeEnum(TaskPriority).optional(),
-    category:     z.nativeEnum(TaskCategory).optional(),
+    isImportant:  z.boolean().optional(),
+    myDay:        z.boolean().optional(),
     dueDate:      z.string().datetime({ offset: true }).optional().nullable(),
     assignedToId: z.string().uuid().optional().nullable(),
     listId:       z.string().uuid().optional().nullable(),
     parentTaskId: z.string().uuid().optional().nullable(),
     isPrivate:    z.boolean().optional(),
+    visibility:   z.nativeEnum(TaskVisibility).optional(),
   }),
 });
 
@@ -22,12 +24,14 @@ export const updateTaskSchema = z.object({
     description:  z.string().max(2000).optional().nullable(),
     status:       z.nativeEnum(TaskStatus).optional(),
     priority:     z.nativeEnum(TaskPriority).optional(),
-    category:     z.nativeEnum(TaskCategory).optional(),
+    isImportant:  z.boolean().optional(),
+    myDay:        z.boolean().optional(),
     dueDate:      z.string().datetime({ offset: true }).optional().nullable(),
     assignedToId: z.string().uuid().optional().nullable(),
     listId:       z.string().uuid().optional().nullable(),
     parentTaskId: z.string().uuid().optional().nullable(),
     isPrivate:    z.boolean().optional(),
+    visibility:   z.nativeEnum(TaskVisibility).optional(),
   }),
 });
 
@@ -38,7 +42,7 @@ export const taskFilterSchema = z.object({
     search:   z.string().optional(),
     status:   z.nativeEnum(TaskStatus).optional(),
     priority: z.nativeEnum(TaskPriority).optional(),
-    view:     z.enum(['my_day', 'assigned', 'important', 'planned', 'all', 'list']).optional(),
+    view:     z.enum(['my_day', 'assigned', 'important', 'planned', 'all', 'list', 'mine', 'browse']).optional(),
     listId:   z.string().optional(),
     userId:   z.string().optional(),
   }),

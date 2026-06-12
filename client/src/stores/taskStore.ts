@@ -4,7 +4,16 @@ import api from '@/lib/api';
 // ── Shared types (re-exported for use in pages) ────────────
 export type TaskStatus   = 'TODO' | 'IN_PROGRESS' | 'DONE';
 export type TaskPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
-export type TaskCategory = 'NONE' | 'MY_DAY' | 'IMPORTANT' | 'PLANNED' | 'CUSTOM';
+
+/** Local YYYY-MM-DD (WIB) — matches the date part of server myDayDate. */
+export function localToday(): string {
+  return new Date().toLocaleDateString('en-CA');
+}
+
+/** True when the task is in today's My Day. */
+export function isInMyDay(t: { myDayDate: string | null }): boolean {
+  return !!t.myDayDate && t.myDayDate.slice(0, 10) === localToday();
+}
 
 export interface TaskUser {
   id: string; fullName: string; avatar: string | null;
@@ -16,7 +25,8 @@ export interface Task {
   description:      string | null;
   status:           TaskStatus;
   priority:         TaskPriority;
-  category:         TaskCategory;
+  isImportant:      boolean;
+  myDayDate:        string | null;
   dueDate:          string | null;
   completedAt:      string | null;
   isPrivate:        boolean;
