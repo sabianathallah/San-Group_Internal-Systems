@@ -8,6 +8,7 @@
   ],
   "scripts": {
     "dev": "npm run dev --workspace=san-group-client",
+    "build": "npm run build --workspace=san-group-server",
     "start": "npm run start --workspace=san-group-server",
     "dev:all": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
     "dev:server": "npm run dev --workspace=san-group-server",
