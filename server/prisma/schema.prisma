@@ -47,6 +47,7 @@ enum BulletinPriority {
 enum NotificationType {
   TASK_ASSIGNED
   TASK_COMPLETED
+  TASK_CREATED
   BULLETIN_NEW
   BULLETIN_URGENT
   SYSTEM

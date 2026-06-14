@@ -318,6 +318,7 @@ export async function createTaskService(userId: string, data: {
     select: TASK_SELECT,
   });
 
+  // Notifikasi ke assignee
   if (isAssigned && data.assignedToId !== userId) {
     const creator = await prisma.user.findUnique({ where: { id: userId }, select: { fullName: true } });
     await notify({
@@ -327,6 +328,41 @@ export async function createTaskService(userId: string, data: {
       toUserId:  data.assignedToId!,
       actorId:   userId,
     });
+  }
+
+  // Notifikasi ke atasan langsung jika task di-share (bukan PRIVATE)
+  const visibility = data.visibility ?? TaskVisibility.PRIVATE;
+  if (!data.isPrivate && visibility !== TaskVisibility.PRIVATE && !data.parentTaskId) {
+    const creator = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { fullName: true, divisionId: true, role: { select: { level: true } } },
+    });
+    if (creator?.divisionId && creator.role) {
+      // Cari atasan langsung: level terendah yang masih di atas creator dalam divisi yang sama
+      const superiors = await prisma.user.findMany({
+        where: {
+          divisionId: creator.divisionId,
+          id: { not: userId },
+          role: { level: { lt: creator.role.level } },
+        },
+        select: { id: true, role: { select: { level: true } } },
+        orderBy: { role: { level: 'desc' } }, // level terbesar = paling dekat dengan creator
+      });
+      // Ambil level terdekat (highest number below creator)
+      if (superiors.length > 0) {
+        const closestLevel = superiors[0].role.level;
+        const directSuperiors = superiors.filter((s) => s.role.level === closestLevel);
+        await Promise.all(directSuperiors.map((s) =>
+          notify({
+            type:     NotificationType.TASK_CREATED,
+            title:    'Task Baru dari Bawahan',
+            message:  `${creator.fullName} membuat task baru: "${data.title}"`,
+            toUserId: s.id,
+            actorId:  userId,
+          }),
+        ));
+      }
+    }
   }
 
   return task;
