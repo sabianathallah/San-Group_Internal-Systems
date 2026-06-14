@@ -15,6 +15,7 @@ export const createTaskSchema = z.object({
     parentTaskId: z.string().uuid().optional().nullable(),
     isPrivate:    z.boolean().optional(),
     visibility:   z.nativeEnum(TaskVisibility).optional(),
+    divisionIds:  z.array(z.string().uuid()).optional(),
   }),
 });
 
@@ -32,6 +33,7 @@ export const updateTaskSchema = z.object({
     parentTaskId: z.string().uuid().optional().nullable(),
     isPrivate:    z.boolean().optional(),
     visibility:   z.nativeEnum(TaskVisibility).optional(),
+    divisionIds:  z.array(z.string().uuid()).optional(),
   }),
 });
 

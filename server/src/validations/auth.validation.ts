@@ -25,9 +25,9 @@ export const registerSchema = z.object({
       .regex(/[A-Z]/, 'Password harus mengandung minimal 1 huruf kapital')
       .regex(/[0-9]/, 'Password harus mengandung minimal 1 angka'),
     fullName: z.string().min(2, 'Nama lengkap minimal 2 karakter').max(100),
-    phone: z.string().optional(),
-    role: z.string().optional(),
-    division: z.string({ required_error: 'Divisi wajib diisi' }),
+    phone:      z.string().optional(),
+    roleId:     z.string().uuid('roleId harus UUID yang valid').optional(),
+    divisionId: z.string().uuid('divisionId harus UUID yang valid'),
   }),
 });
 

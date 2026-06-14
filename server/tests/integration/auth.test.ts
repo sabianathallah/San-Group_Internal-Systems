@@ -292,6 +292,10 @@ describe('POST /api/auth/register', () => {
   });
 
   it('201 — SUPER_ADMIN bisa register user baru', async () => {
+    const staffUser = await createTestUser({ role: 'STAFF', division: 'OPS' });
+    const divisionId = staffUser.division.id;
+    const roleId     = staffUser.role.id;
+
     const res = await request(app)
       .post('/api/auth/register')
       .set('Authorization', `Bearer ${adminToken}`)
@@ -300,7 +304,8 @@ describe('POST /api/auth/register', () => {
         username: 'newstaff',
         password: 'Password123',
         fullName: 'New Staff',
-        division: 'OPS',
+        divisionId,
+        roleId,
       });
 
     expect(res.status).toBe(201);
@@ -309,6 +314,8 @@ describe('POST /api/auth/register', () => {
   });
 
   it('401 — tanpa token tidak bisa register', async () => {
+    const staffUser = await createTestUser({ role: 'STAFF', division: 'OPS' });
+
     const res = await request(app)
       .post('/api/auth/register')
       .send({
@@ -316,14 +323,15 @@ describe('POST /api/auth/register', () => {
         username: 'hacker',
         password: 'Password123',
         fullName: 'Hacker',
-        division: 'OPS',
+        divisionId: staffUser.division.id,
+        roleId: staffUser.role.id,
       });
 
     expect(res.status).toBe(401);
   });
 
   it('403 — STAFF tidak bisa register user baru', async () => {
-    await createTestUser({ email: 'staff@sangroup.id', username: 'staffonly', role: 'STAFF' });
+    const staffUser = await createTestUser({ email: 'staff@sangroup.id', username: 'staffonly', role: 'STAFF' });
 
     const staffRes = await request(app)
       .post('/api/auth/login')
@@ -339,7 +347,8 @@ describe('POST /api/auth/register', () => {
         username: 'another',
         password: 'Password123',
         fullName: 'Another',
-        division: 'OPS',
+        divisionId: staffUser.division.id,
+        roleId: staffUser.role.id,
       });
 
     expect(res.status).toBe(403);

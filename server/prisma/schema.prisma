@@ -57,6 +57,7 @@ enum NotificationType {
 enum TaskVisibility {
   PRIVATE
   DIVISION
+  DIVISION_SELECT
   PUBLIC
 }
 
@@ -82,10 +83,11 @@ model Division {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  users            User[]
-  roles            Role[]
-  bulletinAudiences BulletinAudience[]
-  dbFolders        DatabaseFolder[]    @relation("FolderDivision")
+  users              User[]
+  roles              Role[]
+  bulletinAudiences  BulletinAudience[]
+  dbFolders          DatabaseFolder[]       @relation("FolderDivision")
+  taskDivisionAccess TaskDivisionAccess[]
 
   @@map("divisions")
 }
@@ -216,9 +218,10 @@ model Task {
   parentTask   Task?   @relation("SubTasks", fields: [parentTaskId], references: [id], onDelete: Cascade)
   subTasks     Task[]  @relation("SubTasks")
 
-  attachments TaskAttachment[]
-  links       TaskLink[]
-  comments    TaskComment[]
+  attachments        TaskAttachment[]
+  links              TaskLink[]
+  comments           TaskComment[]
+  divisionAccess     TaskDivisionAccess[]
 
   @@index([userId])
   @@index([assignedToId])
@@ -271,6 +274,19 @@ model TaskComment {
 
   @@index([taskId])
   @@index([userId])
+}
+
+model TaskDivisionAccess {
+  id         String   @id @default(uuid())
+  taskId     String
+  task       Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  divisionId String
+  division   Division @relation(fields: [divisionId], references: [id], onDelete: Cascade)
+
+  @@unique([taskId, divisionId])
+  @@index([taskId])
+  @@index([divisionId])
+  @@map("task_division_access")
 }
 
 // --- Sticky Notes ---

@@ -5,6 +5,8 @@ import { cleanDatabase, createTestUser, testPrisma, disconnectTestDb } from '../
 let adminToken: string;
 let staffToken: string;
 let adminId: string;
+let staffRoleId: string;
+let staffDivisionId: string;
 
 async function loginAs(identifier: string) {
   const res = await request(app)
@@ -25,12 +27,14 @@ beforeEach(async () => {
   adminId = admin.id;
   adminToken = await loginAs('admin@sangroup.id');
 
-  await createTestUser({
+  const staff = await createTestUser({
     email: 'staff@sangroup.id',
     username: 'staffuser',
     role: 'STAFF',
     division: 'OPS',
   });
+  staffRoleId     = staff.role.id;
+  staffDivisionId = staff.division.id;
   staffToken = await loginAs('staff@sangroup.id');
 });
 
@@ -83,7 +87,7 @@ describe('GET /api/users', () => {
       .set('Authorization', `Bearer ${adminToken}`);
 
     expect(res.status).toBe(200);
-    expect(res.body.data.every((u: { role: string }) => u.role === 'STAFF')).toBe(true);
+    expect(res.body.data.every((u: { role: { slug: string } }) => u.role.slug === 'STAFF')).toBe(true);
   });
 
   it('200 — filter by isActive=false returns empty (no inactive users)', async () => {
@@ -140,20 +144,20 @@ describe('GET /api/users/:id', () => {
 
 // ── POST /api/users ────────────────────────────────────────
 describe('POST /api/users', () => {
-  const newUserPayload = {
+  const newUserPayload = () => ({
     email: 'newuser@sangroup.id',
     username: 'newuser',
     password: 'Password123',
     fullName: 'New User',
-    division: 'HRD',
-    role: 'HRD',
-  };
+    roleId:     staffRoleId,
+    divisionId: staffDivisionId,
+  });
 
   it('201 — SUPER_ADMIN bisa create user', async () => {
     const res = await request(app)
       .post('/api/users')
       .set('Authorization', `Bearer ${adminToken}`)
-      .send(newUserPayload);
+      .send(newUserPayload());
 
     expect(res.status).toBe(201);
     expect(res.body.data.email).toBe('newuser@sangroup.id');
@@ -164,7 +168,7 @@ describe('POST /api/users', () => {
     const res = await request(app)
       .post('/api/users')
       .set('Authorization', `Bearer ${staffToken}`)
-      .send(newUserPayload);
+      .send(newUserPayload());
 
     expect(res.status).toBe(403);
   });
@@ -174,13 +178,13 @@ describe('POST /api/users', () => {
     await request(app)
       .post('/api/users')
       .set('Authorization', `Bearer ${adminToken}`)
-      .send(newUserPayload);
+      .send(newUserPayload());
 
     // Create again with same email
     const res = await request(app)
       .post('/api/users')
       .set('Authorization', `Bearer ${adminToken}`)
-      .send({ ...newUserPayload, username: 'different-username' });
+      .send({ ...newUserPayload(), username: 'different-username' });
 
     expect(res.status).toBe(409);
   });
@@ -189,7 +193,7 @@ describe('POST /api/users', () => {
     const res = await request(app)
       .post('/api/users')
       .set('Authorization', `Bearer ${adminToken}`)
-      .send({ ...newUserPayload, email: 'bukan-email' });
+      .send({ ...newUserPayload(), email: 'bukan-email' });
 
     expect(res.status).toBe(422);
   });
@@ -198,7 +202,7 @@ describe('POST /api/users', () => {
     const res = await request(app)
       .post('/api/users')
       .set('Authorization', `Bearer ${adminToken}`)
-      .send({ ...newUserPayload, password: '123' });
+      .send({ ...newUserPayload(), password: '123' });
 
     expect(res.status).toBe(422);
   });

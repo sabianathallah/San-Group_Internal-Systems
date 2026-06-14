@@ -121,13 +121,16 @@ export async function getBulletinByIdService(id: string, userId: string, roleLev
   if (!bulletin) throw new AppError('Bulletin tidak ditemukan', 404);
   if (!isAdmin && !bulletin.isPublished) throw new AppError('Bulletin tidak ditemukan', 404);
 
+  const { readStatus, ...rest } = bulletin;
+
   // Auto mark-as-read when staff opens a published bulletin
-  if (bulletin.isPublished && bulletin.readStatus.length === 0) {
+  const wasRead    = readStatus.length > 0;
+  const justMarked = bulletin.isPublished && !wasRead;
+  if (justMarked) {
     await prisma.bulletinReadStatus.create({ data: { bulletinId: id, userId } }).catch(() => {});
   }
 
-  const { readStatus, ...rest } = bulletin;
-  return { ...rest, isRead: readStatus.length > 0 };
+  return { ...rest, isRead: wasRead || justMarked };
 }
 
 export async function createBulletinService(

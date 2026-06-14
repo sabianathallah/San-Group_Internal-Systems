@@ -1,5 +1,5 @@
 import { mockDeep, mockReset, DeepMockProxy } from 'jest-mock-extended';
-import { PrismaClient, Role, Division } from '@prisma/client';
+import { PrismaClient } from '@prisma/client';
 
 // Mock modules SEBELUM import service
 jest.mock('@/config/database', () => ({
@@ -26,16 +26,21 @@ import {
 
 const prismaMock = prisma as unknown as DeepMockProxy<PrismaClient>;
 
+const MOCK_ROLE = { id: 'role-uuid-1', name: 'Super Admin', slug: 'SUPER_ADMIN', color: '#1e3a5f', level: 1 };
+const MOCK_DIVISION = { id: 'division-uuid-1', name: 'Management', slug: 'MANAGEMENT', color: '#64748b' };
+
 const MOCK_USER = {
   id: 'user-uuid-1',
   email: 'admin@sangroup.id',
   username: 'superadmin',
-  password: '$hashed$', // bcrypt dipanggil via mock
+  password: '$hashed$',
   fullName: 'Super Admin',
   phone: '08100000000',
   avatar: null,
-  role: Role.SUPER_ADMIN,
-  division: Division.MANAGEMENT,
+  roleId: MOCK_ROLE.id,
+  divisionId: MOCK_DIVISION.id,
+  role: MOCK_ROLE,
+  division: MOCK_DIVISION,
   isActive: true,
   lastLoginAt: null,
   createdAt: new Date(),
@@ -50,7 +55,7 @@ beforeEach(() => {
 // ── loginService ───────────────────────────────────────────
 describe('loginService', () => {
   it('returns accessToken and user (password excluded) on valid credentials', async () => {
-    prismaMock.user.findFirst.mockResolvedValue(MOCK_USER);
+    prismaMock.user.findFirst.mockResolvedValue(MOCK_USER as never);
     prismaMock.$transaction.mockResolvedValue([]);
     bcryptCompareMock.mockResolvedValue(true);
 
@@ -61,11 +66,12 @@ describe('loginService', () => {
     expect(result.user.email).toBe('admin@sangroup.id');
     expect(prismaMock.user.findFirst).toHaveBeenCalledWith({
       where: { OR: [{ email: 'admin@sangroup.id' }, { username: 'admin@sangroup.id' }] },
+      include: expect.any(Object),
     });
   });
 
   it('can login with username as identifier', async () => {
-    prismaMock.user.findFirst.mockResolvedValue(MOCK_USER);
+    prismaMock.user.findFirst.mockResolvedValue(MOCK_USER as never);
     prismaMock.$transaction.mockResolvedValue([]);
     bcryptCompareMock.mockResolvedValue(true);
 
@@ -74,6 +80,7 @@ describe('loginService', () => {
     expect(result.accessToken).toBeDefined();
     expect(prismaMock.user.findFirst).toHaveBeenCalledWith({
       where: { OR: [{ email: 'superadmin' }, { username: 'superadmin' }] },
+      include: expect.any(Object),
     });
   });
 
@@ -87,7 +94,7 @@ describe('loginService', () => {
   });
 
   it('throws 401 on wrong password', async () => {
-    prismaMock.user.findFirst.mockResolvedValue(MOCK_USER);
+    prismaMock.user.findFirst.mockResolvedValue(MOCK_USER as never);
     bcryptCompareMock.mockResolvedValue(false);
 
     await expect(loginService('admin@sangroup.id', 'WrongPass999')).rejects.toMatchObject({
@@ -96,7 +103,7 @@ describe('loginService', () => {
   });
 
   it('throws 403 when user is inactive', async () => {
-    prismaMock.user.findFirst.mockResolvedValue({ ...MOCK_USER, isActive: false });
+    prismaMock.user.findFirst.mockResolvedValue({ ...MOCK_USER, isActive: false } as never);
     bcryptCompareMock.mockResolvedValue(true);
 
     await expect(loginService('admin@sangroup.id', 'Password123')).rejects.toMatchObject({
@@ -109,16 +116,19 @@ describe('loginService', () => {
 describe('registerService', () => {
   it('creates and returns user without password', async () => {
     prismaMock.user.findFirst.mockResolvedValue(null);
+    prismaMock.role.findUnique.mockResolvedValue(MOCK_ROLE as never);
+    prismaMock.division.findUnique.mockResolvedValue(MOCK_DIVISION as never);
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { password, ...safeUser } = MOCK_USER;
-    prismaMock.user.create.mockResolvedValue(safeUser as typeof MOCK_USER);
+    prismaMock.user.create.mockResolvedValue(safeUser as never);
 
     const result = await registerService({
       email: 'new@sangroup.id',
       username: 'newuser',
       password: 'Password123',
       fullName: 'New User',
-      division: Division.OPS,
+      roleId:     MOCK_ROLE.id,
+      divisionId: MOCK_DIVISION.id,
     });
 
     expect(result).not.toHaveProperty('password');
@@ -126,7 +136,7 @@ describe('registerService', () => {
   });
 
   it('throws 409 when email already exists', async () => {
-    prismaMock.user.findFirst.mockResolvedValue(MOCK_USER);
+    prismaMock.user.findFirst.mockResolvedValue(MOCK_USER as never);
 
     await expect(
       registerService({
@@ -134,13 +144,14 @@ describe('registerService', () => {
         username: 'different',
         password: 'Password123',
         fullName: 'Dup',
-        division: Division.OPS,
+        roleId:     MOCK_ROLE.id,
+        divisionId: MOCK_DIVISION.id,
       }),
     ).rejects.toMatchObject({ statusCode: 409, message: expect.stringContaining('Email') });
   });
 
   it('throws 409 when username already exists', async () => {
-    prismaMock.user.findFirst.mockResolvedValue({ ...MOCK_USER, email: 'other@x.com' });
+    prismaMock.user.findFirst.mockResolvedValue({ ...MOCK_USER, email: 'other@x.com' } as never);
 
     await expect(
       registerService({
@@ -148,7 +159,8 @@ describe('registerService', () => {
         username: 'superadmin',
         password: 'Password123',
         fullName: 'Dup',
-        division: Division.OPS,
+        roleId:     MOCK_ROLE.id,
+        divisionId: MOCK_DIVISION.id,
       }),
     ).rejects.toMatchObject({ statusCode: 409, message: expect.stringContaining('Username') });
   });
@@ -166,7 +178,7 @@ describe('refreshTokenService', () => {
     // Generate a real-looking token using env secrets
     const jwt = await import('jsonwebtoken');
     const token = jwt.sign(
-      { userId: 'x', email: 'x@x.com', username: 'x', role: 'STAFF' },
+      { userId: 'x', email: 'x@x.com', username: 'x', roleSlug: 'STAFF' },
       process.env.JWT_REFRESH_SECRET!,
       { expiresIn: '7d' },
     );
@@ -188,7 +200,7 @@ describe('changePasswordService', () => {
   });
 
   it('throws 400 when old password does not match', async () => {
-    prismaMock.user.findUnique.mockResolvedValue(MOCK_USER);
+    prismaMock.user.findUnique.mockResolvedValue(MOCK_USER as never);
 
     await expect(
       changePasswordService(MOCK_USER.id, 'WrongOld', 'NewPass123'),
@@ -201,7 +213,7 @@ describe('getMeService', () => {
   it('returns user without password', async () => {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { password, ...safeUser } = MOCK_USER;
-    prismaMock.user.findUnique.mockResolvedValue(safeUser as typeof MOCK_USER);
+    prismaMock.user.findUnique.mockResolvedValue(safeUser as never);
 
     const result = await getMeService(MOCK_USER.id);
 

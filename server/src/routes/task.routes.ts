@@ -5,6 +5,7 @@ import {
   acceptTask, rejectTask,
   listComments, addComment, deleteComment,
   addLink, deleteLink,
+  getCompletedTasks,
 } from '@/controllers/task.controller';
 import { authenticate } from '@/middlewares/auth.middleware';
 import { checkPerm } from '@/middlewares/permission.middleware';
@@ -23,6 +24,7 @@ router.get('/team',          listTeamTasks);
 router.get('/pending-count', getPendingCount);
 router.get('/stats',         getTaskStats);
 router.get('/suggestions',   checkPerm('task', 'view'), getMyDaySuggestions);
+router.get('/completed',     checkPerm('task', 'view'), getCompletedTasks);
 
 router.get('/',    checkPerm('task', 'view'),   validate(taskFilterSchema, ['query']), listTasks);
 router.post('/',   checkPerm('task', 'create'), validate(createTaskSchema), createTask);

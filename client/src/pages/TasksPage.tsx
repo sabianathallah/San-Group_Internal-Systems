@@ -27,11 +27,14 @@ import { cn } from '@/lib/cn';
 type AssignmentStatus = 'PENDING' | 'ACCEPTED' | 'REJECTED';
 type TaskStatus       = 'TODO' | 'IN_PROGRESS' | 'DONE';
 type TaskPriority     = 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
-type TaskVisibility   = 'PRIVATE' | 'DIVISION' | 'PUBLIC';
+type TaskVisibility   = 'PRIVATE' | 'DIVISION' | 'DIVISION_SELECT' | 'PUBLIC';
 type ViewMode         = 'list' | 'board' | 'calendar' | 'table';
-type SidebarView      = 'my_day' | 'important' | 'planned' | 'assigned' | 'my_tasks' | 'browse' | 'team' | `list:${string}`;
+type SidebarView      = 'my_day' | 'important' | 'planned' | 'assigned' | 'my_tasks' | 'completed' | 'browse' | 'team' | `list:${string}`;
 type BrowseMode       = 'staff' | 'division';
 type GroupBy          = 'status' | 'priority' | 'assignee';
+type SortBy           = 'created' | 'due_date' | 'priority' | 'alpha';
+
+const PRIORITY_RANK: Record<TaskPriority, number> = { URGENT: 0, HIGH: 1, MEDIUM: 2, LOW: 3 };
 
 interface TaskUser { id: string; fullName: string; avatar: string | null }
 interface TaskLink { id: string; url: string; title: string | null; createdAt: string }
@@ -49,6 +52,7 @@ interface Task {
   taskList: { id: string; name: string; color: string } | null;
   links: TaskLink[];
   _count: { subTasks: number; attachments: number; comments: number };
+  divisionAccess?: DivisionAccess[];
   subTasks?: Task[];
 }
 
@@ -58,6 +62,8 @@ interface TaskList {
 }
 
 interface UserOption { id: string; fullName: string; avatar: string | null }
+
+interface DivisionAccess { divisionId: string; division: { id: string; name: string; color: string } }
 
 interface Division {
   id: string; name: string; color: string; description?: string | null;
@@ -99,13 +105,15 @@ const PRIORITY_CONFIG: Record<TaskPriority, { label: string; color: string; dot:
 
 const VIEW_LABELS: Record<string, string> = {
   my_day: 'My Day', important: 'Important', planned: 'Planned',
-  assigned: 'Assigned to Me', my_tasks: 'My Tasks', browse: 'All Tasks', team: 'Team Tasks',
+  assigned: 'Assigned to Me', my_tasks: 'My Tasks', completed: 'Selesai',
+  browse: 'All Tasks', team: 'Team Tasks',
 };
 
 const VISIBILITY_CONFIG: Record<TaskVisibility, { label: string; icon: React.ElementType }> = {
-  PRIVATE:  { label: 'Hanya Saya',  icon: Lock  },
-  DIVISION: { label: 'Divisi',      icon: Users },
-  PUBLIC:   { label: 'Semua Staff', icon: Globe },
+  PRIVATE:          { label: 'Hanya Saya',     icon: Lock      },
+  DIVISION:         { label: 'Divisi Saya',    icon: Users     },
+  DIVISION_SELECT:  { label: 'Divisi Pilihan', icon: Building2 },
+  PUBLIC:           { label: 'Semua Staff',    icon: Globe     },
 };
 
 // ── Markdown renderer ──────────────────────────────────────
@@ -124,7 +132,7 @@ function renderMarkdown(text: string): string {
     // links — only http(s) URLs, block javascript:/data: schemes
     .replace(/\[(.+?)\]\((.+?)\)/g, (_, label: string, url: string) =>
       /^https?:\/\//i.test(url)
-        ? `<a href="${url}" target="_blank" rel="noopener noreferrer" style="color:#3b82f6;text-decoration:underline">${label}</a>`
+        ? `<a href="${encodeURI(url)}" target="_blank" rel="noopener noreferrer" style="color:#3b82f6;text-decoration:underline">${label}</a>`
         : label)
     // list items
     .replace(/^[-*] (.+)$/gm, '<li style="margin-left:16px;list-style:disc">$1</li>')
@@ -206,6 +214,7 @@ function TasksSidebar({
     { id: 'planned',   icon: CalendarDays,  label: 'Planned'                             },
     { id: 'assigned',  icon: ClipboardList, label: 'Assigned to Me', badge: pendingCount },
     { id: 'my_tasks',  icon: LayoutList,    label: 'My Tasks'                            },
+    { id: 'completed', icon: CheckCircle2,  label: 'Selesai'                             },
   ];
   const workspaceItems: Item[] = [
     { id: 'browse', icon: Globe, label: 'All Tasks' },
@@ -1252,8 +1261,9 @@ function TaskDetailPanel({
   const [rejecting,  setRejecting]  = useState(false);
   const [accepting,  setAccepting]  = useState(false);
 
-  const [users, setUsers] = useState<UserOption[]>([]);
-  const [tab,   setTab]   = useState<'subtasks' | 'links' | 'comments'>('subtasks');
+  const [users,          setUsers]          = useState<UserOption[]>([]);
+  const [panelDivisions, setPanelDivisions] = useState<Division[]>([]);
+  const [tab,            setTab]            = useState<'subtasks' | 'links' | 'comments'>('subtasks');
 
   const load = useCallback(async () => {
     try {
@@ -1269,6 +1279,9 @@ function TaskDetailPanel({
   useEffect(() => {
     api.get('/users', { params: { limit: 100 } })
       .then((r) => setUsers(r.data.data?.items ?? r.data.data ?? []))
+      .catch(() => {});
+    api.get('/divisions')
+      .then((r) => setPanelDivisions(r.data.data ?? []))
       .catch(() => {});
   }, []);
 
@@ -1563,7 +1576,7 @@ function TaskDetailPanel({
                 {(Object.entries(VISIBILITY_CONFIG) as [TaskVisibility, (typeof VISIBILITY_CONFIG)[TaskVisibility]][]).map(([v, cfg]) => (
                   <button
                     key={v}
-                    onClick={() => patch({ visibility: v, ...(v !== 'PRIVATE' && { isPrivate: false }) })}
+                    onClick={() => patch({ visibility: v, ...(v !== 'PRIVATE' && { isPrivate: false }), ...(v !== 'DIVISION_SELECT' && { divisionIds: [] }) })}
                     disabled={task.isPrivate && v !== 'PRIVATE'}
                     title={task.isPrivate && v !== 'PRIVATE' ? 'Matikan Rahasia dulu untuk membagikan' : undefined}
                     className={cn(
@@ -1578,6 +1591,38 @@ function TaskDetailPanel({
                 ))}
               </div>
             </div>
+
+            {task.visibility === 'DIVISION_SELECT' && (
+              <div className="flex items-start gap-3 px-1 py-2">
+                <div className="flex items-center gap-2 w-24 flex-shrink-0 pt-1">
+                  <Building2 size={13} className="text-gray-400" />
+                  <span className="text-xs text-gray-400">Divisi</span>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {panelDivisions.map((div) => {
+                    const selected = task.divisionAccess?.some((a) => a.divisionId === div.id) ?? false;
+                    const newIds = selected
+                      ? (task.divisionAccess ?? []).filter((a) => a.divisionId !== div.id).map((a) => a.divisionId)
+                      : [...(task.divisionAccess ?? []).map((a) => a.divisionId), div.id];
+                    return (
+                      <button
+                        key={div.id}
+                        onClick={() => patch({ visibility: 'DIVISION_SELECT', divisionIds: newIds })}
+                        className={cn(
+                          'flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] border transition-colors',
+                          selected
+                            ? 'bg-navy/10 text-navy border-navy/30 font-medium'
+                            : 'text-gray-400 border-gray-200 hover:border-navy/30 hover:text-navy',
+                        )}
+                      >
+                        <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: div.color }} />
+                        {div.name}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
             <div className="flex items-center gap-3 px-1 py-2 rounded hover:bg-gray-50">
               <div className="flex items-center gap-2 w-24 flex-shrink-0">
@@ -1776,9 +1821,9 @@ function TaskDetailPanel({
 }
 
 // ── Create Task Modal ──────────────────────────────────────
-function CreateTaskModal({ onClose, onCreated, defaultListId, extraPayload }: {
+function CreateTaskModal({ onClose, onCreated, defaultListId, extraPayload, taskLists }: {
   onClose: () => void; onCreated: (t: Task) => void; defaultListId?: string | null;
-  extraPayload?: Record<string, unknown>;
+  extraPayload?: Record<string, unknown>; taskLists: TaskList[];
 }) {
   const [title,      setTitle]      = useState('');
   const [desc,       setDesc]       = useState('');
@@ -1786,15 +1831,21 @@ function CreateTaskModal({ onClose, onCreated, defaultListId, extraPayload }: {
   const [priority,   setPriority]   = useState<TaskPriority>('MEDIUM');
   const [dueDate,    setDueDate]    = useState('');
   const [assignedTo, setAssignedTo] = useState('');
+  const [listId,     setListId]     = useState(defaultListId ?? '');
   const [isPrivate,   setIsPrivate]   = useState(false);
   const [visibility,  setVisibility]  = useState<TaskVisibility>('PRIVATE');
+  const [divisionIds, setDivisionIds] = useState<string[]>([]);
   const [saving,      setSaving]      = useState(false);
   const [error,       setError]       = useState('');
   const [users,       setUsers]       = useState<UserOption[]>([]);
+  const [divisions,   setDivisions]   = useState<Division[]>([]);
 
   useEffect(() => {
     api.get('/users', { params: { limit: 100 } })
       .then((r) => setUsers(r.data.data?.items ?? r.data.data ?? []))
+      .catch(() => {});
+    api.get('/divisions')
+      .then((r) => setDivisions(r.data.data ?? []))
       .catch(() => {});
   }, []);
 
@@ -1807,7 +1858,8 @@ function CreateTaskModal({ onClose, onCreated, defaultListId, extraPayload }: {
       if (desc.trim())   payload.description = desc.trim();
       if (dueDate)       payload.dueDate      = toLocalISO(dueDate);
       if (assignedTo)    payload.assignedToId = assignedTo;
-      if (defaultListId) payload.listId       = defaultListId;
+      if (listId)        payload.listId       = listId;
+      if (visibility === 'DIVISION_SELECT') payload.divisionIds = divisionIds;
       const res = await api.post('/tasks', payload);
       onCreated(res.data.data);
       onClose();
@@ -1863,6 +1915,17 @@ function CreateTaskModal({ onClose, onCreated, defaultListId, extraPayload }: {
             </div>
           </div>
 
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">List</label>
+            <select value={listId} onChange={(e) => setListId(e.target.value)}
+              className="w-full text-sm border border-gray-200 rounded px-2.5 py-1.5 outline-none focus:border-navy">
+              <option value="">— Tanpa List —</option>
+              {taskLists.map((l) => (
+                <option key={l.id} value={l.id}>{l.icon ? `${l.icon} ` : ''}{l.name}</option>
+              ))}
+            </select>
+          </div>
+
           <div className="space-y-2">
             <div>
               <label className="block text-xs text-gray-500 mb-1">Bagikan ke</label>
@@ -1871,13 +1934,37 @@ function CreateTaskModal({ onClose, onCreated, defaultListId, extraPayload }: {
                   const v = e.target.value as TaskVisibility;
                   setVisibility(v);
                   if (v !== 'PRIVATE') setIsPrivate(false);
+                  if (v !== 'DIVISION_SELECT') setDivisionIds([]);
                 }}
                 className="w-full text-sm border border-gray-200 rounded px-2.5 py-1.5 outline-none focus:border-navy disabled:opacity-50 disabled:bg-gray-50">
                 <option value="PRIVATE">Hanya Saya (default)</option>
                 <option value="DIVISION">Divisi Saya</option>
+                <option value="DIVISION_SELECT">Divisi Pilihan</option>
                 <option value="PUBLIC">Semua Staff</option>
               </select>
             </div>
+
+            {visibility === 'DIVISION_SELECT' && (
+              <div>
+                <label className="block text-xs text-gray-500 mb-1.5">Pilih divisi yang bisa lihat</label>
+                <div className="space-y-1.5 max-h-32 overflow-y-auto border border-gray-200 rounded-lg p-2">
+                  {divisions.map((div) => (
+                    <label key={div.id} className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={divisionIds.includes(div.id)}
+                        onChange={(e) => setDivisionIds((prev) =>
+                          e.target.checked ? [...prev, div.id] : prev.filter((id) => id !== div.id)
+                        )}
+                        className="w-3.5 h-3.5 rounded border-gray-300 accent-navy"
+                      />
+                      <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: div.color }} />
+                      <span className="text-xs text-gray-700">{div.name}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
             <label className="flex items-center gap-2 cursor-pointer select-none">
               <input type="checkbox" checked={isPrivate}
                 onChange={(e) => {
@@ -2049,6 +2136,127 @@ function exportToCSV(tasks: Task[], filename: string) {
   URL.revokeObjectURL(url);
 }
 
+// ── Completed View (Selesai) ───────────────────────────────
+function CompletedView({
+  tasks, selectedId, onSelect,
+}: {
+  tasks: Task[]; selectedId: string | null; onSelect: (id: string) => void;
+}) {
+  // Group by month of completedAt
+  const groups = useMemo(() => {
+    const map = new Map<string, { label: string; key: string; tasks: Task[] }>();
+    // Generate all months from oldest task to now
+    const now = new Date();
+    const earliest = tasks.length > 0
+      ? new Date(tasks[tasks.length - 1].completedAt ?? tasks[tasks.length - 1].createdAt)
+      : now;
+    const start = new Date(earliest.getFullYear(), earliest.getMonth(), 1);
+    const end   = new Date(now.getFullYear(), now.getMonth(), 1);
+    const cur   = new Date(start);
+    while (cur <= end) {
+      const key   = `${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, '0')}`;
+      const label = cur.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' });
+      map.set(key, { label, key, tasks: [] });
+      cur.setMonth(cur.getMonth() + 1);
+    }
+    for (const t of tasks) {
+      const d   = new Date(t.completedAt ?? t.createdAt);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      map.get(key)?.tasks.push(t);
+    }
+    // Sort descending (newest month first)
+    return Array.from(map.values()).reverse();
+  }, [tasks]);
+
+  const currentKey = (() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  })();
+
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>(() => {
+    const init: Record<string, boolean> = {};
+    return init; // set after groups are built
+  });
+
+  // Auto-collapse past months on mount
+  const [initialized, setInitialized] = useState(false);
+  useEffect(() => {
+    if (!initialized && groups.length > 0) {
+      const init: Record<string, boolean> = {};
+      for (const g of groups) {
+        if (g.key !== currentKey) init[g.key] = true;
+      }
+      setCollapsed(init);
+      setInitialized(true);
+    }
+  }, [groups, initialized, currentKey]);
+
+  const toggle = (key: string) => setCollapsed((prev) => ({ ...prev, [key]: !prev[key] }));
+
+  if (tasks.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center flex-1 gap-3 text-gray-400">
+        <CheckCircle2 size={32} className="text-gray-200" />
+        <p className="text-sm">Belum ada task yang selesai</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex-1 overflow-y-auto px-4 py-3 space-y-4">
+      {groups.map(({ key, label, tasks: monthTasks }) => {
+        const isCollapsed = collapsed[key] ?? false;
+        const isCurrent   = key === currentKey;
+        return (
+          <div key={key}>
+            <button
+              onClick={() => toggle(key)}
+              className={cn(
+                'flex items-center gap-2 w-full px-2 py-1.5 rounded-lg text-left transition-colors',
+                isCurrent ? 'text-navy font-semibold' : 'text-gray-500 hover:text-gray-700',
+              )}
+            >
+              {isCollapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
+              <span className="text-sm">{label}</span>
+              <span className={cn('text-xs ml-auto', isCurrent ? 'text-navy/60' : 'text-gray-400')}>
+                {monthTasks.length} task
+              </span>
+            </button>
+
+            {!isCollapsed && (
+              <div className="mt-1 space-y-px border border-gray-100 rounded-lg overflow-hidden">
+                {monthTasks.length === 0 ? (
+                  <div className="px-4 py-3 text-xs text-gray-400 text-center">Tidak ada task selesai bulan ini</div>
+                ) : monthTasks.map((task) => (
+                  <button
+                    key={task.id}
+                    onClick={() => onSelect(task.id)}
+                    className={cn(
+                      'flex items-center gap-3 w-full px-4 py-3 text-left transition-colors text-sm',
+                      selectedId === task.id
+                        ? 'bg-navy/5 border-l-2 border-l-navy'
+                        : 'bg-white hover:bg-gray-50 border-l-2 border-l-transparent',
+                    )}
+                  >
+                    <CheckCircle2 size={15} className="text-green-500 flex-shrink-0" />
+                    <span className="flex-1 truncate line-through text-gray-400">{task.title}</span>
+                    {task.completedAt && (
+                      <span className="text-[10px] text-gray-300 flex-shrink-0">
+                        {new Date(task.completedAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })}
+                      </span>
+                    )}
+                    <PriorityDot priority={task.priority} />
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 // ── Main Page ──────────────────────────────────────────────
 export default function TasksPage() {
   const { user } = useAuthStore();
@@ -2062,6 +2270,7 @@ export default function TasksPage() {
   const [browseMode,   setBrowseMode]   = useState<BrowseMode>('staff');
   const [viewMode,     setViewMode]     = useState<ViewMode>('list');
   const [groupBy,      setGroupBy]      = useState<GroupBy>('status');
+  const [sortBy,       setSortBy]       = useState<SortBy>('created');
   const [showDone,     setShowDone]     = useState(false);
   const [tasks,        setTasks]        = useState<Task[]>([]);
   const [loading,      setLoading]      = useState(false);
@@ -2083,6 +2292,8 @@ export default function TasksPage() {
   const [loadingMore,  setLoadingMore]  = useState(false);
   const [suggestions,  setSuggestions]  = useState<Task[]>([]);
   const [suggestOpen,  setSuggestOpen]  = useState(true);
+  const [completedTasks, setCompletedTasks] = useState<Task[]>([]);
+  const [loadingCompleted, setLoadingCompleted] = useState(false);
 
   // Debounce search
   useEffect(() => {
@@ -2127,8 +2338,22 @@ export default function TasksPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Load completed tasks for Selesai view
+  const loadCompleted = useCallback(async () => {
+    if (sidebarView !== 'completed') return;
+    setLoadingCompleted(true);
+    try {
+      const res = await api.get('/tasks/completed');
+      setCompletedTasks(res.data.data ?? []);
+    } catch (err) { toast.error(extractErr(err)); }
+    finally { setLoadingCompleted(false); }
+  }, [sidebarView]);
+
+  useEffect(() => { loadCompleted(); }, [loadCompleted]);
+
   // Load tasks when view/search changes (page > 1 appends — "Load more")
   const loadTasks = useCallback(async (page = 1) => {
+    if (sidebarView === 'completed') return;
     if (page === 1) setLoading(true); else setLoadingMore(true);
     try {
       const params: Record<string, string> = { limit: '100', page: String(page) };
@@ -2190,8 +2415,24 @@ export default function TasksPage() {
       const now = new Date(); now.setHours(0, 0, 0, 0);
       result = result.filter((t) => t.dueDate && new Date(t.dueDate) < now && t.status !== 'DONE');
     }
-    return result;
-  }, [tasks, filters]);
+
+    const sorted = [...result];
+    if (sortBy === 'due_date') {
+      sorted.sort((a, b) => {
+        if (!a.dueDate && !b.dueDate) return 0;
+        if (!a.dueDate) return 1;
+        if (!b.dueDate) return -1;
+        return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
+      });
+    } else if (sortBy === 'priority') {
+      sorted.sort((a, b) => PRIORITY_RANK[a.priority] - PRIORITY_RANK[b.priority]);
+    } else if (sortBy === 'alpha') {
+      sorted.sort((a, b) => a.title.localeCompare(b.title, 'id'));
+    }
+    // 'created' = urutan dari server (default, tidak perlu sort ulang)
+
+    return sorted;
+  }, [tasks, filters, sortBy]);
 
   const activeFilterCount = [
     filters.statuses.length > 0,
@@ -2482,7 +2723,7 @@ export default function TasksPage() {
             </div>
           )}
 
-          {/* View mode switcher */}
+          {sidebarView !== 'completed' && (
           <div className="flex items-center gap-0.5 bg-gray-100 rounded-lg p-0.5">
             {([
               { v: 'list'     as const, icon: LayoutList,   label: 'List'  },
@@ -2496,10 +2737,10 @@ export default function TasksPage() {
                 <Icon size={12} />{label}
               </button>
             ))}
-          </div>
+          </div>)}
 
           {/* Group by (not for table/calendar) */}
-          {(viewMode === 'list' || viewMode === 'board') && (
+          {sidebarView !== 'completed' && (viewMode === 'list' || viewMode === 'board') && (
             <div className="flex items-center gap-1.5">
               <SortDesc size={13} className="text-gray-400" />
               <select value={groupBy} onChange={(e) => setGroupBy(e.target.value as GroupBy)}
@@ -2511,6 +2752,20 @@ export default function TasksPage() {
             </div>
           )}
 
+          {/* Sort by (not for calendar or completed) */}
+          {sidebarView !== 'completed' && viewMode !== 'calendar' && (
+            <div className="flex items-center gap-1.5">
+              <select value={sortBy} onChange={(e) => setSortBy(e.target.value as SortBy)}
+                className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 outline-none focus:border-navy text-gray-600">
+                <option value="created">Sort: Terbaru</option>
+                <option value="due_date">Sort: Due Date</option>
+                <option value="priority">Sort: Prioritas</option>
+                <option value="alpha">Sort: A–Z</option>
+              </select>
+            </div>
+          )}
+
+          {sidebarView !== 'completed' && <>
           {/* Search */}
           <div className="relative">
             <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
@@ -2570,6 +2825,7 @@ export default function TasksPage() {
               <Plus size={13} /> New Task
             </button>
           )}
+          </>}
         </div>
 
         {/* Filter panel */}
@@ -2621,7 +2877,20 @@ export default function TasksPage() {
         {/* Content */}
         <div className="flex flex-1 min-h-0 overflow-hidden">
           <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
-            {sidebarView === 'browse' && browseMode === 'division' && !selectedDivision ? (
+            {sidebarView === 'completed' ? (
+              loadingCompleted ? (
+                <div className="flex flex-col items-center justify-center flex-1 gap-2">
+                  <Loader2 size={24} className="animate-spin text-gray-300" />
+                  <p className="text-sm text-gray-400">Loading…</p>
+                </div>
+              ) : (
+                <CompletedView
+                  tasks={completedTasks}
+                  selectedId={selectedId}
+                  onSelect={setSelectedId}
+                />
+              )
+            ) : sidebarView === 'browse' && browseMode === 'division' && !selectedDivision ? (
               <DivisionFolderGrid
                 divisions={divisions}
                 onSelect={(div) => { setSelectedDivision(div); setSelectedId(null); }}
@@ -2722,7 +2991,7 @@ export default function TasksPage() {
               <TaskDetailPanel
                 key={selectedId}
                 taskId={selectedId}
-                initialTask={tasks.find((t) => t.id === selectedId) ?? null}
+                initialTask={(sidebarView === 'completed' ? completedTasks : tasks).find((t) => t.id === selectedId) ?? null}
                 onClose={() => setSelectedId(null)}
                 onUpdated={handleTaskUpdated}
                 onRequestDelete={handleDeleteTask}
@@ -2739,6 +3008,7 @@ export default function TasksPage() {
           onCreated={handleTaskCreated}
           defaultListId={activeListId}
           extraPayload={quickAddPayload}
+          taskLists={taskLists}
         />
       )}
       {showNewList && (

@@ -37,6 +37,7 @@ const TASK_SELECT = {
   taskList: { select: { id: true, name: true, color: true } },
   links:    { select: { id: true, url: true, title: true, createdAt: true }, orderBy: { createdAt: 'asc' as const } },
   _count:   { select: { subTasks: true, attachments: true, comments: true } },
+  divisionAccess: { select: { divisionId: true, division: { select: { id: true, name: true, color: true } } } },
 } as const;
 
 // ── Privacy filter helper ──────────────────────────────────
@@ -82,19 +83,35 @@ export async function listTasksService(
   const base: Prisma.TaskWhereInput = { parentTaskId: null };
   const andConditions: Prisma.TaskWhereInput[] = [];
 
+  // Assigned tasks yang masih PENDING belum jadi tanggung jawab user — exclude dari personal views
+  const acceptedAssignment: Prisma.TaskWhereInput = {
+    assignedToId:     userId,
+    assignmentStatus: { not: AssignmentStatus.PENDING },
+  };
+
   if (view === 'mine') {
-    // My Tasks — strictly the user's own (created or assigned), any visibility
-    andConditions.push({ OR: [{ userId }, { assignedToId: userId }] });
+    // My Tasks — milik sendiri, atau assigned & sudah accepted
+    andConditions.push({ OR: [{ userId }, acceptedAssignment] });
   } else if (view === 'browse') {
     // Workspace browse — only tasks explicitly shared by their creators.
     // PUBLIC is visible to everyone; DIVISION only within the creator's division.
+    // DIVISION_SELECT visible if user's division is in taskDivisionAccess.
     // Rahasia (isPrivate) tasks never appear here.
     base.isPrivate = false;
     const sharedOr: Prisma.TaskWhereInput[] = [{ visibility: TaskVisibility.PUBLIC }];
     if (permScope === 'all') {
       sharedOr.push({ visibility: TaskVisibility.DIVISION });
+      sharedOr.push({ visibility: TaskVisibility.DIVISION_SELECT });
     } else if (permScope === 'division') {
       sharedOr.push({ visibility: TaskVisibility.DIVISION, creator: { divisionId: divisionId ?? '' } });
+      if (divisionId) {
+        sharedOr.push({ visibility: TaskVisibility.DIVISION_SELECT, divisionAccess: { some: { divisionId } } });
+      }
+    } else {
+      // own scope — can still see DIVISION_SELECT tasks their division is in
+      if (divisionId) {
+        sharedOr.push({ visibility: TaskVisibility.DIVISION_SELECT, divisionAccess: { some: { divisionId } } });
+      }
     }
     andConditions.push({ OR: sharedOr });
     if (typeof query.divisionId === 'string') {
@@ -102,21 +119,22 @@ export async function listTasksService(
     }
   } else if (view === 'my_day') {
     base.myDayDate = jakartaToday();
-    andConditions.push({ OR: [{ userId }, { assignedToId: userId }] });
+    andConditions.push({ OR: [{ userId }, acceptedAssignment] });
   } else if (view === 'assigned') {
+    // Assigned to Me — tampilkan semua termasuk PENDING
     base.assignedToId = userId;
   } else if (view === 'important') {
     base.isImportant = true;
-    andConditions.push({ OR: [{ userId }, { assignedToId: userId }] });
+    andConditions.push({ OR: [{ userId }, acceptedAssignment] });
   } else if (view === 'planned') {
-    andConditions.push({ OR: [{ userId }, { assignedToId: userId }] });
+    andConditions.push({ OR: [{ userId }, acceptedAssignment] });
     base.dueDate = { not: null };
     base.status  = { not: TaskStatus.DONE };
   } else if (view === 'list' && typeof query.listId === 'string') {
     base.listId = query.listId;
-    andConditions.push({ OR: [{ userId }, { assignedToId: userId }] });
+    andConditions.push({ OR: [{ userId }, acceptedAssignment] });
     if (!viewPrivate) {
-      andConditions.push({ OR: [{ isPrivate: false }, { userId }, { assignedToId: userId }] });
+      andConditions.push({ OR: [{ isPrivate: false }, { userId }, acceptedAssignment] });
     }
   } else {
     // 'all' view — apply permission scope
@@ -246,7 +264,11 @@ export async function getTaskByIdService(
   if (permScope === 'division' && !isOwner) {
     const sameDivision = !!divisionId && task.creator.divisionId === divisionId;
     const visibleEnough = task.visibility !== TaskVisibility.PRIVATE;
-    if (!sameDivision || !visibleEnough) throw new AppError('Akses ditolak', 403);
+    const inDivisionSelect =
+      task.visibility === TaskVisibility.DIVISION_SELECT &&
+      !!divisionId &&
+      task.divisionAccess.some((a) => a.divisionId === divisionId);
+    if (!visibleEnough || (!sameDivision && !inDivisionSelect)) throw new AppError('Akses ditolak', 403);
   }
 
   if (!viewPrivate && task.isPrivate && !isOwner) throw new AppError('Akses ditolak', 403);
@@ -260,12 +282,17 @@ export async function createTaskService(userId: string, data: {
   priority?: TaskPriority; isImportant?: boolean; myDay?: boolean;
   dueDate?: string | null; assignedToId?: string | null;
   listId?: string | null; parentTaskId?: string | null; isPrivate?: boolean;
-  visibility?: TaskVisibility;
+  visibility?: TaskVisibility; divisionIds?: string[];
 }) {
   const isAssigned = !!data.assignedToId;
 
   // Rahasia implies not shared — a secret task can't sit in the workspace
   if (data.isPrivate) data.visibility = TaskVisibility.PRIVATE;
+
+  // DIVISION_SELECT requires at least one division
+  if (data.visibility === TaskVisibility.DIVISION_SELECT && (!data.divisionIds || data.divisionIds.length === 0)) {
+    data.visibility = TaskVisibility.PRIVATE;
+  }
 
   const task = await prisma.task.create({
     data: {
@@ -284,6 +311,9 @@ export async function createTaskService(userId: string, data: {
       visibility:       data.visibility   ?? TaskVisibility.PRIVATE,
       assignmentStatus: isAssigned ? AssignmentStatus.PENDING : null,
       userId,
+      ...(data.visibility === TaskVisibility.DIVISION_SELECT && data.divisionIds?.length && {
+        divisionAccess: { create: data.divisionIds.map((divisionId) => ({ divisionId })) },
+      }),
     },
     select: TASK_SELECT,
   });
@@ -308,7 +338,7 @@ export async function updateTaskService(id: string, userId: string, permScope: s
   priority?: TaskPriority; isImportant?: boolean; myDay?: boolean;
   dueDate?: string | null; assignedToId?: string | null;
   listId?: string | null; parentTaskId?: string | null; isPrivate?: boolean;
-  visibility?: TaskVisibility;
+  visibility?: TaskVisibility; divisionIds?: string[];
 }) {
   const task = await prisma.task.findUnique({
     where: { id },
@@ -346,6 +376,12 @@ export async function updateTaskService(id: string, userId: string, permScope: s
     newAssignmentStatus = data.assignedToId ? AssignmentStatus.PENDING : null;
   }
 
+  // Sync divisionAccess when visibility is DIVISION_SELECT
+  const syncDivisions = data.visibility === TaskVisibility.DIVISION_SELECT && data.divisionIds !== undefined;
+  if (syncDivisions && data.divisionIds!.length === 0) {
+    data.visibility = TaskVisibility.PRIVATE;
+  }
+
   const updated = await prisma.task.update({
     where: { id },
     data: {
@@ -363,6 +399,15 @@ export async function updateTaskService(id: string, userId: string, permScope: s
       ...(data.visibility       !== undefined && { visibility: data.visibility }),
       ...(newAssignmentStatus   !== undefined && { assignmentStatus: newAssignmentStatus }),
       ...(completedAt           !== undefined && { completedAt }),
+      ...(syncDivisions && data.divisionIds!.length > 0 && {
+        divisionAccess: {
+          deleteMany: {},
+          create: data.divisionIds!.map((divisionId) => ({ divisionId })),
+        },
+      }),
+      ...(data.visibility && data.visibility !== TaskVisibility.DIVISION_SELECT && {
+        divisionAccess: { deleteMany: {} },
+      }),
     },
     select: TASK_SELECT,
   });
@@ -562,6 +607,23 @@ export async function myDaySuggestionsService(userId: string) {
     select: TASK_SELECT,
     orderBy: [{ dueDate: 'asc' }, { priority: 'desc' }],
     take: 20,
+  });
+}
+
+// ── Completed tasks (for monthly history view) ─────────────
+export async function getCompletedTasksService(userId: string) {
+  return prisma.task.findMany({
+    where: {
+      parentTaskId: null,
+      status: TaskStatus.DONE,
+      OR: [
+        { userId },
+        { assignedToId: userId, assignmentStatus: AssignmentStatus.ACCEPTED },
+      ],
+    },
+    select: TASK_SELECT,
+    orderBy: { completedAt: 'desc' },
+    take: 1000,
   });
 }
 

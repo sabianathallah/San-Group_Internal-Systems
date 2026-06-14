@@ -8,8 +8,15 @@ import {
   acceptTaskService, rejectTaskService,
   listCommentsService, addCommentService, deleteCommentService,
   addLinkService, deleteLinkService, pendingCountService, getTaskStatsService,
-  myDaySuggestionsService,
+  myDaySuggestionsService, getCompletedTasksService,
 } from '@/services/task.service';
+
+export async function getCompletedTasks(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const tasks = await getCompletedTasksService(req.user!.userId);
+    successResponse(res, tasks, 'Task selesai berhasil diambil');
+  } catch (err) { next(err); }
+}
 
 export async function listTasks(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
