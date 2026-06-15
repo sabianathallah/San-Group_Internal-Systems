@@ -11,10 +11,12 @@ import {
   ChevronRight,
   BarChart3,
   ClipboardList,
+  Inbox,
 } from 'lucide-react';
 import { useUiStore } from '@/stores/uiStore';
 import { useAuthStore } from '@/stores/authStore';
 import { usePermStore } from '@/stores/permStore';
+import { useNotificationStore } from '@/stores/notificationStore';
 import { ROUTES } from '@/lib/constants';
 import { cn } from '@/lib/cn';
 
@@ -25,11 +27,12 @@ interface NavItem {
 }
 
 const mainNav: NavItem[] = [
-  { label: 'Dashboard',   to: ROUTES.DASHBOARD, icon: LayoutDashboard },
-  { label: 'Tasks',       to: ROUTES.TASKS,     icon: CheckSquare2    },
-  { label: 'Bulletin',    to: ROUTES.BULLETIN,  icon: Bell            },
-  { label: 'Notes',       to: ROUTES.NOTES,     icon: StickyNote      },
-  { label: 'DB Links',    to: ROUTES.DATABASE,  icon: Database        },
+  { label: 'Dashboard',      to: ROUTES.DASHBOARD,     icon: LayoutDashboard },
+  { label: 'Tasks',          to: ROUTES.TASKS,         icon: CheckSquare2    },
+  { label: 'Bulletin',       to: ROUTES.BULLETIN,      icon: Bell            },
+  { label: 'Notifications',  to: ROUTES.NOTIFICATIONS, icon: Inbox           },
+  { label: 'Notes',          to: ROUTES.NOTES,         icon: StickyNote      },
+  { label: 'DB Links',       to: ROUTES.DATABASE,      icon: Database        },
 ];
 
 const adminNav: NavItem[] = [
@@ -43,6 +46,7 @@ export default function Sidebar() {
   const toggle = useUiStore((s) => s.toggleSidebar);
   const user   = useAuthStore((s) => s.user);
   const perms  = usePermStore((s) => s.perms);
+  const unreadCount = useNotificationStore((s) => s.unreadCount);
 
   const isAdmin    = (user?.role?.level ?? 99) <= 2;
   const canAnalytics = perms.analytics?.view !== 'none';
@@ -80,7 +84,12 @@ export default function Sidebar() {
         )}
 
         {mainNav.map((item) => (
-          <SidebarLink key={item.to} item={item} open={open} />
+          <SidebarLink
+            key={item.to}
+            item={item}
+            open={open}
+            badge={item.to === ROUTES.NOTIFICATIONS && unreadCount > 0 ? unreadCount : undefined}
+          />
         ))}
 
         {canAnalytics && (
@@ -139,7 +148,7 @@ export default function Sidebar() {
   );
 }
 
-function SidebarLink({ item, open }: { item: NavItem; open: boolean }) {
+function SidebarLink({ item, open, badge }: { item: NavItem; open: boolean; badge?: number }) {
   const Icon = item.icon;
 
   return (
@@ -156,8 +165,20 @@ function SidebarLink({ item, open }: { item: NavItem; open: boolean }) {
       }
       title={!open ? item.label : undefined}
     >
-      <Icon size={20} className="flex-shrink-0" />
-      {open && <span className="truncate">{item.label}</span>}
+      <div className="relative flex-shrink-0">
+        <Icon size={20} />
+        {badge !== undefined && !open && (
+          <span className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-danger text-white text-[9px] font-bold flex items-center justify-center leading-none">
+            {badge > 9 ? '9+' : badge}
+          </span>
+        )}
+      </div>
+      {open && <span className="truncate flex-1">{item.label}</span>}
+      {open && badge !== undefined && (
+        <span className="ml-auto min-w-[18px] h-[18px] rounded-full bg-danger text-white text-[10px] font-bold flex items-center justify-center px-1 leading-none">
+          {badge > 99 ? '99+' : badge}
+        </span>
+      )}
     </NavLink>
   );
 }
