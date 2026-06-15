@@ -503,10 +503,10 @@ export default function UsersPage() {
     setUsersLoading(true); setUsersError('');
     try {
       const params: Record<string, string> = { page: String(page), limit: String(PAGE_SIZE) };
-      if (debSearch)    params.search     = debSearch;
-      if (roleFilter)   params.roleId     = roleFilter;
-      if (divFilter)    params.divisionId = divFilter;
-      if (statusFilter) params.isActive   = statusFilter;
+      if (debSearch)    params.search   = debSearch;
+      if (roleFilter)   params.role     = roleFilter;
+      if (divFilter)    params.division = divFilter;
+      if (statusFilter) params.isActive = statusFilter;
       const res = await api.get('/users', { params });
       setUsers(res.data.data); setMeta(res.data.meta);
     } catch { setUsersError('Failed to load data. Try again.'); }
