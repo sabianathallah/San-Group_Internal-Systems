@@ -23,6 +23,7 @@ import shareRoutes from '@/routes/share.routes';
 import searchRoutes from '@/routes/search.routes';
 import analyticsRoutes from '@/routes/analytics.routes';
 import auditRoutes from '@/routes/audit.routes';
+import scheduledAnnouncementRoutes from '@/routes/scheduled-announcement.routes';
 
 const app = express();
 
@@ -82,6 +83,7 @@ app.use('/api/shares', shareRoutes);
 app.use('/api/search', searchRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/audit-logs', auditRoutes);
+app.use('/api/scheduled-announcements', scheduledAnnouncementRoutes);
 
 // ── Error Handling ─────────────────────────────────────────
 app.use(notFound);

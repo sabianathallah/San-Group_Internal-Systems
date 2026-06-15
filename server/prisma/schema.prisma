@@ -68,6 +68,12 @@ enum AudienceType {
   CUSTOM
 }
 
+enum RecurrenceType {
+  DAILY
+  WEEKDAYS
+  WEEKLY
+}
+
 // ============================================================
 // PHASE 1 — ACTIVE TABLES
 // ============================================================
@@ -86,9 +92,10 @@ model Division {
 
   users              User[]
   roles              Role[]
-  bulletinAudiences  BulletinAudience[]
-  dbFolders          DatabaseFolder[]       @relation("FolderDivision")
-  taskDivisionAccess TaskDivisionAccess[]
+  bulletinAudiences              BulletinAudience[]
+  dbFolders                      DatabaseFolder[]       @relation("FolderDivision")
+  taskDivisionAccess             TaskDivisionAccess[]
+  scheduledAnnouncementAudiences ScheduledAnnouncementAudience[]
 
   @@map("divisions")
 }
@@ -150,7 +157,8 @@ model User {
   taskComments        TaskComment[]
   grantedShares       ResourceShare[]
   auditLogs           AuditLog[]
-  taskListMemberships TaskListMembership[]
+  taskListMemberships        TaskListMembership[]
+  scheduledAnnouncements     ScheduledAnnouncement[]
 
   @@index([email])
   @@index([username])
@@ -472,6 +480,42 @@ model BulletinAudience {
   @@index([bulletinId])
   @@index([divisionId])
   @@map("bulletin_audiences")
+}
+
+model ScheduledAnnouncement {
+  id          String         @id @default(uuid())
+  title       String
+  content     String
+  audienceType AudienceType  @default(ALL)
+  recurrence  RecurrenceType
+  dayOfWeek   Int?
+  sendHour    Int
+  sendMinute  Int            @default(0)
+  isActive    Boolean        @default(true)
+  lastSentAt  DateTime?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  createdById String
+  createdBy   User                           @relation(fields: [createdById], references: [id], onDelete: Cascade)
+  audiences   ScheduledAnnouncementAudience[]
+
+  @@index([createdById])
+  @@index([isActive])
+  @@map("scheduled_announcements")
+}
+
+model ScheduledAnnouncementAudience {
+  id                      String               @id @default(uuid())
+  scheduledAnnouncementId String
+  scheduledAnnouncement   ScheduledAnnouncement @relation(fields: [scheduledAnnouncementId], references: [id], onDelete: Cascade)
+  divisionId              String
+  division                Division             @relation(fields: [divisionId], references: [id], onDelete: Cascade)
+
+  @@unique([scheduledAnnouncementId, divisionId])
+  @@index([scheduledAnnouncementId])
+  @@index([divisionId])
+  @@map("scheduled_announcement_audiences")
 }
 
 model ResourceShare {

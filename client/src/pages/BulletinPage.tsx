@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState, FormEvent } from 'react';
 import {
   Megaphone, Plus, Search, X,
   AlertTriangle, Info, Calendar, Eye, EyeOff,
-  Loader2, Trash2, Edit2, CheckCircle2,
+  Loader2, Trash2, Edit2, CheckCircle2, Clock, ToggleLeft, ToggleRight,
 } from 'lucide-react';
 import api from '@/lib/api';
 import { useAuthStore } from '@/stores/authStore';
@@ -77,10 +77,35 @@ function formatDate(iso: string) {
   });
 }
 
+// ── Scheduled Announcement Types ──────────────────────────
+type RecurrenceType = 'DAILY' | 'WEEKDAYS' | 'WEEKLY';
+const DAY_LABELS = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+const RECURRENCE_LABELS: Record<RecurrenceType, string> = {
+  DAILY: 'Every day', WEEKDAYS: 'Weekdays (Mon–Fri)', WEEKLY: 'Every week on…',
+};
+
+interface ScheduledAnnouncement {
+  id: string; title: string; content: string;
+  audienceType: AudienceType; recurrence: RecurrenceType;
+  dayOfWeek: number | null; sendHour: number; sendMinute: number;
+  isActive: boolean; lastSentAt: string | null;
+  createdAt: string;
+  createdBy: { id: string; fullName: string };
+  audiences: { division: DivisionOption }[];
+}
+
+function pad(n: number) { return String(n).padStart(2, '0'); }
+function scheduleLabel(sa: ScheduledAnnouncement) {
+  const time = `${pad(sa.sendHour)}:${pad(sa.sendMinute)} WIB`;
+  if (sa.recurrence === 'WEEKLY') return `${DAY_LABELS[sa.dayOfWeek ?? 0]}, ${time}`;
+  return `${RECURRENCE_LABELS[sa.recurrence]}, ${time}`;
+}
+
 // ── Main Page ──────────────────────────────────────────────
 export default function BulletinPage() {
   const user = useAuthStore((s) => s.user);
   const isAdmin = (user?.role?.level ?? 99) <= 2;
+  const canManageScheduled = (user?.role?.level ?? 99) <= 3;
   const { perms } = usePermStore();
 
   const [bulletins, setBulletins] = useState<Bulletin[]>([]);
@@ -96,6 +121,12 @@ export default function BulletinPage() {
   const [selected, setSelected] = useState<Bulletin | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [editItem, setEditItem] = useState<Bulletin | null>(null);
+
+  const [activeTab, setActiveTab] = useState<'bulletins' | 'scheduled'>('bulletins');
+  const [scheduled,         setScheduled]         = useState<ScheduledAnnouncement[]>([]);
+  const [loadingScheduled,  setLoadingScheduled]  = useState(false);
+  const [showScheduledForm, setShowScheduledForm] = useState(false);
+  const [editScheduled,     setEditScheduled]     = useState<ScheduledAnnouncement | null>(null);
 
   const fetchBulletins = useCallback(async () => {
     setLoading(true);
@@ -122,6 +153,32 @@ export default function BulletinPage() {
     const t = setTimeout(() => setSearch(searchInput), 400);
     return () => clearTimeout(t);
   }, [searchInput]);
+
+  const fetchScheduled = useCallback(async () => {
+    if (!canManageScheduled) return;
+    setLoadingScheduled(true);
+    try {
+      const res = await api.get('/scheduled-announcements');
+      setScheduled(res.data.data ?? []);
+    } catch { /* ignore */ } finally { setLoadingScheduled(false); }
+  }, [canManageScheduled]);
+
+  useEffect(() => { if (activeTab === 'scheduled') fetchScheduled(); }, [activeTab, fetchScheduled]);
+
+  const handleToggleActive = async (sa: ScheduledAnnouncement) => {
+    try {
+      await api.patch(`/scheduled-announcements/${sa.id}`, { isActive: !sa.isActive });
+      setScheduled((prev) => prev.map((s) => s.id === sa.id ? { ...s, isActive: !sa.isActive } : s));
+    } catch { /* ignore */ }
+  };
+
+  const handleDeleteScheduled = async (id: string) => {
+    if (!confirm('Delete this scheduled announcement?')) return;
+    try {
+      await api.delete(`/scheduled-announcements/${id}`);
+      setScheduled((prev) => prev.filter((s) => s.id !== id));
+    } catch { /* ignore */ }
+  };
 
   const handleDelete = async (id: string) => {
     if (!confirm('Delete this bulletin?')) return;
@@ -153,14 +210,16 @@ export default function BulletinPage() {
       {/* ── Left: list ── */}
       <div className="flex flex-col w-96 flex-shrink-0">
         {/* Header */}
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center justify-between mb-3">
           <div>
             <h1 className="text-xl font-semibold text-gray-800">Bulletin</h1>
             <p className="text-sm text-gray-400 mt-0.5">
-              {meta ? `${meta.total} bulletins` : 'Announcements board'}
+              {activeTab === 'bulletins'
+                ? (meta ? `${meta.total} bulletins` : 'Announcements board')
+                : `${scheduled.length} scheduled`}
             </p>
           </div>
-          {perms.bulletin.create && (
+          {activeTab === 'bulletins' && perms.bulletin.create && (
             <button
               onClick={() => { setEditItem(null); setShowForm(true); }}
               className="flex items-center gap-1.5 h-9 px-3 bg-navy text-white text-sm font-medium rounded hover:bg-navy-light transition-colors"
@@ -168,22 +227,46 @@ export default function BulletinPage() {
               <Plus size={15} /> Create
             </button>
           )}
+          {activeTab === 'scheduled' && canManageScheduled && (
+            <button
+              onClick={() => { setEditScheduled(null); setShowScheduledForm(true); }}
+              className="flex items-center gap-1.5 h-9 px-3 bg-navy text-white text-sm font-medium rounded hover:bg-navy-light transition-colors"
+            >
+              <Plus size={15} /> Add
+            </button>
+          )}
         </div>
 
-        {/* Search */}
-        <div className="relative mb-3">
-          <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
-          <input
-            type="text"
-            placeholder="Search bulletins..."
-            value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
-            className="w-full h-8 pl-8 pr-3 text-sm border border-gray-300 rounded bg-white placeholder:text-gray-400 focus:border-navy focus:outline-none focus:ring-2 focus:ring-navy-50"
-          />
-        </div>
+        {/* Tabs */}
+        {canManageScheduled && (
+          <div className="flex gap-1 mb-3 border-b border-gray-100">
+            {(['bulletins', 'scheduled'] as const).map((t) => (
+              <button key={t} onClick={() => setActiveTab(t)}
+                className={cn('px-3 py-2 text-xs font-medium border-b-2 -mb-px transition-colors capitalize',
+                  activeTab === t ? 'border-navy text-navy' : 'border-transparent text-gray-500 hover:text-gray-700'
+                )}>
+                {t === 'scheduled' ? <span className="flex items-center gap-1"><Clock size={11} /> Scheduled</span> : 'Bulletins'}
+              </button>
+            ))}
+          </div>
+        )}
 
-        {/* Category tabs */}
-        <div className="flex gap-1 flex-wrap mb-3">
+        {/* Search (bulletins only) */}
+        {activeTab === 'bulletins' && (
+          <div className="relative mb-3">
+            <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Search bulletins..."
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              className="w-full h-8 pl-8 pr-3 text-sm border border-gray-300 rounded bg-white placeholder:text-gray-400 focus:border-navy focus:outline-none focus:ring-2 focus:ring-navy-50"
+            />
+          </div>
+        )}
+
+        {/* Category tabs (bulletins only) */}
+        {activeTab === 'bulletins' && <div className="flex gap-1 flex-wrap mb-3">
           {CATEGORY_TABS.map((tab) => (
             <button
               key={tab.value}
@@ -198,45 +281,92 @@ export default function BulletinPage() {
               {tab.label}
             </button>
           ))}
-        </div>
+        </div>}
 
-        {/* Admin: draft toggle */}
-        {isAdmin && (
-          <button
-            onClick={() => setShowDrafts((p) => !p)}
-            className={cn(
-              'flex items-center gap-1.5 text-xs mb-3 self-start px-2.5 py-1 rounded transition-colors',
-              showDrafts ? 'bg-warning-light text-warning' : 'text-gray-400 hover:text-gray-600',
-            )}
-          >
-            {showDrafts ? <EyeOff size={12} /> : <Eye size={12} />}
-            {showDrafts ? 'Hide drafts' : 'Show drafts'}
-          </button>
-        )}
-
-        {/* List */}
-        <div className="flex-1 overflow-y-auto space-y-2 pr-1">
-          {loading ? (
-            <SkeletonList />
-          ) : error ? (
-            <ErrorState message={error} onRetry={fetchBulletins} />
-          ) : bulletins.length === 0 ? (
-            <EmptyState isAdmin={isAdmin} canCreate={perms.bulletin.create} onAdd={() => { setEditItem(null); setShowForm(true); }} />
-          ) : (
-            bulletins.map((b) => (
-              <BulletinCard
-                key={b.id}
-                bulletin={b}
-                isSelected={selected?.id === b.id}
-                isAdmin={isAdmin}
-                onClick={() => openDetail(b)}
-                onEdit={() => { setEditItem(b); setShowForm(true); }}
-                onDelete={() => handleDelete(b.id)}
-                onTogglePublish={() => handleTogglePublish(b)}
-              />
-            ))
+        {activeTab === 'bulletins' && <>
+          {/* Admin: draft toggle */}
+          {isAdmin && (
+            <button
+              onClick={() => setShowDrafts((p) => !p)}
+              className={cn(
+                'flex items-center gap-1.5 text-xs mb-3 self-start px-2.5 py-1 rounded transition-colors',
+                showDrafts ? 'bg-warning-light text-warning' : 'text-gray-400 hover:text-gray-600',
+              )}
+            >
+              {showDrafts ? <EyeOff size={12} /> : <Eye size={12} />}
+              {showDrafts ? 'Hide drafts' : 'Show drafts'}
+            </button>
           )}
-        </div>
+
+          {/* List */}
+          <div className="flex-1 overflow-y-auto space-y-2 pr-1">
+            {loading ? (
+              <SkeletonList />
+            ) : error ? (
+              <ErrorState message={error} onRetry={fetchBulletins} />
+            ) : bulletins.length === 0 ? (
+              <EmptyState isAdmin={isAdmin} canCreate={perms.bulletin.create} onAdd={() => { setEditItem(null); setShowForm(true); }} />
+            ) : (
+              bulletins.map((b) => (
+                <BulletinCard
+                  key={b.id}
+                  bulletin={b}
+                  isSelected={selected?.id === b.id}
+                  isAdmin={isAdmin}
+                  onClick={() => openDetail(b)}
+                  onEdit={() => { setEditItem(b); setShowForm(true); }}
+                  onDelete={() => handleDelete(b.id)}
+                  onTogglePublish={() => handleTogglePublish(b)}
+                />
+              ))
+            )}
+          </div>
+        </>}
+
+        {activeTab === 'scheduled' && (
+          <div className="flex-1 overflow-y-auto space-y-2 pr-1">
+            {loadingScheduled ? (
+              <div className="flex justify-center py-8"><Loader2 size={18} className="animate-spin text-gray-300" /></div>
+            ) : scheduled.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-16 text-center">
+                <Clock size={32} className="text-gray-300 mb-3" />
+                <p className="text-sm font-medium text-gray-600">No scheduled announcements</p>
+                <p className="text-xs text-gray-400 mt-1">Add recurring notifications for your team.</p>
+              </div>
+            ) : scheduled.map((sa) => (
+              <div key={sa.id} className={cn(
+                'border rounded-lg p-3 space-y-1.5 transition-colors',
+                sa.isActive ? 'border-gray-200 bg-white' : 'border-gray-100 bg-gray-50 opacity-60',
+              )}>
+                <div className="flex items-start justify-between gap-2">
+                  <p className="text-sm font-semibold text-gray-800 leading-snug">{sa.title}</p>
+                  <div className="flex items-center gap-1 flex-shrink-0">
+                    <button onClick={() => handleToggleActive(sa)} title={sa.isActive ? 'Deactivate' : 'Activate'}
+                      className="text-gray-400 hover:text-navy transition-colors">
+                      {sa.isActive ? <ToggleRight size={18} className="text-navy" /> : <ToggleLeft size={18} />}
+                    </button>
+                    <button onClick={() => { setEditScheduled(sa); setShowScheduledForm(true); }}
+                      className="p-1 text-gray-400 hover:text-navy rounded"><Edit2 size={13} /></button>
+                    <button onClick={() => handleDeleteScheduled(sa.id)}
+                      className="p-1 text-gray-400 hover:text-danger rounded"><Trash2 size={13} /></button>
+                  </div>
+                </div>
+                <p className="text-xs text-gray-500 line-clamp-2">{sa.content}</p>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="inline-flex items-center gap-1 text-[10px] bg-navy/10 text-navy px-2 py-0.5 rounded-full font-medium">
+                    <Clock size={9} /> {scheduleLabel(sa)}
+                  </span>
+                  <span className="text-[10px] text-gray-400">
+                    {sa.audienceType === 'ALL' ? 'All staff' : sa.audienceType === 'DIVISION' ? "Creator's division" : sa.audiences.map(a => a.division.name).join(', ')}
+                  </span>
+                </div>
+                {sa.lastSentAt && (
+                  <p className="text-[10px] text-gray-400">Last sent: {new Date(sa.lastSentAt).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' })}</p>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* ── Right: detail pane ── */}
@@ -262,6 +392,15 @@ export default function BulletinPage() {
           bulletin={editItem}
           onClose={() => setShowForm(false)}
           onSaved={() => { setShowForm(false); fetchBulletins(); }}
+        />
+      )}
+
+      {/* ── Scheduled Form Modal ── */}
+      {showScheduledForm && (
+        <ScheduledAnnouncementFormModal
+          item={editScheduled}
+          onClose={() => setShowScheduledForm(false)}
+          onSaved={() => { setShowScheduledForm(false); fetchScheduled(); }}
         />
       )}
     </div>
@@ -677,6 +816,159 @@ function ErrorState({ message, onRetry }: { message: string; onRetry: () => void
       <button onClick={onRetry} className="mt-3 text-sm text-info hover:underline">
         Try again
       </button>
+    </div>
+  );
+}
+
+// ── ScheduledAnnouncementFormModal ────────────────────────
+function ScheduledAnnouncementFormModal({ item, onClose, onSaved }: {
+  item: ScheduledAnnouncement | null;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [title,        setTitle]        = useState(item?.title ?? '');
+  const [content,      setContent]      = useState(item?.content ?? '');
+  const [audienceType, setAudienceType] = useState<AudienceType>(item?.audienceType ?? 'ALL');
+  const [recurrence,   setRecurrence]   = useState<RecurrenceType>(item?.recurrence ?? 'DAILY');
+  const [dayOfWeek,    setDayOfWeek]    = useState<number>(item?.dayOfWeek ?? 1);
+  const [sendHour,     setSendHour]     = useState(item?.sendHour ?? 8);
+  const [sendMinute,   setSendMinute]   = useState(item?.sendMinute ?? 0);
+  const [divisionIds,  setDivisionIds]  = useState<string[]>(item?.audiences.map((a) => a.division.id) ?? []);
+  const [divisions,    setDivisions]    = useState<DivisionOption[]>([]);
+  const [saving,       setSaving]       = useState(false);
+  const [error,        setError]        = useState('');
+
+  useEffect(() => {
+    api.get('/divisions').then((r) => setDivisions(r.data.data ?? [])).catch(() => {});
+  }, []);
+
+  const toggleDiv = (id: string) =>
+    setDivisionIds((prev) => prev.includes(id) ? prev.filter((d) => d !== id) : [...prev, id]);
+
+  const handleSubmit = async () => {
+    if (!title.trim() || !content.trim()) { setError('Title and content are required.'); return; }
+    if (audienceType === 'CUSTOM' && divisionIds.length === 0) { setError('Select at least one division.'); return; }
+    setSaving(true); setError('');
+    try {
+      const payload = {
+        title: title.trim(), content: content.trim(),
+        audienceType, recurrence,
+        dayOfWeek: recurrence === 'WEEKLY' ? dayOfWeek : undefined,
+        sendHour, sendMinute,
+        divisionIds: audienceType === 'CUSTOM' ? divisionIds : [],
+      };
+      if (item) {
+        await api.patch(`/scheduled-announcements/${item.id}`, payload);
+      } else {
+        await api.post('/scheduled-announcements', payload);
+      }
+      onSaved();
+    } catch { setError('Failed to save. Please try again.'); }
+    finally { setSaving(false); }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-md max-h-[90vh] flex flex-col">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+          <h2 className="text-base font-semibold text-gray-800">
+            {item ? 'Edit Scheduled Announcement' : 'New Scheduled Announcement'}
+          </h2>
+          <button onClick={onClose} className="p-1 rounded hover:bg-gray-100 text-gray-400"><X size={16} /></button>
+        </div>
+
+        <form onSubmit={(e) => { e.preventDefault(); handleSubmit(); }} className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
+          {error && <p className="text-xs text-danger bg-danger-light p-2 rounded">{error}</p>}
+
+          <div className="space-y-1">
+            <label className="block text-sm font-medium text-gray-700">Title</label>
+            <input value={title} onChange={(e) => setTitle(e.target.value)} required
+              placeholder="e.g. Daily Attendance Reminder"
+              className="w-full h-9 px-3 text-sm border border-gray-300 rounded focus:border-navy focus:outline-none focus:ring-2 focus:ring-navy-50" />
+          </div>
+
+          <div className="space-y-1">
+            <label className="block text-sm font-medium text-gray-700">Message</label>
+            <textarea value={content} onChange={(e) => setContent(e.target.value)} required rows={3}
+              placeholder="e.g. Don't forget to submit your attendance today!"
+              className="w-full px-3 py-2 text-sm border border-gray-300 rounded resize-none focus:border-navy focus:outline-none focus:ring-2 focus:ring-navy-50" />
+          </div>
+
+          <div className="space-y-1">
+            <label className="block text-sm font-medium text-gray-700">Recurrence</label>
+            <select value={recurrence} onChange={(e) => setRecurrence(e.target.value as RecurrenceType)}
+              className="w-full h-9 px-3 text-sm border border-gray-300 rounded focus:border-navy focus:outline-none">
+              <option value="DAILY">Every day</option>
+              <option value="WEEKDAYS">Weekdays (Mon–Fri)</option>
+              <option value="WEEKLY">Every week on a specific day</option>
+            </select>
+          </div>
+
+          {recurrence === 'WEEKLY' && (
+            <div className="space-y-1">
+              <label className="block text-sm font-medium text-gray-700">Day of week</label>
+              <select value={dayOfWeek} onChange={(e) => setDayOfWeek(Number(e.target.value))}
+                className="w-full h-9 px-3 text-sm border border-gray-300 rounded focus:border-navy focus:outline-none">
+                {DAY_LABELS.map((d, i) => <option key={i} value={i}>{d}</option>)}
+              </select>
+            </div>
+          )}
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <label className="block text-sm font-medium text-gray-700">Hour (WIB)</label>
+              <input type="number" min={0} max={23} value={sendHour} onChange={(e) => setSendHour(Number(e.target.value))}
+                className="w-full h-9 px-3 text-sm border border-gray-300 rounded focus:border-navy focus:outline-none" />
+            </div>
+            <div className="space-y-1">
+              <label className="block text-sm font-medium text-gray-700">Minute</label>
+              <input type="number" min={0} max={59} value={sendMinute} onChange={(e) => setSendMinute(Number(e.target.value))}
+                className="w-full h-9 px-3 text-sm border border-gray-300 rounded focus:border-navy focus:outline-none" />
+            </div>
+          </div>
+
+          <div className="space-y-1">
+            <label className="block text-sm font-medium text-gray-700">Audience</label>
+            <select value={audienceType} onChange={(e) => setAudienceType(e.target.value as AudienceType)}
+              className="w-full h-9 px-3 text-sm border border-gray-300 rounded focus:border-navy focus:outline-none">
+              <option value="ALL">All staff</option>
+              <option value="DIVISION">Creator's division only</option>
+              <option value="CUSTOM">Specific divisions</option>
+            </select>
+          </div>
+
+          {audienceType === 'CUSTOM' && (
+            <div className="space-y-1">
+              <label className="block text-sm font-medium text-gray-700">Divisions</label>
+              <div className="flex flex-wrap gap-1.5 border border-gray-200 rounded p-2">
+                {divisions.map((d) => (
+                  <button type="button" key={d.id} onClick={() => toggleDiv(d.id)}
+                    className={cn('flex items-center gap-1 px-2 py-0.5 rounded-full text-xs border transition-colors',
+                      divisionIds.includes(d.id)
+                        ? 'bg-navy/10 text-navy border-navy/30 font-medium'
+                        : 'text-gray-400 border-gray-200 hover:border-navy/30 hover:text-navy',
+                    )}>
+                    <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: d.color }} />
+                    {d.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </form>
+
+        <div className="px-5 py-4 border-t border-gray-100 flex justify-end gap-2">
+          <button type="button" onClick={onClose}
+            className="h-9 px-4 text-sm text-gray-600 border border-gray-300 rounded hover:bg-gray-50">
+            Cancel
+          </button>
+          <button onClick={handleSubmit} disabled={saving}
+            className="h-9 px-4 text-sm font-medium text-white bg-navy rounded hover:bg-navy-light disabled:opacity-50 flex items-center gap-1.5">
+            {saving && <Loader2 size={13} className="animate-spin" />}
+            {item ? 'Save changes' : 'Create'}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
