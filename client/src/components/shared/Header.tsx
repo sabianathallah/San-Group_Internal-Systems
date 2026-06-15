@@ -25,8 +25,7 @@ const BREADCRUMB_MAP: Record<string, string> = {
   '/analytics':          'Analytics',
   '/notifications':      'Notifications',
   '/admin/users':        'Manage Users',
-  '/admin/roles':        'Roles',
-  '/admin/permissions':  'Permissions',
+  '/admin/permissions':  'Roles & Permissions',
   '/admin/audit-log':    'Audit Log',
 };
 
