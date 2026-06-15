@@ -34,14 +34,16 @@ export async function createBulletin(req: AuthRequest, res: Response, next: Next
 
 export async function updateBulletin(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
-    const bulletin = await updateBulletinService(String(req.params.id), req.user!.roleLevel, req.body);
+    const { userId, roleLevel } = req.user!;
+    const bulletin = await updateBulletinService(String(req.params.id), userId, roleLevel, req.body);
     successResponse(res, bulletin, 'Bulletin berhasil diperbarui');
   } catch (err) { next(err); }
 }
 
 export async function deleteBulletin(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
-    await deleteBulletinService(String(req.params.id));
+    const { userId, roleLevel } = req.user!;
+    await deleteBulletinService(String(req.params.id), userId, roleLevel);
     successResponse(res, null, 'Bulletin berhasil dihapus');
   } catch (err) { next(err); }
 }

@@ -1,5 +1,5 @@
 import { prisma } from '@/config/database';
-import { TaskVisibility } from '@prisma/client';
+import { AudienceType, TaskVisibility } from '@prisma/client';
 
 type Scope = 'own' | 'division' | 'all';
 
@@ -7,13 +7,14 @@ interface SearchParams {
   q: string;
   userId: string;
   divisionId: string | null;
+  roleLevel: number;
   permScope: Scope;
   viewPrivate: boolean;
   limit?: number;
 }
 
 export async function globalSearch({
-  q, userId, divisionId, permScope, viewPrivate, limit = 5,
+  q, userId, divisionId, roleLevel, permScope, viewPrivate, limit = 5,
 }: SearchParams) {
   const term = q.trim();
   if (!term) return { tasks: [], bulletins: [], notes: [], files: [] };
@@ -58,6 +59,15 @@ export async function globalSearch({
       where: {
         isPublished: true,
         OR: [{ title: contains }, { content: contains }],
+        ...(roleLevel > 2 && divisionId && {
+          AND: [{
+            OR: [
+              { audienceType: AudienceType.ALL },
+              { audienceType: AudienceType.DIVISION, author: { divisionId } },
+              { audienceType: AudienceType.CUSTOM, audiences: { some: { divisionId } } },
+            ],
+          }],
+        }),
       },
       select: {
         id: true, title: true, createdAt: true,

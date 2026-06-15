@@ -173,7 +173,8 @@ export async function createBulletinService(
 
 export async function updateBulletinService(
   id: string,
-  _roleLevel: number,
+  userId: string,
+  roleLevel: number,
   data: {
     title?: string;
     content?: string;
@@ -187,9 +188,10 @@ export async function updateBulletinService(
 ) {
   const exists = await prisma.bulletin.findUnique({
     where: { id },
-    select: { id: true, isPublished: true },
+    select: { id: true, isPublished: true, authorId: true },
   });
   if (!exists) throw new AppError('Bulletin tidak ditemukan', 404);
+  if (roleLevel > 2 && exists.authorId !== userId) throw new AppError('Hanya penulis atau admin yang dapat mengedit bulletin ini', 403);
 
   // publishedAt: set when newly published, clear when unpublished
   let publishedAt: Date | null | undefined;
@@ -228,8 +230,9 @@ export async function updateBulletinService(
   return updated;
 }
 
-export async function deleteBulletinService(id: string) {
-  const exists = await prisma.bulletin.findUnique({ where: { id }, select: { id: true } });
+export async function deleteBulletinService(id: string, userId: string, roleLevel: number) {
+  const exists = await prisma.bulletin.findUnique({ where: { id }, select: { id: true, authorId: true } });
   if (!exists) throw new AppError('Bulletin tidak ditemukan', 404);
+  if (roleLevel > 2 && exists.authorId !== userId) throw new AppError('Hanya penulis atau admin yang dapat menghapus bulletin ini', 403);
   await prisma.bulletin.delete({ where: { id } });
 }
