@@ -9,8 +9,21 @@
  * Library: node-cron
  */
 
+import cron from 'node-cron';
 import { registerDueDateJob } from './due-date.job';
+import { fireScheduledAnnouncements } from '@/services/scheduled-announcement.service';
 
 export function startScheduler(): void {
   registerDueDateJob();
+
+  // Fire scheduled announcements every minute
+  cron.schedule('* * * * *', async () => {
+    try {
+      await fireScheduledAnnouncements();
+    } catch (err) {
+      console.error('[scheduler] Error firing announcements:', err);
+    }
+  });
+
+  console.log('⏰ Scheduler started');
 }
