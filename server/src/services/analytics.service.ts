@@ -19,7 +19,7 @@ export async function getAnalyticsService(
 
   // ── Scope filter ───────────────────────────────────────────
   const scopeWhere = scope === 'own'
-    ? { OR: [{ createdById: userId }, { assignedToId: userId }] }
+    ? { OR: [{ userId }, { assignedToId: userId }] }
     : scope === 'division' && divisionId
     ? { creator: { divisionId } }
     : {};

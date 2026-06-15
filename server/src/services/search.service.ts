@@ -24,29 +24,31 @@ export async function globalSearch({
   // ── Task filter ────────────────────────────────────────────
   let taskWhere: Record<string, unknown> = {};
   if (permScope === 'own') {
-    taskWhere = { OR: [{ createdById: userId }, { assignedToId: userId }] };
+    taskWhere = { OR: [{ userId }, { assignedToId: userId }] };
   } else if (permScope === 'division') {
     taskWhere = {
       OR: [
-        { createdById: userId },
+        { userId },
         { assignedToId: userId },
         { creator: { divisionId }, visibility: { in: [TaskVisibility.DIVISION, TaskVisibility.PUBLIC] } },
       ],
     };
   }
   if (!viewPrivate) {
-    const privFilter = { OR: [{ isPrivate: false }, { createdById: userId }, { assignedToId: userId }] };
+    const privFilter = { OR: [{ isPrivate: false }, { userId }, { assignedToId: userId }] };
     taskWhere = Object.keys(taskWhere).length
       ? { AND: [taskWhere, privFilter] }
       : privFilter;
   }
 
+  const searchTerms = { OR: [{ title: contains }, { description: contains }] };
+  const taskFilter = Object.keys(taskWhere).length
+    ? { AND: [taskWhere, searchTerms] }
+    : searchTerms;
+
   const [tasks, bulletins, notes, folders, links] = await Promise.all([
     prisma.task.findMany({
-      where: {
-        ...taskWhere,
-        OR: [{ title: contains }, { description: contains }],
-      },
+      where: taskFilter,
       select: {
         id: true, title: true, status: true, priority: true,
         creator: { select: { fullName: true } },

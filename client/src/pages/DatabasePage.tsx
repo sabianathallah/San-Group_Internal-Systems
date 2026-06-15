@@ -200,7 +200,7 @@ function ShareFolderModal({ folderId, folderName, onClose }: {
 
   useEffect(() => {
     Promise.all([
-      api.get('/shares', { params: { resourceType: 'FOLDER', resourceId: folderId } }),
+      api.get('/shares', { params: { resourceType: 'db_folder', resourceId: folderId } }),
       api.get('/divisions'),
     ]).then(([s, d]) => {
       setShares(s.data.data ?? []);
@@ -214,7 +214,7 @@ function ShareFolderModal({ folderId, folderName, onClose }: {
     setAdding(true); setError('');
     try {
       const res = await api.post('/shares', {
-        resourceType: 'FOLDER',
+        resourceType: 'db_folder',
         resourceId:   folderId,
         targetType:   'DIVISION',
         targetId:     selDiv,
