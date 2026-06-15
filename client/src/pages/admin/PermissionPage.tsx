@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Save, Loader2, ShieldCheck, AlertTriangle } from 'lucide-react';
 import api from '@/lib/api';
 import { cn } from '@/lib/cn';
+import { useAuthStore } from '@/stores/authStore';
 
 // ── Types ─────────────────────────────────────────────────────
 type Scope = 'none' | 'own' | 'division' | 'all';
@@ -43,9 +44,10 @@ const TASK_SCOPE_OPTS: { value: Scope; label: string }[] = [
   { value: 'all',      label: 'All'      },
 ];
 const EDIT_SCOPE_OPTS: { value: Scope; label: string }[] = [
-  { value: 'none', label: 'None' },
-  { value: 'own',  label: 'Own'  },
-  { value: 'all',  label: 'All'  },
+  { value: 'none',     label: 'None'     },
+  { value: 'own',      label: 'Own'      },
+  { value: 'division', label: 'Division' },
+  { value: 'all',      label: 'All'      },
 ];
 const AUDIENCE_SCOPE_OPTS: { value: AudienceScope; label: string }[] = [
   { value: 'none',     label: 'None'            },
@@ -142,6 +144,9 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 
 // ── Main Page ─────────────────────────────────────────────────
 export default function PermissionPage() {
+  const currentUser    = useAuthStore((s) => s.user);
+  const canEdit        = (currentUser?.role?.level ?? 99) <= 1;
+
   const [roles,        setRoles]        = useState<RoleWithPerms[]>([]);
   const [selectedId,   setSelectedId]   = useState<string | null>(null);
   const [perms,        setPerms]        = useState<PermissionConfig | null>(null);
@@ -215,6 +220,7 @@ export default function PermissionPage() {
 
   const selectedRole = roles.find((r) => r.id === selectedId);
   const isSuperAdmin = (selectedRole?.level ?? 99) <= 1;
+  const isReadOnly   = !canEdit;
 
   if (loading) {
     return (
@@ -298,10 +304,11 @@ export default function PermissionPage() {
               </div>
               <button
                 onClick={handleSave}
-                disabled={!isDirty || saving || isSuperAdmin}
+                disabled={!isDirty || saving || isSuperAdmin || isReadOnly}
+                title={isReadOnly ? 'Only SuperAdmin can edit permissions' : undefined}
                 className={cn(
                   'flex items-center gap-1.5 h-8 px-4 text-sm font-medium rounded transition-colors',
-                  isDirty && !isSuperAdmin
+                  isDirty && !isSuperAdmin && !isReadOnly
                     ? 'bg-navy text-white hover:bg-navy-light'
                     : 'bg-gray-100 text-gray-400 cursor-not-allowed',
                 )}
@@ -318,6 +325,13 @@ export default function PermissionPage() {
               </div>
             )}
 
+            {isReadOnly && !isSuperAdmin && (
+              <div className="mx-6 mt-4 px-4 py-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-700 flex items-center gap-2">
+                <ShieldCheck size={15} />
+                Only SuperAdmin can modify permissions. You have view-only access.
+              </div>
+            )}
+
             {/* Permission matrix */}
             <div className="flex-1 overflow-y-auto px-6 py-4">
               {/* Task */}
@@ -327,14 +341,14 @@ export default function PermissionPage() {
                     value={perms.task.view}
                     options={TASK_SCOPE_OPTS}
                     onChange={(v) => update('task', 'view', v)}
-                    disabled={isSuperAdmin}
+                    disabled={isSuperAdmin || isReadOnly}
                   />
                 </PermRow>
                 <PermRow label="Create tasks">
                   <Toggle
                     checked={perms.task.create}
                     onChange={(v) => update('task', 'create', v)}
-                    disabled={isSuperAdmin}
+                    disabled={isSuperAdmin || isReadOnly}
                   />
                 </PermRow>
                 <PermRow label="Edit tasks">
@@ -342,7 +356,7 @@ export default function PermissionPage() {
                     value={perms.task.edit}
                     options={TASK_SCOPE_OPTS}
                     onChange={(v) => update('task', 'edit', v)}
-                    disabled={isSuperAdmin}
+                    disabled={isSuperAdmin || isReadOnly}
                   />
                 </PermRow>
                 <PermRow label="Delete tasks">
@@ -350,14 +364,14 @@ export default function PermissionPage() {
                     value={perms.task.delete}
                     options={TASK_SCOPE_OPTS}
                     onChange={(v) => update('task', 'delete', v)}
-                    disabled={isSuperAdmin}
+                    disabled={isSuperAdmin || isReadOnly}
                   />
                 </PermRow>
                 <PermRow label="View others' private tasks">
                   <Toggle
                     checked={perms.task.viewPrivate}
                     onChange={(v) => update('task', 'viewPrivate', v)}
-                    disabled={isSuperAdmin}
+                    disabled={isSuperAdmin || isReadOnly}
                   />
                 </PermRow>
               </Section>
@@ -368,14 +382,14 @@ export default function PermissionPage() {
                   <Toggle
                     checked={perms.bulletin.view}
                     onChange={(v) => update('bulletin', 'view', v)}
-                    disabled={isSuperAdmin}
+                    disabled={isSuperAdmin || isReadOnly}
                   />
                 </PermRow>
                 <PermRow label="Create & publish bulletins">
                   <Toggle
                     checked={perms.bulletin.create}
                     onChange={(v) => update('bulletin', 'create', v)}
-                    disabled={isSuperAdmin}
+                    disabled={isSuperAdmin || isReadOnly}
                   />
                 </PermRow>
                 <PermRow label="Target audience">
@@ -383,7 +397,7 @@ export default function PermissionPage() {
                     value={perms.bulletin.audienceScope}
                     options={AUDIENCE_SCOPE_OPTS}
                     onChange={(v) => update('bulletin', 'audienceScope', v)}
-                    disabled={isSuperAdmin || !perms.bulletin.create}
+                    disabled={isSuperAdmin || isReadOnly || !perms.bulletin.create}
                   />
                 </PermRow>
                 <PermRow label="Edit bulletins">
@@ -391,7 +405,7 @@ export default function PermissionPage() {
                     value={perms.bulletin.edit}
                     options={EDIT_SCOPE_OPTS}
                     onChange={(v) => update('bulletin', 'edit', v)}
-                    disabled={isSuperAdmin}
+                    disabled={isSuperAdmin || isReadOnly}
                   />
                 </PermRow>
                 <PermRow label="Delete bulletins">
@@ -399,7 +413,7 @@ export default function PermissionPage() {
                     value={perms.bulletin.delete}
                     options={EDIT_SCOPE_OPTS}
                     onChange={(v) => update('bulletin', 'delete', v)}
-                    disabled={isSuperAdmin}
+                    disabled={isSuperAdmin || isReadOnly}
                   />
                 </PermRow>
               </Section>
@@ -411,28 +425,28 @@ export default function PermissionPage() {
                     value={perms.db_link.view}
                     options={VIEW_DB_SCOPE_OPTS}
                     onChange={(v) => update('db_link', 'view', v)}
-                    disabled={isSuperAdmin}
+                    disabled={isSuperAdmin || isReadOnly}
                   />
                 </PermRow>
                 <PermRow label="Add links to folders">
                   <Toggle
                     checked={perms.db_link.addLink}
                     onChange={(v) => update('db_link', 'addLink', v)}
-                    disabled={isSuperAdmin}
+                    disabled={isSuperAdmin || isReadOnly}
                   />
                 </PermRow>
                 <PermRow label="Manage folders (create/edit/delete)">
                   <Toggle
                     checked={perms.db_link.manageFolder}
                     onChange={(v) => update('db_link', 'manageFolder', v)}
-                    disabled={isSuperAdmin}
+                    disabled={isSuperAdmin || isReadOnly}
                   />
                 </PermRow>
                 <PermRow label="Share folders with other divisions">
                   <Toggle
                     checked={perms.db_link.shareFolder}
                     onChange={(v) => update('db_link', 'shareFolder', v)}
-                    disabled={isSuperAdmin}
+                    disabled={isSuperAdmin || isReadOnly}
                   />
                 </PermRow>
               </Section>
@@ -444,14 +458,14 @@ export default function PermissionPage() {
                     value={perms.note?.view ?? 'own'}
                     options={TASK_SCOPE_OPTS}
                     onChange={(v) => update('note', 'view', v)}
-                    disabled={isSuperAdmin}
+                    disabled={isSuperAdmin || isReadOnly}
                   />
                 </PermRow>
                 <PermRow label="Create notes">
                   <Toggle
                     checked={perms.note?.create ?? true}
                     onChange={(v) => update('note', 'create', v)}
-                    disabled={isSuperAdmin}
+                    disabled={isSuperAdmin || isReadOnly}
                   />
                 </PermRow>
                 <PermRow label="Edit notes">
@@ -459,7 +473,7 @@ export default function PermissionPage() {
                     value={perms.note?.edit ?? 'own'}
                     options={EDIT_SCOPE_OPTS}
                     onChange={(v) => update('note', 'edit', v)}
-                    disabled={isSuperAdmin}
+                    disabled={isSuperAdmin || isReadOnly}
                   />
                 </PermRow>
                 <PermRow label="Delete notes">
@@ -467,7 +481,7 @@ export default function PermissionPage() {
                     value={perms.note?.delete ?? 'own'}
                     options={EDIT_SCOPE_OPTS}
                     onChange={(v) => update('note', 'delete', v)}
-                    disabled={isSuperAdmin}
+                    disabled={isSuperAdmin || isReadOnly}
                   />
                 </PermRow>
               </Section>
@@ -479,7 +493,7 @@ export default function PermissionPage() {
                     value={perms.analytics?.view ?? 'none'}
                     options={VIEW_SCOPE_OPTS}
                     onChange={(v) => update('analytics', 'view', v)}
-                    disabled={isSuperAdmin}
+                    disabled={isSuperAdmin || isReadOnly}
                   />
                 </PermRow>
               </Section>
@@ -491,7 +505,7 @@ export default function PermissionPage() {
                     value={perms.audit_log?.view ?? 'none'}
                     options={VIEW_SCOPE_OPTS}
                     onChange={(v) => update('audit_log', 'view', v)}
-                    disabled={isSuperAdmin}
+                    disabled={isSuperAdmin || isReadOnly}
                   />
                 </PermRow>
               </Section>
