@@ -244,18 +244,24 @@ export async function getTaskByIdService(
 
   const isOwner = task.creator.id === userId || task.assignee?.id === userId;
 
-  if (permScope === 'own' && !isOwner) throw new AppError('Akses ditolak', 403);
+  if (!isOwner) {
+    const isPublic         = task.visibility === TaskVisibility.PUBLIC;
+    const inSameDivision   = !!divisionId && task.creator.divisionId === divisionId;
+    const inDivisionSelect = task.visibility === TaskVisibility.DIVISION_SELECT &&
+      !!divisionId && task.divisionAccess.some((a) => a.divisionId === divisionId);
 
-  // Mirror the list view's 'division' filter: non-owners only see
-  // DIVISION/PUBLIC tasks created within their own division
-  if (permScope === 'division' && !isOwner) {
-    const sameDivision = !!divisionId && task.creator.divisionId === divisionId;
-    const visibleEnough = task.visibility !== TaskVisibility.PRIVATE;
-    const inDivisionSelect =
-      task.visibility === TaskVisibility.DIVISION_SELECT &&
-      !!divisionId &&
-      task.divisionAccess.some((a) => a.divisionId === divisionId);
-    if (!visibleEnough || (!sameDivision && !inDivisionSelect)) throw new AppError('Akses ditolak', 403);
+    if (permScope === 'own') {
+      // Staff can open shared tasks they can see in browse (PUBLIC, their DIVISION, DIVISION_SELECT)
+      const canView = isPublic ||
+        (task.visibility === TaskVisibility.DIVISION && inSameDivision) ||
+        inDivisionSelect;
+      if (!canView) throw new AppError('Akses ditolak', 403);
+    } else if (permScope === 'division') {
+      // Managers/Supervisors: any non-PRIVATE task they can see in browse
+      const canView = isPublic || (task.visibility !== TaskVisibility.PRIVATE && (inSameDivision || inDivisionSelect));
+      if (!canView) throw new AppError('Akses ditolak', 403);
+    }
+    // permScope === 'all' → no additional check needed
   }
 
 
