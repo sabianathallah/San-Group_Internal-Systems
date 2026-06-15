@@ -38,10 +38,9 @@ export async function getAnalyticsService(
   const completedLast7 = await prisma.task.findMany({
     where: {
       ...scopeWhere,
-      status: TaskStatus.DONE,
-      updatedAt: { gte: sevenDaysAgo },
+      completedAt: { gte: sevenDaysAgo, not: null },
     },
-    select: { updatedAt: true },
+    select: { completedAt: true },
   });
 
   const trendMap: Record<string, number> = {};
@@ -51,7 +50,7 @@ export async function getAnalyticsService(
     trendMap[key] = 0;
   }
   for (const t of completedLast7) {
-    const key = startOfDay(t.updatedAt).toISOString().slice(0, 10);
+    const key = startOfDay(t.completedAt!).toISOString().slice(0, 10);
     if (key in trendMap) trendMap[key]++;
   }
   const completionTrend = Object.entries(trendMap).map(([date, count]) => ({ date, count }));
