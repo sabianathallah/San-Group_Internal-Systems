@@ -12,6 +12,7 @@ import {
   BarChart3,
   ClipboardList,
   Inbox,
+  Shield,
 } from 'lucide-react';
 import { useUiStore } from '@/stores/uiStore';
 import { useAuthStore } from '@/stores/authStore';
@@ -37,6 +38,7 @@ const mainNav: NavItem[] = [
 
 const adminNav: NavItem[] = [
   { label: 'Manage Users', to: ROUTES.ADMIN_USERS,       icon: Users         },
+  { label: 'Roles',        to: ROUTES.ADMIN_ROLES,       icon: Shield        },
   { label: 'Permissions',  to: ROUTES.ADMIN_PERMISSIONS, icon: Lock          },
   { label: 'Audit Log',    to: ROUTES.ADMIN_AUDIT_LOG,   icon: ClipboardList },
 ];

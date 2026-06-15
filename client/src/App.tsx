@@ -14,6 +14,7 @@ import AnalyticsPage from '@/pages/AnalyticsPage';
 import UsersPage from '@/pages/admin/UsersPage';
 import PermissionPage from '@/pages/admin/PermissionPage';
 import AuditLogPage from '@/pages/admin/AuditLogPage';
+import RolesPage from '@/pages/admin/RolesPage';
 import NotificationsPage from '@/pages/NotificationsPage';
 
 function AdminRoute() {
@@ -49,7 +50,7 @@ export default function App() {
             <Route path={ROUTES.ADMIN_PERMISSIONS}  element={<PermissionPage />} />
             <Route path={ROUTES.ADMIN_AUDIT_LOG}    element={<AuditLogPage />}   />
             <Route path={ROUTES.ADMIN_DIVISIONS}    element={<Navigate to={ROUTES.ADMIN_USERS} replace />} />
-            <Route path={ROUTES.ADMIN_ROLES}        element={<Navigate to={ROUTES.ADMIN_USERS} replace />} />
+            <Route path={ROUTES.ADMIN_ROLES}        element={<RolesPage />} />
           </Route>
         </Route>
 
