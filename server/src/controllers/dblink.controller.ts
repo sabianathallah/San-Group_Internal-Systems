@@ -7,7 +7,8 @@ import {
 
 export async function createDatabaseLink(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
-    const link = await createDatabaseLinkService(req.user!.userId, req.body);
+    const { userId, roleLevel, divisionId } = req.user!;
+    const link = await createDatabaseLinkService(userId, roleLevel, divisionId, req.body);
     successResponse(res, link, 'Link berhasil ditambahkan', 201);
   } catch (err) { next(err); }
 }

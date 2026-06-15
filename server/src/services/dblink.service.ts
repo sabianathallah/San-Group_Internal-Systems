@@ -15,10 +15,25 @@ const LINK_SELECT = {
 
 export async function createDatabaseLinkService(
   userId: string,
+  roleLevel: number,
+  userDivisionId: string | undefined,
   data: { title: string; url: string; description?: string; folderId: string },
 ) {
-  const folder = await prisma.databaseFolder.findUnique({ where: { id: data.folderId }, select: { id: true } });
+  const folder = await prisma.databaseFolder.findUnique({
+    where: { id: data.folderId },
+    select: { id: true, divisionId: true, createdById: true },
+  });
   if (!folder) throw new AppError('Folder tidak ditemukan', 404);
+
+  if (!isAdmin(roleLevel)) {
+    const isPublic = folder.divisionId === null;
+    const isOwnDiv = !!userDivisionId && folder.divisionId === userDivisionId;
+    const isOwner  = folder.createdById === userId;
+    const isShared = !isPublic && !isOwnDiv && !isOwner && await prisma.resourceShare.findFirst({
+      where: { resourceType: 'db_folder', resourceId: data.folderId, targetType: 'division', targetId: userDivisionId ?? '' },
+    }).then(Boolean);
+    if (!isPublic && !isOwnDiv && !isOwner && !isShared) throw new AppError('Akses ditolak ke folder ini', 403);
+  }
 
   const count = await prisma.databaseLink.count({ where: { folderId: data.folderId } });
 

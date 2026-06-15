@@ -106,9 +106,27 @@ export async function deleteFolderService(id: string, userId: string, roleLevel:
   await prisma.databaseFolder.delete({ where: { id } });
 }
 
-export async function listFolderLinksService(folderId: string) {
-  const folder = await prisma.databaseFolder.findUnique({ where: { id: folderId }, select: { id: true } });
+export async function listFolderLinksService(
+  folderId: string,
+  userId: string,
+  userDivisionId: string | undefined,
+  roleLevel: number,
+) {
+  const folder = await prisma.databaseFolder.findUnique({
+    where: { id: folderId },
+    select: { id: true, divisionId: true, createdById: true },
+  });
   if (!folder) throw new AppError('Folder tidak ditemukan', 404);
+
+  if (roleLevel > 2) {
+    const isPublic     = folder.divisionId === null;
+    const isOwnDiv     = !!userDivisionId && folder.divisionId === userDivisionId;
+    const isOwner      = folder.createdById === userId;
+    const isShared     = !isPublic && !isOwnDiv && await prisma.resourceShare.findFirst({
+      where: { resourceType: 'db_folder', resourceId: folderId, targetType: 'division', targetId: userDivisionId ?? '' },
+    }).then(Boolean);
+    if (!isPublic && !isOwnDiv && !isOwner && !isShared) throw new AppError('Akses ditolak', 403);
+  }
 
   return prisma.databaseLink.findMany({
     where:   { folderId },

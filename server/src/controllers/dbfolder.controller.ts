@@ -38,7 +38,8 @@ export async function deleteFolder(req: AuthRequest, res: Response, next: NextFu
 
 export async function listFolderLinks(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
-    const links = await listFolderLinksService(String(req.params.id));
+    const { userId, divisionId, roleLevel } = req.user!;
+    const links = await listFolderLinksService(String(req.params.id), userId, divisionId, roleLevel);
     successResponse(res, links, 'Link berhasil diambil');
   } catch (err) { next(err); }
 }
