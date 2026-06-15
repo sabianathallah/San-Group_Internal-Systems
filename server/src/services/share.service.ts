@@ -17,23 +17,25 @@ export async function shareResource(
   targetId: string,
   grantedById: string,
 ) {
+  const normalizedTargetType = targetType.toLowerCase();
+
   // Check for existing share
   const existing = await prisma.resourceShare.findUnique({
     where: {
       resourceType_resourceId_targetType_targetId: {
-        resourceType, resourceId, targetType, targetId,
+        resourceType, resourceId, targetType: normalizedTargetType, targetId,
       },
     },
   });
   if (existing) throw new AppError('Resource sudah dibagikan ke target ini', 409);
 
   const share = await prisma.resourceShare.create({
-    data: { resourceType, resourceId, targetType, targetId, grantedById },
+    data: { resourceType, resourceId, targetType: normalizedTargetType, targetId, grantedById },
     include: { grantedBy: { select: { id: true, fullName: true } } },
   });
 
   // Send notifications when sharing with a division
-  if (targetType === 'DIVISION' || targetType === 'division') {
+  if (normalizedTargetType === 'division') {
     const users = await prisma.user.findMany({
       where: { divisionId: targetId, id: { not: grantedById } },
       select: { id: true },

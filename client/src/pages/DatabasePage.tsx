@@ -572,13 +572,13 @@ export default function DatabasePage() {
                 <div className="flex items-center gap-1.5 flex-shrink-0">
                   <span className="text-[10px] text-gray-300 hidden sm:block">{link.createdBy.fullName}</span>
                   <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    {perms.db_link.manageFolder && (
+                    {(perms.db_link.manageFolder || link.createdBy.id === user?.id) && (
                       <button onClick={() => setLinkModal({ open: true, link })}
                         className="p-1.5 text-gray-400 hover:text-navy hover:bg-navy/5 rounded-lg">
                         <Edit2 size={12} />
                       </button>
                     )}
-                    {perms.db_link.manageFolder && (isAdmin || link.createdBy.id === user?.id) && (
+                    {(perms.db_link.manageFolder || link.createdBy.id === user?.id) && (
                       <button onClick={() => handleDeleteLink(link)}
                         className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg">
                         <Trash2 size={12} />
