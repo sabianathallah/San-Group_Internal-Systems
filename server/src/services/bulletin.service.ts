@@ -1,4 +1,4 @@
-import { Prisma, BulletinCategory, BulletinPriority, AudienceType } from '@prisma/client';
+import { Prisma, BulletinCategory, BulletinPriority, AudienceType, NotificationType } from '@prisma/client';
 import { ParsedQs } from 'qs';
 import { prisma } from '@/config/database';
 import { parsePagination, buildMeta } from '@/helpers/pagination';
@@ -24,6 +24,32 @@ const BULLETIN_SELECT = {
   },
   _count: { select: { readStatus: true } },
 } as const;
+
+async function notifyBulletinPublished(bulletinId: string, authorId: string, title: string, priority: BulletinPriority, audienceType: AudienceType, authorDivisionId: string | null, divisionIds: string[]) {
+  const notifType = priority === BulletinPriority.URGENT ? NotificationType.BULLETIN_URGENT : NotificationType.BULLETIN_NEW;
+
+  let userWhere: Prisma.UserWhereInput = { isActive: true, id: { not: authorId } };
+  if (audienceType === AudienceType.DIVISION) {
+    userWhere = { ...userWhere, divisionId: authorDivisionId ?? undefined };
+  } else if (audienceType === AudienceType.CUSTOM && divisionIds.length > 0) {
+    userWhere = { ...userWhere, divisionId: { in: divisionIds } };
+  }
+
+  const users = await prisma.user.findMany({ where: userWhere, select: { id: true } });
+  if (users.length === 0) return;
+
+  await prisma.notification.createMany({
+    data: users.map((u) => ({
+      userId:  u.id,
+      actorId: authorId,
+      type:    notifType,
+      title:   priority === BulletinPriority.URGENT ? `Urgent: ${title}` : `New bulletin: ${title}`,
+      message: 'A new bulletin has been published. Click to read.',
+      link:    '/bulletin',
+    })),
+    skipDuplicates: true,
+  });
+}
 
 export async function listBulletinsService(
   userId: string,
@@ -150,7 +176,7 @@ export async function createBulletinService(
   const publishedAt = data.isPublished ? new Date() : null;
   const audienceType = data.audienceType ?? AudienceType.ALL;
 
-  return prisma.bulletin.create({
+  const bulletin = await prisma.bulletin.create({
     data: {
       title:       data.title,
       content:     data.content,
@@ -168,8 +194,15 @@ export async function createBulletinService(
             }
           : undefined,
     },
-    select: BULLETIN_SELECT,
+    select: { ...BULLETIN_SELECT, author: { select: { id: true, fullName: true, avatar: true, divisionId: true } } },
   });
+
+  if (bulletin.isPublished) {
+    const divisionIds = bulletin.audiences.map((a) => a.division.id);
+    await notifyBulletinPublished(bulletin.id, authorId, bulletin.title, bulletin.priority, bulletin.audienceType, bulletin.author.divisionId, divisionIds).catch(() => {});
+  }
+
+  return bulletin;
 }
 
 export async function updateBulletinService(
@@ -225,6 +258,17 @@ export async function updateBulletinService(
         data: data.audienceDivisionIds.map((divisionId) => ({ bulletinId: id, divisionId })),
         skipDuplicates: true,
       });
+    }
+  }
+
+  // Notify audience when bulletin is newly published
+  if (data.isPublished === true && !exists.isPublished) {
+    const fresh = await prisma.bulletin.findUnique({
+      where: { id },
+      select: { audienceType: true, priority: true, author: { select: { id: true, divisionId: true } }, audiences: { select: { divisionId: true } } },
+    });
+    if (fresh) {
+      await notifyBulletinPublished(id, fresh.author.id, updated.title, updated.priority, fresh.audienceType, fresh.author.divisionId, fresh.audiences.map((a) => a.divisionId)).catch(() => {});
     }
   }
 

@@ -110,11 +110,11 @@ export default function BulletinPage() {
   const canManageScheduled = roleLevel <= 3;
   const { perms } = usePermStore();
 
-  // Returns true if the current user can edit/delete this specific bulletin
+  // edit/delete are Scope ('none'|'own'|'division'|'all'), not boolean
   const canEditBulletin = (b: Bulletin) =>
-    (perms.bulletin?.edit ?? false) && (isAdmin || b.author.id === currentUserId);
+    perms.bulletin.edit !== 'none' && (isAdmin || b.author.id === currentUserId);
   const canDeleteBulletin = (b: Bulletin) =>
-    (perms.bulletin?.delete ?? false) && (isAdmin || b.author.id === currentUserId);
+    perms.bulletin.delete !== 'none' && (isAdmin || b.author.id === currentUserId);
 
   const [bulletins, setBulletins] = useState<Bulletin[]>([]);
   const [meta,      setMeta]      = useState<Meta | null>(null);
