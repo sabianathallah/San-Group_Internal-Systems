@@ -97,8 +97,9 @@ export async function listTasksService(
         sharedOr.push({ visibility: TaskVisibility.DIVISION_SELECT, divisionAccess: { some: { divisionId } } });
       }
     } else {
-      // own scope — can still see DIVISION_SELECT tasks their division is in
+      // own scope — can see DIVISION tasks from their division and DIVISION_SELECT tasks they're included in
       if (divisionId) {
+        sharedOr.push({ visibility: TaskVisibility.DIVISION, creator: { divisionId } });
         sharedOr.push({ visibility: TaskVisibility.DIVISION_SELECT, divisionAccess: { some: { divisionId } } });
       }
     }

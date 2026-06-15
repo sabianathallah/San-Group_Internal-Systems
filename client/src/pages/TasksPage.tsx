@@ -112,7 +112,7 @@ const PRIORITY_CONFIG: Record<TaskPriority, { label: string; color: string; dot:
 
 const VIEW_LABELS: Record<string, string> = {
   my_day: 'My Day', important: 'Important', planned: 'Planned',
-  assigned: 'Assigned to Me', my_tasks: 'My Tasks', completed: 'Selesai',
+  assigned: 'Assigned to Me', my_tasks: 'My Tasks', completed: 'Completed',
   browse: 'All Tasks', team: 'Team Tasks',
 };
 
@@ -221,7 +221,7 @@ function TasksSidebar({
     { id: 'planned',   icon: CalendarDays,  label: 'Planned'                             },
     { id: 'assigned',  icon: ClipboardList, label: 'Assigned to Me', badge: pendingCount },
     { id: 'my_tasks',  icon: LayoutList,    label: 'My Tasks'                            },
-    { id: 'completed', icon: CheckCircle2,  label: 'Selesai'                             },
+    { id: 'completed', icon: CheckCircle2,  label: 'Completed'                           },
   ];
   const workspaceItems: Item[] = [
     { id: 'browse', icon: Globe, label: 'All Tasks' },
@@ -252,7 +252,7 @@ function TasksSidebar({
   return (
     <div className="w-52 flex-shrink-0 bg-white border-r border-gray-100 flex flex-col h-full overflow-y-auto">
       <div className="px-4 pt-4 pb-1">
-        <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Pribadi</p>
+        <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Personal</p>
       </div>
       <div className="px-3 pb-2 space-y-0.5">
         {personalItems.map(renderItem)}
@@ -2472,8 +2472,10 @@ export default function TasksPage() {
 
   const handleTaskUpdated = useCallback((task: Task) => {
     setTasks((prev) => prev.map((t) => t.id === task.id ? { ...t, ...task } : t));
+    setCompletedTasks((prev) => prev.map((t) => t.id === task.id ? { ...t, ...task } : t));
     loadPendingCount();
-  }, [loadPendingCount]);
+    loadLists();
+  }, [loadPendingCount, loadLists]);
 
   const handleTaskCreated = useCallback((task: Task) => {
     setTasks((prev) => [task, ...prev]);
