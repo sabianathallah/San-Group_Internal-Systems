@@ -686,8 +686,7 @@ export async function getTaskStatsService(
 
     const memberCount = userIds.length;
     if (memberCount > 0) {
-      // Counts include Rahasia tasks (performance metric) — only their contents stay hidden
-      const teamWhere: Prisma.TaskWhereInput = { userId: { in: userIds }, parentTaskId: null };
+      const teamWhere: Prisma.TaskWhereInput = { userId: { in: userIds }, parentTaskId: null, visibility: { not: TaskVisibility.PRIVATE } };
       const [tTotal, tDone, tInProgress] = await prisma.$transaction([
         prisma.task.count({ where: teamWhere }),
         prisma.task.count({ where: { ...teamWhere, status: TaskStatus.DONE } }),
