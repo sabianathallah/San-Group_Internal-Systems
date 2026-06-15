@@ -37,29 +37,28 @@ export async function listBulletinsService(
 
   const where: Prisma.BulletinWhereInput = {};
 
-  // Non-admin hanya lihat yang published dan belum expired
+  // Non-admin hanya lihat yang published dan belum expired, ATAU draft milik sendiri
   if (!isAdmin) {
-    where.isPublished = true;
     const expiryFilter: Prisma.BulletinWhereInput = {
       OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
     };
 
-    // Audience filter for non-admin
     const audienceFilter: Prisma.BulletinWhereInput = {
       OR: [
         { audienceType: AudienceType.ALL },
-        {
-          audienceType: AudienceType.DIVISION,
-          author: { divisionId: userDivisionId },
-        },
-        {
-          audienceType: AudienceType.CUSTOM,
-          audiences: { some: { divisionId: userDivisionId } },
-        },
+        { audienceType: AudienceType.DIVISION, author: { divisionId: userDivisionId } },
+        { audienceType: AudienceType.CUSTOM, audiences: { some: { divisionId: userDivisionId } } },
       ],
     };
 
-    where.AND = [expiryFilter, audienceFilter];
+    where.AND = [{
+      OR: [
+        // Published, not expired, visible to this user's audience
+        { isPublished: true, AND: [expiryFilter, audienceFilter] },
+        // Or own draft (author can see their own unpublished)
+        { isPublished: false, authorId: userId },
+      ],
+    }];
   } else if (query.isPublished !== undefined) {
     where.isPublished = query.isPublished === 'true';
   }
@@ -119,7 +118,9 @@ export async function getBulletinByIdService(id: string, userId: string, roleLev
   });
 
   if (!bulletin) throw new AppError('Bulletin tidak ditemukan', 404);
-  if (!isAdmin && !bulletin.isPublished) throw new AppError('Bulletin tidak ditemukan', 404);
+  if (!isAdmin && !bulletin.isPublished && bulletin.author.id !== userId) {
+    throw new AppError('Bulletin tidak ditemukan', 404);
+  }
 
   const { readStatus, ...rest } = bulletin;
 

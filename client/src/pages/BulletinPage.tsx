@@ -104,9 +104,17 @@ function scheduleLabel(sa: ScheduledAnnouncement) {
 // ── Main Page ──────────────────────────────────────────────
 export default function BulletinPage() {
   const user = useAuthStore((s) => s.user);
-  const isAdmin = (user?.role?.level ?? 99) <= 2;
-  const canManageScheduled = (user?.role?.level ?? 99) <= 3;
+  const currentUserId = user?.id ?? '';
+  const roleLevel = user?.role?.level ?? 99;
+  const isAdmin = roleLevel <= 2;
+  const canManageScheduled = roleLevel <= 3;
   const { perms } = usePermStore();
+
+  // Returns true if the current user can edit/delete this specific bulletin
+  const canEditBulletin = (b: Bulletin) =>
+    (perms.bulletin?.edit ?? false) && (isAdmin || b.author.id === currentUserId);
+  const canDeleteBulletin = (b: Bulletin) =>
+    (perms.bulletin?.delete ?? false) && (isAdmin || b.author.id === currentUserId);
 
   const [bulletins, setBulletins] = useState<Bulletin[]>([]);
   const [meta,      setMeta]      = useState<Meta | null>(null);
@@ -312,7 +320,8 @@ export default function BulletinPage() {
                   key={b.id}
                   bulletin={b}
                   isSelected={selected?.id === b.id}
-                  isAdmin={isAdmin}
+                  canEdit={canEditBulletin(b)}
+                  canDelete={canDeleteBulletin(b)}
                   onClick={() => openDetail(b)}
                   onEdit={() => { setEditItem(b); setShowForm(true); }}
                   onDelete={() => handleDelete(b.id)}
@@ -372,7 +381,9 @@ export default function BulletinPage() {
       {/* ── Right: detail pane ── */}
       <div className="flex-1 bg-white border border-gray-200 rounded-lg overflow-hidden flex flex-col">
         {selected ? (
-          <DetailPane bulletin={selected} isAdmin={isAdmin}
+          <DetailPane bulletin={selected}
+            canEdit={canEditBulletin(selected)}
+            canDelete={canDeleteBulletin(selected)}
             onEdit={() => { setEditItem(selected); setShowForm(true); }}
             onDelete={() => handleDelete(selected.id)}
             onTogglePublish={() => handleTogglePublish(selected)}
@@ -391,7 +402,12 @@ export default function BulletinPage() {
         <BulletinFormModal
           bulletin={editItem}
           onClose={() => setShowForm(false)}
-          onSaved={() => { setShowForm(false); fetchBulletins(); }}
+          onSaved={() => {
+            setShowForm(false);
+            fetchBulletins();
+            // Refresh detail pane if we just edited the open bulletin
+            if (editItem && selected?.id === editItem.id) openDetail(editItem);
+          }}
         />
       )}
 
@@ -408,8 +424,8 @@ export default function BulletinPage() {
 }
 
 // ── BulletinCard ───────────────────────────────────────────
-function BulletinCard({ bulletin: b, isSelected, isAdmin, onClick, onEdit, onDelete, onTogglePublish }: {
-  bulletin: Bulletin; isSelected: boolean; isAdmin: boolean;
+function BulletinCard({ bulletin: b, isSelected, canEdit, canDelete, onClick, onEdit, onDelete, onTogglePublish }: {
+  bulletin: Bulletin; isSelected: boolean; canEdit: boolean; canDelete: boolean;
   onClick: () => void; onEdit: () => void;
   onDelete: () => void; onTogglePublish: () => void;
 }) {
@@ -454,25 +470,31 @@ function BulletinCard({ bulletin: b, isSelected, isAdmin, onClick, onEdit, onDel
         </div>
       </div>
 
-      {/* Admin actions */}
-      {isAdmin && (
+      {/* Author / admin actions */}
+      {(canEdit || canDelete) && (
         <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 flex items-center gap-1 transition-opacity">
-          <button onClick={(e) => { e.stopPropagation(); onTogglePublish(); }}
-            className="p-1 rounded hover:bg-white/80 text-gray-400 hover:text-gray-700 transition-colors"
-            title={b.isPublished ? 'Unpublish' : 'Publish'}
-          >
-            {b.isPublished ? <EyeOff size={13} /> : <Eye size={13} />}
-          </button>
-          <button onClick={(e) => { e.stopPropagation(); onEdit(); }}
-            className="p-1 rounded hover:bg-white/80 text-gray-400 hover:text-gray-700 transition-colors"
-          >
-            <Edit2 size={13} />
-          </button>
-          <button onClick={(e) => { e.stopPropagation(); onDelete(); }}
-            className="p-1 rounded hover:bg-white/80 text-gray-400 hover:text-danger transition-colors"
-          >
-            <Trash2 size={13} />
-          </button>
+          {canEdit && (
+            <button onClick={(e) => { e.stopPropagation(); onTogglePublish(); }}
+              className="p-1 rounded hover:bg-white/80 text-gray-400 hover:text-gray-700 transition-colors"
+              title={b.isPublished ? 'Unpublish' : 'Publish'}
+            >
+              {b.isPublished ? <EyeOff size={13} /> : <Eye size={13} />}
+            </button>
+          )}
+          {canEdit && (
+            <button onClick={(e) => { e.stopPropagation(); onEdit(); }}
+              className="p-1 rounded hover:bg-white/80 text-gray-400 hover:text-gray-700 transition-colors"
+            >
+              <Edit2 size={13} />
+            </button>
+          )}
+          {canDelete && (
+            <button onClick={(e) => { e.stopPropagation(); onDelete(); }}
+              className="p-1 rounded hover:bg-white/80 text-gray-400 hover:text-danger transition-colors"
+            >
+              <Trash2 size={13} />
+            </button>
+          )}
         </div>
       )}
     </div>
@@ -480,8 +502,8 @@ function BulletinCard({ bulletin: b, isSelected, isAdmin, onClick, onEdit, onDel
 }
 
 // ── DetailPane ─────────────────────────────────────────────
-function DetailPane({ bulletin: b, isAdmin, onEdit, onDelete, onTogglePublish }: {
-  bulletin: Bulletin; isAdmin: boolean;
+function DetailPane({ bulletin: b, canEdit, canDelete, onEdit, onDelete, onTogglePublish }: {
+  bulletin: Bulletin; canEdit: boolean; canDelete: boolean;
   onEdit: () => void; onDelete: () => void; onTogglePublish: () => void;
 }) {
   const cfg = priorityConfig(b.priority);
@@ -523,23 +545,29 @@ function DetailPane({ bulletin: b, isAdmin, onEdit, onDelete, onTogglePublish }:
             </div>
           </div>
 
-          {isAdmin && (
+          {(canEdit || canDelete) && (
             <div className="flex items-center gap-1 flex-shrink-0">
-              <button onClick={onTogglePublish}
-                className="flex items-center gap-1.5 h-8 px-3 text-xs border border-gray-300 rounded hover:bg-gray-50 transition-colors text-gray-600"
-              >
-                {b.isPublished ? <><EyeOff size={12} /> Unpublish</> : <><Eye size={12} /> Publish</>}
-              </button>
-              <button onClick={onEdit}
-                className="h-8 px-3 text-xs border border-gray-300 rounded hover:bg-gray-50 transition-colors text-gray-600"
-              >
-                <Edit2 size={12} />
-              </button>
-              <button onClick={onDelete}
-                className="h-8 px-3 text-xs border border-danger/30 rounded hover:bg-danger-light transition-colors text-danger"
-              >
-                <Trash2 size={12} />
-              </button>
+              {canEdit && (
+                <button onClick={onTogglePublish}
+                  className="flex items-center gap-1.5 h-8 px-3 text-xs border border-gray-300 rounded hover:bg-gray-50 transition-colors text-gray-600"
+                >
+                  {b.isPublished ? <><EyeOff size={12} /> Unpublish</> : <><Eye size={12} /> Publish</>}
+                </button>
+              )}
+              {canEdit && (
+                <button onClick={onEdit}
+                  className="h-8 px-3 text-xs border border-gray-300 rounded hover:bg-gray-50 transition-colors text-gray-600"
+                >
+                  <Edit2 size={12} />
+                </button>
+              )}
+              {canDelete && (
+                <button onClick={onDelete}
+                  className="h-8 px-3 text-xs border border-danger/30 rounded hover:bg-danger-light transition-colors text-danger"
+                >
+                  <Trash2 size={12} />
+                </button>
+              )}
             </div>
           )}
         </div>
