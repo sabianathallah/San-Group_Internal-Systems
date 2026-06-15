@@ -284,6 +284,22 @@ export async function createTaskService(userId: string, data: {
     data.visibility = TaskVisibility.PRIVATE;
   }
 
+  // Auto-upgrade visibility when assigning to someone else:
+  // use DIVISION_SELECT so both creator's and assignee's divisions can see the task in All Tasks.
+  if (isAssigned && data.assignedToId !== userId && !data.visibility) {
+    const [creator, assignee] = await Promise.all([
+      prisma.user.findUnique({ where: { id: userId },              select: { divisionId: true } }),
+      prisma.user.findUnique({ where: { id: data.assignedToId! }, select: { divisionId: true } }),
+    ]);
+    const divIds = [...new Set([creator?.divisionId, assignee?.divisionId].filter(Boolean) as string[])];
+    if (divIds.length > 0) {
+      data.visibility  = TaskVisibility.DIVISION_SELECT;
+      data.divisionIds = divIds;
+    } else {
+      data.visibility = TaskVisibility.DIVISION;
+    }
+  }
+
   const task = await prisma.task.create({
     data: {
       title:            data.title,
@@ -367,7 +383,7 @@ export async function updateTaskService(id: string, userId: string, permScope: s
 }) {
   const task = await prisma.task.findUnique({
     where: { id },
-    select: { userId: true, assignedToId: true, title: true },
+    select: { userId: true, assignedToId: true, title: true, visibility: true },
   });
   if (!task) throw new AppError('Task tidak ditemukan', 404);
 
@@ -394,6 +410,23 @@ export async function updateTaskService(id: string, userId: string, permScope: s
   let newAssignmentStatus: AssignmentStatus | null | undefined;
   if (data.assignedToId !== undefined) {
     newAssignmentStatus = data.assignedToId ? AssignmentStatus.PENDING : null;
+  }
+
+  // Auto-upgrade visibility when assigning cross-user and task is still PRIVATE:
+  // use DIVISION_SELECT so both creator's and assignee's divisions can see the task in All Tasks.
+  if (data.assignedToId && data.assignedToId !== userId && data.assignedToId !== task.assignedToId
+      && !data.visibility && task.visibility === TaskVisibility.PRIVATE) {
+    const [creator, assignee] = await Promise.all([
+      prisma.user.findUnique({ where: { id: task.userId },         select: { divisionId: true } }),
+      prisma.user.findUnique({ where: { id: data.assignedToId! }, select: { divisionId: true } }),
+    ]);
+    const divIds = [...new Set([creator?.divisionId, assignee?.divisionId].filter(Boolean) as string[])];
+    if (divIds.length > 0) {
+      data.visibility  = TaskVisibility.DIVISION_SELECT;
+      data.divisionIds = divIds;
+    } else {
+      data.visibility = TaskVisibility.DIVISION;
+    }
   }
 
   // Sync divisionAccess when visibility is DIVISION_SELECT
