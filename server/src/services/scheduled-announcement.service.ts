@@ -162,7 +162,7 @@ export async function fireScheduledAnnouncements() {
         type:    NotificationType.SYSTEM,
         title:   sa.title,
         message: sa.content,
-        link:    '/bulletin',
+        link:    '/notifications',
         userId,
         actorId: sa.createdBy.id,
       })),

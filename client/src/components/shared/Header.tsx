@@ -1,8 +1,8 @@
-import { useRef, useState, useEffect } from 'react';
+import { useRef, useState, useEffect, useCallback } from 'react';
 import { useLocation, useNavigate, Link } from 'react-router-dom';
 import {
   Menu, Bell, ChevronDown, LogOut, KeyRound, ChevronRight,
-  Loader2, Clock, Megaphone, ShieldAlert, Info, CheckCircle2, User, Search,
+  Loader2, Clock, Megaphone, ShieldAlert, Info, CheckCircle2, User, Search, ArrowRight,
 } from 'lucide-react';
 import { useUiStore } from '@/stores/uiStore';
 import { useAuthStore } from '@/stores/authStore';
@@ -12,6 +12,7 @@ import ChangePasswordModal from '@/components/shared/ChangePasswordModal';
 import { ROUTES } from '@/lib/constants';
 import { cn } from '@/lib/cn';
 import api from '@/lib/api';
+import { toast } from '@/stores/toastStore';
 
 const BREADCRUMB_MAP: Record<string, string> = {
   '/dashboard':          'Dashboard',
@@ -21,6 +22,7 @@ const BREADCRUMB_MAP: Record<string, string> = {
   '/database':           'DB Links',
   '/profile':            'My Profile',
   '/analytics':          'Analytics',
+  '/notifications':      'Notifications',
   '/admin/users':        'Manage Users',
   '/admin/permissions':  'Permissions',
   '/admin/audit-log':    'Audit Log',
@@ -39,13 +41,14 @@ function useBreadcrumbs() {
   return crumbs;
 }
 
-function NotifIcon({ type }: { type: string }) {
+export function NotifIcon({ type }: { type: string }) {
   const cls = 'flex-shrink-0 mt-0.5';
   switch (type) {
     case 'TASK_ASSIGNED':
     case 'TASK_COMPLETED':  return <CheckCircle2 size={14} className={cn(cls, 'text-info')} />;
     case 'BULLETIN_NEW':    return <Megaphone    size={14} className={cn(cls, 'text-warning')} />;
     case 'BULLETIN_URGENT': return <ShieldAlert  size={14} className={cn(cls, 'text-danger')} />;
+    case 'SYSTEM':          return <Clock        size={14} className={cn(cls, 'text-navy')} />;
     default:                return <Info         size={14} className={cn(cls, 'text-gray-400')} />;
   }
 }
@@ -67,6 +70,7 @@ export default function Header({ onSearchClick }: { onSearchClick?: () => void }
   const unreadCount   = useNotificationStore((s) => s.unreadCount);
   const notifLoading  = useNotificationStore((s) => s.loading);
   const fetchNotifs   = useNotificationStore((s) => s.fetch);
+  const pollNotifs    = useNotificationStore((s) => s.poll);
   const markRead      = useNotificationStore((s) => s.markRead);
   const markAllRead   = useNotificationStore((s) => s.markAllRead);
   const navigate = useNavigate();
@@ -83,6 +87,19 @@ export default function Header({ onSearchClick }: { onSearchClick?: () => void }
   useClickOutside(notifRef,    () => setNotifOpen(false));
 
   useEffect(() => { fetchNotifs(); }, [fetchNotifs]);
+
+  // Poll every 60s; toast when new notifications arrive
+  const handlePoll = useCallback(async () => {
+    const delta = await pollNotifs();
+    if (delta > 0) {
+      toast.info(`${delta} new notification${delta > 1 ? 's' : ''}`);
+    }
+  }, [pollNotifs]);
+
+  useEffect(() => {
+    const id = setInterval(handlePoll, 60_000);
+    return () => clearInterval(id);
+  }, [handlePoll]);
 
   async function handleLogout() {
     try { await api.post('/auth/logout'); } catch { /* ignore */ }
@@ -168,7 +185,12 @@ export default function Header({ onSearchClick }: { onSearchClick?: () => void }
                       <p className="text-sm text-gray-400">No notifications yet</p>
                     </div>
                   ) : notifications.map((n) => (
-                    <button key={n.id} onClick={() => markRead(n.id)}
+                    <button key={n.id}
+                      onClick={() => {
+                        markRead(n.id);
+                        if (n.link) navigate(n.link);
+                        setNotifOpen(false);
+                      }}
                       className={cn(
                         'w-full text-left flex items-start gap-2.5 px-4 py-3 border-b border-gray-50 last:border-0 hover:bg-gray-50 transition-colors',
                         !n.isRead && 'bg-info/5',
@@ -187,6 +209,13 @@ export default function Header({ onSearchClick }: { onSearchClick?: () => void }
                     </button>
                   ))}
                 </div>
+                <Link
+                  to={ROUTES.NOTIFICATIONS}
+                  onClick={() => setNotifOpen(false)}
+                  className="flex items-center justify-center gap-1.5 w-full py-2.5 text-xs font-medium text-navy hover:bg-gray-50 border-t border-gray-100 transition-colors"
+                >
+                  See all notifications <ArrowRight size={12} />
+                </Link>
               </div>
             )}
           </div>

@@ -16,7 +16,8 @@ interface NotificationState {
   notifications: Notification[];
   unreadCount:   number;
   loading:       boolean;
-  fetch:         () => Promise<void>;
+  fetch:         (limit?: number) => Promise<void>;
+  poll:          () => Promise<number>; // returns delta of new unread
   markRead:      (id: string) => Promise<void>;
   markAllRead:   () => Promise<void>;
 }
@@ -26,20 +27,28 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
   unreadCount:   0,
   loading:       false,
 
-  fetch: async () => {
+  fetch: async (limit = 30) => {
     set({ loading: true });
     try {
-      const res = await api.get('/notifications');
+      const res = await api.get('/notifications', { params: { limit } });
       const list: Notification[] = res.data.data ?? [];
-      set({
-        notifications: list,
-        unreadCount:   list.filter((n) => !n.isRead).length,
-      });
+      set({ notifications: list, unreadCount: list.filter((n) => !n.isRead).length });
     } catch {
       // silently ignore — bell stays empty on error
     } finally {
       set({ loading: false });
     }
+  },
+
+  poll: async () => {
+    const prevUnread = get().unreadCount;
+    try {
+      const res = await api.get('/notifications', { params: { limit: 30 } });
+      const list: Notification[] = res.data.data ?? [];
+      const newUnread = list.filter((n) => !n.isRead).length;
+      set({ notifications: list, unreadCount: newUnread });
+      return Math.max(0, newUnread - prevUnread);
+    } catch { return 0; }
   },
 
   markRead: async (id: string) => {

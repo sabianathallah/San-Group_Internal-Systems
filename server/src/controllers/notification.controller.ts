@@ -10,7 +10,8 @@ import {
 
 export async function listNotifications(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
-    const notifications = await listNotificationsService(req.user!.userId);
+    const limit = req.query.limit ? Number(req.query.limit) : 30;
+    const notifications = await listNotificationsService(req.user!.userId, limit);
     successResponse(res, notifications, 'Daftar notifikasi berhasil diambil');
   } catch (err) { next(err); }
 }

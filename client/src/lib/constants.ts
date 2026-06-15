@@ -12,4 +12,5 @@ export const ROUTES = {
   ADMIN_PERMISSIONS:  '/admin/permissions',
   ANALYTICS:          '/analytics',
   ADMIN_AUDIT_LOG:    '/admin/audit-log',
+  NOTIFICATIONS:      '/notifications',
 } as const;

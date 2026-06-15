@@ -12,12 +12,12 @@ const NOTIF_SELECT = {
   actor: { select: { id: true, fullName: true, avatar: true } },
 } as const;
 
-export async function listNotificationsService(userId: string) {
+export async function listNotificationsService(userId: string, limit = 30) {
   return prisma.notification.findMany({
     where: { userId },
     select: NOTIF_SELECT,
     orderBy: { createdAt: 'desc' },
-    take: 30,
+    take: Math.min(limit, 100),
   });
 }
 
