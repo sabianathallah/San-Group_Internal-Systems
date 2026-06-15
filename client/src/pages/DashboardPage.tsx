@@ -3,9 +3,9 @@ import {
   Star, AlertCircle, Megaphone, Users,
   ArrowRight, CheckCircle2, Circle,
   Loader2, Sun, ChevronDown, ChevronRight,
-  Plus, ExternalLink, Pin,
-  ClipboardList, TrendingUp, Activity,
-  BarChart3, Shield, UserCheck,
+  Plus, Pin,
+  ClipboardList, TrendingUp,
+  BarChart3, UserCheck,
 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/stores/authStore';
@@ -20,7 +20,6 @@ function getGreeting(): string {
   const h = new Date().getHours();
   if (h < 11) return 'Good morning';
   if (h < 15) return 'Good afternoon';
-  if (h < 18) return 'Good evening';
   return 'Good evening';
 }
 
@@ -36,7 +35,7 @@ function relativeDate(iso: string | null): { label: string; overdue: boolean } {
   const now  = new Date();
   now.setHours(0, 0, 0, 0);
   const diff = Math.ceil((d.getTime() - now.getTime()) / 86_400_000);
-  if (diff < 0)  return { label: `${Math.abs(diff)} days ago`, overdue: true };
+  if (diff < 0)  return { label: `${Math.abs(diff)}d overdue`, overdue: true };
   if (diff === 0) return { label: 'Today', overdue: false };
   if (diff === 1) return { label: 'Tomorrow', overdue: false };
   return {
@@ -45,7 +44,11 @@ function relativeDate(iso: string | null): { label: string; overdue: boolean } {
   };
 }
 
-function bulletinDate(iso: string): string {
+function bulletinAge(iso: string): string {
+  const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000);
+  if (diff === 0) return 'Today';
+  if (diff === 1) return 'Yesterday';
+  if (diff < 7)  return `${diff} days ago`;
   return new Date(iso).toLocaleDateString('en-US', { day: '2-digit', month: 'short' });
 }
 
@@ -76,17 +79,16 @@ const PRIORITY_COLOR: Record<TaskPriority, string> = {
   LOW:    'text-gray-300',
 };
 
-const BULLETIN_BADGE: Record<BulletinPriority, string> = {
-  URGENT:    'bg-danger/10 text-danger',
-  IMPORTANT: 'bg-warning/10 text-warning',
-  NORMAL:    'bg-gray-100 text-gray-500',
+const BULLETIN_BADGE: Record<BulletinPriority, { bg: string; dot: string }> = {
+  URGENT:    { bg: 'bg-danger/10 text-danger',   dot: 'bg-danger'  },
+  IMPORTANT: { bg: 'bg-warning/10 text-warning', dot: 'bg-warning' },
+  NORMAL:    { bg: 'bg-gray-100 text-gray-500',  dot: 'bg-gray-400'},
 };
 
 const BULLETIN_LABEL: Record<BulletinPriority, string> = {
   URGENT: 'Urgent', IMPORTANT: 'Important', NORMAL: 'General',
 };
 
-// ── Note color map (dashboard widget) ─────────────────────
 const NOTE_COLOR: Record<string, { bg: string; border: string }> = {
   yellow: { bg: 'bg-yellow-50',  border: 'border-yellow-200' },
   blue:   { bg: 'bg-blue-50',    border: 'border-blue-200'   },
@@ -98,7 +100,7 @@ const NOTE_COLOR: Record<string, { bg: string; border: string }> = {
 };
 
 // ── Progress Ring ──────────────────────────────────────────
-function ProgressRing({ done, total, size = 56 }: { done: number; total: number; size?: number }) {
+function ProgressRing({ done, total, size = 60 }: { done: number; total: number; size?: number }) {
   const pct    = total === 0 ? 0 : Math.round((done / total) * 100);
   const r      = (size - 8) / 2;
   const circ   = 2 * Math.PI * r;
@@ -107,48 +109,19 @@ function ProgressRing({ done, total, size = 56 }: { done: number; total: number;
   return (
     <div className="relative flex items-center justify-center" style={{ width: size, height: size }}>
       <svg width={size} height={size} className="-rotate-90">
-        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="rgba(255,255,255,0.2)" strokeWidth={4} />
+        <circle cx={size/2} cy={size/2} r={r} fill="none" stroke="rgba(255,255,255,0.15)" strokeWidth={4} />
         <circle
-          cx={size / 2} cy={size / 2} r={r} fill="none"
+          cx={size/2} cy={size/2} r={r} fill="none"
           stroke="white" strokeWidth={4}
           strokeDasharray={circ} strokeDashoffset={offset}
           strokeLinecap="round"
           style={{ transition: 'stroke-dashoffset 0.5s ease' }}
         />
       </svg>
-      <span className="absolute text-white font-semibold" style={{ fontSize: size * 0.22 }}>
-        {pct}%
-      </span>
-    </div>
-  );
-}
-
-// ── Stat Card ──────────────────────────────────────────────
-function StatCard({
-  icon: Icon, label, value, sub, color, loading,
-}: {
-  icon:     React.ElementType;
-  label:    string;
-  value:    number | string;
-  sub?:     string;
-  color:    string;
-  loading?: boolean;
-}) {
-  return (
-    <div className={cn('rounded-xl p-4 flex items-center gap-3 shadow-sm border', color)}>
-      <div className="flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center bg-white/30">
-        <Icon size={18} />
-      </div>
-      <div className="min-w-0">
-        <p className="text-[11px] font-medium opacity-80 truncate">{label}</p>
-        {loading ? (
-          <div className="h-5 w-10 rounded bg-white/30 animate-pulse mt-0.5" />
-        ) : (
-          <p className="text-xl font-bold leading-tight">{value}</p>
-        )}
-        {sub && !loading && (
-          <p className="text-[10px] opacity-70 mt-0.5">{sub}</p>
-        )}
+      <div className="absolute flex flex-col items-center">
+        <span className="text-white font-bold" style={{ fontSize: size * 0.22 }}>
+          {total === 0 ? '—' : `${pct}%`}
+        </span>
       </div>
     </div>
   );
@@ -168,48 +141,46 @@ function TaskRow({ task, onNavigate }: { task: Task; onNavigate: (id: string) =>
   return (
     <button
       onClick={() => onNavigate(task.id)}
-      className={cn(
-        'group flex items-center gap-3 px-5 py-3 border-b border-gray-50 last:border-0 w-full text-left',
-        'hover:bg-gray-50/70 transition-colors',
-      )}
+      className="group flex items-center gap-3 px-5 py-3 border-b border-gray-50 last:border-0 w-full text-left hover:bg-gray-50/70 transition-colors"
     >
       <span
         className="flex-shrink-0 w-4 h-4 rounded-full border-2 flex items-center justify-center"
         style={{ borderColor: dotColor, backgroundColor: isDone ? dotColor : 'transparent' }}
       >
         {isDone && <CheckCircle2 size={9} className="text-white" strokeWidth={3} />}
-        {isProgress && !isDone && <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: dotColor }} />}
-        {isPending && <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: dotColor }} />}
+        {!isDone && (isProgress || isPending) && (
+          <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: dotColor }} />
+        )}
       </span>
 
       <div className="flex-1 min-w-0">
         <p className={cn('text-sm text-gray-800 truncate', isDone && 'line-through text-gray-400')}>
           {task.title}
         </p>
-        <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+        <div className="flex items-center gap-2 mt-0.5">
           {isPending && (
-            <span className="text-[10px] font-medium text-amber-500">Waiting for confirmation</span>
+            <span className="text-[10px] font-medium text-amber-500">Waiting</span>
           )}
-          {isProgress && !isDone && !isPending && (
-            <span className="text-[10px] font-medium text-info">On progress</span>
+          {isProgress && !isPending && (
+            <span className="text-[10px] font-medium text-info">In progress</span>
           )}
           {dueLabel && (
             <span className={cn('text-[10px]', overdue ? 'text-danger font-semibold' : 'text-gray-400')}>
-              {overdue && '⚠ '}{dueLabel}
+              {dueLabel}
             </span>
           )}
-          {task.assignee && (
-            <span className="text-[10px] text-gray-400">· {task.assignee.fullName}</span>
+          {task.assignee && !isDone && (
+            <span className="text-[10px] text-gray-400 truncate">· {task.assignee.fullName}</span>
           )}
         </div>
       </div>
 
       <Star
-        size={13}
+        size={12}
         className={cn('flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity', PRIORITY_COLOR[task.priority])}
         fill={task.priority === 'URGENT' || task.priority === 'HIGH' ? 'currentColor' : 'none'}
       />
-      <ArrowRight size={13} className="flex-shrink-0 text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity" />
+      <ArrowRight size={12} className="flex-shrink-0 text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity" />
     </button>
   );
 }
@@ -217,7 +188,7 @@ function TaskRow({ task, onNavigate }: { task: Task; onNavigate: (id: string) =>
 // ── Quick Add Task ─────────────────────────────────────────
 function QuickAddTask({ onAdded }: { onAdded: (task: Task) => void }) {
   const [active, setActive] = useState(false);
-  const [title, setTitle]   = useState('');
+  const [title,  setTitle]  = useState('');
   const [saving, setSaving] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -235,9 +206,7 @@ function QuickAddTask({ onAdded }: { onAdded: (task: Task) => void }) {
       onAdded(res.data.data);
       setTitle('');
       setActive(false);
-    } catch {
-      // silent
-    } finally {
+    } catch { /* silent */ } finally {
       setSaving(false);
     }
   }
@@ -248,18 +217,15 @@ function QuickAddTask({ onAdded }: { onAdded: (task: Task) => void }) {
         onClick={open}
         className="flex items-center gap-2.5 w-full px-5 py-3.5 text-sm text-gray-400 hover:text-navy hover:bg-gray-50/60 transition-colors border-t border-gray-100"
       >
-        <Plus size={16} className="text-navy" />
-        Add task
+        <Plus size={15} className="text-navy" />
+        Add task to My Day
       </button>
     );
   }
 
   return (
-    <form
-      onSubmit={handleSubmit}
-      className="flex items-center gap-2.5 px-5 py-3 border-t border-navy/20 bg-navy/5"
-    >
-      <Circle size={18} className="text-gray-300 flex-shrink-0" />
+    <form onSubmit={handleSubmit} className="flex items-center gap-2.5 px-5 py-3 border-t border-navy/20 bg-navy/5">
+      <Circle size={16} className="text-gray-300 flex-shrink-0" />
       <input
         ref={inputRef}
         value={title}
@@ -269,213 +235,105 @@ function QuickAddTask({ onAdded }: { onAdded: (task: Task) => void }) {
         className="flex-1 text-sm bg-transparent outline-none text-gray-800 placeholder:text-gray-400"
       />
       <button
-        type="submit"
-        disabled={saving || !title.trim()}
+        type="submit" disabled={saving || !title.trim()}
         className="px-3 py-1 text-xs font-medium text-white bg-navy rounded hover:bg-navy-light disabled:opacity-40 transition-colors"
       >
         {saving ? <Loader2 size={12} className="animate-spin" /> : 'Add'}
       </button>
-      <button
-        type="button"
-        onClick={() => setActive(false)}
-        className="text-xs text-gray-400 hover:text-gray-600"
-      >
+      <button type="button" onClick={() => setActive(false)} className="text-xs text-gray-400 hover:text-gray-600">
         Cancel
       </button>
     </form>
   );
 }
 
-// ── Role Stats Section ─────────────────────────────────────
-function RoleStatsSection({ stats, statsLoading, roleLevel }: {
-  stats:        TaskStats | null;
-  statsLoading: boolean;
-  roleLevel:    number;
-}) {
+// ── Personal Stats Strip ───────────────────────────────────
+function PersonalStats({ stats, loading }: { stats: TaskStats | null; loading: boolean }) {
+  const items = [
+    { label: 'To Do',    value: stats?.personal.todo,       color: 'text-blue-600'   },
+    { label: 'Active',   value: stats?.personal.inProgress, color: 'text-amber-600'  },
+    { label: 'Done',     value: stats?.personal.done,       color: 'text-green-600'  },
+    { label: 'Awaiting', value: stats?.personal.assigned,   color: 'text-orange-600' },
+  ];
+
+  return (
+    <div className="px-4 pt-3 pb-3 bg-white border-b border-gray-100">
+      <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2">My Tasks</p>
+      <div className="grid grid-cols-4 gap-1.5">
+        {items.map(({ label, value, color }) => (
+          <div key={label} className="rounded-lg bg-gray-50 py-2.5 text-center">
+            {loading ? (
+              <div className="h-5 w-6 mx-auto rounded bg-gray-200 animate-pulse mb-1" />
+            ) : (
+              <p className={cn('text-lg font-bold leading-tight', color)}>{value ?? 0}</p>
+            )}
+            <p className="text-[10px] text-gray-400 mt-0.5 leading-tight">{label}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── Team Stats ─────────────────────────────────────────────
+function TeamStats({ stats, loading, roleLevel }: { stats: TaskStats | null; loading: boolean; roleLevel: number }) {
+  if (roleLevel > 5) return null;
+
   const teamDonePct = stats?.team && stats.team.total > 0
     ? Math.round((stats.team.done / stats.team.total) * 100)
     : 0;
 
+  const label = roleLevel <= 3 ? 'My Division' : 'My Team';
+
   return (
-    <div className="px-4 pt-3 pb-4 bg-white border-b border-gray-100">
-      {/* Personal stats — always visible */}
-      <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2">
-        My Tasks
-      </p>
-      <div className="grid grid-cols-2 gap-2">
-        <StatCard
-          icon={ClipboardList}
-          label="To Do"
-          value={stats?.personal.todo ?? 0}
-          color="bg-blue-50 text-blue-700 border-blue-100"
-          loading={statsLoading}
-        />
-        <StatCard
-          icon={Activity}
-          label="In Progress"
-          value={stats?.personal.inProgress ?? 0}
-          color="bg-amber-50 text-amber-700 border-amber-100"
-          loading={statsLoading}
-        />
-        <StatCard
-          icon={CheckCircle2}
-          label="Completed This Week"
-          value={stats?.personal.done ?? 0}
-          color="bg-green-50 text-green-700 border-green-100"
-          loading={statsLoading}
-        />
-        <StatCard
-          icon={UserCheck}
-          label="Awaiting Confirmation"
-          value={stats?.personal.assigned ?? 0}
-          color="bg-orange-50 text-orange-700 border-orange-100"
-          loading={statsLoading}
-        />
-      </div>
-
-      {/* Team stats — for Supervisor/Manager/Director/Admin (level <= 5) */}
-      {roleLevel <= 5 && (
-        <div className="mt-3">
-          <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2">
-            My Team
-          </p>
-          <div className="rounded-xl border border-indigo-100 bg-indigo-50 p-3">
-            {statsLoading ? (
-              <div className="flex gap-3">
-                {[1,2,3].map((i) => <div key={i} className="flex-1 h-10 rounded-lg bg-white/50 animate-pulse" />)}
-              </div>
-            ) : stats?.team ? (
-              <div className="flex items-center gap-3">
-                <div className="flex-1 text-center">
-                  <p className="text-xl font-bold text-indigo-700">{stats.team.total}</p>
-                  <p className="text-[10px] text-indigo-500">Total Tasks</p>
-                </div>
-                <div className="w-px h-8 bg-indigo-200" />
-                <div className="flex-1 text-center">
-                  <p className="text-xl font-bold text-indigo-700">{teamDonePct}%</p>
-                  <p className="text-[10px] text-indigo-500">Done</p>
-                </div>
-                <div className="w-px h-8 bg-indigo-200" />
-                <div className="flex-1 text-center">
-                  <p className="text-xl font-bold text-indigo-700">{stats.team.memberCount}</p>
-                  <p className="text-[10px] text-indigo-500">Members</p>
-                </div>
-              </div>
-            ) : (
-              <p className="text-xs text-indigo-400 text-center py-2">No team data available</p>
-            )}
+    <div className="px-4 pt-3 pb-3 bg-white border-b border-gray-100">
+      <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2">{label}</p>
+      {loading ? (
+        <div className="h-12 rounded-lg bg-gray-100 animate-pulse" />
+      ) : stats?.team ? (
+        <div className="rounded-lg border border-gray-100 bg-gray-50 px-3 py-2.5 grid grid-cols-3 gap-2 text-center">
+          <div>
+            <p className="text-base font-bold text-gray-800">{stats.team.total}</p>
+            <p className="text-[10px] text-gray-400">Tasks</p>
+          </div>
+          <div>
+            <p className="text-base font-bold text-navy">{teamDonePct}%</p>
+            <p className="text-[10px] text-gray-400">Done</p>
+          </div>
+          <div>
+            <p className="text-base font-bold text-gray-800">{stats.team.memberCount}</p>
+            <p className="text-[10px] text-gray-400">Members</p>
           </div>
         </div>
-      )}
-
-      {/* Division stats — for Director (level <= 3) shown as sub-label in team card */}
-      {roleLevel <= 3 && roleLevel > 2 && (
-        <div className="mt-3">
-          <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2">
-            Division
-          </p>
-          <div className="rounded-xl border border-violet-100 bg-violet-50 p-3 flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-violet-200 flex items-center justify-center flex-shrink-0">
-              <BarChart3 size={15} className="text-violet-700" />
-            </div>
-            {statsLoading ? (
-              <div className="flex-1 h-8 rounded-lg bg-white/50 animate-pulse" />
-            ) : (
-              <div className="flex-1">
-                <p className="text-sm font-semibold text-violet-800">
-                  {stats?.team ? `${teamDonePct}% completion rate` : '—'}
-                </p>
-                <p className="text-[10px] text-violet-500">
-                  {stats?.team ? `${stats.team.done} of ${stats.team.total} tasks completed` : 'Loading data…'}
-                </p>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* System stats — for Admin/SuperAdmin (level <= 2) */}
-      {roleLevel <= 2 && stats?.system && (
-        <div className="mt-3">
-          <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2">
-            System
-          </p>
-          <div className="grid grid-cols-3 gap-2">
-            <div className="rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-center">
-              <p className="text-lg font-bold text-slate-700">
-                {statsLoading ? '—' : stats.system.totalUsers}
-              </p>
-              <p className="text-[10px] text-slate-500">Users</p>
-            </div>
-            <div className="rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-center">
-              <p className="text-lg font-bold text-slate-700">
-                {statsLoading ? '—' : stats.system.totalTasks}
-              </p>
-              <p className="text-[10px] text-slate-500">Task</p>
-            </div>
-            <div className="rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-center">
-              <p className="text-lg font-bold text-slate-700">
-                {statsLoading ? '—' : stats.system.totalBulletins}
-              </p>
-              <p className="text-[10px] text-slate-500">Bulletin</p>
-            </div>
-          </div>
-        </div>
+      ) : (
+        <p className="text-xs text-gray-400 py-2 text-center">No team data</p>
       )}
     </div>
   );
 }
 
-// ── Quick Actions ──────────────────────────────────────────
-function QuickActionsSection({ roleLevel }: { roleLevel: number }) {
-  const navigate = useNavigate();
-
-  const actions: { label: string; to?: string; onClick?: () => void; icon: React.ElementType }[] = [
-    { label: 'Task Management',    to: ROUTES.TASKS,    icon: ClipboardList },
-    { label: 'My Notes',           to: ROUTES.NOTES,    icon: Pin },
-    { label: 'Bulletin Board',     to: ROUTES.BULLETIN, icon: Megaphone },
-    { label: 'Database Links',     to: ROUTES.DATABASE, icon: ExternalLink },
-  ];
-
-  if (roleLevel <= 4) {
-    actions.push({ label: 'Team Tasks', onClick: () => navigate(ROUTES.TASKS, { state: { view: 'team' } }), icon: Users });
-  }
-  if (roleLevel <= 2) {
-    actions.push({ label: 'Manage Users',  to: ROUTES.ADMIN_USERS,       icon: Users });
-    actions.push({ label: 'Permissions',   to: ROUTES.ADMIN_PERMISSIONS, icon: Shield });
-  }
+// ── System Stats (Admin only) ──────────────────────────────
+function SystemStats({ stats, loading }: { stats: TaskStats | null; loading: boolean }) {
+  if (!stats?.system) return null;
 
   return (
-    <div className="bg-white px-4 py-3">
-      <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2">Quick Menu</p>
-      <div className="space-y-0.5">
-        {actions.map((a) =>
-          a.to ? (
-            <Link
-              key={a.label}
-              to={a.to}
-              className="flex items-center justify-between px-2 py-2 rounded text-xs text-gray-600 hover:bg-gray-50 hover:text-navy transition-colors group"
-            >
-              <span className="flex items-center gap-2">
-                <a.icon size={12} className="text-gray-400 group-hover:text-navy" />
-                {a.label}
-              </span>
-              <ExternalLink size={10} className="text-gray-300 group-hover:text-navy opacity-0 group-hover:opacity-100 transition-all" />
-            </Link>
-          ) : (
-            <button
-              key={a.label}
-              onClick={a.onClick}
-              className="flex items-center justify-between w-full px-2 py-2 rounded text-xs text-gray-600 hover:bg-gray-50 hover:text-navy transition-colors group"
-            >
-              <span className="flex items-center gap-2">
-                <a.icon size={12} className="text-gray-400 group-hover:text-navy" />
-                {a.label}
-              </span>
-              <ExternalLink size={10} className="text-gray-300 group-hover:text-navy opacity-0 group-hover:opacity-100 transition-all" />
-            </button>
-          ),
-        )}
+    <div className="px-4 pt-3 pb-3 bg-white border-b border-gray-100">
+      <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2">System</p>
+      <div className="grid grid-cols-3 gap-1.5 text-center">
+        {[
+          { label: 'Users',    value: stats.system.totalUsers     },
+          { label: 'Tasks',    value: stats.system.totalTasks     },
+          { label: 'Bulletin', value: stats.system.totalBulletins },
+        ].map(({ label, value }) => (
+          <div key={label} className="rounded-lg bg-gray-50 py-2.5">
+            {loading ? (
+              <div className="h-5 w-6 mx-auto rounded bg-gray-200 animate-pulse mb-1" />
+            ) : (
+              <p className="text-base font-bold text-gray-800">{value}</p>
+            )}
+            <p className="text-[10px] text-gray-400 mt-0.5">{label}</p>
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -488,7 +346,6 @@ export default function DashboardPage() {
   const roleLevel = user?.role?.level ?? 99;
   const isAdmin   = roleLevel <= 2;
 
-  // ── Shared task store ──
   const allTasks    = useTaskStore((s) => s.tasks);
   const taskLoading = useTaskStore((s) => s.loading);
   const addTask     = useTaskStore((s) => s.addTask);
@@ -497,7 +354,6 @@ export default function DashboardPage() {
     navigate(ROUTES.TASKS, { state: { selectedTaskId: taskId } });
   }, [navigate]);
 
-  // ── Shared note store ──
   const allNotes = useNoteStore((s) => s.notes);
 
   const [bulletins,    setBulletins]    = useState<Bulletin[]>([]);
@@ -506,7 +362,6 @@ export default function DashboardPage() {
   const [stats,        setStats]        = useState<TaskStats | null>(null);
   const [statsLoading, setStatsLoading] = useState(true);
 
-  // Single mount effect — fetch all dashboard data once
   useEffect(() => {
     useTaskStore.getState().fetchTasks();
     useNoteStore.getState().fetchNotes();
@@ -528,19 +383,14 @@ export default function DashboardPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  function handleTaskAdded(task: Task) {
-    addTask(task);
-  }
-
-  // Derived — dashboard hanya tampilkan tasks di My Day hari ini
   const now = new Date(); now.setHours(0, 0, 0, 0);
-  const myDayTasks = allTasks.filter(isInMyDay);
-  const active  = myDayTasks.filter((t) => t.status !== 'DONE');
-  const done    = myDayTasks.filter((t) => t.status === 'DONE');
-  const overdue = active.filter((t) => t.dueDate && new Date(t.dueDate) < now);
+  const myDayTasks      = allTasks.filter(isInMyDay);
+  const active          = myDayTasks.filter((t) => t.status !== 'DONE');
+  const done            = myDayTasks.filter((t) => t.status === 'DONE');
+  const overdue         = active.filter((t) => t.dueDate && new Date(t.dueDate) < now);
   const unreadBulletins = bulletins.filter((b) => !b.isRead);
+  const awaiting        = stats?.personal.assigned ?? 0;
 
-  // Sort active tasks: overdue first, then by due date, then no date
   const sortedActive = [...active].sort((a, b) => {
     const aOver = a.dueDate && new Date(a.dueDate) < now;
     const bOver = b.dueDate && new Date(b.dueDate) < now;
@@ -552,18 +402,17 @@ export default function DashboardPage() {
     return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
   });
 
-  // Notes widget: hanya yang disematkan (pinned), max 4
-  const dashNotes = allNotes.filter((n) => n.isPinned).slice(0, 4);
-
-  const firstName = user?.fullName?.split(' ')[0] ?? 'User';
+  const dashNotes  = allNotes.filter((n) => n.isPinned).slice(0, 4);
+  const firstName  = user?.fullName?.split(' ')[0] ?? 'User';
 
   return (
     <div className="space-y-0 -m-6">
-      {/* ── Header / My Day ─────────────────────────────── */}
+
+      {/* ── Header ──────────────────────────────────────── */}
       <div className="bg-navy px-8 pt-8 pb-6">
         <div className="flex items-start justify-between">
           <div>
-            <p className="text-navy-100/70 text-xs font-medium tracking-widest uppercase mb-1">
+            <p className="text-white/40 text-xs font-medium tracking-widest uppercase mb-1">
               {formatDateShort()}
             </p>
             <h1 className="text-white text-2xl font-semibold leading-tight">
@@ -571,14 +420,13 @@ export default function DashboardPage() {
             </h1>
             <p className="text-white/50 text-sm mt-1">
               {myDayTasks.length === 0
-                ? 'No tasks in My Day today'
+                ? 'No tasks in My Day — add one below'
                 : active.length === 0
                   ? 'All My Day tasks completed!'
-                  : `${active.length} My Day task${active.length !== 1 ? 's' : ''} pending`}
+                  : `${active.length} task${active.length !== 1 ? 's' : ''} remaining today`}
             </p>
-            {/* Role badge */}
             {user?.role && (
-              <span className="inline-flex items-center gap-1 mt-2 text-[10px] font-medium text-white/60 bg-white/10 px-2 py-0.5 rounded-full">
+              <span className="inline-flex items-center gap-1 mt-2 text-[10px] font-medium text-white/50 bg-white/10 px-2 py-0.5 rounded-full">
                 <TrendingUp size={9} />
                 {user.role.name}
                 {user.division?.name && ` · ${user.division.name}`}
@@ -586,54 +434,41 @@ export default function DashboardPage() {
             )}
           </div>
 
-          {/* Progress ring */}
           <div className="flex flex-col items-center gap-1">
             {taskLoading
               ? <div className="w-14 h-14 rounded-full border-4 border-white/20 animate-pulse" />
-              : <ProgressRing done={done.length} total={myDayTasks.length} size={60} />
+              : <ProgressRing done={done.length} total={myDayTasks.length} />
             }
-            <p className="text-white/60 text-[10px] mt-0.5">
+            <p className="text-white/40 text-[10px]">
               {done.length}/{myDayTasks.length} done
             </p>
           </div>
         </div>
 
-        {/* Stats strip */}
-        <div className="flex items-center gap-5 mt-5 flex-wrap">
-          <StatChip
-            icon={AlertCircle}
-            label={`${overdue.length} overdue`}
-            active={overdue.length > 0}
-            danger
-          />
-          <StatChip
-            icon={Megaphone}
-            label={`${unreadBulletins.length} unread bulletin${unreadBulletins.length !== 1 ? 's' : ''}`}
-            active={unreadBulletins.length > 0}
-          />
-          {isAdmin && (
-            <StatChip
-              icon={Users}
-              label={`${activeUsers} active staff`}
-              active={false}
-            />
-          )}
-          {stats?.personal.assigned !== undefined && stats.personal.assigned > 0 && (
-            <StatChip
-              icon={UserCheck}
-              label={`${stats.personal.assigned} awaiting confirmation`}
-              active
-            />
-          )}
-        </div>
+        {/* Alert chips — only shown when non-zero */}
+        {(overdue.length > 0 || unreadBulletins.length > 0 || awaiting > 0 || (isAdmin && activeUsers > 0)) && (
+          <div className="flex items-center gap-2.5 mt-5 flex-wrap">
+            {overdue.length > 0 && (
+              <AlertChip icon={AlertCircle} label={`${overdue.length} overdue`} danger />
+            )}
+            {unreadBulletins.length > 0 && (
+              <AlertChip icon={Megaphone} label={`${unreadBulletins.length} unread`} />
+            )}
+            {awaiting > 0 && (
+              <AlertChip icon={UserCheck} label={`${awaiting} awaiting`} />
+            )}
+            {isAdmin && activeUsers > 0 && (
+              <AlertChip icon={Users} label={`${activeUsers} users`} />
+            )}
+          </div>
+        )}
       </div>
 
-      {/* ── Body ────────────────────────────────────────── */}
-      <div className="grid grid-cols-3 gap-0 bg-gray-50 min-h-[calc(100vh-220px)]">
+      {/* ── Body ──────────────────────────────────────────── */}
+      <div className="grid grid-cols-3 bg-gray-50 min-h-[calc(100vh-220px)]">
 
-        {/* ── Task List (2/3) ── */}
+        {/* ── Left: My Day tasks (2/3) ── */}
         <div className="col-span-2 bg-white border-r border-gray-100">
-          {/* Section header */}
           <div className="flex items-center justify-between px-5 py-3.5 border-b border-gray-100 sticky top-0 bg-white z-10">
             <div className="flex items-center gap-2">
               <Sun size={15} className="text-navy" />
@@ -644,19 +479,15 @@ export default function DashboardPage() {
                 </span>
               )}
             </div>
-            <Link
-              to={ROUTES.TASKS}
-              className="flex items-center gap-1 text-xs text-gray-400 hover:text-navy transition-colors"
-            >
-              View all <ArrowRight size={11} />
+            <Link to={ROUTES.TASKS} className="flex items-center gap-1 text-xs text-gray-400 hover:text-navy transition-colors">
+              All tasks <ArrowRight size={11} />
             </Link>
           </div>
 
-          {/* Task rows */}
           {taskLoading ? (
             <div className="flex flex-col items-center justify-center py-16 gap-2">
               <Loader2 size={22} className="animate-spin text-gray-300" />
-              <p className="text-xs text-gray-400">Loading tasks...</p>
+              <p className="text-xs text-gray-400">Loading tasks…</p>
             </div>
           ) : sortedActive.length === 0 && done.length === 0 ? (
             <EmptyMyDay onNavigate={() => navigate(ROUTES.TASKS)} />
@@ -665,21 +496,16 @@ export default function DashboardPage() {
               {sortedActive.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-10 gap-2">
                   <CheckCircle2 size={28} className="text-success" />
-                  <p className="text-sm font-medium text-gray-700">All tasks done!</p>
-                  <p className="text-xs text-gray-400">No active tasks at the moment.</p>
+                  <p className="text-sm font-medium text-gray-700">All tasks done for today!</p>
                 </div>
               ) : (
-                <div>
-                  {sortedActive.map((task) => (
-                    <TaskRow key={task.id} task={task} onNavigate={goToTask} />
-                  ))}
-                </div>
+                sortedActive.map((task) => (
+                  <TaskRow key={task.id} task={task} onNavigate={goToTask} />
+                ))
               )}
 
-              {/* Quick add */}
-              <QuickAddTask onAdded={handleTaskAdded} />
+              <QuickAddTask onAdded={(t) => addTask(t)} />
 
-              {/* Completed section */}
               {done.length > 0 && (
                 <div className="border-t border-gray-100">
                   <button
@@ -687,8 +513,8 @@ export default function DashboardPage() {
                     className="flex items-center gap-2 w-full px-5 py-3 text-xs text-gray-500 hover:bg-gray-50 transition-colors"
                   >
                     {showDone ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
-                    <span className="font-medium">Done</span>
-                    <span className="text-gray-400">{done.length}</span>
+                    <span className="font-medium">Completed</span>
+                    <span className="ml-1 text-gray-400">{done.length}</span>
                   </button>
                   {showDone && done.map((task) => (
                     <TaskRow key={task.id} task={task} onNavigate={goToTask} />
@@ -699,15 +525,21 @@ export default function DashboardPage() {
           )}
         </div>
 
-        {/* ── Right Panel (1/3) ── */}
-        <div className="col-span-1 flex flex-col gap-0 overflow-y-auto">
+        {/* ── Right panel (1/3) ── */}
+        <div className="col-span-1 flex flex-col overflow-y-auto">
 
-          {/* Role-based stats cards */}
-          <RoleStatsSection stats={stats} statsLoading={statsLoading} roleLevel={roleLevel} />
+          {/* Personal task stats */}
+          <PersonalStats stats={stats} loading={statsLoading} />
 
-          {/* Bulletin terbaru */}
-          <div className="flex-1 border-b border-gray-100">
-            <div className="flex items-center justify-between px-4 py-3.5 border-b border-gray-100 bg-white sticky top-0 z-10">
+          {/* Team / Division stats */}
+          <TeamStats stats={stats} loading={statsLoading} roleLevel={roleLevel} />
+
+          {/* System stats (Admin+) */}
+          {isAdmin && <SystemStats stats={stats} loading={statsLoading} />}
+
+          {/* Bulletin */}
+          <div className="flex-shrink-0">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 bg-white sticky top-0 z-10">
               <div className="flex items-center gap-2">
                 <Megaphone size={14} className="text-navy" />
                 <span className="text-sm font-semibold text-gray-800">Bulletin</span>
@@ -724,55 +556,47 @@ export default function DashboardPage() {
 
             <div className="bg-white">
               {bulletins.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-10 text-center px-4">
-                  <Megaphone size={24} className="text-gray-200 mb-2" />
+                <div className="flex flex-col items-center justify-center py-8 text-center px-4">
+                  <Megaphone size={22} className="text-gray-200 mb-2" />
                   <p className="text-xs text-gray-400">No announcements yet</p>
                 </div>
               ) : (
-                <ul>
-                  {bulletins.slice(0, 5).map((b) => (
-                    <li
-                      key={b.id}
-                      className="flex items-start gap-3 px-4 py-3 border-b border-gray-50 last:border-0 hover:bg-gray-50/60 transition-colors"
-                    >
-                      <div className="flex-shrink-0 mt-1.5">
-                        {!b.isRead
-                          ? <span className="block w-1.5 h-1.5 rounded-full bg-navy" />
-                          : <span className="block w-1.5 h-1.5 rounded-full bg-transparent" />
-                        }
+                bulletins.slice(0, 5).map((b) => (
+                  <Link
+                    key={b.id}
+                    to={ROUTES.BULLETIN}
+                    className="flex items-start gap-3 px-4 py-3 border-b border-gray-50 last:border-0 hover:bg-gray-50/60 transition-colors"
+                  >
+                    <span className={cn(
+                      'flex-shrink-0 mt-1.5 w-1.5 h-1.5 rounded-full',
+                      BULLETIN_BADGE[b.priority].dot,
+                      b.isRead && 'opacity-30',
+                    )} />
+                    <div className="flex-1 min-w-0">
+                      <p className={cn('text-xs leading-snug', !b.isRead ? 'font-semibold text-gray-800' : 'text-gray-500')}>
+                        {b.title}
+                      </p>
+                      <div className="flex items-center gap-1.5 mt-1">
+                        <span className={cn('text-[10px] font-medium px-1.5 py-0.5 rounded-full', BULLETIN_BADGE[b.priority].bg)}>
+                          {BULLETIN_LABEL[b.priority]}
+                        </span>
+                        {b.publishedAt && (
+                          <span className="text-[10px] text-gray-400">{bulletinAge(b.publishedAt)}</span>
+                        )}
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <p className={cn(
-                          'text-xs leading-snug',
-                          !b.isRead ? 'font-semibold text-gray-800' : 'text-gray-600',
-                        )}>
-                          {b.title}
-                        </p>
-                        <div className="flex items-center gap-1.5 mt-1">
-                          <span className={cn('text-[10px] font-medium px-1.5 py-0.5 rounded-full', BULLETIN_BADGE[b.priority])}>
-                            {BULLETIN_LABEL[b.priority]}
-                          </span>
-                          {b.publishedAt && (
-                            <span className="text-[10px] text-gray-400">{bulletinDate(b.publishedAt)}</span>
-                          )}
-                        </div>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
+                    </div>
+                  </Link>
+                ))
               )}
             </div>
           </div>
 
-          {/* Notes widget */}
-          <div className="border-b border-gray-100 bg-white">
+          {/* Pinned Notes */}
+          <div className="flex-shrink-0 border-t border-gray-100 bg-white">
             <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
               <div className="flex items-center gap-2">
                 <Pin size={14} className="text-navy" />
                 <span className="text-sm font-semibold text-gray-800">Pinned Notes</span>
-                {dashNotes.length > 0 && (
-                  <span className="text-[10px] text-gray-400">({dashNotes.length})</span>
-                )}
               </div>
               <Link to={ROUTES.NOTES} className="flex items-center gap-1 text-xs text-gray-400 hover:text-navy transition-colors">
                 All <ArrowRight size={11} />
@@ -781,51 +605,49 @@ export default function DashboardPage() {
 
             {dashNotes.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-6 text-center px-4">
-                <Pin size={20} className="text-gray-200 mb-1.5" />
-                <p className="text-xs text-gray-400">No pinned notes yet</p>
-                <p className="text-[10px] text-gray-300 mt-0.5">Pin notes to see them here</p>
+                <Pin size={18} className="text-gray-200 mb-1.5" />
+                <p className="text-xs text-gray-400">No pinned notes</p>
               </div>
             ) : (
-              <div className="p-3 space-y-2">
+              <div className="p-3 space-y-1.5">
                 {dashNotes.map((note) => {
                   const { bg, border } = NOTE_COLOR[note.color] ?? NOTE_COLOR.yellow;
                   return (
                     <Link
                       key={note.id}
                       to={ROUTES.NOTES}
-                      className={cn(
-                        'block rounded border px-3 py-2 hover:shadow-sm transition-shadow',
-                        bg, border,
-                      )}
+                      className={cn('block rounded border px-3 py-2 hover:shadow-sm transition-shadow', bg, border)}
                     >
-                      <div className="flex items-start gap-1.5">
-                        {note.isPinned && <Pin size={9} className="text-gray-400 flex-shrink-0 mt-0.5" />}
-                        <div className="min-w-0">
-                          {note.title && (
-                            <p className="text-xs font-semibold text-gray-800 truncate">{note.title}</p>
-                          )}
-                          <p className="text-xs text-gray-600 line-clamp-2 leading-relaxed">
-                            {note.content}
-                          </p>
-                        </div>
-                      </div>
+                      {note.title && (
+                        <p className="text-xs font-semibold text-gray-800 truncate mb-0.5">{note.title}</p>
+                      )}
+                      <p className="text-xs text-gray-600 line-clamp-2 leading-relaxed">{note.content}</p>
                     </Link>
                   );
                 })}
                 {allNotes.filter((n) => n.isPinned).length > 4 && (
-                  <Link
-                    to={ROUTES.NOTES}
-                    className="block text-center text-xs text-gray-400 hover:text-navy py-1 transition-colors"
-                  >
-                    +{allNotes.filter((n) => n.isPinned).length - 4} more notes
+                  <Link to={ROUTES.NOTES} className="block text-center text-xs text-gray-400 hover:text-navy py-1 transition-colors">
+                    +{allNotes.filter((n) => n.isPinned).length - 4} more
                   </Link>
                 )}
               </div>
             )}
           </div>
 
-          {/* Quick nav */}
-          <QuickActionsSection roleLevel={roleLevel} />
+          {/* Analytics shortcut — for roles with analytics access */}
+          {roleLevel <= 5 && (
+            <Link
+              to={ROUTES.ANALYTICS}
+              className="flex items-center justify-between px-4 py-3 bg-white border-t border-gray-100 text-xs text-gray-500 hover:text-navy hover:bg-gray-50 transition-colors group"
+            >
+              <span className="flex items-center gap-2">
+                <BarChart3 size={13} className="text-gray-400 group-hover:text-navy" />
+                View full analytics
+              </span>
+              <ArrowRight size={11} className="text-gray-300 group-hover:text-navy" />
+            </Link>
+          )}
+
         </div>
       </div>
     </div>
@@ -833,18 +655,13 @@ export default function DashboardPage() {
 }
 
 // ── Sub-components ─────────────────────────────────────────
-function StatChip({ icon: Icon, label, active, danger }: {
-  icon:   React.ElementType;
-  label:  string;
-  active: boolean;
-  danger?: boolean;
+function AlertChip({ icon: Icon, label, danger }: {
+  icon: React.ElementType; label: string; danger?: boolean;
 }) {
   return (
     <div className={cn(
-      'flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full',
-      active && danger  ? 'bg-danger/20 text-danger font-semibold'  :
-      active            ? 'bg-white/20 text-white font-medium'       :
-                          'text-white/40',
+      'flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1 rounded-full',
+      danger ? 'bg-danger/20 text-danger' : 'bg-white/15 text-white/80',
     )}>
       <Icon size={11} />
       {label}
@@ -855,12 +672,12 @@ function StatChip({ icon: Icon, label, active, danger }: {
 function EmptyMyDay({ onNavigate }: { onNavigate: () => void }) {
   return (
     <div className="flex flex-col items-center justify-center py-20 text-center px-8">
-      <div className="w-16 h-16 rounded-full bg-navy/5 flex items-center justify-center mb-4">
-        <Sun size={28} className="text-navy/30" />
+      <div className="w-14 h-14 rounded-full bg-navy/5 flex items-center justify-center mb-4">
+        <Sun size={24} className="text-navy/30" />
       </div>
       <p className="text-sm font-semibold text-gray-700">My Day is empty</p>
       <p className="text-xs text-gray-400 mt-1 leading-relaxed max-w-[220px]">
-        Add a task here or select a task on the Tasks page and click ☀️ to add it to My Day.
+        Add a task below, or open Tasks and mark any task as My Day.
       </p>
       <button
         onClick={onNavigate}
