@@ -45,7 +45,7 @@ interface Task {
   status: TaskStatus; priority: TaskPriority;
   isImportant: boolean; myDayDate: string | null;
   dueDate: string | null; completedAt: string | null;
-  isPrivate: boolean; visibility: TaskVisibility;
+  isPrivate?: boolean; visibility: TaskVisibility;
   assignmentStatus: AssignmentStatus | null; assignmentNote: string | null;
   position: number; createdAt: string; updatedAt: string;
   creator: TaskUser; assignee: TaskUser | null;
@@ -538,7 +538,6 @@ function ListView({
                       <span className={cn('text-sm truncate flex-1', task.status === 'DONE' && 'line-through text-gray-400')}>
                         {task.title}
                       </span>
-                      {task.isPrivate && <Lock size={11} className="text-gray-300" />}
                       {task.assignmentStatus && <AssignBadge status={task.assignmentStatus} />}
                       {(task._count.subTasks > 0 || task._count.comments > 0) && (
                         <span className="text-[10px] text-gray-400 flex items-center gap-1 flex-shrink-0">
@@ -648,7 +647,6 @@ function BoardCard({ task, selected, draggable, onSelect, onToggle, onDelete, on
           <PriorityDot priority={task.priority} />{PRIORITY_CONFIG[task.priority].label}
         </span>
         {due.text && <span className={cn('text-[10px] flex items-center gap-0.5', due.overdue ? 'text-red-500' : 'text-gray-400')}><Calendar size={9} />{due.text}</span>}
-        {task.isPrivate && <Lock size={10} className="text-gray-300" />}
         {task.assignmentStatus && <AssignBadge status={task.assignmentStatus} />}
         {task.assignee && <div className="ml-auto"><Avatar name={task.assignee.fullName} avatar={task.assignee.avatar} size={18} /></div>}
         <button onClick={(e) => { e.stopPropagation(); onToggleMyDay(task); }}
@@ -1576,9 +1574,8 @@ function TaskDetailPanel({
                 {(Object.entries(VISIBILITY_CONFIG) as [TaskVisibility, (typeof VISIBILITY_CONFIG)[TaskVisibility]][]).map(([v, cfg]) => (
                   <button
                     key={v}
-                    onClick={() => patch({ visibility: v, ...(v !== 'PRIVATE' && { isPrivate: false }), ...(v !== 'DIVISION_SELECT' && { divisionIds: [] }) })}
-                    disabled={task.isPrivate && v !== 'PRIVATE'}
-                    title={task.isPrivate && v !== 'PRIVATE' ? 'Matikan Rahasia dulu untuk membagikan' : undefined}
+                    onClick={() => patch({ visibility: v, ...(v !== 'DIVISION_SELECT' && { divisionIds: [] }) })}
+                    disabled={false}
                     className={cn(
                       'flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-medium border transition-colors disabled:opacity-40',
                       task.visibility === v
@@ -1623,18 +1620,6 @@ function TaskDetailPanel({
                 </div>
               </div>
             )}
-
-            <div className="flex items-center gap-3 px-1 py-2 rounded hover:bg-gray-50">
-              <div className="flex items-center gap-2 w-24 flex-shrink-0">
-                {task.isPrivate ? <Lock size={13} className="text-gray-400" /> : <Unlock size={13} className="text-gray-400" />}
-                <span className="text-xs text-gray-400">Rahasia</span>
-              </div>
-              <button onClick={() => patch({ isPrivate: !task.isPrivate, ...(!task.isPrivate && { visibility: 'PRIVATE' }) })}
-                className={cn('w-8 h-4 rounded-full transition-colors relative flex-shrink-0', task.isPrivate ? 'bg-navy' : 'bg-gray-200')}>
-                <span className={cn('absolute top-0.5 w-3 h-3 bg-white rounded-full shadow transition-all', task.isPrivate ? 'left-4' : 'left-0.5')} />
-              </button>
-              <span className="text-[10px] text-gray-400">sembunyikan juga dari atasan</span>
-            </div>
 
             <div className="flex items-center gap-3 px-1 py-2 rounded hover:bg-gray-50">
               <div className="flex items-center gap-2 w-24 flex-shrink-0">
@@ -1832,7 +1817,6 @@ function CreateTaskModal({ onClose, onCreated, defaultListId, extraPayload, task
   const [dueDate,    setDueDate]    = useState('');
   const [assignedTo, setAssignedTo] = useState('');
   const [listId,     setListId]     = useState(defaultListId ?? '');
-  const [isPrivate,   setIsPrivate]   = useState(false);
   const [visibility,  setVisibility]  = useState<TaskVisibility>('PRIVATE');
   const [divisionIds, setDivisionIds] = useState<string[]>([]);
   const [saving,      setSaving]      = useState(false);
@@ -1854,7 +1838,7 @@ function CreateTaskModal({ onClose, onCreated, defaultListId, extraPayload, task
     if (!title.trim()) { setError('Title is required'); return; }
     setSaving(true); setError('');
     try {
-      const payload: Record<string, unknown> = { title: title.trim(), status, priority, isPrivate, visibility, ...extraPayload };
+      const payload: Record<string, unknown> = { title: title.trim(), status, priority, visibility, ...extraPayload };
       if (desc.trim())   payload.description = desc.trim();
       if (dueDate)       payload.dueDate      = toLocalISO(dueDate);
       if (assignedTo)    payload.assignedToId = assignedTo;
@@ -1929,11 +1913,10 @@ function CreateTaskModal({ onClose, onCreated, defaultListId, extraPayload, task
           <div className="space-y-2">
             <div>
               <label className="block text-xs text-gray-500 mb-1">Bagikan ke</label>
-              <select value={visibility} disabled={isPrivate}
+              <select value={visibility}
                 onChange={(e) => {
                   const v = e.target.value as TaskVisibility;
                   setVisibility(v);
-                  if (v !== 'PRIVATE') setIsPrivate(false);
                   if (v !== 'DIVISION_SELECT') setDivisionIds([]);
                 }}
                 className="w-full text-sm border border-gray-200 rounded px-2.5 py-1.5 outline-none focus:border-navy disabled:opacity-50 disabled:bg-gray-50">
@@ -1965,16 +1948,6 @@ function CreateTaskModal({ onClose, onCreated, defaultListId, extraPayload, task
                 </div>
               </div>
             )}
-            <label className="flex items-center gap-2 cursor-pointer select-none">
-              <input type="checkbox" checked={isPrivate}
-                onChange={(e) => {
-                  setIsPrivate(e.target.checked);
-                  if (e.target.checked) setVisibility('PRIVATE');
-                }}
-                className="w-4 h-4 rounded border-gray-300 accent-navy" />
-              <Lock size={13} className="text-gray-400" />
-              <span className="text-xs text-gray-600">Rahasia — sembunyikan juga dari atasan</span>
-            </label>
           </div>
 
           {error && <p className="text-xs text-red-500 flex items-center gap-1"><AlertCircle size={12} />{error}</p>}

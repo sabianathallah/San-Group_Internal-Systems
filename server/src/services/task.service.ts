@@ -40,17 +40,6 @@ const TASK_SELECT = {
   divisionAccess: { select: { divisionId: true, division: { select: { id: true, name: true, color: true } } } },
 } as const;
 
-// ── Privacy filter helper ──────────────────────────────────
-function privacyFilter(userId: string, roleLevel: number): Prisma.TaskWhereInput {
-  if (canManage(roleLevel)) return {};
-  return {
-    OR: [
-      { isPrivate: false },
-      { isPrivate: true, userId },
-    ],
-  };
-}
-
 // ── Notify helper ──────────────────────────────────────────
 async function notify(data: {
   type: NotificationType; title: string; message: string;
@@ -74,7 +63,6 @@ export async function listTasksService(
   roleLevel: number,
   divisionId: string | undefined,
   permScope: string,
-  viewPrivate: boolean,
   query: ParsedQs,
 ) {
   const { page, limit, skip } = parsePagination(query, { createdAt: 'desc' });
@@ -96,8 +84,8 @@ export async function listTasksService(
     // Workspace browse — only tasks explicitly shared by their creators.
     // PUBLIC is visible to everyone; DIVISION only within the creator's division.
     // DIVISION_SELECT visible if user's division is in taskDivisionAccess.
-    // Rahasia (isPrivate) tasks never appear here.
-    base.isPrivate = false;
+    // PRIVATE tasks never appear here.
+    base.visibility = { not: TaskVisibility.PRIVATE };
     const sharedOr: Prisma.TaskWhereInput[] = [{ visibility: TaskVisibility.PUBLIC }];
     if (permScope === 'all') {
       sharedOr.push({ visibility: TaskVisibility.DIVISION });
@@ -133,9 +121,6 @@ export async function listTasksService(
   } else if (view === 'list' && typeof query.listId === 'string') {
     base.listId = query.listId;
     andConditions.push({ OR: [{ userId }, acceptedAssignment] });
-    if (!viewPrivate) {
-      andConditions.push({ OR: [{ isPrivate: false }, { userId }, acceptedAssignment] });
-    }
   } else {
     // 'all' view — apply permission scope
     if (permScope === 'own') {
@@ -151,9 +136,6 @@ export async function listTasksService(
           },
         ],
       });
-      if (!viewPrivate) {
-        andConditions.push({ OR: [{ isPrivate: false }, { userId }, { assignedToId: userId }] });
-      }
     } else {
       // permScope === 'all'
       if (typeof query.userId === 'string') {
@@ -161,9 +143,6 @@ export async function listTasksService(
       }
       if (typeof query.divisionId === 'string') {
         andConditions.push({ creator: { divisionId: query.divisionId } });
-      }
-      if (!viewPrivate) {
-        andConditions.push({ OR: [{ isPrivate: false }, { userId }, { assignedToId: userId }] });
       }
     }
   }
@@ -220,7 +199,7 @@ export async function listTeamTasksService(
   const where: Prisma.TaskWhereInput = {
     userId: { in: userIds },
     parentTaskId: null,
-    isPrivate: false,
+    visibility: { not: TaskVisibility.PRIVATE },
   };
   if (query.status)   where.status   = query.status as TaskStatus;
   if (query.priority) where.priority = query.priority as TaskPriority;
@@ -240,7 +219,7 @@ export async function listTeamTasksService(
 
 // ── Get single task ────────────────────────────────────────
 export async function getTaskByIdService(
-  id: string, userId: string, permScope: string, viewPrivate: boolean,
+  id: string, userId: string, permScope: string,
   divisionId?: string,
 ) {
   const task = await prisma.task.findUnique({
@@ -271,7 +250,7 @@ export async function getTaskByIdService(
     if (!visibleEnough || (!sameDivision && !inDivisionSelect)) throw new AppError('Akses ditolak', 403);
   }
 
-  if (!viewPrivate && task.isPrivate && !isOwner) throw new AppError('Akses ditolak', 403);
+
 
   return task;
 }
@@ -281,13 +260,10 @@ export async function createTaskService(userId: string, data: {
   title: string; description?: string; status?: TaskStatus;
   priority?: TaskPriority; isImportant?: boolean; myDay?: boolean;
   dueDate?: string | null; assignedToId?: string | null;
-  listId?: string | null; parentTaskId?: string | null; isPrivate?: boolean;
+  listId?: string | null; parentTaskId?: string | null;
   visibility?: TaskVisibility; divisionIds?: string[];
 }) {
   const isAssigned = !!data.assignedToId;
-
-  // Rahasia implies not shared — a secret task can't sit in the workspace
-  if (data.isPrivate) data.visibility = TaskVisibility.PRIVATE;
 
   // DIVISION_SELECT requires at least one division
   if (data.visibility === TaskVisibility.DIVISION_SELECT && (!data.divisionIds || data.divisionIds.length === 0)) {
@@ -306,8 +282,7 @@ export async function createTaskService(userId: string, data: {
       assignedToId:     data.assignedToId ?? null,
       listId:           data.listId       ?? null,
       parentTaskId:     data.parentTaskId ?? null,
-      isPrivate:        data.isPrivate    ?? false,
-      // Personal-first: tasks are "My Task" unless the creator shares them
+      isPrivate:        false,
       visibility:       data.visibility   ?? TaskVisibility.PRIVATE,
       assignmentStatus: isAssigned ? AssignmentStatus.PENDING : null,
       userId,
@@ -332,7 +307,7 @@ export async function createTaskService(userId: string, data: {
 
   // Notifikasi ke atasan langsung jika task di-share (bukan PRIVATE)
   const visibility = data.visibility ?? TaskVisibility.PRIVATE;
-  if (!data.isPrivate && visibility !== TaskVisibility.PRIVATE && !data.parentTaskId) {
+  if (visibility !== TaskVisibility.PRIVATE && !data.parentTaskId) {
     const creator = await prisma.user.findUnique({
       where: { id: userId },
       select: { fullName: true, divisionId: true, role: { select: { level: true } } },
@@ -373,7 +348,7 @@ export async function updateTaskService(id: string, userId: string, permScope: s
   title?: string; description?: string | null; status?: TaskStatus;
   priority?: TaskPriority; isImportant?: boolean; myDay?: boolean;
   dueDate?: string | null; assignedToId?: string | null;
-  listId?: string | null; parentTaskId?: string | null; isPrivate?: boolean;
+  listId?: string | null; parentTaskId?: string | null;
   visibility?: TaskVisibility; divisionIds?: string[];
 }) {
   const task = await prisma.task.findUnique({
@@ -397,11 +372,6 @@ export async function updateTaskService(id: string, userId: string, permScope: s
       );
     }
   }
-
-  // Rahasia dan sharing saling eksklusif:
-  // menyalakan Rahasia menarik task kembali ke PRIVATE; membagikan mematikan Rahasia
-  if (data.isPrivate === true) data.visibility = TaskVisibility.PRIVATE;
-  else if (data.visibility && data.visibility !== TaskVisibility.PRIVATE) data.isPrivate = false;
 
   const completedAt =
     data.status === TaskStatus.DONE ? new Date() :
@@ -431,7 +401,6 @@ export async function updateTaskService(id: string, userId: string, permScope: s
       ...(data.assignedToId     !== undefined && { assignedToId: data.assignedToId }),
       ...(data.listId           !== undefined && { listId: data.listId }),
       ...(data.parentTaskId     !== undefined && { parentTaskId: data.parentTaskId }),
-      ...(data.isPrivate        !== undefined && { isPrivate: data.isPrivate }),
       ...(data.visibility       !== undefined && { visibility: data.visibility }),
       ...(newAssignmentStatus   !== undefined && { assignmentStatus: newAssignmentStatus }),
       ...(completedAt           !== undefined && { completedAt }),

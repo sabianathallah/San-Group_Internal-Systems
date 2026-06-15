@@ -22,8 +22,7 @@ export async function listTasks(req: AuthRequest, res: Response, next: NextFunct
   try {
     const { userId, roleLevel, divisionId } = req.user!;
     const permScope   = req.permScope  ?? 'own';
-    const viewPrivate = req.viewPrivate ?? false;
-    const { tasks, meta } = await listTasksService(userId, roleLevel, divisionId, permScope, viewPrivate, req.query);
+    const { tasks, meta } = await listTasksService(userId, roleLevel, divisionId, permScope, req.query);
     successResponse(res, tasks, 'Daftar task berhasil diambil', 200, meta);
   } catch (err) { next(err); }
 }
@@ -62,8 +61,7 @@ export async function getTaskById(req: AuthRequest, res: Response, next: NextFun
   try {
     const { userId, divisionId } = req.user!;
     const permScope   = req.permScope  ?? 'own';
-    const viewPrivate = req.viewPrivate ?? false;
-    const task = await getTaskByIdService(String(req.params.id), userId, permScope, viewPrivate, divisionId);
+    const task = await getTaskByIdService(String(req.params.id), userId, permScope, divisionId);
     successResponse(res, task, 'Detail task berhasil diambil');
   } catch (err) { next(err); }
 }
