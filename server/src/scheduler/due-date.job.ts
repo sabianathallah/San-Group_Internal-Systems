@@ -6,6 +6,7 @@ import { NotificationType } from '@prisma/client';
  * Due Date Notification Job
  * Runs daily at 08:00 WIB (01:00 UTC).
  * Sends notifications for tasks due tomorrow, in 3 days, and overdue tasks.
+ * Deduplicates: skips if an identical notification was already sent today.
  */
 export function registerDueDateJob(): void {
   cron.schedule('0 1 * * *', async () => {
@@ -34,39 +35,21 @@ export function registerDueDateJob(): void {
       const overdueBase = new Date(now);
       overdueBase.setHours(0, 0, 0, 0);
 
-      // Find tasks due tomorrow
-      const dueTomorrow = await prisma.task.findMany({
+      // ── Deduplication: load all due-date notifs already sent today ──
+      const todayStart = new Date(now);
+      todayStart.setHours(0, 0, 0, 0);
+      const sentToday = await prisma.notification.findMany({
         where: {
-          dueDate: { gte: tomorrowStart, lte: tomorrowEnd },
-          status: { not: 'DONE' },
-          parentTaskId: null,
+          type:      { in: [NotificationType.TASK_DUE_SOON, NotificationType.TASK_OVERDUE] },
+          createdAt: { gte: todayStart },
         },
-        select: { id: true, title: true, userId: true, assignedToId: true },
+        select: { type: true, userId: true, message: true },
       });
+      // Key: type|userId|message — if already in set, skip
+      const alreadySent = new Set(sentToday.map((n) => `${n.type}|${n.userId}|${n.message}`));
 
-      // Find tasks due in 3 days
-      const dueIn3 = await prisma.task.findMany({
-        where: {
-          dueDate: { gte: in3Start, lte: in3End },
-          status: { not: 'DONE' },
-          parentTaskId: null,
-        },
-        select: { id: true, title: true, userId: true, assignedToId: true },
-      });
-
-      // Find overdue tasks
-      const overdue = await prisma.task.findMany({
-        where: {
-          dueDate: { lt: overdueBase },
-          status: { not: 'DONE' },
-          parentTaskId: null,
-        },
-        select: { id: true, title: true, userId: true, assignedToId: true },
-      });
-
-      // Helper: send notification to unique recipients
+      // Helper: send notification only if not already sent today
       async function sendNotif(
-        _taskId: string,
         title: string,
         message: string,
         type: NotificationType,
@@ -74,24 +57,44 @@ export function registerDueDateJob(): void {
       ) {
         const unique = [...new Set(recipientIds.filter(Boolean))] as string[];
         for (const userId of unique) {
+          const key = `${type}|${userId}|${message}`;
+          if (alreadySent.has(key)) continue;
           await prisma.notification.create({
-            data: {
-              type,
-              title,
-              message,
-              link: '/tasks',
-              userId,
-              actorId: null,
-            },
+            data: { type, title, message, link: '/tasks', userId, actorId: null },
           });
+          alreadySent.add(key);
         }
       }
 
+      // Find tasks due tomorrow
+      const dueTomorrow = await prisma.task.findMany({
+        where: { dueDate: { gte: tomorrowStart, lte: tomorrowEnd }, status: { not: 'DONE' }, parentTaskId: null },
+        select: { id: true, title: true, userId: true, assignedToId: true },
+      });
+
+      // Find tasks due in 3 days
+      const dueIn3 = await prisma.task.findMany({
+        where: { dueDate: { gte: in3Start, lte: in3End }, status: { not: 'DONE' }, parentTaskId: null },
+        select: { id: true, title: true, userId: true, assignedToId: true },
+      });
+
+      // Find overdue tasks (only those that became overdue recently — last 7 days)
+      // to avoid notifying forever about very old overdue tasks
+      const overdueWindow = new Date(now);
+      overdueWindow.setDate(now.getDate() - 7);
+      const overdue = await prisma.task.findMany({
+        where: {
+          dueDate: { gte: overdueWindow, lt: overdueBase },
+          status:  { not: 'DONE' },
+          parentTaskId: null,
+        },
+        select: { id: true, title: true, userId: true, assignedToId: true },
+      });
+
       for (const t of dueTomorrow) {
         await sendNotif(
-          t.id,
-          'Task Due Besok',
-          `"${t.title}" jatuh tempo besok`,
+          'Task Due Tomorrow',
+          `"${t.title}" is due tomorrow`,
           NotificationType.TASK_DUE_SOON,
           [t.userId, t.assignedToId],
         );
@@ -99,9 +102,8 @@ export function registerDueDateJob(): void {
 
       for (const t of dueIn3) {
         await sendNotif(
-          t.id,
-          'Task Due 3 Hari Lagi',
-          `"${t.title}" jatuh tempo dalam 3 hari`,
+          'Task Due in 3 Days',
+          `"${t.title}" is due in 3 days`,
           NotificationType.TASK_DUE_SOON,
           [t.userId, t.assignedToId],
         );
@@ -109,9 +111,8 @@ export function registerDueDateJob(): void {
 
       for (const t of overdue) {
         await sendNotif(
-          t.id,
           'Task Overdue',
-          `"${t.title}" sudah melewati deadline`,
+          `"${t.title}" has passed its deadline`,
           NotificationType.TASK_OVERDUE,
           [t.userId, t.assignedToId],
         );

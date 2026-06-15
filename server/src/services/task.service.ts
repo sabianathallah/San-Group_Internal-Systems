@@ -431,14 +431,32 @@ export async function updateTaskService(id: string, userId: string, permScope: s
     select: TASK_SELECT,
   });
 
+  // Fetch actor name once if needed for notifications below
+  const needsActor = (data.assignedToId && data.assignedToId !== task.assignedToId && data.assignedToId !== userId)
+    || (data.status === TaskStatus.DONE && task.userId !== userId);
+
+  const actor = needsActor
+    ? await prisma.user.findUnique({ where: { id: userId }, select: { fullName: true } })
+    : null;
+
   if (data.assignedToId && data.assignedToId !== task.assignedToId && data.assignedToId !== userId) {
-    const actor = await prisma.user.findUnique({ where: { id: userId }, select: { fullName: true } });
     await notify({
       type:      NotificationType.TASK_ASSIGNED,
       title:     'Task Baru Ditugaskan',
       message:   `${actor?.fullName ?? 'Seseorang'} menugaskan kamu: "${updated.title}"`,
       toUserId:  data.assignedToId,
       actorId:   userId,
+    });
+  }
+
+  // Notify creator when someone else marks the task as done
+  if (data.status === TaskStatus.DONE && task.userId !== userId) {
+    await notify({
+      type:     NotificationType.TASK_COMPLETED,
+      title:    'Task Selesai',
+      message:  `${actor?.fullName ?? 'Seseorang'} menyelesaikan: "${updated.title}"`,
+      toUserId: task.userId,
+      actorId:  userId,
     });
   }
 

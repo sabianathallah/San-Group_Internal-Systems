@@ -3,6 +3,7 @@ import { useLocation, useNavigate, Link } from 'react-router-dom';
 import {
   Menu, Bell, ChevronDown, LogOut, KeyRound, ChevronRight,
   Loader2, Clock, Megaphone, ShieldAlert, Info, CheckCircle2, User, Search, ArrowRight,
+  AlertTriangle, ClipboardList, Timer,
 } from 'lucide-react';
 import { useUiStore } from '@/stores/uiStore';
 import { useAuthStore } from '@/stores/authStore';
@@ -44,12 +45,15 @@ function useBreadcrumbs() {
 export function NotifIcon({ type }: { type: string }) {
   const cls = 'flex-shrink-0 mt-0.5';
   switch (type) {
-    case 'TASK_ASSIGNED':
-    case 'TASK_COMPLETED':  return <CheckCircle2 size={14} className={cn(cls, 'text-info')} />;
-    case 'BULLETIN_NEW':    return <Megaphone    size={14} className={cn(cls, 'text-warning')} />;
-    case 'BULLETIN_URGENT': return <ShieldAlert  size={14} className={cn(cls, 'text-danger')} />;
-    case 'SYSTEM':          return <Clock        size={14} className={cn(cls, 'text-navy')} />;
-    default:                return <Info         size={14} className={cn(cls, 'text-gray-400')} />;
+    case 'TASK_ASSIGNED':   return <CheckCircle2   size={14} className={cn(cls, 'text-info')} />;
+    case 'TASK_COMPLETED':  return <CheckCircle2   size={14} className={cn(cls, 'text-success')} />;
+    case 'TASK_CREATED':    return <ClipboardList  size={14} className={cn(cls, 'text-navy')} />;
+    case 'TASK_DUE_SOON':   return <Timer          size={14} className={cn(cls, 'text-warning')} />;
+    case 'TASK_OVERDUE':    return <AlertTriangle  size={14} className={cn(cls, 'text-danger')} />;
+    case 'BULLETIN_NEW':    return <Megaphone      size={14} className={cn(cls, 'text-warning')} />;
+    case 'BULLETIN_URGENT': return <ShieldAlert    size={14} className={cn(cls, 'text-danger')} />;
+    case 'SYSTEM':          return <Clock          size={14} className={cn(cls, 'text-navy')} />;
+    default:                return <Info           size={14} className={cn(cls, 'text-gray-400')} />;
   }
 }
 

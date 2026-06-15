@@ -108,9 +108,13 @@ export default function NotificationsPage() {
                     {/* Icon */}
                     <div className={cn(
                       'w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5',
-                      n.type === 'BULLETIN_URGENT' ? 'bg-danger/10' :
+                      n.type === 'BULLETIN_URGENT' ? 'bg-danger/10'  :
+                      n.type === 'TASK_OVERDUE'    ? 'bg-danger/10'  :
                       n.type === 'BULLETIN_NEW'    ? 'bg-warning/10' :
-                      n.type === 'SYSTEM'          ? 'bg-navy/10' :
+                      n.type === 'TASK_DUE_SOON'   ? 'bg-warning/10' :
+                      n.type === 'SYSTEM'          ? 'bg-navy/10'    :
+                      n.type === 'TASK_CREATED'    ? 'bg-navy/10'    :
+                      n.type === 'TASK_COMPLETED'  ? 'bg-success/10' :
                       'bg-info/10',
                     )}>
                       <NotifIcon type={n.type} />
