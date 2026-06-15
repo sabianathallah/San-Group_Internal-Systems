@@ -147,9 +147,10 @@ model User {
   triggeredNotifs    Notification[]      @relation("NotificationActor")
   databaseLinks      DatabaseLink[]
   databaseFolders    DatabaseFolder[]
-  taskComments       TaskComment[]
-  grantedShares      ResourceShare[]
-  auditLogs          AuditLog[]
+  taskComments        TaskComment[]
+  grantedShares       ResourceShare[]
+  auditLogs           AuditLog[]
+  taskListMemberships TaskListMembership[]
 
   @@index([email])
   @@index([username])
@@ -180,9 +181,10 @@ model TaskList {
   position  Int      @default(0)
   createdAt DateTime @default(now())
 
-  userId String
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  tasks  Task[]
+  userId      String
+  user        User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tasks       Task[]
+  memberships TaskListMembership[]
 
   @@index([userId])
 }
@@ -223,6 +225,7 @@ model Task {
   links              TaskLink[]
   comments           TaskComment[]
   divisionAccess     TaskDivisionAccess[]
+  listMemberships    TaskListMembership[]
 
   @@index([userId])
   @@index([assignedToId])
@@ -288,6 +291,22 @@ model TaskDivisionAccess {
   @@index([taskId])
   @@index([divisionId])
   @@map("task_division_access")
+}
+
+model TaskListMembership {
+  id        String   @id @default(uuid())
+  taskId    String
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  listId    String
+  taskList  TaskList @relation(fields: [listId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([taskId, userId])
+  @@index([userId])
+  @@index([listId])
+  @@map("task_list_memberships")
 }
 
 // --- Sticky Notes ---

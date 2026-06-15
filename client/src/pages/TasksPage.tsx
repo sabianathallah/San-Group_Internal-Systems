@@ -40,6 +40,12 @@ interface TaskUser { id: string; fullName: string; avatar: string | null }
 interface TaskLink { id: string; url: string; title: string | null; createdAt: string }
 interface Comment   { id: string; content: string; createdAt: string; user: TaskUser }
 
+interface ListMembership {
+  userId: string;
+  listId: string;
+  taskList: { id: string; name: string; color: string };
+}
+
 interface Task {
   id: string; title: string; description: string | null;
   status: TaskStatus; priority: TaskPriority;
@@ -50,6 +56,7 @@ interface Task {
   position: number; createdAt: string; updatedAt: string;
   creator: TaskUser; assignee: TaskUser | null;
   taskList: { id: string; name: string; color: string } | null;
+  listMemberships?: ListMembership[];
   links: TaskLink[];
   _count: { subTasks: number; attachments: number; comments: number };
   divisionAccess?: DivisionAccess[];
@@ -58,7 +65,7 @@ interface Task {
 
 interface TaskList {
   id: string; name: string; color: string; icon: string | null;
-  _count?: { tasks: number };
+  _count?: { tasks: number; memberships: number };
 }
 
 interface UserOption { id: string; fullName: string; avatar: string | null }
@@ -282,8 +289,8 @@ function TasksSidebar({
             >
               <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: list.color }} />
               <span className="flex-1 text-left truncate">{list.icon && `${list.icon} `}{list.name}</span>
-              {(list._count?.tasks ?? 0) > 0 && (
-                <span className="text-[10px] text-gray-400">{list._count?.tasks}</span>
+              {((list._count?.tasks ?? 0) + (list._count?.memberships ?? 0)) > 0 && (
+                <span className="text-[10px] text-gray-400">{(list._count?.tasks ?? 0) + (list._count?.memberships ?? 0)}</span>
               )}
             </button>
           );
@@ -1224,10 +1231,11 @@ function DescriptionEditor({
 
 // ── Task Detail Panel ──────────────────────────────────────
 function TaskDetailPanel({
-  taskId, initialTask, onClose, onUpdated, onRequestDelete, currentUserId,
+  taskId, initialTask, onClose, onUpdated, onRequestDelete, currentUserId, taskLists,
 }: {
   taskId: string; initialTask?: Task | null; onClose: () => void;
   onUpdated: (t: Task) => void; onRequestDelete: (t: Task) => void; currentUserId: string;
+  taskLists: TaskList[];
 }) {
   // Render instantly from the list's copy; hydrate subtasks/links in the background
   const [task,    setTask]    = useState<Task | null>(initialTask ?? null);
@@ -1297,6 +1305,16 @@ function TaskDetailPanel({
     setSaving(true);
     try {
       const res = await api.patch(`/tasks/${task.id}`, data);
+      const updated: Task = { ...res.data.data, subTasks: task.subTasks };
+      setTask(updated); onUpdated(res.data.data);
+    } catch (err) { toast.error(extractErr(err)); } finally { setSaving(false); }
+  }
+
+  async function patchMyList(listId: string | null) {
+    if (!task) return;
+    setSaving(true);
+    try {
+      const res = await api.put(`/tasks/${task.id}/my-list`, { listId });
       const updated: Task = { ...res.data.data, subTasks: task.subTasks };
       setTask(updated); onUpdated(res.data.data);
     } catch (err) { toast.error(extractErr(err)); } finally { setSaving(false); }
@@ -1406,8 +1424,10 @@ function TaskDetailPanel({
   const doneSubCount = task.subTasks?.filter((s) => s.status === 'DONE').length ?? 0;
   const totalSub     = task.subTasks?.length ?? 0;
   const subProgress  = totalSub > 0 ? Math.round((doneSubCount / totalSub) * 100) : 0;
+  const isOwner      = task.creator.id === currentUserId;
   const isAssignee   = task.assignee?.id === currentUserId;
   const isPending    = task.assignmentStatus === 'PENDING' && isAssignee;
+  const myMembership = task.listMemberships?.find((m) => m.userId === currentUserId) ?? null;
 
   return (
     <div className="flex flex-col h-full overflow-hidden bg-white">
@@ -1533,6 +1553,34 @@ function TaskDetailPanel({
                 {users.map((u) => <option key={u.id} value={u.id}>{u.fullName}</option>)}
               </select>
             </div>
+
+            {isOwner && (
+              <div className="flex items-center gap-3 px-1 py-2 rounded hover:bg-gray-50">
+                <div className="flex items-center gap-2 w-24 flex-shrink-0">
+                  <LayoutList size={13} className="text-gray-400" />
+                  <span className="text-xs text-gray-400">List</span>
+                </div>
+                <select value={task.taskList?.id ?? ''} onChange={(e) => patch({ listId: e.target.value || null })}
+                  className="text-xs bg-transparent outline-none cursor-pointer text-gray-700 hover:text-navy max-w-[200px]">
+                  <option value="">— Tanpa list —</option>
+                  {taskLists.map((l) => <option key={l.id} value={l.id}>{l.icon ? `${l.icon} ` : ''}{l.name}</option>)}
+                </select>
+              </div>
+            )}
+
+            {isAssignee && !isOwner && (
+              <div className="flex items-center gap-3 px-1 py-2 rounded hover:bg-gray-50">
+                <div className="flex items-center gap-2 w-24 flex-shrink-0">
+                  <LayoutList size={13} className="text-gray-400" />
+                  <span className="text-xs text-gray-400">List Saya</span>
+                </div>
+                <select value={myMembership?.listId ?? ''} onChange={(e) => patchMyList(e.target.value || null)}
+                  className="text-xs bg-transparent outline-none cursor-pointer text-gray-700 hover:text-navy max-w-[200px]">
+                  <option value="">— Tanpa list —</option>
+                  {taskLists.map((l) => <option key={l.id} value={l.id}>{l.icon ? `${l.icon} ` : ''}{l.name}</option>)}
+                </select>
+              </div>
+            )}
 
             <div className="flex items-center gap-3 px-1 py-2 rounded hover:bg-gray-50">
               <div className="flex items-center gap-2 w-24 flex-shrink-0">
@@ -2969,6 +3017,7 @@ export default function TasksPage() {
                 onUpdated={handleTaskUpdated}
                 onRequestDelete={handleDeleteTask}
                 currentUserId={user?.id ?? ''}
+                taskLists={taskLists}
               />
             </div>
           )}

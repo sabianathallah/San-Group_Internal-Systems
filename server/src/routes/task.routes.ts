@@ -5,7 +5,7 @@ import {
   acceptTask, rejectTask,
   listComments, addComment, deleteComment,
   addLink, deleteLink,
-  getCompletedTasks,
+  getCompletedTasks, setPersonalList,
 } from '@/controllers/task.controller';
 import { authenticate } from '@/middlewares/auth.middleware';
 import { checkPerm } from '@/middlewares/permission.middleware';
@@ -33,8 +33,9 @@ router.get('/:id',    checkPerm('task', 'view'),   validate(uuidParamSchema, ['p
 router.patch('/:id',  checkPerm('task', 'edit'),   validate(uuidParamSchema, ['params']), validate(updateTaskSchema), updateTask);
 router.delete('/:id', checkPerm('task', 'delete'), validate(uuidParamSchema, ['params']), deleteTask);
 
-router.post('/:id/accept', validate(uuidParamSchema, ['params']), acceptTask);
-router.post('/:id/reject', validate(uuidParamSchema, ['params']), validate(rejectTaskSchema), rejectTask);
+router.post('/:id/accept',    validate(uuidParamSchema, ['params']), acceptTask);
+router.post('/:id/reject',    validate(uuidParamSchema, ['params']), validate(rejectTaskSchema), rejectTask);
+router.put('/:id/my-list',    validate(uuidParamSchema, ['params']), setPersonalList);
 
 router.get('/:id/comments',              validate(uuidParamSchema, ['params']), listComments);
 router.post('/:id/comments',             validate(uuidParamSchema, ['params']), validate(addCommentSchema), addComment);

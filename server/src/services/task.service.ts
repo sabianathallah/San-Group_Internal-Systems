@@ -35,6 +35,7 @@ const TASK_SELECT = {
   creator:  { select: USER_MINI },
   assignee: { select: USER_MINI },
   taskList: { select: { id: true, name: true, color: true } },
+  listMemberships: { select: { userId: true, listId: true, taskList: { select: { id: true, name: true, color: true } } } },
   links:    { select: { id: true, url: true, title: true, createdAt: true }, orderBy: { createdAt: 'asc' as const } },
   _count:   { select: { subTasks: true, attachments: true, comments: true } },
   divisionAccess: { select: { divisionId: true, division: { select: { id: true, name: true, color: true } } } },
@@ -119,8 +120,14 @@ export async function listTasksService(
     base.dueDate = { not: null };
     base.status  = { not: TaskStatus.DONE };
   } else if (view === 'list' && typeof query.listId === 'string') {
-    base.listId = query.listId;
-    andConditions.push({ OR: [{ userId }, acceptedAssignment] });
+    const qListId = query.listId;
+    // Tasks owned with that list OR tasks where user has a personal membership to that list
+    andConditions.push({
+      OR: [
+        { listId: qListId, userId },
+        { listMemberships: { some: { userId, listId: qListId } } },
+      ],
+    });
   } else {
     // 'all' view — apply permission scope
     if (permScope === 'own') {
@@ -710,4 +717,30 @@ export async function getTaskStatsService(
   }
 
   return { personal, team, system };
+}
+
+// ── Personal list membership ───────────────────────────────
+export async function setPersonalListService(taskId: string, userId: string, listId: string | null) {
+  const task = await prisma.task.findUnique({
+    where: { id: taskId },
+    select: { userId: true, assignedToId: true },
+  });
+  if (!task) throw new AppError('Task tidak ditemukan', 404);
+  if (task.userId !== userId && task.assignedToId !== userId) {
+    throw new AppError('Akses ditolak', 403);
+  }
+
+  if (listId === null) {
+    await prisma.taskListMembership.deleteMany({ where: { taskId, userId } });
+  } else {
+    const list = await prisma.taskList.findFirst({ where: { id: listId, userId } });
+    if (!list) throw new AppError('List tidak ditemukan', 404);
+    await prisma.taskListMembership.upsert({
+      where:  { taskId_userId: { taskId, userId } },
+      create: { taskId, listId, userId },
+      update: { listId },
+    });
+  }
+
+  return prisma.task.findUnique({ where: { id: taskId }, select: TASK_SELECT });
 }

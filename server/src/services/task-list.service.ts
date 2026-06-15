@@ -7,7 +7,7 @@ const LIST_SELECT = {
   color:    true,
   icon:     true,
   position: true,
-  _count:   { select: { tasks: { where: { parentTaskId: null } } } },
+  _count:   { select: { tasks: { where: { parentTaskId: null } }, memberships: true } },
 } as const;
 
 export async function listTaskListsService(userId: string) {

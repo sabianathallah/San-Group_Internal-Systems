@@ -8,13 +8,20 @@ import {
   acceptTaskService, rejectTaskService,
   listCommentsService, addCommentService, deleteCommentService,
   addLinkService, deleteLinkService, pendingCountService, getTaskStatsService,
-  myDaySuggestionsService, getCompletedTasksService,
+  myDaySuggestionsService, getCompletedTasksService, setPersonalListService,
 } from '@/services/task.service';
 
 export async function getCompletedTasks(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
     const tasks = await getCompletedTasksService(req.user!.userId);
     successResponse(res, tasks, 'Task selesai berhasil diambil');
+  } catch (err) { next(err); }
+}
+
+export async function setPersonalList(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const task = await setPersonalListService(String(req.params.id), req.user!.userId, req.body.listId ?? null);
+    successResponse(res, task, 'List pribadi berhasil diperbarui');
   } catch (err) { next(err); }
 }
 
