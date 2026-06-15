@@ -8,7 +8,7 @@ import {
   Circle, CheckCircle2, Clock,
   AlertCircle, Calendar, User, Loader2, Trash2, FileText,
   ChevronsRight, GripVertical, ChevronLeft, Columns3,
-  Filter, SortDesc, Lock, Unlock, Link2, ExternalLink, MessageSquare,
+  Filter, SortDesc, Lock, Link2, ExternalLink, MessageSquare,
   Check, XCircle, Eye, EyeOff, Download, Lightbulb, Globe,
 } from 'lucide-react';
 import { useLocation } from 'react-router-dom';

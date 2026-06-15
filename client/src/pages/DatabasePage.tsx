@@ -309,7 +309,6 @@ function ShareFolderModal({ folderId, folderName, onClose }: {
 // ── Main Page ──────────────────────────────────────────────
 export default function DatabasePage() {
   const { user } = useAuthStore();
-  const isAdmin = (user?.role?.level ?? 99) <= 2;
   const { perms } = usePermStore();
 
   const [folders,        setFolders]        = useState<DbFolder[]>([]);

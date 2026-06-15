@@ -4,7 +4,7 @@ import {
   ArrowRight, CheckCircle2, Circle,
   Loader2, Sun, ChevronDown, ChevronRight,
   Plus, Pin,
-  ClipboardList, TrendingUp,
+  TrendingUp,
   BarChart3, UserCheck,
 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
