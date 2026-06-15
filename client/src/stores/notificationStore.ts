@@ -43,10 +43,15 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
   poll: async () => {
     const prevUnread = get().unreadCount;
     try {
-      const res = await api.get('/notifications', { params: { limit: 30 } });
-      const list: Notification[] = res.data.data ?? [];
-      const newUnread = list.filter((n) => !n.isRead).length;
-      set({ notifications: list, unreadCount: newUnread });
+      // Check unread count first — cheap call
+      const countRes = await api.get('/notifications/unread-count');
+      const newUnread: number = countRes.data.data?.count ?? 0;
+      if (newUnread === prevUnread) return 0;
+      // Something changed — refresh list, keeping at least as many items as currently loaded
+      const limit = Math.max(30, get().notifications.length);
+      const listRes = await api.get('/notifications', { params: { limit } });
+      const list: Notification[] = listRes.data.data ?? [];
+      set({ notifications: list, unreadCount: list.filter((n) => !n.isRead).length });
       return Math.max(0, newUnread - prevUnread);
     } catch { return 0; }
   },

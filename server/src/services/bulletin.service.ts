@@ -25,7 +25,7 @@ const BULLETIN_SELECT = {
   _count: { select: { readStatus: true } },
 } as const;
 
-async function notifyBulletinPublished(bulletinId: string, authorId: string, title: string, priority: BulletinPriority, audienceType: AudienceType, authorDivisionId: string | null, divisionIds: string[]) {
+async function notifyBulletinPublished(authorId: string, title: string, priority: BulletinPriority, audienceType: AudienceType, authorDivisionId: string | null, divisionIds: string[]) {
   const notifType = priority === BulletinPriority.URGENT ? NotificationType.BULLETIN_URGENT : NotificationType.BULLETIN_NEW;
 
   let userWhere: Prisma.UserWhereInput = { isActive: true, id: { not: authorId } };
@@ -199,7 +199,7 @@ export async function createBulletinService(
 
   if (bulletin.isPublished) {
     const divisionIds = bulletin.audiences.map((a) => a.division.id);
-    await notifyBulletinPublished(bulletin.id, authorId, bulletin.title, bulletin.priority, bulletin.audienceType, bulletin.author.divisionId, divisionIds).catch(() => {});
+    await notifyBulletinPublished(authorId, bulletin.title, bulletin.priority, bulletin.audienceType, bulletin.author.divisionId, divisionIds).catch(() => {});
   }
 
   return bulletin;
@@ -268,7 +268,7 @@ export async function updateBulletinService(
       select: { audienceType: true, priority: true, author: { select: { id: true, divisionId: true } }, audiences: { select: { divisionId: true } } },
     });
     if (fresh) {
-      await notifyBulletinPublished(id, fresh.author.id, updated.title, updated.priority, fresh.audienceType, fresh.author.divisionId, fresh.audiences.map((a) => a.divisionId)).catch(() => {});
+      await notifyBulletinPublished(fresh.author.id, updated.title, updated.priority, fresh.audienceType, fresh.author.divisionId, fresh.audiences.map((a) => a.divisionId)).catch(() => {});
     }
   }
 

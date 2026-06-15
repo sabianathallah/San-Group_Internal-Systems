@@ -187,7 +187,7 @@ export default function Header({ onSearchClick }: { onSearchClick?: () => void }
                   ) : notifications.map((n) => (
                     <button key={n.id}
                       onClick={() => {
-                        markRead(n.id);
+                        if (!n.isRead) markRead(n.id);
                         if (n.link) navigate(n.link);
                         setNotifOpen(false);
                       }}
