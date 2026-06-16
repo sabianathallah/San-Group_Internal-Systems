@@ -6,7 +6,7 @@ import {
 } from '@/controllers/user.controller';
 import { authenticate, authorize, authorizeLevel } from '@/middlewares/auth.middleware';
 import { validate } from '@/middlewares/validate.middleware';
-import { uploadAvatar } from '@/middlewares/upload.middleware';
+import { uploadAvatar, validateImageMagicBytes } from '@/middlewares/upload.middleware';
 import { uuidParamSchema, userFilterSchema } from '@/validations/common.validation';
 import { createUserSchema, updateUserSchema, updateMyProfileSchema } from '@/validations/user.validation';
 
@@ -16,7 +16,7 @@ router.use(authenticate);
 
 // ── Self-service routes (must be before /:id) ──────────────
 router.patch('/me', validate(updateMyProfileSchema), updateMyProfile);
-router.patch('/me/avatar', uploadAvatar.single('avatar'), updateMyAvatar);
+router.patch('/me/avatar', uploadAvatar.single('avatar'), validateImageMagicBytes, updateMyAvatar);
 
 // ── Admin routes ───────────────────────────────────────────
 router.get('/', validate(userFilterSchema, ['query']), listUsers);
@@ -49,6 +49,7 @@ router.patch(
   authorizeLevel(2),
   validate(uuidParamSchema, ['params']),
   uploadAvatar.single('avatar'),
+  validateImageMagicBytes,
   updateAvatar,
 );
 

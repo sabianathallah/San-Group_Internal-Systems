@@ -27,6 +27,9 @@ import scheduledAnnouncementRoutes from '@/routes/scheduled-announcement.routes'
 
 const app = express();
 
+// Trust Railway/Vercel proxy so express-rate-limit can read the real client IP
+app.set('trust proxy', 1);
+
 // ── Security ───────────────────────────────────────────────
 app.use(helmet());
 app.use(

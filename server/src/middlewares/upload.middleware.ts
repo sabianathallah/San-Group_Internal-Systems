@@ -1,6 +1,7 @@
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
+import { Request, Response, NextFunction } from 'express';
 import { env } from '@/config/env';
 
 const ALLOWED_MIME_TYPES = new Set([
@@ -78,3 +79,55 @@ export const uploadAvatar = multer({
   limits: { fileSize: 2 * 1024 * 1024 }, // 2MB for avatars
   fileFilter: imageFilter,
 });
+
+// Magic-byte signatures for allowed image types.
+// Checked after multer saves to disk to prevent MIME spoofing.
+const IMAGE_SIGNATURES: { bytes: number[]; mask?: number[] }[] = [
+  { bytes: [0xff, 0xd8, 0xff] },                                           // JPEG
+  { bytes: [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a] },           // PNG
+  { bytes: [0x47, 0x49, 0x46, 0x38] },                                     // GIF (GIF8)
+  { bytes: [0x52, 0x49, 0x46, 0x46, 0, 0, 0, 0, 0x57, 0x45, 0x42, 0x50], // WebP: RIFF....WEBP
+    mask:  [0xff, 0xff, 0xff, 0xff, 0, 0, 0, 0, 0xff, 0xff, 0xff, 0xff] },
+];
+
+function matchesSignature(buf: Buffer): boolean {
+  return IMAGE_SIGNATURES.some(({ bytes, mask }) =>
+    bytes.every((b, i) => {
+      const m = mask ? mask[i] : 0xff;
+      return (buf[i] & m) === (b & m);
+    }),
+  );
+}
+
+function deleteFile(filePath: string) {
+  fs.unlink(filePath, () => {});
+}
+
+export function validateImageMagicBytes(req: Request, res: Response, next: NextFunction): void {
+  const file = req.file;
+  if (!file) { next(); return; }
+
+  const buf = Buffer.alloc(12);
+  let fd: number;
+  try {
+    fd = fs.openSync(file.path, 'r');
+  } catch {
+    deleteFile(file.path);
+    res.status(400).json({ success: false, message: 'File tidak dapat dibaca' });
+    return;
+  }
+
+  try {
+    fs.readSync(fd, buf, 0, 12, 0);
+  } finally {
+    fs.closeSync(fd);
+  }
+
+  if (!matchesSignature(buf)) {
+    deleteFile(file.path);
+    res.status(400).json({ success: false, message: 'Tipe file tidak valid' });
+    return;
+  }
+
+  next();
+}
