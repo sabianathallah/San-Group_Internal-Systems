@@ -7,6 +7,7 @@ import {
 import api from '@/lib/api';
 import { useAuthStore } from '@/stores/authStore';
 import { usePermStore } from '@/stores/permStore';
+import { useToastStore } from '@/stores/toastStore';
 import { cn } from '@/lib/cn';
 
 // ── Types ──────────────────────────────────────────────────
@@ -109,6 +110,7 @@ export default function BulletinPage() {
   const isAdmin = roleLevel <= 2;
   const canManageScheduled = roleLevel <= 3;
   const { perms } = usePermStore();
+  const pushToast = useToastStore((s) => s.push);
 
   // edit/delete are Scope ('none'|'own'|'division'|'all'), not boolean
   const canEditBulletin = (b: Bulletin) =>
@@ -177,7 +179,9 @@ export default function BulletinPage() {
     try {
       await api.patch(`/scheduled-announcements/${sa.id}`, { isActive: !sa.isActive });
       setScheduled((prev) => prev.map((s) => s.id === sa.id ? { ...s, isActive: !sa.isActive } : s));
-    } catch { /* ignore */ }
+    } catch {
+      pushToast('error', 'Gagal mengubah status pengumuman terjadwal');
+    }
   };
 
   const handleDeleteScheduled = async (id: string) => {
@@ -185,7 +189,9 @@ export default function BulletinPage() {
     try {
       await api.delete(`/scheduled-announcements/${id}`);
       setScheduled((prev) => prev.filter((s) => s.id !== id));
-    } catch { /* ignore */ }
+    } catch {
+      pushToast('error', 'Gagal menghapus pengumuman terjadwal');
+    }
   };
 
   const handleDelete = async (id: string) => {
@@ -194,14 +200,18 @@ export default function BulletinPage() {
       await api.delete(`/bulletins/${id}`);
       if (selected?.id === id) setSelected(null);
       fetchBulletins();
-    } catch { /* ignore */ }
+    } catch {
+      pushToast('error', 'Gagal menghapus bulletin');
+    }
   };
 
   const handleTogglePublish = async (b: Bulletin) => {
     try {
       await api.patch(`/bulletins/${b.id}`, { isPublished: !b.isPublished });
       fetchBulletins();
-    } catch { /* ignore */ }
+    } catch {
+      pushToast('error', 'Gagal mengubah status publikasi bulletin');
+    }
   };
 
   const openDetail = async (b: Bulletin) => {

@@ -34,18 +34,30 @@ export async function createScheduledAnnouncementService(
     throw new AppError('Pilih minimal satu divisi untuk audience CUSTOM', 400);
   }
 
+  const audienceType = data.audienceType ?? AudienceType.ALL;
+
+  // For DIVISION type: snapshot the creator's division now so audience stays stable
+  // even if the creator changes divisions later.
+  let audienceDivisionIds: string[] = [];
+  if (audienceType === AudienceType.DIVISION) {
+    const creator = await prisma.user.findUnique({ where: { id: createdById }, select: { divisionId: true } });
+    if (creator?.divisionId) audienceDivisionIds = [creator.divisionId];
+  } else if (audienceType === AudienceType.CUSTOM && data.divisionIds?.length) {
+    audienceDivisionIds = data.divisionIds;
+  }
+
   return prisma.scheduledAnnouncement.create({
     data: {
       title:        data.title,
       content:      data.content,
-      audienceType: data.audienceType ?? AudienceType.ALL,
+      audienceType,
       recurrence:   data.recurrence,
       dayOfWeek:    data.recurrence === RecurrenceType.WEEKLY ? (data.dayOfWeek ?? null) : null,
       sendHour:     data.sendHour,
       sendMinute:   data.sendMinute ?? 0,
       createdById,
-      ...(data.audienceType === AudienceType.CUSTOM && data.divisionIds?.length && {
-        audiences: { create: data.divisionIds.map((divisionId) => ({ divisionId })) },
+      ...(audienceDivisionIds.length > 0 && {
+        audiences: { create: audienceDivisionIds.map((divisionId) => ({ divisionId })) },
       }),
     },
     select: SA_SELECT,
@@ -99,8 +111,20 @@ export async function deleteScheduledAnnouncementService(id: string) {
   await prisma.scheduledAnnouncement.delete({ where: { id } });
 }
 
+let _firingInProgress = false;
+
 // Called by cron every minute
 export async function fireScheduledAnnouncements() {
+  if (_firingInProgress) return;
+  _firingInProgress = true;
+  try {
+    return await _doFireScheduledAnnouncements();
+  } finally {
+    _firingInProgress = false;
+  }
+}
+
+async function _doFireScheduledAnnouncements() {
   // Jakarta = UTC+7
   const now = new Date(Date.now() + 7 * 3_600_000);
   const currentHour    = now.getUTCHours();
@@ -114,7 +138,7 @@ export async function fireScheduledAnnouncements() {
       sendHour:   currentHour,
       sendMinute: currentMinute,
     },
-    select: { ...SA_SELECT, lastSentAt: true },
+    select: SA_SELECT,
   });
 
   for (const sa of candidates) {
@@ -137,16 +161,8 @@ export async function fireScheduledAnnouncements() {
     if (sa.audienceType === AudienceType.ALL) {
       const users = await prisma.user.findMany({ where: { isActive: true }, select: { id: true } });
       userIds = users.map((u) => u.id);
-    } else if (sa.audienceType === AudienceType.DIVISION) {
-      // Users in same division as creator — resolved at fire time via createdBy
-      const creator = await prisma.user.findUnique({ where: { id: sa.createdBy.id }, select: { divisionId: true } });
-      const users = await prisma.user.findMany({
-        where: { isActive: true, divisionId: creator?.divisionId ?? '' },
-        select: { id: true },
-      });
-      userIds = users.map((u) => u.id);
     } else {
-      // CUSTOM — use audience divisions
+      // DIVISION and CUSTOM both use the stored audience divisions (snapshotted at create time)
       const divisionIds = sa.audiences.map((a) => a.division.id);
       const users = await prisma.user.findMany({
         where: { isActive: true, divisionId: { in: divisionIds } },

@@ -173,7 +173,7 @@ export async function refreshTokenService(token: string) {
       data: {
         token: newRefreshToken,
         userId: user.id,
-        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+        expiresAt: new Date(Date.now() + 12 * 60 * 60 * 1000), // 12h — must match JWT_REFRESH_EXPIRY
       },
     }),
   ]);

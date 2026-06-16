@@ -232,34 +232,38 @@ export async function updateBulletinService(
   if (data.isPublished === true && !exists.isPublished)  publishedAt = new Date();
   if (data.isPublished === false && exists.isPublished)  publishedAt = null;
 
-  const updated = await prisma.bulletin.update({
-    where: { id },
-    data: {
-      ...(data.title       !== undefined && { title: data.title }),
-      ...(data.content     !== undefined && { content: data.content }),
-      ...(data.category    !== undefined && { category: data.category }),
-      ...(data.priority    !== undefined && { priority: data.priority }),
-      ...(data.isPublished !== undefined && { isPublished: data.isPublished }),
-      ...(publishedAt      !== undefined && { publishedAt }),
-      ...(data.expiresAt   !== undefined && { expiresAt: data.expiresAt ? new Date(data.expiresAt) : null }),
-      ...(data.audienceType !== undefined && { audienceType: data.audienceType }),
-    },
-    select: BULLETIN_SELECT,
-  });
+  const updated = await prisma.$transaction(async (tx) => {
+    const result = await tx.bulletin.update({
+      where: { id },
+      data: {
+        ...(data.title        !== undefined && { title: data.title }),
+        ...(data.content      !== undefined && { content: data.content }),
+        ...(data.category     !== undefined && { category: data.category }),
+        ...(data.priority     !== undefined && { priority: data.priority }),
+        ...(data.isPublished  !== undefined && { isPublished: data.isPublished }),
+        ...(publishedAt       !== undefined && { publishedAt }),
+        ...(data.expiresAt    !== undefined && { expiresAt: data.expiresAt ? new Date(data.expiresAt) : null }),
+        ...(data.audienceType !== undefined && { audienceType: data.audienceType }),
+      },
+      select: BULLETIN_SELECT,
+    });
 
-  // Re-sync audience records if audienceType or audienceDivisionIds changed
-  if (data.audienceType !== undefined || data.audienceDivisionIds !== undefined) {
-    await prisma.bulletinAudience.deleteMany({ where: { bulletinId: id } });
-    if (
-      (data.audienceType ?? updated.audienceType) === AudienceType.CUSTOM &&
-      data.audienceDivisionIds?.length
-    ) {
-      await prisma.bulletinAudience.createMany({
-        data: data.audienceDivisionIds.map((divisionId) => ({ bulletinId: id, divisionId })),
-        skipDuplicates: true,
-      });
+    // Re-sync audience records atomically with the bulletin update
+    if (data.audienceType !== undefined || data.audienceDivisionIds !== undefined) {
+      await tx.bulletinAudience.deleteMany({ where: { bulletinId: id } });
+      if (
+        (data.audienceType ?? result.audienceType) === AudienceType.CUSTOM &&
+        data.audienceDivisionIds?.length
+      ) {
+        await tx.bulletinAudience.createMany({
+          data: data.audienceDivisionIds.map((divisionId) => ({ bulletinId: id, divisionId })),
+          skipDuplicates: true,
+        });
+      }
     }
-  }
+
+    return result;
+  });
 
   // Notify audience when bulletin is newly published
   if (data.isPublished === true && !exists.isPublished) {
