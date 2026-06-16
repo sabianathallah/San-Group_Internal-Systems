@@ -7,10 +7,22 @@ import Sidebar from '@/components/shared/Sidebar';
 import Header from '@/components/shared/Header';
 import CommandPalette from '@/components/shared/CommandPalette';
 import Toasts from '@/components/shared/Toasts';
+import api from '@/lib/api';
+
+function isJwtExpired(token: string): boolean {
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    return Date.now() >= payload.exp * 1000 - 10_000; // 10s buffer
+  } catch {
+    return true;
+  }
+}
 
 export default function DashboardLayout() {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const logout          = useAuthStore((s) => s.logout);
   const [hasHydrated, setHasHydrated] = useState(useAuthStore.persist.hasHydrated());
+  const [tokenReady, setTokenReady]   = useState(false);
   const fetchPerms = usePermStore((s) => s.fetch);
   const [paletteOpen, setPaletteOpen] = useState(false);
 
@@ -21,11 +33,33 @@ export default function DashboardLayout() {
     });
   }, []);
 
+  // After hydration, proactively refresh if access token is expired
   useEffect(() => {
-    if (isAuthenticated) {
+    if (!hasHydrated || !isAuthenticated) {
+      if (hasHydrated) setTokenReady(true);
+      return;
+    }
+    const token = localStorage.getItem('access_token');
+    if (!token || isJwtExpired(token)) {
+      api.post('/auth/refresh')
+        .then(({ data }) => {
+          localStorage.setItem('access_token', data.data.accessToken);
+          setTokenReady(true);
+        })
+        .catch(() => {
+          logout();
+          setTokenReady(true);
+        });
+    } else {
+      setTokenReady(true);
+    }
+  }, [hasHydrated, isAuthenticated, logout]);
+
+  useEffect(() => {
+    if (isAuthenticated && tokenReady) {
       fetchPerms();
     }
-  }, [isAuthenticated, fetchPerms]);
+  }, [isAuthenticated, tokenReady, fetchPerms]);
 
   // Global Cmd+K / Ctrl+K shortcut
   useEffect(() => {
@@ -39,7 +73,7 @@ export default function DashboardLayout() {
     return () => document.removeEventListener('keydown', handler);
   }, []);
 
-  if (!hasHydrated) {
+  if (!hasHydrated || !tokenReady) {
     return null;
   }
 

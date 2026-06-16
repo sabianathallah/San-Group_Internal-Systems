@@ -1,22 +1,24 @@
 import { create } from 'zustand';
 
-export type ToastType = 'success' | 'error' | 'info';
+export type ToastType = 'success' | 'error' | 'info' | 'notif';
 
 export interface Toast {
-  id: number;
-  type: ToastType;
-  message: string;
-  onUndo?: () => void;
-  duration: number;
+  id:        number;
+  type:      ToastType;
+  message:   string;
+  // notif-specific fields
+  title?:     string;
+  notifType?: string;
+  link?:      string | null;
+  onClick?:   () => void;
+  onUndo?:   () => void;
+  duration:  number;
 }
 
 interface ToastState {
   toasts: Toast[];
   push: (type: ToastType, message: string, duration?: number) => void;
-  /**
-   * Optimistic action with undo — `onCommit` fires after the toast expires
-   * (or is dismissed) unless the user clicks Undo, in which case `onUndo` runs.
-   */
+  pushNotif: (title: string, message: string, notifType: string, link: string | null, onClick: () => void) => void;
   pushUndoable: (message: string, opts: { onUndo: () => void; onCommit: () => void; duration?: number }) => void;
   dismiss: (id: number, undone?: boolean) => void;
 }
@@ -31,6 +33,12 @@ export const useToastStore = create<ToastState>((set, get) => ({
   push: (type, message, duration = 3500) => {
     const id = nextId++;
     set((s) => ({ toasts: [...s.toasts.slice(-3), { id, type, message, duration }] }));
+    timers.set(id, setTimeout(() => get().dismiss(id), duration));
+  },
+
+  pushNotif: (title, message, notifType, link, onClick, duration = 5000) => {
+    const id = nextId++;
+    set((s) => ({ toasts: [...s.toasts.slice(-3), { id, type: 'notif', title, message, notifType, link, onClick, duration }] }));
     timers.set(id, setTimeout(() => get().dismiss(id), duration));
   },
 
@@ -61,4 +69,6 @@ export const toast = {
   info:     (m: string) => useToastStore.getState().push('info', m),
   undoable: (m: string, opts: { onUndo: () => void; onCommit: () => void; duration?: number }) =>
     useToastStore.getState().pushUndoable(m, opts),
+  notif: (title: string, message: string, notifType: string, link: string | null, onClick: () => void) =>
+    useToastStore.getState().pushNotif(title, message, notifType, link, onClick),
 };

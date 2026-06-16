@@ -17,7 +17,7 @@ interface NotificationState {
   unreadCount:   number;
   loading:       boolean;
   fetch:         (limit?: number) => Promise<void>;
-  poll:          () => Promise<number>; // returns delta of new unread
+  poll:          () => Promise<Notification[]>; // returns newly arrived unread notifications
   markRead:      (id: string) => Promise<void>;
   markAllRead:   () => Promise<void>;
 }
@@ -41,19 +41,17 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
   },
 
   poll: async () => {
-    const prevUnread = get().unreadCount;
+    const prevIds = new Set(get().notifications.map((n) => n.id));
     try {
-      // Check unread count first — cheap call
-      const countRes = await api.get('/notifications/unread-count');
-      const newUnread: number = countRes.data.data?.count ?? 0;
-      if (newUnread === prevUnread) return 0;
-      // Something changed — refresh list, keeping at least as many items as currently loaded
-      const limit = Math.max(30, get().notifications.length);
+      const limit   = Math.max(30, get().notifications.length);
       const listRes = await api.get('/notifications', { params: { limit } });
       const list: Notification[] = listRes.data.data ?? [];
-      set({ notifications: list, unreadCount: list.filter((n) => !n.isRead).length });
-      return Math.max(0, newUnread - prevUnread);
-    } catch { return 0; }
+      const newNotifs = list.filter((n) => !prevIds.has(n.id) && !n.isRead);
+      if (newNotifs.length > 0) {
+        set({ notifications: list, unreadCount: list.filter((n) => !n.isRead).length });
+      }
+      return newNotifs;
+    } catch { return []; }
   },
 
   markRead: async (id: string) => {

@@ -92,13 +92,20 @@ export default function Header({ onSearchClick }: { onSearchClick?: () => void }
 
   useEffect(() => { fetchNotifs(); }, [fetchNotifs]);
 
-  // Poll every 60s; toast when new notifications arrive
+  // Poll every 60s; toast each new notification individually (max 3)
   const handlePoll = useCallback(async () => {
-    const delta = await pollNotifs();
-    if (delta > 0) {
-      toast.info(`${delta} new notification${delta > 1 ? 's' : ''}`);
+    const newNotifs = await pollNotifs();
+    const shown = newNotifs.slice(0, 3);
+    shown.forEach((n) => {
+      toast.notif(n.title, n.message, n.type, n.link ?? null, () => {
+        markRead(n.id);
+        if (n.link) navigate(n.link);
+      });
+    });
+    if (newNotifs.length > 3) {
+      toast.info(`+${newNotifs.length - 3} notifikasi lainnya`);
     }
-  }, [pollNotifs]);
+  }, [pollNotifs, markRead, navigate]);
 
   useEffect(() => {
     const id = setInterval(handlePoll, 60_000);
