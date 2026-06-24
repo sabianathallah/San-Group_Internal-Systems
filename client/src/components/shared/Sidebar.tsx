@@ -12,6 +12,7 @@ import {
   ClipboardList,
   Inbox,
   Shield,
+  Wrench,
 } from 'lucide-react';
 import { useUiStore } from '@/stores/uiStore';
 import { useAuthStore } from '@/stores/authStore';
@@ -29,6 +30,7 @@ interface NavItem {
 const mainNav: NavItem[] = [
   { label: 'Dashboard',      to: ROUTES.DASHBOARD,     icon: LayoutDashboard },
   { label: 'Tasks',          to: ROUTES.TASKS,         icon: CheckSquare2    },
+  { label: 'Work Orders',    to: ROUTES.WORK_ORDERS,   icon: Wrench          },
   { label: 'Bulletin',       to: ROUTES.BULLETIN,      icon: Bell            },
   { label: 'Notifications',  to: ROUTES.NOTIFICATIONS, icon: Inbox           },
   { label: 'Notes',          to: ROUTES.NOTES,         icon: StickyNote      },

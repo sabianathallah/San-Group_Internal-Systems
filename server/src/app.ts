@@ -24,6 +24,7 @@ import searchRoutes from '@/routes/search.routes';
 import analyticsRoutes from '@/routes/analytics.routes';
 import auditRoutes from '@/routes/audit.routes';
 import scheduledAnnouncementRoutes from '@/routes/scheduled-announcement.routes';
+import workOrderRoutes from '@/routes/work-order.routes';
 
 const app = express();
 
@@ -87,6 +88,7 @@ app.use('/api/search', searchRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/audit-logs', auditRoutes);
 app.use('/api/scheduled-announcements', scheduledAnnouncementRoutes);
+app.use('/api/work-orders', workOrderRoutes);
 
 // ── Error Handling ─────────────────────────────────────────
 app.use(notFound);

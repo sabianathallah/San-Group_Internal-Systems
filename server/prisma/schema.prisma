@@ -53,6 +53,35 @@ enum NotificationType {
   SYSTEM
   TASK_DUE_SOON
   TASK_OVERDUE
+  WO_ASSIGNED
+  WO_STATUS_CHANGED
+  WO_COMPLETED
+}
+
+enum WorkOrderStatus {
+  OPEN
+  ASSIGNED
+  IN_PROGRESS
+  PENDING_PARTS
+  DONE
+  CANCELLED
+}
+
+enum WorkOrderPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum WorkOrderCategory {
+  ELECTRICAL
+  PLUMBING
+  HVAC
+  CIVIL
+  CLEANING
+  SECURITY
+  OTHER
 }
 
 enum TaskVisibility {
@@ -159,6 +188,10 @@ model User {
   auditLogs           AuditLog[]
   taskListMemberships        TaskListMembership[]
   scheduledAnnouncements     ScheduledAnnouncement[]
+  reportedWorkOrders         WorkOrder[]             @relation("WOReporter")
+  assignedWorkOrders         WorkOrder[]             @relation("WOAssignee")
+  workOrderHistories         WorkOrderHistory[]
+  workOrderAttachments       WorkOrderAttachment[]
 
   @@index([email])
   @@index([username])
@@ -555,13 +588,69 @@ model AuditLog {
 // ============================================================
 
 // --- Work Order System ---
-// enum WorkOrderStatus { OPEN, ASSIGNED, IN_PROGRESS, PENDING_PARTS, DONE, CANCELLED }
-// enum WorkOrderPriority { LOW, MEDIUM, HIGH, URGENT }
-// enum WorkOrderCategory { ELECTRICAL, PLUMBING, HVAC, CIVIL, CLEANING, SECURITY, OTHER }
-//
-// model WorkOrder { ... }
-// model WorkOrderHistory { ... }
-// model WorkOrderAttachment { ... }
+
+model WorkOrder {
+  id          String            @id @default(uuid())
+  title       String
+  description String?
+  status      WorkOrderStatus   @default(OPEN)
+  priority    WorkOrderPriority @default(MEDIUM)
+  category    WorkOrderCategory @default(OTHER)
+  location    String?
+  dueDate     DateTime?
+  completedAt DateTime?
+  notes       String?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  reportedById String
+  reportedBy   User   @relation("WOReporter", fields: [reportedById], references: [id])
+
+  assignedToId String?
+  assignee     User?   @relation("WOAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+
+  history     WorkOrderHistory[]
+  attachments WorkOrderAttachment[]
+
+  @@index([reportedById])
+  @@index([assignedToId])
+  @@index([status])
+  @@index([priority])
+  @@index([category])
+  @@map("work_orders")
+}
+
+model WorkOrderHistory {
+  id          String           @id @default(uuid())
+  workOrderId String
+  workOrder   WorkOrder        @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+  fromStatus  WorkOrderStatus?
+  toStatus    WorkOrderStatus
+  note        String?
+  changedById String
+  changedBy   User             @relation(fields: [changedById], references: [id])
+  createdAt   DateTime         @default(now())
+
+  @@index([workOrderId])
+  @@index([changedById])
+  @@map("work_order_history")
+}
+
+model WorkOrderAttachment {
+  id           String    @id @default(uuid())
+  workOrderId  String
+  workOrder    WorkOrder @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+  fileName     String
+  filePath     String
+  fileSize     Int
+  mimeType     String
+  uploadedById String
+  uploadedBy   User      @relation(fields: [uploadedById], references: [id])
+  createdAt    DateTime  @default(now())
+
+  @@index([workOrderId])
+  @@map("work_order_attachments")
+}
 
 // --- HRIS ---
 // model Attendance { ... }

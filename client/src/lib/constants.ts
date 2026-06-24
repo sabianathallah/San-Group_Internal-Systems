@@ -13,4 +13,5 @@ export const ROUTES = {
   ANALYTICS:          '/analytics',
   ADMIN_AUDIT_LOG:    '/admin/audit-log',
   NOTIFICATIONS:      '/notifications',
+  WORK_ORDERS:        '/work-orders',
 } as const;
