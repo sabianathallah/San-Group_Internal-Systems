@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { ROUTES } from '@/lib/constants';
 import { useAuthStore } from '@/stores/authStore';
+import { usePermStore } from '@/stores/permStore';
 import AuthLayout from '@/layouts/AuthLayout';
 import DashboardLayout from '@/layouts/DashboardLayout';
 import LoginPage from '@/pages/LoginPage';
@@ -31,6 +32,18 @@ function AdminRoute() {
   return <Outlet />;
 }
 
+function HrisAdminRoute() {
+  const perms = usePermStore((s) => s.perms);
+  if (!perms.hris.manageShifts && !perms.hris.manageLocations) return <Navigate to={ROUTES.HRIS} replace />;
+  return <Outlet />;
+}
+
+function HrisReportsRoute() {
+  const perms = usePermStore((s) => s.perms);
+  if (perms.hris.viewReports === 'none') return <Navigate to={ROUTES.HRIS} replace />;
+  return <Outlet />;
+}
+
 export default function App() {
   return (
     <BrowserRouter>
@@ -55,9 +68,13 @@ export default function App() {
           <Route path={ROUTES.HRIS_ATTENDANCE}      element={<AttendancePage />}      />
           <Route path={ROUTES.HRIS_LEAVE}           element={<LeavePage />}           />
           <Route path={ROUTES.HRIS_OVERTIME}        element={<OvertimePage />}        />
-          <Route path={ROUTES.HRIS_REPORTS}         element={<ReportsPage />}         />
-          <Route path={ROUTES.HRIS_ADMIN_SHIFTS}    element={<ShiftsAdminPage />}     />
-          <Route path={ROUTES.HRIS_ADMIN_LOCATIONS} element={<LocationsAdminPage />}  />
+          <Route element={<HrisReportsRoute />}>
+            <Route path={ROUTES.HRIS_REPORTS} element={<ReportsPage />} />
+          </Route>
+          <Route element={<HrisAdminRoute />}>
+            <Route path={ROUTES.HRIS_ADMIN_SHIFTS}    element={<ShiftsAdminPage />}    />
+            <Route path={ROUTES.HRIS_ADMIN_LOCATIONS} element={<LocationsAdminPage />} />
+          </Route>
 
           {/* Admin-only routes */}
           <Route element={<AdminRoute />}>

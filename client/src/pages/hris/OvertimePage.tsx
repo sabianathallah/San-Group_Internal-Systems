@@ -6,6 +6,7 @@ import {
 import api from '@/lib/api';
 import { cn } from '@/lib/cn';
 import { useAuthStore } from '@/stores/authStore';
+import { usePermStore } from '@/stores/permStore';
 import { toast } from '@/stores/toastStore';
 
 // ── Types ──────────────────────────────────────────────────────
@@ -212,8 +213,8 @@ const TABS: { label: string; value: string }[] = [
 
 export default function OvertimePage() {
   const user = useAuthStore((s) => s.user);
-  const roleLevel = user?.role?.level ?? 99;
-  const isManager = roleLevel <= 4;
+  const perms = usePermStore((s) => s.perms);
+  const isManager = perms.hris.reviewOvertime;
 
   const now = new Date();
   const [month, setMonth] = useState(now.getMonth() + 1);

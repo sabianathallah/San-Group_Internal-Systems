@@ -6,6 +6,7 @@ import {
 import api from '@/lib/api';
 import { cn } from '@/lib/cn';
 import { useAuthStore } from '@/stores/authStore';
+import { usePermStore } from '@/stores/permStore';
 import { toast } from '@/stores/toastStore';
 
 // ── Types ──────────────────────────────────────────────────────
@@ -83,9 +84,9 @@ function exportCSV(rows: ReportRow[], month: number, year: number) {
 
 // ── Component ──────────────────────────────────────────────────
 export default function ReportsPage() {
-  const user = useAuthStore((s) => s.user);
-  const roleLevel = user?.role?.level ?? 99;
-  const isHRAdmin = roleLevel <= 2;
+  useAuthStore((s) => s.user);
+  const perms = usePermStore((s) => s.perms);
+  const isHRAdmin = perms.hris.viewReports === 'all';
 
   const now = new Date();
   const [month, setMonth]     = useState(now.getMonth() + 1);

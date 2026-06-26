@@ -7,6 +7,7 @@ import {
 import api from '@/lib/api';
 import { cn } from '@/lib/cn';
 import { useAuthStore } from '@/stores/authStore';
+import { usePermStore } from '@/stores/permStore';
 
 type AttendanceStatus = 'PRESENT' | 'LATE' | 'WFH' | 'PERMISSION' | 'ABSENT' | 'HOLIDAY';
 
@@ -191,8 +192,9 @@ function LogTable({
 
 // ── Main Page ──────────────────────────────────────────────────
 export default function AttendancePage() {
-  const user = useAuthStore((s) => s.user);
-  const isManager = (user?.role?.level ?? 99) <= 4;
+  useAuthStore((s) => s.user);
+  const perms = usePermStore((s) => s.perms);
+  const canSeeTeam = perms.hris.editAttendance;
 
   const now = new Date();
   const [month, setMonth]           = useState(now.getMonth() + 1);
@@ -214,13 +216,13 @@ export default function AttendancePage() {
       setSummary(summaryRes.data.data.summary);
       setRecords(summaryRes.data.data.records ?? []);
 
-      if (isManager && viewMode === 'team') {
+      if (canSeeTeam && viewMode === 'team') {
         const teamRes = await api.get('/hris/attendance', { params: { month, year, limit: 300 } });
         setTeamRecords(teamRes.data.data ?? []);
       }
     } catch { /* silent */ }
     finally { setLoading(false); }
-  }, [month, year, viewMode, isManager]);
+  }, [month, year, viewMode, canSeeTeam]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -269,7 +271,7 @@ export default function AttendancePage() {
             <p className="text-sm text-gray-500 mt-0.5">Monthly attendance summary</p>
           </div>
           <div className="flex items-center gap-2">
-            {isManager && (
+            {canSeeTeam && (
               <div className="flex rounded-lg border border-gray-200 overflow-hidden text-sm">
                 <button
                   onClick={() => setViewMode('mine')}

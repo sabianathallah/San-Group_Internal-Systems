@@ -63,19 +63,19 @@ async function sendWONotification(
   });
 }
 
-export async function listWorkOrdersService(userId: string, roleLevel: number, query: ParsedQs) {
+export async function listWorkOrdersService(userId: string, viewScope: string, query: ParsedQs) {
   const { page, limit, skip } = parsePagination(query, { createdAt: 'desc' });
 
   const view = (query.view as string) || 'all';
   const where: Prisma.WorkOrderWhereInput = {};
 
-  // Non-admin/manager: hanya lihat WO yang mereka buat atau yang di-assign
-  if (roleLevel > 4) {
+  // 'own' scope: only WOs the user created or is assigned to
+  if (viewScope === 'own') {
     where.OR = [{ reportedById: userId }, { assignedToId: userId }];
   }
 
-  if (view === 'mine')      { where.assignedToId = userId; }
-  if (view === 'reported')  { where.reportedById = userId; }
+  if (view === 'mine')       { where.assignedToId = userId; }
+  if (view === 'reported')   { where.reportedById = userId; }
   if (view === 'unassigned') { where.assignedToId = null; where.status = { not: WorkOrderStatus.DONE }; }
 
   if (query.status   && typeof query.status   === 'string') where.status   = query.status   as WorkOrderStatus;
@@ -86,11 +86,7 @@ export async function listWorkOrdersService(userId: string, roleLevel: number, q
   if (query.search && typeof query.search === 'string') {
     const s = { contains: query.search, mode: 'insensitive' as const };
     const searchOr: Prisma.WorkOrderWhereInput[] = [{ title: s }, { description: s }, { location: s }];
-    if (where.OR && !view) {
-      where.AND = [{ OR: searchOr }];
-    } else {
-      where.AND = [...((where.AND as Prisma.WorkOrderWhereInput[] | undefined) ?? []), { OR: searchOr }];
-    }
+    where.AND = [...((where.AND as Prisma.WorkOrderWhereInput[] | undefined) ?? []), { OR: searchOr }];
   }
 
   const [workOrders, total] = await prisma.$transaction([
@@ -101,12 +97,11 @@ export async function listWorkOrdersService(userId: string, roleLevel: number, q
   return { workOrders, meta: buildMeta(total, page, limit) };
 }
 
-export async function getWorkOrderByIdService(id: string, userId: string, roleLevel: number) {
+export async function getWorkOrderByIdService(id: string, userId: string, viewScope: string) {
   const wo = await prisma.workOrder.findUnique({ where: { id }, select: WO_DETAIL_SELECT });
   if (!wo) throw new AppError('Work order tidak ditemukan', 404);
 
-  // Staff/Supervisor hanya bisa lihat WO miliknya
-  if (roleLevel > 4 && wo.reportedBy.id !== userId && wo.assignee?.id !== userId) {
+  if (viewScope === 'own' && wo.reportedBy.id !== userId && wo.assignee?.id !== userId) {
     throw new AppError('Akses ditolak', 403);
   }
 
@@ -159,7 +154,7 @@ export async function createWorkOrderService(userId: string, body: Record<string
 export async function updateWorkOrderService(
   id: string,
   userId: string,
-  roleLevel: number,
+  editScope: string,
   body: Record<string, unknown>,
 ) {
   const existing = await prisma.workOrder.findUnique({
@@ -168,8 +163,7 @@ export async function updateWorkOrderService(
   });
   if (!existing) throw new AppError('Work order tidak ditemukan', 404);
 
-  // Hanya creator atau admin/manager yang bisa edit
-  if (roleLevel > 4 && existing.reportedById !== userId) {
+  if (editScope === 'own' && existing.reportedById !== userId) {
     throw new AppError('Hanya pembuat WO yang bisa mengedit', 403);
   }
   if (existing.status === WorkOrderStatus.DONE || existing.status === WorkOrderStatus.CANCELLED) {
@@ -185,7 +179,6 @@ export async function updateWorkOrderService(
   const prevAssignee = existing.assignedToId;
   const newAssignee  = assignedToId !== undefined ? (assignedToId ?? null) : existing.assignedToId;
 
-  // Auto-adjust status when assignee changes
   let statusUpdate: WorkOrderStatus | undefined;
   if (assignedToId !== undefined) {
     if (assignedToId && existing.status === WorkOrderStatus.OPEN) statusUpdate = WorkOrderStatus.ASSIGNED;
@@ -208,7 +201,6 @@ export async function updateWorkOrderService(
     select: WO_DETAIL_SELECT,
   });
 
-  // Notify new assignee
   if (newAssignee && newAssignee !== prevAssignee) {
     await sendWONotification(
       NotificationType.WO_ASSIGNED,
@@ -226,7 +218,7 @@ export async function updateWorkOrderService(
 export async function changeWorkOrderStatusService(
   id: string,
   userId: string,
-  roleLevel: number,
+  editScope: string,
   body: { status: WorkOrderStatus; note?: string | null },
 ) {
   const existing = await prisma.workOrder.findUnique({
@@ -235,8 +227,7 @@ export async function changeWorkOrderStatusService(
   });
   if (!existing) throw new AppError('Work order tidak ditemukan', 404);
 
-  // Staff hanya bisa ubah status WO yang di-assign ke mereka
-  if (roleLevel > 4 && existing.assignedToId !== userId && existing.reportedById !== userId) {
+  if (editScope === 'own' && existing.assignedToId !== userId && existing.reportedById !== userId) {
     throw new AppError('Akses ditolak', 403);
   }
 
@@ -263,7 +254,6 @@ export async function changeWorkOrderStatusService(
     select: WO_DETAIL_SELECT,
   });
 
-  // Notify reporter when status changes (tidak notify diri sendiri)
   if (existing.reportedById !== userId) {
     await sendWONotification(
       status === WorkOrderStatus.DONE ? NotificationType.WO_COMPLETED : NotificationType.WO_STATUS_CHANGED,
@@ -278,22 +268,22 @@ export async function changeWorkOrderStatusService(
   return wo;
 }
 
-export async function deleteWorkOrderService(id: string, userId: string, roleLevel: number) {
+export async function deleteWorkOrderService(id: string, userId: string, deleteScope: string) {
   const existing = await prisma.workOrder.findUnique({
     where: { id },
     select: { id: true, reportedById: true },
   });
   if (!existing) throw new AppError('Work order tidak ditemukan', 404);
-  if (roleLevel > 4 && existing.reportedById !== userId) {
+  if (deleteScope === 'own' && existing.reportedById !== userId) {
     throw new AppError('Hanya pembuat WO yang bisa menghapus', 403);
   }
 
   await prisma.workOrder.delete({ where: { id } });
 }
 
-export async function getWorkOrderStatsService(userId: string, roleLevel: number) {
+export async function getWorkOrderStatsService(userId: string, viewScope: string) {
   const where: Prisma.WorkOrderWhereInput =
-    roleLevel > 4 ? { OR: [{ reportedById: userId }, { assignedToId: userId }] } : {};
+    viewScope === 'own' ? { OR: [{ reportedById: userId }, { assignedToId: userId }] } : {};
 
   const [byStatus, byPriority, overdue] = await prisma.$transaction([
     prisma.workOrder.groupBy({ by: ['status'], where, _count: true, orderBy: { status: 'asc' } }),

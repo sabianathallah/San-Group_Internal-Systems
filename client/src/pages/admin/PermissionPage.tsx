@@ -22,9 +22,17 @@ interface NotePerms {
 }
 interface AnalyticsPerms { view: Scope; }
 interface AuditLogPerms  { view: Scope; }
+interface HrisPerms {
+  reviewLeave: boolean; reviewOvertime: boolean; editAttendance: boolean;
+  manageShifts: boolean; manageLocations: boolean; viewReports: Scope;
+}
+interface WorkOrderPerms {
+  view: Scope; create: boolean; edit: Scope; delete: Scope;
+}
 interface PermissionConfig {
   task: TaskPerms; bulletin: BulletinPerms; db_link: DbLinkPerms;
   note: NotePerms; analytics: AnalyticsPerms; audit_log: AuditLogPerms;
+  hris: HrisPerms; work_order: WorkOrderPerms;
 }
 
 interface RoleWithPerms {
@@ -773,6 +781,52 @@ export default function PermissionPage() {
                 <PermRow label="View audit log">
                   <ScopeSelector value={perms.audit_log?.view ?? 'none'} options={VIEW_SCOPE_OPTS}
                     onChange={(v) => update('audit_log', 'view', v)} disabled={isSuperAdmin || isReadOnly} />
+                </PermRow>
+              </Section>
+
+              <Section title="HRIS">
+                <PermRow label="Review leave requests">
+                  <Toggle checked={perms.hris?.reviewLeave ?? false} onChange={(v) => update('hris', 'reviewLeave', v)}
+                    disabled={isSuperAdmin || isReadOnly} />
+                </PermRow>
+                <PermRow label="Review overtime requests">
+                  <Toggle checked={perms.hris?.reviewOvertime ?? false} onChange={(v) => update('hris', 'reviewOvertime', v)}
+                    disabled={isSuperAdmin || isReadOnly} />
+                </PermRow>
+                <PermRow label="Edit attendance records">
+                  <Toggle checked={perms.hris?.editAttendance ?? false} onChange={(v) => update('hris', 'editAttendance', v)}
+                    disabled={isSuperAdmin || isReadOnly} />
+                </PermRow>
+                <PermRow label="Manage shifts">
+                  <Toggle checked={perms.hris?.manageShifts ?? false} onChange={(v) => update('hris', 'manageShifts', v)}
+                    disabled={isSuperAdmin || isReadOnly} />
+                </PermRow>
+                <PermRow label="Manage office locations">
+                  <Toggle checked={perms.hris?.manageLocations ?? false} onChange={(v) => update('hris', 'manageLocations', v)}
+                    disabled={isSuperAdmin || isReadOnly} />
+                </PermRow>
+                <PermRow label="View attendance reports">
+                  <ScopeSelector value={perms.hris?.viewReports ?? 'none'} options={VIEW_SCOPE_OPTS}
+                    onChange={(v) => update('hris', 'viewReports', v)} disabled={isSuperAdmin || isReadOnly} />
+                </PermRow>
+              </Section>
+
+              <Section title="Work Orders">
+                <PermRow label="View work orders">
+                  <ScopeSelector value={perms.work_order?.view ?? 'own'} options={TASK_SCOPE_OPTS}
+                    onChange={(v) => update('work_order', 'view', v)} disabled={isSuperAdmin || isReadOnly} />
+                </PermRow>
+                <PermRow label="Create work orders">
+                  <Toggle checked={perms.work_order?.create ?? true} onChange={(v) => update('work_order', 'create', v)}
+                    disabled={isSuperAdmin || isReadOnly} />
+                </PermRow>
+                <PermRow label="Edit work orders">
+                  <ScopeSelector value={perms.work_order?.edit ?? 'own'} options={EDIT_SCOPE_OPTS}
+                    onChange={(v) => update('work_order', 'edit', v)} disabled={isSuperAdmin || isReadOnly} />
+                </PermRow>
+                <PermRow label="Delete work orders">
+                  <ScopeSelector value={perms.work_order?.delete ?? 'own'} options={EDIT_SCOPE_OPTS}
+                    onChange={(v) => update('work_order', 'delete', v)} disabled={isSuperAdmin || isReadOnly} />
                 </PermRow>
               </Section>
             </div>

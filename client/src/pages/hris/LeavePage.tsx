@@ -6,6 +6,7 @@ import {
 import api from '@/lib/api';
 import { cn } from '@/lib/cn';
 import { useAuthStore } from '@/stores/authStore';
+import { usePermStore } from '@/stores/permStore';
 import { toast } from '@/stores/toastStore';
 
 // ── Types ──────────────────────────────────────────────────────
@@ -267,7 +268,8 @@ function ReviewModal({
 // ── Main Page ──────────────────────────────────────────────────
 export default function LeavePage() {
   const user = useAuthStore((s) => s.user);
-  const isManager = (user?.role?.level ?? 99) <= 4;
+  const perms = usePermStore((s) => s.perms);
+  const isManager = perms.hris.reviewLeave;
 
   const [leaveTypes,   setLeaveTypes]   = useState<LeaveType[]>([]);
   const [balances,     setBalances]     = useState<LeaveBalance[]>([]);

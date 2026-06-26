@@ -74,8 +74,8 @@ export default function Sidebar() {
   const roleLevel    = user?.role?.level ?? 99;
   const isAdmin      = roleLevel <= 2;
   const canAnalytics = perms.analytics?.view !== 'none';
-  const canReports   = roleLevel <= 4;
-  const isHRAdmin    = roleLevel <= 2;
+  const canReports   = perms.hris?.viewReports !== 'none';
+  const isHRAdmin    = perms.hris?.manageShifts || perms.hris?.manageLocations;
   const activeModule = useActiveModule();
 
   const internalNav: NavItem[] = [

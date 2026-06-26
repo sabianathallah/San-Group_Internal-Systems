@@ -3,6 +3,7 @@ import { v2 as cloudinary } from 'cloudinary';
 import '@/config/cloudinary';
 import { AuthRequest } from '@/types';
 import { successResponse } from '@/helpers/response';
+import { getPermissionsForRole } from '@/services/permission.service';
 import {
   listLeaveTypesService,
   getLeaveBalancesService,
@@ -57,8 +58,9 @@ export async function getLeaveBalances(req: AuthRequest, res: Response, next: Ne
 
 export async function listLeaveRequests(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
-    const { userId, roleLevel } = req.user!;
-    const result = await listLeaveRequestsService(userId, roleLevel, req.query);
+    const { userId, roleId, roleLevel } = req.user!;
+    const perms = await getPermissionsForRole(roleId, roleLevel);
+    const result = await listLeaveRequestsService(userId, perms.hris.reviewLeave, req.query);
     successResponse(res, result.leaveRequests, 'Daftar cuti berhasil diambil', 200, result.meta);
   } catch (err) { next(err); }
 }
@@ -72,8 +74,7 @@ export async function createLeaveRequest(req: AuthRequest, res: Response, next: 
 
 export async function reviewLeaveRequest(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
-    const { userId, roleLevel } = req.user!;
-    const result = await reviewLeaveRequestService(String(req.params.id), userId, roleLevel, req.body);
+    const result = await reviewLeaveRequestService(String(req.params.id), req.user!.userId, req.body);
     successResponse(res, result, 'Pengajuan cuti berhasil diproses');
   } catch (err) { next(err); }
 }
@@ -121,8 +122,9 @@ export async function checkOut(req: AuthRequest, res: Response, next: NextFuncti
 
 export async function listAttendance(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
-    const { userId, roleLevel } = req.user!;
-    const result = await listAttendanceService(userId, roleLevel, req.query);
+    const { userId, roleId, roleLevel } = req.user!;
+    const perms = await getPermissionsForRole(roleId, roleLevel);
+    const result = await listAttendanceService(userId, perms.hris.editAttendance, req.query);
     successResponse(res, result.attendance, 'Data absensi berhasil diambil', 200, result.meta);
   } catch (err) { next(err); }
 }
@@ -140,7 +142,7 @@ export async function getAttendanceSummary(req: AuthRequest, res: Response, next
 
 export async function updateAttendance(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
-    const record = await adminUpdateAttendanceService(String(req.params.id), req.user!.roleLevel, req.body);
+    const record = await adminUpdateAttendanceService(String(req.params.id), req.body);
     successResponse(res, record, 'Absensi berhasil diperbarui');
   } catch (err) { next(err); }
 }
@@ -156,21 +158,21 @@ export async function listShifts(req: AuthRequest, res: Response, next: NextFunc
 
 export async function createShift(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
-    const data = await createShiftService(req.user!.roleLevel, req.body);
+    const data = await createShiftService(req.body);
     successResponse(res, data, 'Shift berhasil dibuat', 201);
   } catch (err) { next(err); }
 }
 
 export async function updateShift(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
-    const data = await updateShiftService(String(req.params.id), req.user!.roleLevel, req.body);
+    const data = await updateShiftService(String(req.params.id), req.body);
     successResponse(res, data, 'Shift berhasil diperbarui');
   } catch (err) { next(err); }
 }
 
 export async function deleteShift(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
-    await deleteShiftService(String(req.params.id), req.user!.roleLevel);
+    await deleteShiftService(String(req.params.id));
     successResponse(res, null, 'Shift berhasil dihapus');
   } catch (err) { next(err); }
 }
@@ -178,14 +180,14 @@ export async function deleteShift(req: AuthRequest, res: Response, next: NextFun
 export async function assignShift(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
     const { userId, shiftId } = req.body;
-    const data = await assignShiftService(req.user!.roleLevel, userId, shiftId);
+    const data = await assignShiftService(userId, shiftId);
     successResponse(res, data, 'Shift berhasil di-assign');
   } catch (err) { next(err); }
 }
 
 export async function listUsersForShift(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
-    const data = await listUsersForShiftService(req.user!.roleLevel);
+    const data = await listUsersForShiftService();
     successResponse(res, data, 'Daftar karyawan berhasil diambil');
   } catch (err) { next(err); }
 }
@@ -201,21 +203,21 @@ export async function listOfficeLocations(req: AuthRequest, res: Response, next:
 
 export async function createOfficeLocation(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
-    const data = await createOfficeLocationService(req.user!.roleLevel, req.body);
+    const data = await createOfficeLocationService(req.body);
     successResponse(res, data, 'Lokasi kantor berhasil ditambahkan', 201);
   } catch (err) { next(err); }
 }
 
 export async function updateOfficeLocation(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
-    const data = await updateOfficeLocationService(String(req.params.id), req.user!.roleLevel, req.body);
+    const data = await updateOfficeLocationService(String(req.params.id), req.body);
     successResponse(res, data, 'Lokasi kantor berhasil diperbarui');
   } catch (err) { next(err); }
 }
 
 export async function deleteOfficeLocation(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
-    await deleteOfficeLocationService(String(req.params.id), req.user!.roleLevel);
+    await deleteOfficeLocationService(String(req.params.id));
     successResponse(res, null, 'Lokasi kantor berhasil dihapus');
   } catch (err) { next(err); }
 }
@@ -224,8 +226,9 @@ export async function deleteOfficeLocation(req: AuthRequest, res: Response, next
 
 export async function listOvertimes(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
-    const { userId, roleLevel } = req.user!;
-    const result = await listOvertimeRequestsService(userId, roleLevel, req.query);
+    const { userId, roleId, roleLevel } = req.user!;
+    const perms = await getPermissionsForRole(roleId, roleLevel);
+    const result = await listOvertimeRequestsService(userId, perms.hris.reviewOvertime, req.query);
     successResponse(res, result.overtimes, 'Daftar lembur berhasil diambil', 200, result.meta);
   } catch (err) { next(err); }
 }
@@ -239,8 +242,7 @@ export async function createOvertime(req: AuthRequest, res: Response, next: Next
 
 export async function reviewOvertime(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
-    const { userId, roleLevel } = req.user!;
-    const data = await reviewOvertimeRequestService(String(req.params.id), userId, roleLevel, req.body);
+    const data = await reviewOvertimeRequestService(String(req.params.id), req.user!.userId, req.body);
     successResponse(res, data, 'Pengajuan lembur berhasil diproses');
   } catch (err) { next(err); }
 }
@@ -256,8 +258,9 @@ export async function cancelOvertime(req: AuthRequest, res: Response, next: Next
 
 export async function getAttendanceReports(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
-    const { userId, roleLevel } = req.user!;
-    const result = await getAttendanceReportsService(userId, roleLevel, req.query);
+    const { userId } = req.user!;
+    const permScope = req.permScope ?? 'all';
+    const result = await getAttendanceReportsService(userId, permScope, req.query);
     successResponse(res, result, 'Laporan absensi berhasil diambil');
   } catch (err) { next(err); }
 }

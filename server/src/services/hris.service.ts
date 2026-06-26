@@ -98,14 +98,14 @@ export async function getLeaveBalancesService(userId: string, year: number) {
 // ── Leave Requests ─────────────────────────────────────────────
 
 export async function listLeaveRequestsService(
-  callerId: string, roleLevel: number, query: ParsedQs,
+  callerId: string, canReview: boolean, query: ParsedQs,
 ) {
   const { page, limit, skip } = parsePagination(query);
   const year   = query.year   ? Number(query.year)   : new Date().getFullYear();
   const status = query.status as LeaveStatus | undefined;
 
   const where: Prisma.LeaveRequestWhereInput = {};
-  if (roleLevel > 4) {
+  if (!canReview) {
     where.userId = callerId;
   } else if (query.userId) {
     where.userId = query.userId as string;
@@ -188,10 +188,9 @@ export async function createLeaveRequestService(
 }
 
 export async function reviewLeaveRequestService(
-  id: string, reviewerId: string, roleLevel: number,
+  id: string, reviewerId: string,
   body: { status: 'APPROVED' | 'REJECTED'; reviewNote?: string | null },
 ) {
-  if (roleLevel > 4) throw new AppError('Hanya manager/admin yang bisa review cuti', 403);
 
   const req = await prisma.leaveRequest.findUnique({ where: { id }, include: { leaveType: true } });
   if (!req) throw new AppError('Pengajuan cuti tidak ditemukan', 404);
@@ -399,7 +398,7 @@ export async function checkOutService(userId: string, body: { note?: string | nu
 }
 
 export async function listAttendanceService(
-  callerId: string, roleLevel: number, query: ParsedQs,
+  callerId: string, canManage: boolean, query: ParsedQs,
 ) {
   const { page, limit, skip } = parsePagination(query);
   const now   = new Date();
@@ -411,7 +410,7 @@ export async function listAttendanceService(
   endOfMonth.setUTCHours(23, 59, 59, 999);
 
   const where: Prisma.AttendanceWhereInput = { date: { gte: startOfMonth, lte: endOfMonth } };
-  if (roleLevel > 4) { where.userId = callerId; }
+  if (!canManage) { where.userId = callerId; }
   else if (query.userId) { where.userId = query.userId as string; }
   if (query.status) where.status = query.status as AttendanceStatus;
 
@@ -459,10 +458,9 @@ export async function getAttendanceSummaryService(userId: string, month: number,
 }
 
 export async function adminUpdateAttendanceService(
-  id: string, roleLevel: number,
+  id: string,
   body: { status?: AttendanceStatus; note?: string | null; checkIn?: string | null; checkOut?: string | null },
 ) {
-  if (roleLevel > 4) throw new AppError('Hanya admin/manager yang bisa edit absensi', 403);
   const existing = await prisma.attendance.findUnique({ where: { id } });
   if (!existing) throw new AppError('Record absensi tidak ditemukan', 404);
 
@@ -495,22 +493,20 @@ export async function listShiftsService() {
   });
 }
 
-export async function createShiftService(roleLevel: number, body: {
+export async function createShiftService(body: {
   name: string; startTime: string; endTime: string;
   lateThresholdMinutes?: number; isDefault?: boolean; color?: string;
 }) {
-  if (roleLevel > 2) throw new AppError('Hanya HR Admin', 403);
   if (body.isDefault) {
     await prisma.shift.updateMany({ where: { isDefault: true }, data: { isDefault: false } });
   }
   return prisma.shift.create({ data: body });
 }
 
-export async function updateShiftService(id: string, roleLevel: number, body: {
+export async function updateShiftService(id: string, body: {
   name?: string; startTime?: string; endTime?: string;
   lateThresholdMinutes?: number; isDefault?: boolean; color?: string; isActive?: boolean;
 }) {
-  if (roleLevel > 2) throw new AppError('Hanya HR Admin', 403);
   const existing = await prisma.shift.findUnique({ where: { id } });
   if (!existing) throw new AppError('Shift tidak ditemukan', 404);
   if (body.isDefault) {
@@ -519,8 +515,7 @@ export async function updateShiftService(id: string, roleLevel: number, body: {
   return prisma.shift.update({ where: { id }, data: body });
 }
 
-export async function deleteShiftService(id: string, roleLevel: number) {
-  if (roleLevel > 2) throw new AppError('Hanya HR Admin', 403);
+export async function deleteShiftService(id: string) {
   const shift = await prisma.shift.findUnique({ where: { id }, include: { _count: { select: { users: true } } } });
   if (!shift) throw new AppError('Shift tidak ditemukan', 404);
   if (shift.isDefault) throw new AppError('Tidak bisa hapus shift default', 400);
@@ -528,8 +523,7 @@ export async function deleteShiftService(id: string, roleLevel: number) {
   return prisma.shift.delete({ where: { id } });
 }
 
-export async function assignShiftService(roleLevel: number, userId: string, shiftId: string | null) {
-  if (roleLevel > 2) throw new AppError('Hanya HR Admin', 403);
+export async function assignShiftService(userId: string, shiftId: string | null) {
   const user = await prisma.user.findUnique({ where: { id: userId } });
   if (!user) throw new AppError('User tidak ditemukan', 404);
   return prisma.user.update({
@@ -539,8 +533,7 @@ export async function assignShiftService(roleLevel: number, userId: string, shif
   });
 }
 
-export async function listUsersForShiftService(roleLevel: number) {
-  if (roleLevel > 2) throw new AppError('Hanya HR Admin', 403);
+export async function listUsersForShiftService() {
   return prisma.user.findMany({
     where: { isActive: true },
     select: {
@@ -559,24 +552,21 @@ export async function listOfficeLocationsService() {
   return prisma.officeLocation.findMany({ orderBy: { name: 'asc' } });
 }
 
-export async function createOfficeLocationService(roleLevel: number, body: {
+export async function createOfficeLocationService(body: {
   name: string; address?: string | null; lat: number; lng: number; radiusMeters?: number;
 }) {
-  if (roleLevel > 2) throw new AppError('Hanya HR Admin', 403);
   return prisma.officeLocation.create({ data: body });
 }
 
-export async function updateOfficeLocationService(id: string, roleLevel: number, body: {
+export async function updateOfficeLocationService(id: string, body: {
   name?: string; address?: string | null; lat?: number; lng?: number; radiusMeters?: number; isActive?: boolean;
 }) {
-  if (roleLevel > 2) throw new AppError('Hanya HR Admin', 403);
   const loc = await prisma.officeLocation.findUnique({ where: { id } });
   if (!loc) throw new AppError('Lokasi tidak ditemukan', 404);
   return prisma.officeLocation.update({ where: { id }, data: body });
 }
 
-export async function deleteOfficeLocationService(id: string, roleLevel: number) {
-  if (roleLevel > 2) throw new AppError('Hanya HR Admin', 403);
+export async function deleteOfficeLocationService(id: string) {
   const loc = await prisma.officeLocation.findUnique({ where: { id } });
   if (!loc) throw new AppError('Lokasi tidak ditemukan', 404);
   return prisma.officeLocation.delete({ where: { id } });
@@ -584,7 +574,7 @@ export async function deleteOfficeLocationService(id: string, roleLevel: number)
 
 // ── Overtime ───────────────────────────────────────────────────
 
-export async function listOvertimeRequestsService(callerId: string, roleLevel: number, query: ParsedQs) {
+export async function listOvertimeRequestsService(callerId: string, canReview: boolean, query: ParsedQs) {
   const { page, limit, skip } = parsePagination(query);
   const now   = new Date();
   const month = query.month ? Number(query.month) : now.getMonth() + 1;
@@ -595,7 +585,7 @@ export async function listOvertimeRequestsService(callerId: string, roleLevel: n
   endOfMonth.setUTCHours(23, 59, 59, 999);
 
   const where: Prisma.OvertimeRequestWhereInput = { date: { gte: startOfMonth, lte: endOfMonth } };
-  if (roleLevel > 4) { where.userId = callerId; }
+  if (!canReview) { where.userId = callerId; }
   else if (query.userId) { where.userId = query.userId as string; }
   if (query.status) where.status = query.status as OvertimeStatus;
 
@@ -652,10 +642,9 @@ export async function createOvertimeRequestService(userId: string, body: {
 }
 
 export async function reviewOvertimeRequestService(
-  id: string, reviewerId: string, roleLevel: number,
+  id: string, reviewerId: string,
   body: { status: 'APPROVED' | 'REJECTED'; reviewNote?: string | null },
 ) {
-  if (roleLevel > 4) throw new AppError('Hanya manager/admin yang bisa review lembur', 403);
   const ot = await prisma.overtimeRequest.findUnique({ where: { id } });
   if (!ot) throw new AppError('Pengajuan lembur tidak ditemukan', 404);
   if (ot.status !== OvertimeStatus.PENDING) throw new AppError('Pengajuan ini sudah diproses', 400);
@@ -691,9 +680,7 @@ export async function cancelOvertimeRequestService(id: string, userId: string) {
 
 // ── Attendance Reports ─────────────────────────────────────────
 
-export async function getAttendanceReportsService(callerId: string, roleLevel: number, query: ParsedQs) {
-  if (roleLevel > 4) throw new AppError('Only manager/admin can view reports', 403);
-
+export async function getAttendanceReportsService(callerId: string, permScope: string, query: ParsedQs) {
   const now   = new Date();
   const month = query.month ? Number(query.month) : now.getMonth() + 1;
   const year  = query.year  ? Number(query.year)  : now.getFullYear();
@@ -702,13 +689,13 @@ export async function getAttendanceReportsService(callerId: string, roleLevel: n
   const endOfMonth   = new Date(year, month, 0);
   endOfMonth.setUTCHours(23, 59, 59, 999);
 
-  // Scope by user/division; non-HR managers see their own division only
+  // Scope by user/division based on permScope ('division' = own division only, 'all' = everyone)
   let userWhere: Prisma.UserWhereInput = {};
   if (query.userId) {
     userWhere = { id: query.userId as string };
   } else if (query.divisionId) {
     userWhere = { divisionId: query.divisionId as string };
-  } else if (roleLevel > 2) {
+  } else if (permScope === 'division') {
     const me = await prisma.user.findUnique({ where: { id: callerId }, select: { divisionId: true } });
     if (me?.divisionId) userWhere = { divisionId: me.divisionId };
   }
