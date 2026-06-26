@@ -117,10 +117,10 @@ const VIEW_LABELS: Record<string, string> = {
 };
 
 const VISIBILITY_CONFIG: Record<TaskVisibility, { label: string; icon: React.ElementType }> = {
-  PRIVATE:          { label: 'Hanya Saya',     icon: Lock      },
-  DIVISION:         { label: 'Divisi Saya',    icon: Users     },
-  DIVISION_SELECT:  { label: 'Divisi Pilihan', icon: Building2 },
-  PUBLIC:           { label: 'Semua Staff',    icon: Globe     },
+  PRIVATE:          { label: 'Only Me',         icon: Lock      },
+  DIVISION:         { label: 'My Division',     icon: Users     },
+  DIVISION_SELECT:  { label: 'Select Divisions',icon: Building2 },
+  PUBLIC:           { label: 'All Staff',       icon: Globe     },
 };
 
 // ── Markdown renderer ──────────────────────────────────────
@@ -1572,7 +1572,7 @@ function TaskDetailPanel({
               <div className="flex items-center gap-3 px-1 py-2 rounded hover:bg-gray-50">
                 <div className="flex items-center gap-2 w-24 flex-shrink-0">
                   <LayoutList size={13} className="text-gray-400" />
-                  <span className="text-xs text-gray-400">List Saya</span>
+                  <span className="text-xs text-gray-400">My Lists</span>
                 </div>
                 <select value={myMembership?.listId ?? ''} onChange={(e) => patchMyList(e.target.value || null)}
                   className="text-xs bg-transparent outline-none cursor-pointer text-gray-700 hover:text-navy max-w-[200px]">
@@ -1641,7 +1641,7 @@ function TaskDetailPanel({
               <div className="flex items-start gap-3 px-1 py-2">
                 <div className="flex items-center gap-2 w-24 flex-shrink-0 pt-1">
                   <Building2 size={13} className="text-gray-400" />
-                  <span className="text-xs text-gray-400">Divisi</span>
+                  <span className="text-xs text-gray-400">Division</span>
                 </div>
                 <div className="flex flex-wrap gap-1.5">
                   {panelDivisions.map((div) => {
@@ -1968,16 +1968,16 @@ function CreateTaskModal({ onClose, onCreated, defaultListId, extraPayload, task
                   if (v !== 'DIVISION_SELECT') setDivisionIds([]);
                 }}
                 className="w-full text-sm border border-gray-200 rounded px-2.5 py-1.5 outline-none focus:border-navy disabled:opacity-50 disabled:bg-gray-50">
-                <option value="PRIVATE">Hanya Saya (default)</option>
-                <option value="DIVISION">Divisi Saya</option>
-                <option value="DIVISION_SELECT">Divisi Pilihan</option>
-                <option value="PUBLIC">Semua Staff</option>
+                <option value="PRIVATE">Only Me (default)</option>
+                <option value="DIVISION">My Division</option>
+                <option value="DIVISION_SELECT">Select Divisions</option>
+                <option value="PUBLIC">All Staff</option>
               </select>
             </div>
 
             {visibility === 'DIVISION_SELECT' && (
               <div>
-                <label className="block text-xs text-gray-500 mb-1.5">Pilih divisi yang bisa lihat</label>
+                <label className="block text-xs text-gray-500 mb-1.5">Select divisions that can view</label>
                 <div className="space-y-1.5 max-h-32 overflow-y-auto border border-gray-200 rounded-lg p-2">
                   {divisions.map((div) => (
                     <label key={div.id} className="flex items-center gap-2 cursor-pointer">
@@ -2176,7 +2176,7 @@ function CompletedView({
     const cur   = new Date(start);
     while (cur <= end) {
       const key   = `${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, '0')}`;
-      const label = cur.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' });
+      const label = cur.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
       map.set(key, { label, key, tasks: [] });
       cur.setMonth(cur.getMonth() + 1);
     }
@@ -2218,7 +2218,7 @@ function CompletedView({
     return (
       <div className="flex flex-col items-center justify-center flex-1 gap-3 text-gray-400">
         <CheckCircle2 size={32} className="text-gray-200" />
-        <p className="text-sm">Belum ada task yang selesai</p>
+        <p className="text-sm">No completed tasks yet</p>
       </div>
     );
   }
@@ -2247,7 +2247,7 @@ function CompletedView({
             {!isCollapsed && (
               <div className="mt-1 space-y-px border border-gray-100 rounded-lg overflow-hidden">
                 {monthTasks.length === 0 ? (
-                  <div className="px-4 py-3 text-xs text-gray-400 text-center">Tidak ada task selesai bulan ini</div>
+                  <div className="px-4 py-3 text-xs text-gray-400 text-center">No completed tasks this month</div>
                 ) : monthTasks.map((task) => (
                   <button
                     key={task.id}
@@ -2263,7 +2263,7 @@ function CompletedView({
                     <span className="flex-1 truncate line-through text-gray-400">{task.title}</span>
                     {task.completedAt && (
                       <span className="text-[10px] text-gray-300 flex-shrink-0">
-                        {new Date(task.completedAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })}
+                        {new Date(task.completedAt).toLocaleDateString('en-US', { day: 'numeric', month: 'short' })}
                       </span>
                     )}
                     <PriorityDot priority={task.priority} />
@@ -2494,7 +2494,7 @@ export default function TasksPage() {
       const res = await api.patch(`/tasks/${task.id}`, { status: next });
       setTasks((p) => p.map((t) => t.id === task.id ? { ...t, ...res.data.data } : t));
       if (next === 'DONE') {
-        toast.undoable(`"${task.title}" selesai`, {
+        toast.undoable(`"${task.title}" marked done`, {
           onCommit: () => {},
           onUndo: async () => {
             setTasks((p) => p.map((t) => t.id === task.id ? { ...t, status: prev, completedAt: null } : t));
@@ -2733,8 +2733,8 @@ export default function TasksPage() {
           {sidebarView === 'browse' && (
             <div className="flex items-center gap-0.5 bg-gray-100 rounded-lg p-0.5">
               {([
-                { m: 'staff'    as const, icon: Globe,     label: 'Semua Staff' },
-                { m: 'division' as const, icon: Building2, label: 'Per Divisi'  },
+                { m: 'staff'    as const, icon: Globe,     label: 'All Staff'   },
+                { m: 'division' as const, icon: Building2, label: 'By Division' },
               ]).map(({ m, icon: Icon, label }) => (
                 <button key={m}
                   onClick={() => { setBrowseMode(m); setSelectedDivision(null); setSelectedId(null); }}
@@ -2780,9 +2780,9 @@ export default function TasksPage() {
             <div className="flex items-center gap-1.5">
               <select value={sortBy} onChange={(e) => setSortBy(e.target.value as SortBy)}
                 className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 outline-none focus:border-navy text-gray-600">
-                <option value="created">Sort: Terbaru</option>
+                <option value="created">Sort: Latest</option>
                 <option value="due_date">Sort: Due Date</option>
-                <option value="priority">Sort: Prioritas</option>
+                <option value="priority">Sort: Priority</option>
                 <option value="alpha">Sort: A–Z</option>
               </select>
             </div>
@@ -2867,7 +2867,7 @@ export default function TasksPage() {
               <span className="text-xs font-semibold text-amber-700">
                 Suggestions ({suggestions.length})
               </span>
-              <span className="text-[10px] text-amber-600/60">overdue · due hari ini · kemarin belum selesai</span>
+              <span className="text-[10px] text-amber-600/60">overdue · due today · not done yesterday</span>
               {suggestOpen ? <ChevronDown size={13} className="text-amber-400 ml-auto" /> : <ChevronRight size={13} className="text-amber-400 ml-auto" />}
             </button>
             {suggestOpen && (
