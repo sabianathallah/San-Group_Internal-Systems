@@ -2513,7 +2513,7 @@ export default function TasksPage() {
   const handleDeleteTask = useCallback((task: Task) => {
     setTasks((prev) => prev.filter((t) => t.id !== task.id));
     setSelectedId((prev) => prev === task.id ? null : prev);
-    toast.undoable(`"${task.title}" dihapus`, {
+    toast.undoable(`"${task.title}" deleted`, {
       onUndo: () => setTasks((prev) => [task, ...prev]),
       onCommit: async () => {
         try { await api.delete(`/tasks/${task.id}`); loadLists(); }
