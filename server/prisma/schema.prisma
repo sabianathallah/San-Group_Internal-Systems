@@ -56,6 +56,35 @@ enum NotificationType {
   WO_ASSIGNED
   WO_STATUS_CHANGED
   WO_COMPLETED
+  LEAVE_SUBMITTED
+  LEAVE_APPROVED
+  LEAVE_REJECTED
+  OVERTIME_SUBMITTED
+  OVERTIME_APPROVED
+  OVERTIME_REJECTED
+}
+
+enum OvertimeStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum AttendanceStatus {
+  PRESENT
+  LATE
+  WFH
+  PERMISSION
+  ABSENT
+  HOLIDAY
+}
+
+enum LeaveStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
 }
 
 enum WorkOrderStatus {
@@ -170,6 +199,9 @@ model User {
   divisionId String
   division   Division @relation(fields: [divisionId], references: [id])
 
+  shiftId    String?
+  shift      Shift?   @relation(fields: [shiftId], references: [id], onDelete: SetNull)
+
   // Relations
   refreshTokens      RefreshToken[]
   tasks              Task[]              @relation("TaskCreator")
@@ -192,11 +224,18 @@ model User {
   assignedWorkOrders         WorkOrder[]             @relation("WOAssignee")
   workOrderHistories         WorkOrderHistory[]
   workOrderAttachments       WorkOrderAttachment[]
+  attendances                Attendance[]
+  leaveRequests              LeaveRequest[]          @relation("LRRequester")
+  reviewedLeaveRequests      LeaveRequest[]          @relation("LRReviewer")
+  leaveBalances              LeaveBalance[]
+  overtimeRequests           OvertimeRequest[]       @relation("OTRequester")
+  reviewedOvertimes          OvertimeRequest[]       @relation("OTReviewer")
 
   @@index([email])
   @@index([username])
   @@index([roleId])
   @@index([divisionId])
+  @@index([shiftId])
 }
 
 model RefreshToken {
@@ -653,10 +692,162 @@ model WorkOrderAttachment {
 }
 
 // --- HRIS ---
-// model Attendance { ... }
-// model Leave { ... }
-// model LeaveBalance { ... }
-// model Timetable { ... }
+
+model LeaveType {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  slug        String   @unique
+  color       String   @default("#6366f1")
+  maxDaysPerYear Int   @default(0) // 0 = unlimited
+  isPaid      Boolean  @default(true)
+  requiresDoc Boolean  @default(false)
+  isActive    Boolean  @default(true)
+  position    Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  leaveBalances LeaveBalance[]
+  leaveRequests LeaveRequest[]
+
+  @@map("leave_types")
+}
+
+model LeaveBalance {
+  id          String    @id @default(uuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  leaveTypeId String
+  leaveType   LeaveType @relation(fields: [leaveTypeId], references: [id], onDelete: Cascade)
+  year        Int
+  totalDays   Int
+  usedDays    Int       @default(0)
+  pendingDays Int       @default(0)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([userId, leaveTypeId, year])
+  @@index([userId])
+  @@index([leaveTypeId])
+  @@map("leave_balances")
+}
+
+model LeaveRequest {
+  id           String      @id @default(uuid())
+  userId       String
+  user         User        @relation("LRRequester", fields: [userId], references: [id])
+  leaveTypeId  String
+  leaveType    LeaveType   @relation(fields: [leaveTypeId], references: [id])
+  startDate    DateTime    @db.Date
+  endDate      DateTime    @db.Date
+  totalDays    Int
+  reason       String
+  status       LeaveStatus @default(PENDING)
+  reviewNote   String?
+  reviewedById String?
+  reviewedBy   User?       @relation("LRReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+  reviewedAt   DateTime?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  @@index([userId])
+  @@index([leaveTypeId])
+  @@index([status])
+  @@map("leave_requests")
+}
+
+model Shift {
+  id                   String   @id @default(uuid())
+  name                 String   @unique
+  startTime            String
+  endTime              String
+  lateThresholdMinutes Int      @default(0)
+  isDefault            Boolean  @default(false)
+  color                String   @default("#6366f1")
+  isActive             Boolean  @default(true)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  users       User[]
+  attendances Attendance[]
+
+  @@map("shifts")
+}
+
+model OfficeLocation {
+  id           String   @id @default(uuid())
+  name         String
+  address      String?
+  lat          Float
+  lng          Float
+  radiusMeters Int      @default(150)
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  attendances Attendance[]
+
+  @@map("office_locations")
+}
+
+model Attendance {
+  id               String           @id @default(uuid())
+  userId           String
+  user             User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  date             DateTime         @db.Date
+  checkIn          DateTime?
+  checkOut         DateTime?
+  status           AttendanceStatus @default(PRESENT)
+  note             String?
+  isLate           Boolean          @default(false)
+  lateMinutes      Int              @default(0)
+  workMinutes      Int?
+  lat              Float?
+  lng              Float?
+  locationName     String?
+  isOutOfArea      Boolean          @default(false)
+  outOfAreaReason  String?
+  shiftId          String?
+  shift            Shift?           @relation(fields: [shiftId], references: [id], onDelete: SetNull)
+  officeLocationId String?
+  officeLocation   OfficeLocation?  @relation(fields: [officeLocationId], references: [id], onDelete: SetNull)
+  photoUrl         String?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  overtimeRequests OvertimeRequest[]
+
+  @@unique([userId, date])
+  @@index([userId])
+  @@index([date])
+  @@index([status])
+  @@index([shiftId])
+  @@index([officeLocationId])
+  @@map("attendance")
+}
+
+model OvertimeRequest {
+  id              String         @id @default(uuid())
+  userId          String
+  user            User           @relation("OTRequester", fields: [userId], references: [id])
+  attendanceId    String?
+  attendance      Attendance?    @relation(fields: [attendanceId], references: [id], onDelete: SetNull)
+  date            DateTime       @db.Date
+  startTime       String
+  endTime         String
+  durationMinutes Int
+  reason          String
+  status          OvertimeStatus @default(PENDING)
+  reviewNote      String?
+  reviewedById    String?
+  reviewedBy      User?          @relation("OTReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+  reviewedAt      DateTime?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  @@index([userId])
+  @@index([status])
+  @@map("overtime_requests")
+}
 
 // ============================================================
 // PHASE 3 — COMMENTED OUT (uncomment saat Phase 3 dimulai)

@@ -14,4 +14,11 @@ export const ROUTES = {
   ADMIN_AUDIT_LOG:    '/admin/audit-log',
   NOTIFICATIONS:      '/notifications',
   WORK_ORDERS:        '/work-orders',
+  HRIS:                  '/hris',
+  HRIS_ATTENDANCE:       '/hris/attendance',
+  HRIS_LEAVE:            '/hris/leave',
+  HRIS_OVERTIME:         '/hris/overtime',
+  HRIS_REPORTS:          '/hris/reports',
+  HRIS_ADMIN_SHIFTS:     '/hris/admin/shifts',
+  HRIS_ADMIN_LOCATIONS:  '/hris/admin/locations',
 } as const;

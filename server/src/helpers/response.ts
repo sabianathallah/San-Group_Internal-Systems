@@ -17,9 +17,9 @@ export function errorResponse(
   res: Response,
   message = 'Internal server error',
   statusCode = 500,
-  errors?: unknown,
+  data?: unknown,
 ): void {
   const body: ApiResponse = { success: false, message };
-  if (errors !== undefined) body.errors = errors;
+  if (data !== undefined) (body as any).data = data;
   res.status(statusCode).json(body);
 }

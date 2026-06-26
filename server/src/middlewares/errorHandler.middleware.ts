@@ -5,12 +5,15 @@ import { Prisma } from '@prisma/client';
 import { errorResponse } from '@/helpers/response';
 
 export class AppError extends Error {
+  public data?: unknown;
   constructor(
     public message: string,
     public statusCode: number = 500,
+    data?: unknown,
   ) {
     super(message);
     this.name = 'AppError';
+    if (data !== undefined) this.data = data;
   }
 }
 
@@ -36,7 +39,7 @@ export function globalErrorHandler(
 
   // Custom app errors
   if (err instanceof AppError) {
-    errorResponse(res, err.message, err.statusCode);
+    errorResponse(res, err.message, err.statusCode, err.data);
     return;
   }
 

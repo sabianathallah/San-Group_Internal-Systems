@@ -1,6 +1,8 @@
 import {
   PrismaClient, TaskStatus, TaskPriority, TaskVisibility,
   BulletinCategory, BulletinPriority, NotificationType, AssignmentStatus,
+  WorkOrderStatus, WorkOrderPriority, WorkOrderCategory,
+  AttendanceStatus, LeaveStatus, OvertimeStatus,
 } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 
@@ -380,6 +382,325 @@ async function main() {
   ]});
   console.log('✅ Database folders & links created');
 
+  // ── HRIS ───────────────────────────────────────────────────
+  await prisma.overtimeRequest.deleteMany({});
+  await prisma.attendance.deleteMany({});
+  await prisma.leaveRequest.deleteMany({});
+  await prisma.leaveBalance.deleteMany({});
+  await prisma.leaveType.deleteMany({});
+  await prisma.officeLocation.deleteMany({});
+  await prisma.shift.deleteMany({});
+
+  // Shifts
+  const shiftOffice = await prisma.shift.create({ data: { name: 'Office Staff', startTime: '08:00', endTime: '17:00', lateThresholdMinutes: 0, isDefault: true, color: '#3b82f6' } });
+  await prisma.shift.create({ data: { name: 'Security', startTime: '07:00', endTime: '19:00', lateThresholdMinutes: 0, color: '#ef4444' } });
+  await prisma.shift.create({ data: { name: 'Shift Siang', startTime: '12:00', endTime: '21:00', lateThresholdMinutes: 0, color: '#f59e0b' } });
+
+  // Office Locations
+  const locHead = await prisma.officeLocation.create({ data: { name: 'Head Office - Jakarta', address: 'Jakarta Selatan', lat: -6.2297, lng: 106.8295, radiusMeters: 150 } });
+  await prisma.officeLocation.create({ data: { name: 'Site - Properti A', address: 'Tangerang Selatan', lat: -6.3297, lng: 106.7295, radiusMeters: 200 } });
+
+  // Assign default shift to all users
+  for (const u of [admin, director, pm, hr, finance, engineer]) {
+    await prisma.user.update({ where: { id: u.id }, data: { shiftId: shiftOffice.id } });
+  }
+  console.log('✅ Shifts & office locations created');
+
+  // Leave types
+  const ltAnnual = await prisma.leaveType.create({ data: { name: 'Annual Leave',    slug: 'ANNUAL',      color: '#6366f1', maxDaysPerYear: 12, isPaid: true, requiresDoc: false, position: 0 } });
+  const ltSick   = await prisma.leaveType.create({ data: { name: 'Sick Leave',      slug: 'SICK',        color: '#ef4444', maxDaysPerYear: 0,  isPaid: true, requiresDoc: true,  position: 1 } });
+  const ltEmerg  = await prisma.leaveType.create({ data: { name: 'Emergency Leave', slug: 'EMERGENCY',   color: '#f97316', maxDaysPerYear: 3,  isPaid: true, requiresDoc: false, position: 2 } });
+  const ltWFH    = await prisma.leaveType.create({ data: { name: 'WFH Special',     slug: 'WFH_SPECIAL', color: '#3b82f6', maxDaysPerYear: 6,  isPaid: true, requiresDoc: false, position: 3 } });
+
+  // Leave balances (year 2026) for all 6 users
+  const allUsers = [admin, director, pm, hr, finance, engineer];
+  for (const u of allUsers) {
+    await prisma.leaveBalance.create({ data: { userId: u.id, leaveTypeId: ltAnnual.id, year: 2026, totalDays: 12, usedDays: 3, pendingDays: 0 } });
+    await prisma.leaveBalance.create({ data: { userId: u.id, leaveTypeId: ltEmerg.id,  year: 2026, totalDays: 3,  usedDays: 0, pendingDays: 0 } });
+    await prisma.leaveBalance.create({ data: { userId: u.id, leaveTypeId: ltWFH.id,    year: 2026, totalDays: 6,  usedDays: 2, pendingDays: 0 } });
+  }
+
+  // Leave requests
+  // 1) APPROVED — hr ambil cuti tahunan bulan lalu
+  await prisma.leaveRequest.create({ data: {
+    userId: hr.id, leaveTypeId: ltAnnual.id,
+    startDate: days(-15), endDate: days(-13), totalDays: 3,
+    reason: 'Keperluan keluarga di luar kota.',
+    status: LeaveStatus.APPROVED,
+    reviewedById: admin.id, reviewedAt: days(-17),
+    reviewNote: 'Disetujui. Pastikan handover ke rekan sebelum cuti.',
+  }});
+  // 2) APPROVED — finance sakit
+  await prisma.leaveRequest.create({ data: {
+    userId: finance.id, leaveTypeId: ltSick.id,
+    startDate: days(-5), endDate: days(-4), totalDays: 2,
+    reason: 'Demam dan flu sejak 2 hari lalu. Sudah periksa ke dokter.',
+    status: LeaveStatus.APPROVED,
+    reviewedById: admin.id, reviewedAt: days(-6),
+  }});
+  // 3) PENDING — engineer minta cuti tahunan
+  const lrPending = await prisma.leaveRequest.create({ data: {
+    userId: engineer.id, leaveTypeId: ltAnnual.id,
+    startDate: days(3), endDate: days(5), totalDays: 3,
+    reason: 'Pernikahan adik di Yogyakarta.',
+    status: LeaveStatus.PENDING,
+  }});
+  // 4) PENDING — pm darurat
+  const lrPending2 = await prisma.leaveRequest.create({ data: {
+    userId: pm.id, leaveTypeId: ltEmerg.id,
+    startDate: days(1), endDate: days(1), totalDays: 1,
+    reason: 'Orang tua masuk rumah sakit mendadak.',
+    status: LeaveStatus.PENDING,
+  }});
+  // 5) REJECTED — director
+  await prisma.leaveRequest.create({ data: {
+    userId: director.id, leaveTypeId: ltAnnual.id,
+    startDate: days(-2), endDate: days(0), totalDays: 2,
+    reason: 'Perlu istirahat setelah closing Q2.',
+    status: LeaveStatus.REJECTED,
+    reviewedById: admin.id, reviewedAt: days(-3),
+    reviewNote: 'Tidak bisa disetujui minggu ini karena ada meeting direksi. Coba jadwalkan minggu depan.',
+  }});
+  console.log('✅ HRIS leave types, balances & requests created');
+
+  // Attendance — 10 hari terakhir untuk semua user
+  const checkInHour  = (h: number, m: number) => new Date(Date.UTC(2026, 5, 26 - 10, h, m)); // base date
+  for (let d = 9; d >= 0; d--) {
+    const dateOffset = -d;
+    const dateVal = new Date(Date.now() + dateOffset * 86_400_000);
+    // Skip weekend
+    const dayOfWeek = dateVal.getUTCDay();
+    if (dayOfWeek === 0 || dayOfWeek === 6) continue;
+
+    for (const u of allUsers) {
+      // Randomize a bit
+      const lateChance = Math.random();
+      const isLate = lateChance > 0.8;
+      const checkInMin = isLate ? 90 + Math.floor(Math.random() * 30) : 60 + Math.floor(Math.random() * 25);
+      const checkInTime = new Date(dateVal);
+      checkInTime.setUTCHours(1, checkInMin, 0, 0); // ~08:00-09:30 WIB
+
+      const checkOutTime = new Date(dateVal);
+      checkOutTime.setUTCHours(10, 0 + Math.floor(Math.random() * 30), 0, 0); // ~17:00-17:30 WIB
+
+      const workMinutes = Math.floor((checkOutTime.getTime() - checkInTime.getTime()) / 60000);
+      const status = isLate ? AttendanceStatus.LATE : AttendanceStatus.PRESENT;
+      const lateMinutes = isLate ? checkInMin - 90 : 0;
+
+      const dateOnly = new Date(dateVal.toISOString().slice(0, 10) + 'T00:00:00.000Z');
+
+      await prisma.attendance.upsert({
+        where: { userId_date: { userId: u.id, date: dateOnly } },
+        update: {},
+        create: {
+          userId: u.id, date: dateOnly,
+          checkIn: checkInTime, checkOut: checkOutTime,
+          status, isLate, lateMinutes, workMinutes,
+          shiftId: shiftOffice.id,
+          lat: locHead.lat + (Math.random() - 0.5) * 0.001,
+          lng: locHead.lng + (Math.random() - 0.5) * 0.001,
+          locationName: 'Head Office - Jakarta',
+          officeLocationId: locHead.id,
+        },
+      });
+    }
+  }
+  // WFH example for finance today
+  {
+    const todayDate = new Date(new Date().toISOString().slice(0, 10) + 'T00:00:00.000Z');
+    const ci = new Date(); ci.setUTCHours(1, 5, 0, 0);
+    await prisma.attendance.upsert({
+      where: { userId_date: { userId: finance.id, date: todayDate } },
+      update: { status: AttendanceStatus.WFH, checkIn: ci, note: 'WFH hari ini', shiftId: shiftOffice.id },
+      create: { userId: finance.id, date: todayDate, checkIn: ci, status: AttendanceStatus.WFH, isLate: false, lateMinutes: 0, note: 'WFH hari ini', shiftId: shiftOffice.id },
+    });
+  }
+  console.log('✅ HRIS attendance records created');
+
+  // Overtime requests
+  const todayForOT = new Date(new Date().toISOString().slice(0, 10) + 'T00:00:00.000Z');
+  const ot1Date    = new Date(new Date(Date.now() - 3 * 86400000).toISOString().slice(0, 10) + 'T00:00:00.000Z');
+  const ot2Date    = new Date(new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10) + 'T00:00:00.000Z');
+  await prisma.overtimeRequest.create({ data: {
+    userId: engineer.id, date: todayForOT,
+    startTime: '17:00', endTime: '20:00', durationMinutes: 180,
+    reason: 'Perbaikan AC lantai 3 harus selesai sebelum rapat direksi besok pagi.',
+    status: OvertimeStatus.PENDING,
+  }});
+  await prisma.overtimeRequest.create({ data: {
+    userId: pm.id, date: ot1Date,
+    startTime: '17:00', endTime: '19:30', durationMinutes: 150,
+    reason: 'Finalisasi laporan inspeksi bangunan untuk diserahkan ke klien.',
+    status: OvertimeStatus.APPROVED,
+    reviewedById: admin.id, reviewedAt: new Date(Date.now() - 2 * 86400000),
+    reviewNote: 'Disetujui. Pastikan laporan sudah lengkap.',
+  }});
+  await prisma.overtimeRequest.create({ data: {
+    userId: hr.id, date: ot2Date,
+    startTime: '17:00', endTime: '19:00', durationMinutes: 120,
+    reason: 'Persiapan dokumen onboarding 3 staff baru yang mulai Senin.',
+    status: OvertimeStatus.APPROVED,
+    reviewedById: admin.id, reviewedAt: new Date(Date.now() - 6 * 86400000),
+  }});
+  console.log('✅ Overtime requests created');
+
+  // ── Work Orders ────────────────────────────────────────────
+  // Clear previous WO seed data
+  await prisma.workOrderAttachment.deleteMany({});
+  await prisma.workOrderHistory.deleteMany({});
+  await prisma.workOrder.deleteMany({});
+
+  // 1) DONE — AC lantai 3 selesai diperbaiki (ELECTRICAL, oleh engineer)
+  const woAC = await prisma.workOrder.create({ data: {
+    title: 'Kerusakan AC Ruang Meeting Lantai 3',
+    description: 'AC tidak bisa dinyalakan sejak pagi. Ruang meeting tidak dapat digunakan untuk rapat direksi siang ini.',
+    status: WorkOrderStatus.DONE,
+    priority: WorkOrderPriority.URGENT,
+    category: WorkOrderCategory.ELECTRICAL,
+    location: 'Tower A — Lantai 3, Ruang Meeting Utama',
+    dueDate: days(-1),
+    completedAt: days(-1),
+    notes: 'Kapasitor kompresor diganti. Unit berjalan normal kembali.',
+    reportedById: admin.id,
+    assignedToId: engineer.id,
+    history: { create: [
+      { fromStatus: null,                      toStatus: WorkOrderStatus.OPEN,        note: 'Work order dibuat',                                        changedById: admin.id,    createdAt: days(-3) },
+      { fromStatus: WorkOrderStatus.OPEN,      toStatus: WorkOrderStatus.ASSIGNED,    note: 'Ditugaskan ke Chief Engineer',                             changedById: admin.id,    createdAt: days(-3) },
+      { fromStatus: WorkOrderStatus.ASSIGNED,  toStatus: WorkOrderStatus.IN_PROGRESS, note: 'Teknisi sudah di lokasi, sedang pengecekan awal',           changedById: engineer.id, createdAt: days(-2) },
+      { fromStatus: WorkOrderStatus.IN_PROGRESS, toStatus: WorkOrderStatus.PENDING_PARTS, note: 'Kapasitor kompresor rusak, perlu spare part',           changedById: engineer.id, createdAt: days(-2) },
+      { fromStatus: WorkOrderStatus.PENDING_PARTS, toStatus: WorkOrderStatus.IN_PROGRESS, note: 'Spare part sudah tersedia, pengerjaan dilanjutkan',     changedById: engineer.id, createdAt: days(-1) },
+      { fromStatus: WorkOrderStatus.IN_PROGRESS, toStatus: WorkOrderStatus.DONE,       note: 'Kapasitor diganti, AC berjalan normal. Sudah diuji coba.', changedById: engineer.id, createdAt: days(-1) },
+    ]},
+  }});
+
+  // 2) IN_PROGRESS — kebocoran pipa toilet lantai 2 (PLUMBING)
+  const woLeak = await prisma.workOrder.create({ data: {
+    title: 'Kebocoran Pipa Air Toilet Pria Lantai 2',
+    description: 'Air merembes dari sambungan pipa di bawah wastafel. Lantai sudah tergenang, risiko terpeleset.',
+    status: WorkOrderStatus.IN_PROGRESS,
+    priority: WorkOrderPriority.HIGH,
+    category: WorkOrderCategory.PLUMBING,
+    location: 'Tower A — Lantai 2, Toilet Pria',
+    dueDate: days(1),
+    reportedById: pm.id,
+    assignedToId: engineer.id,
+    history: { create: [
+      { fromStatus: null,                      toStatus: WorkOrderStatus.OPEN,        note: 'Work order dibuat',                      changedById: pm.id,       createdAt: days(-1) },
+      { fromStatus: WorkOrderStatus.OPEN,      toStatus: WorkOrderStatus.ASSIGNED,    note: 'Ditugaskan ke Chief Engineer',            changedById: admin.id,    createdAt: days(-1) },
+      { fromStatus: WorkOrderStatus.ASSIGNED,  toStatus: WorkOrderStatus.IN_PROGRESS, note: 'Pengecekan lokasi kebocoran sedang dilakukan', changedById: engineer.id, createdAt: days(0) },
+    ]},
+  }});
+
+  // 3) PENDING_PARTS — sistem HVAC lobby perlu filter baru (HVAC)
+  const woHVAC = await prisma.workOrder.create({ data: {
+    title: 'Filter HVAC Lobby Utama Perlu Diganti',
+    description: 'Kualitas udara lobby menurun, bau tidak sedap. Cek filter HVAC menunjukkan sudah sangat kotor dan perlu penggantian.',
+    status: WorkOrderStatus.PENDING_PARTS,
+    priority: WorkOrderPriority.MEDIUM,
+    category: WorkOrderCategory.HVAC,
+    location: 'Tower A — Lobby Lantai 1',
+    dueDate: days(3),
+    notes: 'Menunggu pengiriman filter HEPA ukuran 24x24x4. PO sudah diajukan ke procurement.',
+    reportedById: engineer.id,
+    assignedToId: engineer.id,
+    history: { create: [
+      { fromStatus: null,                      toStatus: WorkOrderStatus.OPEN,            note: 'Work order dibuat',                                  changedById: engineer.id, createdAt: days(-4) },
+      { fromStatus: WorkOrderStatus.OPEN,      toStatus: WorkOrderStatus.ASSIGNED,        note: 'Self-assigned untuk pengecekan',                     changedById: engineer.id, createdAt: days(-4) },
+      { fromStatus: WorkOrderStatus.ASSIGNED,  toStatus: WorkOrderStatus.IN_PROGRESS,     note: 'Inspeksi dilakukan, filter confirmed perlu diganti', changedById: engineer.id, createdAt: days(-3) },
+      { fromStatus: WorkOrderStatus.IN_PROGRESS, toStatus: WorkOrderStatus.PENDING_PARTS, note: 'Menunggu spare part filter HEPA dari supplier',      changedById: engineer.id, createdAt: days(-2) },
+    ]},
+  }});
+
+  // 4) ASSIGNED — lampu parkir basement mati (ELECTRICAL)
+  const woLamp = await prisma.workOrder.create({ data: {
+    title: 'Lampu Parkir Basement B2 Mati Sebagian',
+    description: '6 unit lampu di area parkir B2 sektor C tidak menyala. Area menjadi gelap dan membahayakan pengguna parkir di malam hari.',
+    status: WorkOrderStatus.ASSIGNED,
+    priority: WorkOrderPriority.HIGH,
+    category: WorkOrderCategory.ELECTRICAL,
+    location: 'Basement B2 — Sektor C',
+    dueDate: days(2),
+    reportedById: admin.id,
+    assignedToId: engineer.id,
+    history: { create: [
+      { fromStatus: null,                 toStatus: WorkOrderStatus.OPEN,     note: 'Work order dibuat',        changedById: admin.id, createdAt: days(-1) },
+      { fromStatus: WorkOrderStatus.OPEN, toStatus: WorkOrderStatus.ASSIGNED, note: 'Ditugaskan ke Chief Engineer', changedById: admin.id, createdAt: days(-1) },
+    ]},
+  }});
+
+  // 5) OPEN — retak di dinding tangga darurat (CIVIL)
+  const woCivil = await prisma.workOrder.create({ data: {
+    title: 'Retak Dinding Tangga Darurat Tower B Lantai 5',
+    description: 'Ditemukan retakan horizontal sekitar 30cm pada dinding tangga darurat lantai 5. Perlu assessment struktural segera.',
+    status: WorkOrderStatus.OPEN,
+    priority: WorkOrderPriority.URGENT,
+    category: WorkOrderCategory.CIVIL,
+    location: 'Tower B — Tangga Darurat Lantai 5',
+    dueDate: days(1),
+    reportedById: pm.id,
+    assignedToId: null,
+    history: { create: [
+      { fromStatus: null, toStatus: WorkOrderStatus.OPEN, note: 'Work order dibuat, menunggu assignment teknisi', changedById: pm.id, createdAt: days(0) },
+    ]},
+  }});
+
+  // 6) OPEN — kebersihan area parkir (CLEANING)
+  await prisma.workOrder.create({ data: {
+    title: 'Pembersihan Menyeluruh Area Parkir Basement B1',
+    description: 'Area parkir B1 perlu pembersihan berkala. Debu dan kotoran menumpuk di sudut-sudut dan marka lantai sudah pudar.',
+    status: WorkOrderStatus.OPEN,
+    priority: WorkOrderPriority.LOW,
+    category: WorkOrderCategory.CLEANING,
+    location: 'Basement B1 — Seluruh Area',
+    dueDate: days(7),
+    reportedById: pm.id,
+    assignedToId: null,
+    history: { create: [
+      { fromStatus: null, toStatus: WorkOrderStatus.OPEN, note: 'Work order dibuat', changedById: pm.id, createdAt: days(0) },
+    ]},
+  }});
+
+  // 7) DONE — penggantian kunci pintu server room (SECURITY)
+  const woSecurity = await prisma.workOrder.create({ data: {
+    title: 'Penggantian Kunci Pintu Server Room',
+    description: 'Kunci pintu server room mengalami kerusakan mekanisme. Pintu tidak bisa dikunci dari dalam.',
+    status: WorkOrderStatus.DONE,
+    priority: WorkOrderPriority.URGENT,
+    category: WorkOrderCategory.SECURITY,
+    location: 'Tower A — Lantai 4, Server Room',
+    dueDate: days(-5),
+    completedAt: days(-5),
+    notes: 'Kunci diganti dengan model mortise lock baru. Kunci cadangan diserahkan ke admin dan GM.',
+    reportedById: admin.id,
+    assignedToId: engineer.id,
+    history: { create: [
+      { fromStatus: null,                      toStatus: WorkOrderStatus.OPEN,        note: 'Work order dibuat',                            changedById: admin.id,    createdAt: days(-7) },
+      { fromStatus: WorkOrderStatus.OPEN,      toStatus: WorkOrderStatus.ASSIGNED,    note: 'Ditugaskan ke Chief Engineer',                 changedById: admin.id,    createdAt: days(-7) },
+      { fromStatus: WorkOrderStatus.ASSIGNED,  toStatus: WorkOrderStatus.IN_PROGRESS, note: 'Teknisi locksmith sudah dipanggil ke lokasi',  changedById: engineer.id, createdAt: days(-6) },
+      { fromStatus: WorkOrderStatus.IN_PROGRESS, toStatus: WorkOrderStatus.DONE,      note: 'Kunci baru terpasang dan berfungsi normal',    changedById: engineer.id, createdAt: days(-5) },
+    ]},
+  }});
+
+  // 8) CANCELLED — rencana pengecatan yang dibatalkan
+  await prisma.workOrder.create({ data: {
+    title: 'Pengecatan Ulang Tangga Darurat Tower A',
+    description: 'Cat tangga darurat Tower A sudah pudar dan mengelupas di beberapa titik.',
+    status: WorkOrderStatus.CANCELLED,
+    priority: WorkOrderPriority.LOW,
+    category: WorkOrderCategory.CIVIL,
+    location: 'Tower A — Semua Lantai Tangga Darurat',
+    dueDate: days(-2),
+    notes: 'Dibatalkan — pengecatan dijadwalkan ulang bersamaan dengan proyek renovasi Tower A bulan depan agar lebih efisien.',
+    reportedById: pm.id,
+    assignedToId: null,
+    history: { create: [
+      { fromStatus: null,                 toStatus: WorkOrderStatus.OPEN,      note: 'Work order dibuat',                                    changedById: pm.id,    createdAt: days(-10) },
+      { fromStatus: WorkOrderStatus.OPEN, toStatus: WorkOrderStatus.CANCELLED, note: 'Dijadwalkan ulang ke proyek renovasi Tower A bulan depan', changedById: admin.id, createdAt: days(-8) },
+    ]},
+  }});
+
+  console.log('✅ Work orders & histories created');
+
   // ── Notifications ──────────────────────────────────────────
   await prisma.notification.createMany({ data: [
     { type: NotificationType.TASK_ASSIGNED,  title: 'Task Baru Ditugaskan', message: 'Super Admin menugaskan kamu: "Audit Laporan Keuangan Q1 2026".', link: '/tasks', isRead: false, userId: finance.id,   actorId: admin.id   },
@@ -390,6 +711,24 @@ async function main() {
     { type: NotificationType.BULLETIN_URGENT, title: 'Pengumuman Urgent',   message: 'Dimas Wijaya memposting: "Pemeliharaan Lift Tower A — Sabtu 7 Juni 2026".', link: '/bulletin', isRead: false, userId: admin.id, actorId: pm.id  },
     { type: NotificationType.SYSTEM,         title: 'Selamat Datang',       message: 'Akun kamu sudah aktif. Mulai kelola tugas dan baca pengumuman.', link: '/dashboard', isRead: true, userId: finance.id, actorId: null },
     { type: NotificationType.TASK_COMPLETED, title: 'Task Selesai',         message: 'Reza Maulana menyelesaikan subtask "Finalisasi pilihan warna dengan manajemen".', link: '/tasks', isRead: false, userId: pm.id, actorId: engineer.id },
+    // HRIS notifications
+    { type: NotificationType.LEAVE_SUBMITTED, title: 'Pengajuan Cuti Baru',  message: 'Reza Maulana mengajukan Cuti Tahunan (3 hari) mulai Jun 28.',    link: '/hris/leave', isRead: false, userId: admin.id,   actorId: engineer.id },
+    { type: NotificationType.LEAVE_SUBMITTED, title: 'Pengajuan Cuti Baru',  message: 'Dimas Wijaya mengajukan Darurat (1 hari) mulai Jun 26.',          link: '/hris/leave', isRead: false, userId: admin.id,   actorId: pm.id       },
+    { type: NotificationType.LEAVE_APPROVED,  title: 'Cuti Disetujui',       message: 'Super Admin menyetujui pengajuan Cuti Tahunan kamu.',             link: '/hris/leave', isRead: false, userId: hr.id,      actorId: admin.id    },
+    { type: NotificationType.LEAVE_APPROVED,  title: 'Cuti Disetujui',       message: 'Super Admin menyetujui pengajuan Sakit kamu.',                    link: '/hris/leave', isRead: true,  userId: finance.id, actorId: admin.id    },
+    { type: NotificationType.LEAVE_REJECTED,  title: 'Cuti Ditolak',         message: 'Super Admin menolak pengajuan Cuti Tahunan: Tidak bisa disetujui minggu ini.', link: '/hris/leave', isRead: false, userId: director.id, actorId: admin.id },
+    // WO notifications
+    { type: NotificationType.WO_ASSIGNED,      title: 'Work Order Ditugaskan',    message: 'Super Admin menugaskan kamu: "Kerusakan AC Ruang Meeting Lantai 3". Prioritas URGENT.',          link: `/work-orders/${woAC.id}`,       isRead: true,  userId: engineer.id, actorId: admin.id    },
+    { type: NotificationType.WO_ASSIGNED,      title: 'Work Order Ditugaskan',    message: 'Super Admin menugaskan kamu: "Lampu Parkir Basement B2 Mati Sebagian". Due 2 hari lagi.',        link: `/work-orders/${woLamp.id}`,     isRead: false, userId: engineer.id, actorId: admin.id    },
+    { type: NotificationType.WO_COMPLETED,     title: 'Work Order Selesai',       message: 'Reza Maulana menyelesaikan WO "Kerusakan AC Ruang Meeting Lantai 3".',                          link: `/work-orders/${woAC.id}`,       isRead: false, userId: admin.id,    actorId: engineer.id },
+    { type: NotificationType.WO_COMPLETED,     title: 'Work Order Selesai',       message: 'Reza Maulana menyelesaikan WO "Penggantian Kunci Pintu Server Room".',                          link: `/work-orders/${woSecurity.id}`, isRead: true,  userId: admin.id,    actorId: engineer.id },
+    { type: NotificationType.WO_STATUS_CHANGED, title: 'Status WO Diperbarui',   message: 'WO "Kebocoran Pipa Air Toilet Pria Lantai 2" — status menjadi: IN PROGRESS.',                   link: `/work-orders/${woLeak.id}`,     isRead: false, userId: pm.id,       actorId: engineer.id },
+    { type: NotificationType.WO_STATUS_CHANGED, title: 'Status WO Diperbarui',   message: 'WO "Filter HVAC Lobby Utama Perlu Diganti" — status menjadi: PENDING PARTS. Menunggu spare part.', link: `/work-orders/${woHVAC.id}`,  isRead: false, userId: admin.id,    actorId: engineer.id },
+    { type: NotificationType.WO_ASSIGNED,      title: 'Work Order Baru Dilaporkan', message: 'Dimas Wijaya membuat WO urgent: "Retak Dinding Tangga Darurat Tower B Lantai 5". Belum ada assignee.', link: `/work-orders/${woCivil.id}`, isRead: false, userId: admin.id, actorId: pm.id },
+    // Overtime notifications
+    { type: NotificationType.OVERTIME_SUBMITTED, title: 'Pengajuan Lembur Baru', message: 'Reza Maulana mengajukan lembur hari ini (3j 0m).', link: '/hris/overtime', isRead: false, userId: admin.id, actorId: engineer.id },
+    { type: NotificationType.OVERTIME_APPROVED,  title: 'Lembur Disetujui',      message: 'Super Admin menyetujui pengajuan lembur kamu.',  link: '/hris/overtime', isRead: false, userId: pm.id,      actorId: admin.id    },
+    { type: NotificationType.OVERTIME_APPROVED,  title: 'Lembur Disetujui',      message: 'Super Admin menyetujui pengajuan lembur kamu.',  link: '/hris/overtime', isRead: true,  userId: hr.id,      actorId: admin.id    },
   ]});
   console.log('✅ Notifications created');
 

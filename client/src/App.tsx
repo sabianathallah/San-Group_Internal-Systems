@@ -16,6 +16,13 @@ import PermissionPage from '@/pages/admin/PermissionPage';
 import AuditLogPage from '@/pages/admin/AuditLogPage';
 import NotificationsPage from '@/pages/NotificationsPage';
 import WorkOrderPage from '@/pages/WorkOrderPage';
+import HRISOverviewPage from '@/pages/hris/HRISOverviewPage';
+import AttendancePage from '@/pages/hris/AttendancePage';
+import LeavePage from '@/pages/hris/LeavePage';
+import OvertimePage from '@/pages/hris/OvertimePage';
+import ReportsPage from '@/pages/hris/ReportsPage';
+import ShiftsAdminPage from '@/pages/hris/admin/ShiftsAdminPage';
+import LocationsAdminPage from '@/pages/hris/admin/LocationsAdminPage';
 
 function AdminRoute() {
   const user = useAuthStore((s) => s.user);
@@ -44,6 +51,13 @@ export default function App() {
           <Route path={ROUTES.ANALYTICS}      element={<AnalyticsPage />}      />
           <Route path={ROUTES.NOTIFICATIONS} element={<NotificationsPage />} />
           <Route path={ROUTES.WORK_ORDERS}   element={<WorkOrderPage />}     />
+          <Route path={ROUTES.HRIS}                 element={<HRISOverviewPage />}    />
+          <Route path={ROUTES.HRIS_ATTENDANCE}      element={<AttendancePage />}      />
+          <Route path={ROUTES.HRIS_LEAVE}           element={<LeavePage />}           />
+          <Route path={ROUTES.HRIS_OVERTIME}        element={<OvertimePage />}        />
+          <Route path={ROUTES.HRIS_REPORTS}         element={<ReportsPage />}         />
+          <Route path={ROUTES.HRIS_ADMIN_SHIFTS}    element={<ShiftsAdminPage />}     />
+          <Route path={ROUTES.HRIS_ADMIN_LOCATIONS} element={<LocationsAdminPage />}  />
 
           {/* Admin-only routes */}
           <Route element={<AdminRoute />}>

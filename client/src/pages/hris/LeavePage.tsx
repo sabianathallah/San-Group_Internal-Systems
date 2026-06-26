@@ -1,0 +1,481 @@
+import { useEffect, useState, useCallback } from 'react';
+import {
+  Plus, X, Loader2, CheckCircle2, XCircle,
+  CalendarRange, RefreshCw, ChevronDown, Users, Clock,
+} from 'lucide-react';
+import api from '@/lib/api';
+import { cn } from '@/lib/cn';
+import { useAuthStore } from '@/stores/authStore';
+import { toast } from '@/stores/toastStore';
+
+// ── Types ──────────────────────────────────────────────────────
+type LeaveStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED';
+
+interface LeaveType {
+  id: string; name: string; slug: string; color: string;
+  maxDaysPerYear: number; isPaid: boolean; requiresDoc: boolean;
+}
+
+interface LeaveBalance {
+  leaveType: LeaveType;
+  totalDays: number; usedDays: number;
+  pendingDays: number; remainingDays: number | null;
+}
+
+interface LeaveRequest {
+  id: string; status: LeaveStatus;
+  startDate: string; endDate: string; totalDays: number; reason: string;
+  reviewNote: string | null; reviewedAt: string | null;
+  createdAt: string;
+  leaveType: LeaveType;
+  user: { id: string; fullName: string; avatar: string | null };
+  reviewedBy: { id: string; fullName: string } | null;
+}
+
+// ── Helpers ────────────────────────────────────────────────────
+const STATUS_STYLE: Record<LeaveStatus, { label: string; cls: string }> = {
+  PENDING:   { label: 'Pending',  cls: 'bg-yellow-50 text-yellow-700 border-yellow-200'  },
+  APPROVED:  { label: 'Approved',  cls: 'bg-green-50 text-green-700 border-green-200'     },
+  REJECTED:  { label: 'Rejected',  cls: 'bg-red-50 text-red-700 border-red-200'           },
+  CANCELLED: { label: 'Cancelled', cls: 'bg-gray-50 text-gray-500 border-gray-200'        },
+};
+
+function fmtDate(iso: string) {
+  return new Date(iso).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+function countWeekdays(start: string, end: string): number {
+  if (!start || !end) return 0;
+  let count = 0;
+  const cur = new Date(start + 'T00:00:00Z');
+  const endD = new Date(end + 'T00:00:00Z');
+  while (cur <= endD) {
+    const d = cur.getUTCDay();
+    if (d !== 0 && d !== 6) count++;
+    cur.setUTCDate(cur.getUTCDate() + 1);
+  }
+  return count;
+}
+
+// ── Create Modal ───────────────────────────────────────────────
+function CreateLeaveModal({
+  open, onClose, leaveTypes, balances, onCreated,
+}: {
+  open: boolean; onClose: () => void;
+  leaveTypes: LeaveType[]; balances: LeaveBalance[];
+  onCreated: () => void;
+}) {
+  const [form, setForm] = useState({ leaveTypeId: '', startDate: '', endDate: '', reason: '' });
+  const [saving, setSaving] = useState(false);
+
+  const totalDays = form.startDate && form.endDate ? countWeekdays(form.startDate, form.endDate) : 0;
+  const selType   = leaveTypes.find((t) => t.id === form.leaveTypeId);
+  const selBal    = balances.find((b) => b.leaveType.id === form.leaveTypeId);
+
+  useEffect(() => {
+    if (open) setForm({ leaveTypeId: leaveTypes[0]?.id ?? '', startDate: '', endDate: '', reason: '' });
+  }, [open, leaveTypes]);
+
+  if (!open) return null;
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!form.leaveTypeId || !form.startDate || !form.endDate || !form.reason.trim()) return;
+    setSaving(true);
+    try {
+      await api.post('/hris/leave-requests', form);
+      toast.success('Leave request submitted');
+      onCreated();
+      onClose();
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'Failed to submit leave request';
+      toast.error(msg);
+    } finally { setSaving(false); }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-md">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+          <h2 className="text-base font-semibold text-gray-800">Request Leave</h2>
+          <button onClick={onClose} className="p-1 rounded hover:bg-gray-100 transition-colors">
+            <X size={16} className="text-gray-500" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="p-5 space-y-4">
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1.5">Leave Type</label>
+            <div className="relative">
+              <select
+                value={form.leaveTypeId}
+                onChange={(e) => setForm((f) => ({ ...f, leaveTypeId: e.target.value }))}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 appearance-none pr-8 focus:outline-none focus:ring-2 focus:ring-navy/20"
+                required
+              >
+                {leaveTypes.map((t) => (
+                  <option key={t.id} value={t.id}>{t.name}</option>
+                ))}
+              </select>
+              <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+            </div>
+            {selBal && selBal.remainingDays !== null && (
+              <p className="text-xs text-gray-400 mt-1">Remaining balance: <strong className="text-gray-600">{selBal.remainingDays} days</strong></p>
+            )}
+            {selType?.requiresDoc && (
+              <p className="text-xs text-orange-500 mt-1">⚠ Requires supporting document</p>
+            )}
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1.5">Start Date</label>
+              <input
+                type="date"
+                value={form.startDate}
+                onChange={(e) => setForm((f) => ({ ...f, startDate: e.target.value }))}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-navy/20"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1.5">End Date</label>
+              <input
+                type="date"
+                value={form.endDate}
+                min={form.startDate}
+                onChange={(e) => setForm((f) => ({ ...f, endDate: e.target.value }))}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-navy/20"
+                required
+              />
+            </div>
+          </div>
+
+          {totalDays > 0 && (
+            <p className="text-xs text-gray-500 -mt-2">
+              Total: <strong className="text-gray-800">{totalDays} working days</strong>
+            </p>
+          )}
+
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1.5">Reason</label>
+            <textarea
+              value={form.reason}
+              onChange={(e) => setForm((f) => ({ ...f, reason: e.target.value }))}
+              rows={3}
+              placeholder="Enter leave reason..."
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 resize-none focus:outline-none focus:ring-2 focus:ring-navy/20"
+              required
+            />
+          </div>
+
+          <div className="flex gap-2 pt-1">
+            <button type="button" onClick={onClose} className="flex-1 px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={saving || !form.leaveTypeId || !form.startDate || !form.endDate || !form.reason.trim()}
+              className="flex-1 px-4 py-2 text-sm font-medium bg-navy text-white rounded-lg hover:bg-navy/90 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              {saving && <Loader2 size={13} className="animate-spin" />}
+              Submit Request
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// ── Review Modal (Manager) ─────────────────────────────────────
+function ReviewModal({
+  request, onClose, onDone,
+}: { request: LeaveRequest; onClose: () => void; onDone: () => void }) {
+  const [note, setNote]     = useState('');
+  const [saving, setSaving] = useState(false);
+
+  async function handle(status: 'APPROVED' | 'REJECTED') {
+    setSaving(true);
+    try {
+      await api.patch(`/hris/leave-requests/${request.id}/review`, { status, reviewNote: note || null });
+      toast.success(status === 'APPROVED' ? 'Leave approved' : 'Leave rejected');
+      onDone();
+      onClose();
+    } catch {
+      toast.error('Failed to process request');
+    } finally { setSaving(false); }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-md">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+          <h2 className="text-base font-semibold text-gray-800">Review Leave Request</h2>
+          <button onClick={onClose} className="p-1 rounded hover:bg-gray-100">
+            <X size={16} className="text-gray-500" />
+          </button>
+        </div>
+        <div className="p-5 space-y-4">
+          <div className="bg-gray-50 rounded-lg p-4 space-y-1.5">
+            <div className="flex items-center gap-2">
+              <div className="w-7 h-7 rounded-full bg-navy/10 flex items-center justify-center text-navy text-xs font-semibold">
+                {request.user.fullName.slice(0, 2).toUpperCase()}
+              </div>
+              <span className="font-medium text-gray-800">{request.user.fullName}</span>
+            </div>
+            <p className="text-sm text-gray-700">
+              <span className="font-medium" style={{ color: request.leaveType.color }}>{request.leaveType.name}</span>
+              {' · '}{fmtDate(request.startDate)} — {fmtDate(request.endDate)} ({request.totalDays} days)
+            </p>
+            <p className="text-xs text-gray-500">{request.reason}</p>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1.5">Note (optional)</label>
+            <textarea
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              rows={2}
+              placeholder="Add a note for the employee..."
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-navy/20"
+            />
+          </div>
+          <div className="flex gap-2 pt-1">
+            <button
+              disabled={saving}
+              onClick={() => handle('REJECTED')}
+              className="flex-1 flex items-center justify-center gap-1.5 px-4 py-2 text-sm font-medium text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
+            >
+              {saving ? <Loader2 size={13} className="animate-spin" /> : <XCircle size={14} />}
+              Reject
+            </button>
+            <button
+              disabled={saving}
+              onClick={() => handle('APPROVED')}
+              className="flex-1 flex items-center justify-center gap-1.5 px-4 py-2 text-sm font-medium bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
+            >
+              {saving ? <Loader2 size={13} className="animate-spin" /> : <CheckCircle2 size={14} />}
+              Approve
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Main Page ──────────────────────────────────────────────────
+export default function LeavePage() {
+  const user = useAuthStore((s) => s.user);
+  const isManager = (user?.role?.level ?? 99) <= 4;
+
+  const [leaveTypes,   setLeaveTypes]   = useState<LeaveType[]>([]);
+  const [balances,     setBalances]     = useState<LeaveBalance[]>([]);
+  const [requests,     setRequests]     = useState<LeaveRequest[]>([]);
+  const [loading,      setLoading]      = useState(true);
+  const [createOpen,   setCreateOpen]   = useState(false);
+  const [reviewTarget, setReviewTarget] = useState<LeaveRequest | null>(null);
+  const [viewMode,     setViewMode]     = useState<'mine' | 'team'>('mine');
+  const [statusFilter, setStatusFilter] = useState<LeaveStatus | ''>('');
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const params: Record<string, unknown> = { limit: 50, year: new Date().getFullYear() };
+      if (statusFilter) params.status = statusFilter;
+
+      const [typesRes, balRes, reqRes] = await Promise.all([
+        api.get('/hris/leave-types'),
+        api.get('/hris/leave-balances'),
+        api.get('/hris/leave-requests', { params }),
+      ]);
+      setLeaveTypes(typesRes.data.data);
+      setBalances(balRes.data.data);
+      setRequests(reqRes.data.data);
+    } catch { /* silent */ }
+    finally { setLoading(false); }
+  }, [statusFilter]);
+
+  useEffect(() => { load(); }, [load]);
+
+  async function handleCancel(id: string) {
+    try {
+      await api.patch(`/hris/leave-requests/${id}/cancel`);
+      toast.success('Leave request cancelled');
+      load();
+    } catch { toast.error('Failed to cancel request'); }
+  }
+
+  const displayed = viewMode === 'mine'
+    ? requests.filter((r) => r.user.id === user?.id)
+    : requests;
+
+  return (
+    <div className="max-w-4xl mx-auto space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-xl font-bold text-gray-900">Leave</h1>
+          <p className="text-sm text-gray-500 mt-0.5">Leave requests and balance</p>
+        </div>
+        <div className="flex items-center gap-2">
+          {isManager && (
+            <div className="flex rounded-lg border border-gray-200 overflow-hidden text-sm">
+              <button onClick={() => setViewMode('mine')} className={cn('px-3 py-1.5 flex items-center gap-1.5 transition-colors', viewMode === 'mine' ? 'bg-navy text-white' : 'text-gray-600 hover:bg-gray-50')}>
+                <Clock size={13} /> Me
+              </button>
+              <button onClick={() => setViewMode('team')} className={cn('px-3 py-1.5 flex items-center gap-1.5 transition-colors', viewMode === 'team' ? 'bg-navy text-white' : 'text-gray-600 hover:bg-gray-50')}>
+                <Users size={13} /> Team
+              </button>
+            </div>
+          )}
+          <button onClick={load} className="p-2 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 transition-colors">
+            <RefreshCw size={15} className={loading ? 'animate-spin' : ''} />
+          </button>
+          <button
+            onClick={() => setCreateOpen(true)}
+            className="flex items-center gap-1.5 px-3 py-2 bg-navy text-white rounded-lg text-sm font-medium hover:bg-navy/90 transition-colors"
+          >
+            <Plus size={15} /> Request Leave
+          </button>
+        </div>
+      </div>
+
+      {/* Balance cards */}
+      {viewMode === 'mine' && (
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+          {balances.map((b) => (
+            <div key={b.leaveType.id} className="bg-white rounded-xl border border-gray-200 px-4 py-3">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: b.leaveType.color }} />
+                <span className="text-xs font-medium text-gray-600 truncate">{b.leaveType.name}</span>
+              </div>
+              {b.remainingDays !== null ? (
+                <>
+                  <p className="text-2xl font-bold text-gray-900">{b.remainingDays}</p>
+                  <p className="text-xs text-gray-400 mt-0.5">of {b.totalDays} days · {b.usedDays} used</p>
+                  <div className="h-1 bg-gray-100 rounded-full mt-2 overflow-hidden">
+                    <div
+                      className="h-full rounded-full"
+                      style={{
+                        width: `${Math.max(0, (b.remainingDays / b.totalDays) * 100)}%`,
+                        backgroundColor: b.leaveType.color,
+                      }}
+                    />
+                  </div>
+                </>
+              ) : (
+                <p className="text-sm font-semibold text-gray-500 mt-1">Unlimited</p>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Filter */}
+      <div className="flex gap-2 flex-wrap">
+        {(['', 'PENDING', 'APPROVED', 'REJECTED', 'CANCELLED'] as const).map((s) => (
+          <button
+            key={s}
+            onClick={() => setStatusFilter(s as LeaveStatus | '')}
+            className={cn(
+              'px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors',
+              statusFilter === s
+                ? 'bg-navy text-white border-navy'
+                : 'text-gray-600 border-gray-200 hover:bg-gray-50',
+            )}
+          >
+            {s === '' ? 'All' : STATUS_STYLE[s as LeaveStatus].label}
+          </button>
+        ))}
+      </div>
+
+      {/* List */}
+      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        {loading ? (
+          <div className="flex items-center justify-center h-32">
+            <Loader2 size={20} className="animate-spin text-gray-300" />
+          </div>
+        ) : displayed.length === 0 ? (
+          <div className="py-16 text-center">
+            <CalendarRange size={32} className="text-gray-200 mx-auto mb-3" />
+            <p className="text-sm text-gray-400">No leave requests yet.</p>
+          </div>
+        ) : (
+          <div className="divide-y divide-gray-50">
+            {displayed.map((r) => {
+              const cfg = STATUS_STYLE[r.status];
+              const isOwn = r.user.id === user?.id;
+              return (
+                <div key={r.id} className="px-5 py-4 hover:bg-gray-50/50 transition-colors">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        {viewMode === 'team' && (
+                          <span className="text-sm font-medium text-gray-800">{r.user.fullName} ·</span>
+                        )}
+                        <span className="text-sm font-semibold" style={{ color: r.leaveType.color }}>
+                          {r.leaveType.name}
+                        </span>
+                        <span className={cn('text-[11px] font-medium px-2 py-0.5 rounded-full border', cfg.cls)}>
+                          {cfg.label}
+                        </span>
+                      </div>
+                      <p className="text-xs text-gray-500 mt-1">
+                        {fmtDate(r.startDate)} — {fmtDate(r.endDate)} · <strong>{r.totalDays} working days</strong>
+                      </p>
+                      <p className="text-xs text-gray-400 mt-0.5 line-clamp-1">{r.reason}</p>
+                      {r.reviewNote && (
+                        <p className="text-xs text-gray-500 mt-1 italic bg-gray-50 rounded px-2 py-1">"{r.reviewNote}"</p>
+                      )}
+                      {r.reviewedBy && (
+                        <p className="text-xs text-gray-400 mt-0.5">
+                          {r.status === 'APPROVED' ? 'Approved' : 'Rejected'} by <span className="font-medium">{r.reviewedBy.fullName}</span>
+                          {r.reviewedAt && ` · ${new Date(r.reviewedAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })}`}
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      {isManager && !isOwn && r.status === 'PENDING' && (
+                        <button
+                          onClick={() => setReviewTarget(r)}
+                          className="px-3 py-1.5 text-xs font-medium bg-navy text-white rounded-lg hover:bg-navy/90 transition-colors"
+                        >
+                          Review
+                        </button>
+                      )}
+                      {isOwn && r.status === 'PENDING' && (
+                        <button
+                          onClick={() => handleCancel(r.id)}
+                          className="px-3 py-1.5 text-xs font-medium text-gray-500 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+                        >
+                          Cancel
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Modals */}
+      <CreateLeaveModal
+        open={createOpen}
+        onClose={() => setCreateOpen(false)}
+        leaveTypes={leaveTypes}
+        balances={balances}
+        onCreated={load}
+      />
+      {reviewTarget && (
+        <ReviewModal
+          request={reviewTarget}
+          onClose={() => setReviewTarget(null)}
+          onDone={load}
+        />
+      )}
+    </div>
+  );
+}
