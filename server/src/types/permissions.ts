@@ -55,6 +55,30 @@ export interface WorkOrderPermissions {
   delete: Scope;   // same
 }
 
+// NOTE: for user/role/division management, a level-ceiling rule is ALWAYS
+// enforced in the service layer regardless of scope — you can never create,
+// edit, delete, or assign a role to a user/role that is at or above your own
+// level. Scope here only narrows *which* lower-level records you can reach
+// ('division' = only within your own division), it never widens the ceiling.
+export interface UserManagementPermissions {
+  create: boolean;
+  edit: Scope;         // none/division/all
+  delete: Scope;       // none/division/all
+  toggleStatus: Scope; // none/division/all — activate/deactivate account
+}
+
+export interface RoleManagementPermissions {
+  create: boolean;
+  edit: Scope;   // none/division/all
+  delete: Scope; // none/division/all
+}
+
+export interface DivisionManagementPermissions {
+  create: boolean;
+  edit: Scope;   // none/division/all — 'division' means only your own division
+  delete: Scope; // none/division/all
+}
+
 export interface PermissionConfig {
   task: TaskPermissions;
   bulletin: BulletinPermissions;
@@ -64,6 +88,9 @@ export interface PermissionConfig {
   audit_log: AuditLogPermissions;
   hris: HrisPermissions;
   work_order: WorkOrderPermissions;
+  user_mgmt: UserManagementPermissions;
+  role_mgmt: RoleManagementPermissions;
+  division_mgmt: DivisionManagementPermissions;
 }
 
 // Default permissions per level — matches previous hardcoded behaviour
@@ -77,6 +104,9 @@ export const DEFAULT_PERMISSIONS: Record<number, PermissionConfig> = {
     audit_log:  { view: 'all' },
     hris:       { reviewLeave: 'all',  reviewOvertime: 'all',  editAttendance: 'all',  manageShifts: true,  manageLocations: true,  viewReports: 'all' },
     work_order: { view: 'all', create: true, edit: 'all', delete: 'all' },
+    user_mgmt:     { create: true, edit: 'all', delete: 'all', toggleStatus: 'all' },
+    role_mgmt:     { create: true, edit: 'all', delete: 'all' },
+    division_mgmt: { create: true, edit: 'all', delete: 'all' },
   },
   2: {
     task:       { view: 'all',      create: true,  edit: 'all',      delete: 'all',      viewPrivate: true },
@@ -87,6 +117,11 @@ export const DEFAULT_PERMISSIONS: Record<number, PermissionConfig> = {
     audit_log:  { view: 'all' },
     hris:       { reviewLeave: 'all',  reviewOvertime: 'all',  editAttendance: 'all',  manageShifts: true,  manageLocations: true,  viewReports: 'all' },
     work_order: { view: 'all', create: true, edit: 'all', delete: 'all' },
+    // toggleStatus/delete default to 'none' here — matches the previous hardcoded
+    // behaviour where only the true SUPER_ADMIN slug could deactivate/delete users.
+    user_mgmt:     { create: true, edit: 'all', delete: 'none', toggleStatus: 'none' },
+    role_mgmt:     { create: true, edit: 'all', delete: 'all' },
+    division_mgmt: { create: true, edit: 'all', delete: 'all' },
   },
   3: {
     task:       { view: 'division', create: true,  edit: 'division', delete: 'division', viewPrivate: true },
@@ -97,6 +132,9 @@ export const DEFAULT_PERMISSIONS: Record<number, PermissionConfig> = {
     audit_log:  { view: 'division' },
     hris:       { reviewLeave: 'all',  reviewOvertime: 'all',  editAttendance: 'all',  manageShifts: false, manageLocations: false, viewReports: 'all' },
     work_order: { view: 'all', create: true, edit: 'all', delete: 'all' },
+    user_mgmt:     { create: false, edit: 'none', delete: 'none', toggleStatus: 'none' },
+    role_mgmt:     { create: false, edit: 'none', delete: 'none' },
+    division_mgmt: { create: false, edit: 'none', delete: 'none' },
   },
   4: {
     task:       { view: 'division', create: true,  edit: 'own',      delete: 'own',      viewPrivate: false },
@@ -107,6 +145,9 @@ export const DEFAULT_PERMISSIONS: Record<number, PermissionConfig> = {
     audit_log:  { view: 'none' },
     hris:       { reviewLeave: 'division',  reviewOvertime: 'division',  editAttendance: 'division',  manageShifts: false, manageLocations: false, viewReports: 'division' },
     work_order: { view: 'all', create: true, edit: 'all', delete: 'all' },
+    user_mgmt:     { create: false, edit: 'none', delete: 'none', toggleStatus: 'none' },
+    role_mgmt:     { create: false, edit: 'none', delete: 'none' },
+    division_mgmt: { create: false, edit: 'none', delete: 'none' },
   },
   5: {
     task:       { view: 'division', create: true,  edit: 'own',      delete: 'own',      viewPrivate: false },
@@ -117,6 +158,9 @@ export const DEFAULT_PERMISSIONS: Record<number, PermissionConfig> = {
     audit_log:  { view: 'none' },
     hris:       { reviewLeave: 'none', reviewOvertime: 'none', editAttendance: 'none', manageShifts: false, manageLocations: false, viewReports: 'none' },
     work_order: { view: 'own', create: true, edit: 'own', delete: 'own' },
+    user_mgmt:     { create: false, edit: 'none', delete: 'none', toggleStatus: 'none' },
+    role_mgmt:     { create: false, edit: 'none', delete: 'none' },
+    division_mgmt: { create: false, edit: 'none', delete: 'none' },
   },
   6: {
     task:       { view: 'division', create: true,  edit: 'own',      delete: 'own',      viewPrivate: false },
@@ -127,5 +171,8 @@ export const DEFAULT_PERMISSIONS: Record<number, PermissionConfig> = {
     audit_log:  { view: 'none' },
     hris:       { reviewLeave: 'none', reviewOvertime: 'none', editAttendance: 'none', manageShifts: false, manageLocations: false, viewReports: 'none' },
     work_order: { view: 'own', create: true, edit: 'own', delete: 'own' },
+    user_mgmt:     { create: false, edit: 'none', delete: 'none', toggleStatus: 'none' },
+    role_mgmt:     { create: false, edit: 'none', delete: 'none' },
+    division_mgmt: { create: false, edit: 'none', delete: 'none' },
   },
 };

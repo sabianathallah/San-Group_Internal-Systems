@@ -26,21 +26,25 @@ export async function getRoleById(req: AuthRequest, res: Response, next: NextFun
 
 export async function createRole(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
-    const role = await createRoleService(req.body);
+    const role = await createRoleService(req.user!.roleLevel, req.body);
     successResponse(res, role, 'Role berhasil dibuat', 201);
   } catch (err) { next(err); }
 }
 
 export async function updateRole(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
-    const role = await updateRoleService(String(req.params.id), req.body);
+    const { roleLevel, divisionId } = req.user!;
+    const editScope = req.permScope ?? 'all';
+    const role = await updateRoleService(String(req.params.id), roleLevel, editScope, divisionId, req.body);
     successResponse(res, role, 'Role berhasil diperbarui');
   } catch (err) { next(err); }
 }
 
 export async function deleteRole(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
-    await deleteRoleService(String(req.params.id));
+    const { roleLevel, divisionId } = req.user!;
+    const deleteScope = req.permScope ?? 'all';
+    await deleteRoleService(String(req.params.id), roleLevel, deleteScope, divisionId);
     successResponse(res, null, 'Role berhasil dihapus');
   } catch (err) { next(err); }
 }

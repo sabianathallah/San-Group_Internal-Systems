@@ -4,7 +4,8 @@ import {
   updateMyProfile, updateMyAvatar,
   toggleUser, deleteUser, updateAvatar,
 } from '@/controllers/user.controller';
-import { authenticate, authorize, authorizeLevel } from '@/middlewares/auth.middleware';
+import { authenticate } from '@/middlewares/auth.middleware';
+import { checkPerm } from '@/middlewares/permission.middleware';
 import { validate } from '@/middlewares/validate.middleware';
 import { uploadAvatar, validateImageMagicBytes } from '@/middlewares/upload.middleware';
 import { uuidParamSchema, userFilterSchema } from '@/validations/common.validation';
@@ -22,31 +23,30 @@ router.patch('/me/avatar', uploadAvatar.single('avatar'), validateImageMagicByte
 router.get('/', validate(userFilterSchema, ['query']), listUsers);
 router.get('/:id', validate(uuidParamSchema, ['params']), getUserById);
 
-// level <= 2 = SUPER_ADMIN, ADMIN, OWNER
-router.post('/', authorizeLevel(2), validate(createUserSchema), createUser);
+router.post('/', checkPerm('user_mgmt', 'create'), validate(createUserSchema), createUser);
 
 router.patch(
   '/:id',
-  authorizeLevel(2),
+  checkPerm('user_mgmt', 'edit'),
   validate(uuidParamSchema, ['params']),
   validate(updateUserSchema),
   updateUser,
 );
 router.patch(
   '/:id/toggle',
-  authorize('SUPER_ADMIN', 'ADMIN', 'OWNER'),
+  checkPerm('user_mgmt', 'toggleStatus'),
   validate(uuidParamSchema, ['params']),
   toggleUser,
 );
 router.delete(
   '/:id',
-  authorize('SUPER_ADMIN', 'OWNER'),
+  checkPerm('user_mgmt', 'delete'),
   validate(uuidParamSchema, ['params']),
   deleteUser,
 );
 router.patch(
   '/:id/avatar',
-  authorizeLevel(2),
+  checkPerm('user_mgmt', 'edit'),
   validate(uuidParamSchema, ['params']),
   uploadAvatar.single('avatar'),
   validateImageMagicBytes,

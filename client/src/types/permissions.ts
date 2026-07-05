@@ -33,6 +33,22 @@ export interface WorkOrderPerms {
   edit: Scope;
   delete: Scope;
 }
+export interface UserMgmtPerms {
+  create: boolean;
+  edit: Scope;
+  delete: Scope;
+  toggleStatus: Scope;
+}
+export interface RoleMgmtPerms {
+  create: boolean;
+  edit: Scope;
+  delete: Scope;
+}
+export interface DivisionMgmtPerms {
+  create: boolean;
+  edit: Scope;
+  delete: Scope;
+}
 export interface PermissionConfig {
   task: TaskPerms;
   bulletin: BulletinPerms;
@@ -42,6 +58,9 @@ export interface PermissionConfig {
   audit_log: AuditLogPerms;
   hris: HrisPerms;
   work_order: WorkOrderPerms;
+  user_mgmt: UserMgmtPerms;
+  role_mgmt: RoleMgmtPerms;
+  division_mgmt: DivisionMgmtPerms;
 }
 
 export const DEFAULT_PERMS: PermissionConfig = {
@@ -53,4 +72,7 @@ export const DEFAULT_PERMS: PermissionConfig = {
   audit_log:  { view: 'none' },
   hris:       { reviewLeave: 'none', reviewOvertime: 'none', editAttendance: 'none', manageShifts: false, manageLocations: false, viewReports: 'none' },
   work_order: { view: 'own', create: true, edit: 'own', delete: 'own' },
+  user_mgmt:     { create: false, edit: 'none', delete: 'none', toggleStatus: 'none' },
+  role_mgmt:     { create: false, edit: 'none', delete: 'none' },
+  division_mgmt: { create: false, edit: 'none', delete: 'none' },
 };

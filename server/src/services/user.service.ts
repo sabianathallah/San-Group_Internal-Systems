@@ -75,7 +75,7 @@ export async function getUserByIdService(id: string) {
   return user;
 }
 
-export async function createUserService(data: {
+export async function createUserService(requesterLevel: number, data: {
   email: string;
   username: string;
   password: string;
@@ -100,6 +100,11 @@ export async function createUserService(data: {
   if (!role) throw new AppError('Role tidak ditemukan', 404);
   if (!division) throw new AppError('Divisi tidak ditemukan', 404);
 
+  // Ceiling: cannot create a user with a role at or above your own level
+  if (requesterLevel > 1 && role.level <= requesterLevel) {
+    throw new AppError('Tidak dapat membuat user dengan role setara atau lebih tinggi dari level Anda', 403);
+  }
+
   const hashed = await hashPassword(data.password);
 
   return prisma.user.create({
@@ -118,6 +123,10 @@ export async function createUserService(data: {
 
 export async function updateUserService(
   id: string,
+  requesterId: string,
+  requesterLevel: number,
+  editScope: string,
+  requesterDivisionId: string,
   data: {
     fullName?: string;
     phone?: string | null;
@@ -125,12 +134,34 @@ export async function updateUserService(
     divisionId?: string;
   },
 ) {
-  const exists = await prisma.user.findUnique({ where: { id }, select: { id: true } });
+  const exists = await prisma.user.findUnique({
+    where: { id },
+    select: { id: true, divisionId: true, role: { select: { level: true } } },
+  });
   if (!exists) throw new AppError('User tidak ditemukan', 404);
 
+  const isSuperAdmin = requesterLevel <= 1;
+
+  // Ceiling: cannot edit a user at or above your own level
+  if (!isSuperAdmin && exists.role.level <= requesterLevel) {
+    throw new AppError('Tidak dapat mengubah user dengan level setara atau lebih tinggi dari level Anda', 403);
+  }
+  // Scope: 'division' can only reach users within your own division
+  if (editScope === 'division' && exists.divisionId !== requesterDivisionId) {
+    throw new AppError('Akses ditolak ke user di luar divisi Anda', 403);
+  }
+
   if (data.roleId) {
+    // Never allow changing your own role, even for a SuperAdmin — role
+    // changes always require a different, higher authority to perform.
+    if (id === requesterId) {
+      throw new AppError('Tidak dapat mengubah role diri sendiri', 403);
+    }
     const role = await prisma.role.findUnique({ where: { id: data.roleId } });
     if (!role) throw new AppError('Role tidak ditemukan', 404);
+    if (!isSuperAdmin && role.level <= requesterLevel) {
+      throw new AppError('Tidak dapat memberikan role setara atau lebih tinggi dari level Anda', 403);
+    }
   }
   if (data.divisionId) {
     const division = await prisma.division.findUnique({ where: { id: data.divisionId } });
@@ -144,14 +175,23 @@ export async function updateUserService(
   });
 }
 
-export async function toggleUserService(id: string, requesterId: string) {
+export async function toggleUserService(
+  id: string, requesterId: string, requesterLevel: number,
+  toggleScope: string, requesterDivisionId: string,
+) {
   const user = await prisma.user.findUnique({
     where: { id },
-    select: { id: true, isActive: true, role: { select: { slug: true } } },
+    select: { id: true, isActive: true, divisionId: true, role: { select: { slug: true, level: true } } },
   });
   if (!user) throw new AppError('User tidak ditemukan', 404);
   if (id === requesterId) throw new AppError('Tidak dapat menonaktifkan akun sendiri', 400);
   if (user.role.slug === 'SUPER_ADMIN') throw new AppError('SUPER_ADMIN tidak dapat dinonaktifkan', 403);
+  if (requesterLevel > 1 && user.role.level <= requesterLevel) {
+    throw new AppError('Tidak dapat mengubah status user dengan level setara atau lebih tinggi dari level Anda', 403);
+  }
+  if (toggleScope === 'division' && user.divisionId !== requesterDivisionId) {
+    throw new AppError('Akses ditolak ke user di luar divisi Anda', 403);
+  }
 
   return prisma.user.update({
     where: { id },
@@ -160,14 +200,23 @@ export async function toggleUserService(id: string, requesterId: string) {
   });
 }
 
-export async function deleteUserService(id: string, requesterId: string) {
+export async function deleteUserService(
+  id: string, requesterId: string, requesterLevel: number,
+  deleteScope: string, requesterDivisionId: string,
+) {
   const user = await prisma.user.findUnique({
     where: { id },
-    select: { id: true, role: { select: { slug: true } } },
+    select: { id: true, divisionId: true, role: { select: { slug: true, level: true } } },
   });
   if (!user) throw new AppError('User tidak ditemukan', 404);
   if (id === requesterId) throw new AppError('Tidak dapat menghapus akun sendiri', 400);
   if (user.role.slug === 'SUPER_ADMIN') throw new AppError('SUPER_ADMIN tidak dapat dihapus', 403);
+  if (requesterLevel > 1 && user.role.level <= requesterLevel) {
+    throw new AppError('Tidak dapat menghapus user dengan level setara atau lebih tinggi dari level Anda', 403);
+  }
+  if (deleteScope === 'division' && user.divisionId !== requesterDivisionId) {
+    throw new AppError('Akses ditolak ke user di luar divisi Anda', 403);
+  }
 
   // Soft delete
   return prisma.user.update({
@@ -191,9 +240,15 @@ export async function updateMyProfileService(
   });
 }
 
-export async function updateAvatarService(id: string, filePath: string) {
+export async function updateAvatarService(
+  id: string, filePath: string,
+  editScope?: string, requesterDivisionId?: string,
+) {
   // Delete old avatar file if exists
-  const user = await prisma.user.findUnique({ where: { id }, select: { avatar: true } });
+  const user = await prisma.user.findUnique({ where: { id }, select: { avatar: true, divisionId: true } });
+  if (editScope === 'division' && user?.divisionId !== requesterDivisionId) {
+    throw new AppError('Akses ditolak ke user di luar divisi Anda', 403);
+  }
   if (user?.avatar) {
     const oldPath = path.join(process.cwd(), user.avatar);
     if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);

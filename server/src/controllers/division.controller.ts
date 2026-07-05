@@ -32,14 +32,16 @@ export async function createDivision(req: AuthRequest, res: Response, next: Next
 
 export async function updateDivision(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
-    const division = await updateDivisionService(String(req.params.id), req.body);
+    const editScope = req.permScope ?? 'all';
+    const division = await updateDivisionService(String(req.params.id), editScope, req.user!.divisionId, req.body);
     successResponse(res, division, 'Divisi berhasil diperbarui');
   } catch (err) { next(err); }
 }
 
 export async function deleteDivision(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
-    await deleteDivisionService(String(req.params.id));
+    const deleteScope = req.permScope ?? 'all';
+    await deleteDivisionService(String(req.params.id), deleteScope, req.user!.divisionId);
     successResponse(res, null, 'Divisi berhasil dihapus');
   } catch (err) { next(err); }
 }

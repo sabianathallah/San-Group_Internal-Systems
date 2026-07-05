@@ -29,10 +29,20 @@ interface HrisPerms {
 interface WorkOrderPerms {
   view: Scope; create: boolean; edit: Scope; delete: Scope;
 }
+interface UserMgmtPerms {
+  create: boolean; edit: Scope; delete: Scope; toggleStatus: Scope;
+}
+interface RoleMgmtPerms {
+  create: boolean; edit: Scope; delete: Scope;
+}
+interface DivisionMgmtPerms {
+  create: boolean; edit: Scope; delete: Scope;
+}
 interface PermissionConfig {
   task: TaskPerms; bulletin: BulletinPerms; db_link: DbLinkPerms;
   note: NotePerms; analytics: AnalyticsPerms; audit_log: AuditLogPerms;
   hris: HrisPerms; work_order: WorkOrderPerms;
+  user_mgmt: UserMgmtPerms; role_mgmt: RoleMgmtPerms; division_mgmt: DivisionMgmtPerms;
 }
 
 interface RoleWithPerms {
@@ -827,6 +837,55 @@ export default function PermissionPage() {
                 <PermRow label="Delete work orders">
                   <ScopeSelector value={perms.work_order?.delete ?? 'own'} options={EDIT_SCOPE_OPTS}
                     onChange={(v) => update('work_order', 'delete', v)} disabled={isSuperAdmin || isReadOnly} />
+                </PermRow>
+              </Section>
+
+              <Section title="User Management">
+                <PermRow label="Create users">
+                  <Toggle checked={perms.user_mgmt?.create ?? false} onChange={(v) => update('user_mgmt', 'create', v)}
+                    disabled={isSuperAdmin || isReadOnly} />
+                </PermRow>
+                <PermRow label="Edit users">
+                  <ScopeSelector value={perms.user_mgmt?.edit ?? 'none'} options={VIEW_DB_SCOPE_OPTS}
+                    onChange={(v) => update('user_mgmt', 'edit', v)} disabled={isSuperAdmin || isReadOnly} />
+                </PermRow>
+                <PermRow label="Activate / deactivate users">
+                  <ScopeSelector value={perms.user_mgmt?.toggleStatus ?? 'none'} options={VIEW_DB_SCOPE_OPTS}
+                    onChange={(v) => update('user_mgmt', 'toggleStatus', v)} disabled={isSuperAdmin || isReadOnly} />
+                </PermRow>
+                <PermRow label="Delete users">
+                  <ScopeSelector value={perms.user_mgmt?.delete ?? 'none'} options={VIEW_DB_SCOPE_OPTS}
+                    onChange={(v) => update('user_mgmt', 'delete', v)} disabled={isSuperAdmin || isReadOnly} />
+                </PermRow>
+              </Section>
+
+              <Section title="Role Management">
+                <PermRow label="Create roles">
+                  <Toggle checked={perms.role_mgmt?.create ?? false} onChange={(v) => update('role_mgmt', 'create', v)}
+                    disabled={isSuperAdmin || isReadOnly} />
+                </PermRow>
+                <PermRow label="Edit roles">
+                  <ScopeSelector value={perms.role_mgmt?.edit ?? 'none'} options={VIEW_DB_SCOPE_OPTS}
+                    onChange={(v) => update('role_mgmt', 'edit', v)} disabled={isSuperAdmin || isReadOnly} />
+                </PermRow>
+                <PermRow label="Delete roles">
+                  <ScopeSelector value={perms.role_mgmt?.delete ?? 'none'} options={VIEW_DB_SCOPE_OPTS}
+                    onChange={(v) => update('role_mgmt', 'delete', v)} disabled={isSuperAdmin || isReadOnly} />
+                </PermRow>
+              </Section>
+
+              <Section title="Division Management">
+                <PermRow label="Create divisions">
+                  <Toggle checked={perms.division_mgmt?.create ?? false} onChange={(v) => update('division_mgmt', 'create', v)}
+                    disabled={isSuperAdmin || isReadOnly} />
+                </PermRow>
+                <PermRow label="Edit divisions">
+                  <ScopeSelector value={perms.division_mgmt?.edit ?? 'none'} options={VIEW_DB_SCOPE_OPTS}
+                    onChange={(v) => update('division_mgmt', 'edit', v)} disabled={isSuperAdmin || isReadOnly} />
+                </PermRow>
+                <PermRow label="Delete divisions">
+                  <ScopeSelector value={perms.division_mgmt?.delete ?? 'none'} options={VIEW_DB_SCOPE_OPTS}
+                    onChange={(v) => update('division_mgmt', 'delete', v)} disabled={isSuperAdmin || isReadOnly} />
                 </PermRow>
               </Section>
             </div>

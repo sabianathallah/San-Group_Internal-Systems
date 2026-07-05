@@ -2,7 +2,8 @@ import { Router } from 'express';
 import {
   listDivisions, getDivisionById, createDivision, updateDivision, deleteDivision,
 } from '@/controllers/division.controller';
-import { authenticate, authorizeLevel } from '@/middlewares/auth.middleware';
+import { authenticate } from '@/middlewares/auth.middleware';
+import { checkPerm } from '@/middlewares/permission.middleware';
 import { validate } from '@/middlewares/validate.middleware';
 import { uuidParamSchema } from '@/validations/common.validation';
 
@@ -16,13 +17,10 @@ router.get('/', listDivisions);
 // GET /api/divisions/:id
 router.get('/:id', validate(uuidParamSchema, ['params']), getDivisionById);
 
-// POST /api/divisions — admin only (level <= 2)
-router.post('/', authorizeLevel(2), createDivision);
+router.post('/', checkPerm('division_mgmt', 'create'), createDivision);
 
-// PATCH /api/divisions/:id — admin only
-router.patch('/:id', authorizeLevel(2), validate(uuidParamSchema, ['params']), updateDivision);
+router.patch('/:id', checkPerm('division_mgmt', 'edit'), validate(uuidParamSchema, ['params']), updateDivision);
 
-// DELETE /api/divisions/:id — admin only
-router.delete('/:id', authorizeLevel(2), validate(uuidParamSchema, ['params']), deleteDivision);
+router.delete('/:id', checkPerm('division_mgmt', 'delete'), validate(uuidParamSchema, ['params']), deleteDivision);
 
 export default router;
