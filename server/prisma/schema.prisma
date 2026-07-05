@@ -89,11 +89,19 @@ enum LeaveStatus {
 
 enum WorkOrderStatus {
   OPEN
+  VALIDATED
   ASSIGNED
   IN_PROGRESS
   PENDING_PARTS
+  PENDING_REVIEW
   DONE
   CANCELLED
+}
+
+enum WorkOrderAttachmentType {
+  BEFORE
+  AFTER
+  OTHER
 }
 
 enum WorkOrderPriority {
@@ -222,6 +230,8 @@ model User {
   scheduledAnnouncements     ScheduledAnnouncement[]
   reportedWorkOrders         WorkOrder[]             @relation("WOReporter")
   assignedWorkOrders         WorkOrder[]             @relation("WOAssignee")
+  assignedByMeWorkOrders     WorkOrder[]             @relation("WOAssigner")
+  reviewedWorkOrders         WorkOrder[]             @relation("WOReviewer")
   workOrderHistories         WorkOrderHistory[]
   workOrderAttachments       WorkOrderAttachment[]
   attendances                Attendance[]
@@ -630,6 +640,7 @@ model AuditLog {
 
 model WorkOrder {
   id          String            @id @default(uuid())
+  code        String            @unique // auto-generated, e.g. WO/2026/001
   title       String
   description String?
   status      WorkOrderStatus   @default(OPEN)
@@ -638,6 +649,7 @@ model WorkOrder {
   location    String?
   dueDate     DateTime?
   completedAt DateTime?
+  closedAt    DateTime?
   notes       String?
   createdAt   DateTime          @default(now())
   updatedAt   DateTime          @updatedAt
@@ -647,16 +659,34 @@ model WorkOrder {
 
   assignedToId String?
   assignee     User?   @relation("WOAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+  assignedById String?
+  assignedBy   User?   @relation("WOAssigner", fields: [assignedById], references: [id], onDelete: SetNull)
+  assignedAt   DateTime?
+
+  reviewedById String?
+  reviewedBy   User?     @relation("WOReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+  reviewedAt   DateTime?
+  reviewNotes  String?
 
   history     WorkOrderHistory[]
   attachments WorkOrderAttachment[]
 
   @@index([reportedById])
   @@index([assignedToId])
+  @@index([assignedById])
+  @@index([reviewedById])
   @@index([status])
   @@index([priority])
   @@index([category])
   @@map("work_orders")
+}
+
+// Atomic per-year counter backing WorkOrder.code (WO/{year}/{seq}).
+model WorkOrderSequence {
+  year    Int @id
+  counter Int @default(0)
+
+  @@map("work_order_sequences")
 }
 
 model WorkOrderHistory {
@@ -676,18 +706,20 @@ model WorkOrderHistory {
 }
 
 model WorkOrderAttachment {
-  id           String    @id @default(uuid())
+  id           String                  @id @default(uuid())
   workOrderId  String
-  workOrder    WorkOrder @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+  workOrder    WorkOrder               @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+  type         WorkOrderAttachmentType @default(OTHER)
   fileName     String
   filePath     String
   fileSize     Int
   mimeType     String
   uploadedById String
-  uploadedBy   User      @relation(fields: [uploadedById], references: [id])
-  createdAt    DateTime  @default(now())
+  uploadedBy   User                    @relation(fields: [uploadedById], references: [id])
+  createdAt    DateTime                @default(now())
 
   @@index([workOrderId])
+  @@index([type])
   @@map("work_order_attachments")
 }
 

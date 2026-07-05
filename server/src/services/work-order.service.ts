@@ -1,4 +1,7 @@
-import { Prisma, WorkOrderStatus, WorkOrderPriority, WorkOrderCategory, NotificationType } from '@prisma/client';
+import {
+  Prisma, WorkOrderStatus, WorkOrderPriority, WorkOrderCategory,
+  WorkOrderAttachmentType, NotificationType,
+} from '@prisma/client';
 import { ParsedQs } from 'qs';
 import { prisma } from '@/config/database';
 import { parsePagination, buildMeta } from '@/helpers/pagination';
@@ -7,17 +10,23 @@ import { AppError } from '@/middlewares/errorHandler.middleware';
 const USER_SELECT = { id: true, fullName: true, username: true, avatar: true, divisionId: true } as const;
 
 // Mirrors client-side STATUS_TRANSITIONS in WorkOrderPage.tsx — kept in sync manually.
+// PENDING_REVIEW is only ever entered via submitForReviewService (photo-gated) and
+// only ever left via reviewWorkOrderService (approve -> DONE, reject -> IN_PROGRESS) —
+// both are excluded from the generic transition map on purpose.
 const STATUS_TRANSITIONS: Record<WorkOrderStatus, WorkOrderStatus[]> = {
-  OPEN:          [WorkOrderStatus.ASSIGNED, WorkOrderStatus.CANCELLED],
-  ASSIGNED:      [WorkOrderStatus.IN_PROGRESS, WorkOrderStatus.OPEN, WorkOrderStatus.CANCELLED],
-  IN_PROGRESS:   [WorkOrderStatus.PENDING_PARTS, WorkOrderStatus.DONE, WorkOrderStatus.CANCELLED],
-  PENDING_PARTS: [WorkOrderStatus.IN_PROGRESS, WorkOrderStatus.DONE, WorkOrderStatus.CANCELLED],
-  DONE:          [],
-  CANCELLED:     [],
+  OPEN:           [WorkOrderStatus.VALIDATED, WorkOrderStatus.CANCELLED],
+  VALIDATED:      [WorkOrderStatus.ASSIGNED, WorkOrderStatus.CANCELLED],
+  ASSIGNED:       [WorkOrderStatus.IN_PROGRESS, WorkOrderStatus.VALIDATED, WorkOrderStatus.CANCELLED],
+  IN_PROGRESS:    [WorkOrderStatus.PENDING_PARTS, WorkOrderStatus.CANCELLED],
+  PENDING_PARTS:  [WorkOrderStatus.IN_PROGRESS, WorkOrderStatus.CANCELLED],
+  PENDING_REVIEW: [],
+  DONE:           [],
+  CANCELLED:      [],
 };
 
 const WO_SELECT = {
   id: true,
+  code: true,
   title: true,
   description: true,
   status: true,
@@ -26,11 +35,17 @@ const WO_SELECT = {
   location: true,
   dueDate: true,
   completedAt: true,
+  closedAt: true,
   notes: true,
   createdAt: true,
   updatedAt: true,
+  assignedAt: true,
+  reviewedAt: true,
+  reviewNotes: true,
   reportedBy: { select: USER_SELECT },
   assignee:   { select: USER_SELECT },
+  assignedBy: { select: USER_SELECT },
+  reviewedBy: { select: USER_SELECT },
   _count: { select: { history: true, attachments: true } },
 } as const;
 
@@ -45,7 +60,7 @@ const WO_DETAIL_SELECT = {
   },
   attachments: {
     select: {
-      id: true, fileName: true, filePath: true, fileSize: true, mimeType: true, createdAt: true,
+      id: true, type: true, fileName: true, filePath: true, fileSize: true, mimeType: true, createdAt: true,
       uploadedBy: { select: USER_SELECT },
     },
     orderBy: { createdAt: 'asc' as const },
@@ -73,6 +88,20 @@ async function sendWONotification(
   });
 }
 
+// Atomically reserves the next sequence number for the given year and returns
+// a formatted code like WO/2026/001. Backed by a dedicated counter table so
+// concurrent creates never collide (a plain COUNT(*)+1 would race).
+async function generateWorkOrderCode(): Promise<string> {
+  const year = new Date().getFullYear();
+  const rows = await prisma.$queryRaw<{ counter: number }[]>`
+    INSERT INTO work_order_sequences (year, counter) VALUES (${year}, 1)
+    ON CONFLICT (year) DO UPDATE SET counter = work_order_sequences.counter + 1
+    RETURNING counter
+  `;
+  const counter = rows[0].counter;
+  return `WO/${year}/${String(counter).padStart(3, '0')}`;
+}
+
 export async function listWorkOrdersService(userId: string, viewScope: string, divisionId: string, query: ParsedQs) {
   const { page, limit, skip } = parsePagination(query, { createdAt: 'desc' });
 
@@ -98,9 +127,16 @@ export async function listWorkOrdersService(userId: string, viewScope: string, d
   if (query.category && typeof query.category === 'string') where.category = query.category as WorkOrderCategory;
   if (query.assignedToId && typeof query.assignedToId === 'string') where.assignedToId = query.assignedToId;
 
+  if (query.dateFrom && typeof query.dateFrom === 'string') {
+    where.createdAt = { ...(where.createdAt as object), gte: new Date(query.dateFrom) };
+  }
+  if (query.dateTo && typeof query.dateTo === 'string') {
+    where.createdAt = { ...(where.createdAt as object), lte: new Date(query.dateTo) };
+  }
+
   if (query.search && typeof query.search === 'string') {
     const s = { contains: query.search, mode: 'insensitive' as const };
-    const searchOr: Prisma.WorkOrderWhereInput[] = [{ title: s }, { description: s }, { location: s }];
+    const searchOr: Prisma.WorkOrderWhereInput[] = [{ title: s }, { description: s }, { location: s }, { code: s }];
     where.AND = [...((where.AND as Prisma.WorkOrderWhereInput[] | undefined) ?? []), { OR: searchOr }];
   }
 
@@ -138,20 +174,28 @@ export async function createWorkOrderService(userId: string, body: Record<string
     assignedToId?: string | null;
   };
 
+  const code = await generateWorkOrderCode();
+  // Creating with an assignee already implies the creator (an admin) has
+  // vetted it — skip straight past OPEN/VALIDATED to ASSIGNED.
+  const initialStatus = assignedToId ? WorkOrderStatus.ASSIGNED : WorkOrderStatus.OPEN;
+
   const wo = await prisma.workOrder.create({
     data: {
+      code,
       title,
       description: description ?? null,
       priority:    priority   ?? WorkOrderPriority.MEDIUM,
       category:    category   ?? WorkOrderCategory.OTHER,
       location:    location   ?? null,
       dueDate:     dueDate    ? new Date(dueDate) : null,
-      status:      assignedToId ? WorkOrderStatus.ASSIGNED : WorkOrderStatus.OPEN,
+      status:      initialStatus,
       reportedById: userId,
       assignedToId: assignedToId ?? null,
+      assignedById: assignedToId ? userId : null,
+      assignedAt:   assignedToId ? new Date() : null,
       history: {
         create: {
-          toStatus:   assignedToId ? WorkOrderStatus.ASSIGNED : WorkOrderStatus.OPEN,
+          toStatus:   initialStatus,
           note:       'Work order dibuat',
           changedById: userId,
         },
@@ -216,8 +260,9 @@ export async function updateWorkOrderService(
 
   let statusUpdate: WorkOrderStatus | undefined;
   if (assignedToId !== undefined) {
-    if (assignedToId && existing.status === WorkOrderStatus.OPEN) statusUpdate = WorkOrderStatus.ASSIGNED;
-    if (!assignedToId && existing.status === WorkOrderStatus.ASSIGNED) statusUpdate = WorkOrderStatus.OPEN;
+    const assignable = existing.status === WorkOrderStatus.OPEN || existing.status === WorkOrderStatus.VALIDATED;
+    if (assignedToId && assignable) statusUpdate = WorkOrderStatus.ASSIGNED;
+    if (!assignedToId && existing.status === WorkOrderStatus.ASSIGNED) statusUpdate = WorkOrderStatus.VALIDATED;
   }
 
   const wo = await prisma.workOrder.update({
@@ -230,7 +275,11 @@ export async function updateWorkOrderService(
       ...(location    !== undefined && { location }),
       ...(dueDate     !== undefined && { dueDate: dueDate ? new Date(dueDate) : null }),
       ...(notes       !== undefined && { notes }),
-      ...(assignedToId !== undefined && { assignedToId: assignedToId ?? null }),
+      ...(assignedToId !== undefined && {
+        assignedToId: assignedToId ?? null,
+        assignedById: assignedToId ? userId : null,
+        assignedAt:   assignedToId ? new Date() : null,
+      }),
       ...(statusUpdate && { status: statusUpdate }),
     },
     select: WO_DETAIL_SELECT,
@@ -263,6 +312,7 @@ export async function changeWorkOrderStatusService(
       id: true, reportedById: true, assignedToId: true, status: true, title: true,
       reportedBy: { select: { divisionId: true } },
       assignee:   { select: { divisionId: true } },
+      attachments: { select: { type: true } },
     },
   });
   if (!existing) throw new AppError('Work order tidak ditemukan', 404);
@@ -280,18 +330,29 @@ export async function changeWorkOrderStatusService(
 
   const { status, note } = body;
   if (existing.status === status) throw new AppError('Status sudah sama', 400);
-  if (!STATUS_TRANSITIONS[existing.status].includes(status)) {
+
+  // PENDING_REVIEW is a special case: reachable from IN_PROGRESS/PENDING_PARTS,
+  // but only once at least one "after" photo has been uploaded as proof of work.
+  const isSubmitForReview = status === WorkOrderStatus.PENDING_REVIEW;
+  const canSubmitForReview = isSubmitForReview
+    && (existing.status === WorkOrderStatus.IN_PROGRESS || existing.status === WorkOrderStatus.PENDING_PARTS);
+
+  if (isSubmitForReview) {
+    if (!canSubmitForReview) {
+      throw new AppError(`Tidak bisa ubah status dari ${existing.status} ke ${status}`, 400);
+    }
+    const hasAfterPhoto = existing.attachments.some((a) => a.type === WorkOrderAttachmentType.AFTER);
+    if (!hasAfterPhoto) {
+      throw new AppError('Minimal 1 foto sesudah pengerjaan (after) wajib diunggah sebelum submit review', 400);
+    }
+  } else if (!STATUS_TRANSITIONS[existing.status].includes(status)) {
     throw new AppError(`Tidak bisa ubah status dari ${existing.status} ke ${status}`, 400);
   }
-
-  const completedAt = status === WorkOrderStatus.DONE ? new Date() : null;
 
   const wo = await prisma.workOrder.update({
     where: { id },
     data: {
       status,
-      ...(completedAt !== null && { completedAt }),
-      ...(status !== WorkOrderStatus.DONE && { completedAt: null }),
       history: {
         create: {
           fromStatus:  existing.status,
@@ -306,7 +367,7 @@ export async function changeWorkOrderStatusService(
 
   if (existing.reportedById !== userId) {
     await sendWONotification(
-      status === WorkOrderStatus.DONE ? NotificationType.WO_COMPLETED : NotificationType.WO_STATUS_CHANGED,
+      NotificationType.WO_STATUS_CHANGED,
       userId,
       existing.reportedById,
       `WO "${existing.title}" — status diperbarui`,
@@ -314,8 +375,115 @@ export async function changeWorkOrderStatusService(
       id,
     );
   }
+  return wo;
+}
+
+export async function reviewWorkOrderService(
+  id: string,
+  reviewerId: string,
+  reviewScope: string,
+  divisionId: string,
+  body: { decision: 'APPROVED' | 'REJECTED'; reviewNotes?: string | null },
+) {
+  const existing = await prisma.workOrder.findUnique({
+    where: { id },
+    select: {
+      id: true, reportedById: true, assignedToId: true, status: true, title: true,
+      reportedBy: { select: { divisionId: true } },
+      assignee:   { select: { divisionId: true } },
+    },
+  });
+  if (!existing) throw new AppError('Work order tidak ditemukan', 404);
+  if (existing.status !== WorkOrderStatus.PENDING_REVIEW) {
+    throw new AppError('Work order ini tidak sedang menunggu review', 400);
+  }
+  if (
+    reviewScope === 'division' &&
+    existing.reportedBy.divisionId !== divisionId &&
+    existing.assignee?.divisionId !== divisionId
+  ) {
+    throw new AppError('Akses ditolak', 403);
+  }
+
+  const { decision, reviewNotes } = body;
+  if (decision === 'REJECTED' && !reviewNotes?.trim()) {
+    throw new AppError('Alasan penolakan wajib diisi', 400);
+  }
+
+  const nextStatus = decision === 'APPROVED' ? WorkOrderStatus.DONE : WorkOrderStatus.IN_PROGRESS;
+  const now = new Date();
+
+  const wo = await prisma.workOrder.update({
+    where: { id },
+    data: {
+      status: nextStatus,
+      reviewedById: reviewerId,
+      reviewedAt:   now,
+      reviewNotes:  reviewNotes ?? null,
+      ...(decision === 'APPROVED' && { completedAt: now, closedAt: now }),
+      history: {
+        create: {
+          fromStatus:  WorkOrderStatus.PENDING_REVIEW,
+          toStatus:    nextStatus,
+          note:        reviewNotes ?? (decision === 'APPROVED' ? 'Disetujui' : null),
+          changedById: reviewerId,
+        },
+      },
+    },
+    select: WO_DETAIL_SELECT,
+  });
+
+  if (existing.assignedToId) {
+    await sendWONotification(
+      decision === 'APPROVED' ? NotificationType.WO_COMPLETED : NotificationType.WO_STATUS_CHANGED,
+      reviewerId,
+      existing.assignedToId,
+      decision === 'APPROVED' ? `WO "${existing.title}" disetujui` : `WO "${existing.title}" ditolak — perlu revisi`,
+      decision === 'APPROVED' ? 'Pekerjaan kamu sudah diverifikasi dan ditutup.' : `Alasan: ${reviewNotes}`,
+      id,
+    );
+  }
 
   return wo;
+}
+
+export async function addWorkOrderAttachmentService(
+  id: string,
+  userId: string,
+  editScope: string,
+  divisionId: string,
+  data: { type: WorkOrderAttachmentType; fileName: string; filePath: string; fileSize: number; mimeType: string },
+) {
+  const existing = await prisma.workOrder.findUnique({
+    where: { id },
+    select: {
+      id: true, reportedById: true, assignedToId: true, status: true,
+      reportedBy: { select: { divisionId: true } },
+      assignee:   { select: { divisionId: true } },
+    },
+  });
+  if (!existing) throw new AppError('Work order tidak ditemukan', 404);
+  if (editScope === 'own' && existing.assignedToId !== userId && existing.reportedById !== userId) {
+    throw new AppError('Akses ditolak', 403);
+  }
+  if (
+    editScope === 'division' &&
+    existing.reportedBy.divisionId !== divisionId &&
+    existing.assignee?.divisionId !== divisionId
+  ) {
+    throw new AppError('Akses ditolak', 403);
+  }
+  if (existing.status === WorkOrderStatus.DONE || existing.status === WorkOrderStatus.CANCELLED) {
+    throw new AppError('WO yang sudah selesai atau dibatalkan tidak bisa ditambah lampiran', 400);
+  }
+
+  return prisma.workOrderAttachment.create({
+    data: { workOrderId: id, uploadedById: userId, ...data },
+    select: {
+      id: true, type: true, fileName: true, filePath: true, fileSize: true, mimeType: true, createdAt: true,
+      uploadedBy: { select: USER_SELECT },
+    },
+  });
 }
 
 export async function deleteWorkOrderService(id: string, userId: string, deleteScope: string, divisionId: string) {
@@ -360,4 +528,68 @@ export async function getWorkOrderStatsService(userId: string, viewScope: string
   ]);
 
   return { byStatus, byPriority, overdue };
+}
+
+// ── Reporting ────────────────────────────────────────────────
+export async function getWorkOrderReportsService(viewScope: string, divisionId: string, query: ParsedQs) {
+  const now   = new Date();
+  const month = query.month ? Number(query.month) : now.getMonth() + 1;
+  const year  = query.year  ? Number(query.year)  : now.getFullYear();
+  const startOfMonth = new Date(`${year}-${String(month).padStart(2, '0')}-01T00:00:00.000Z`);
+  const endOfMonth   = new Date(year, month, 0);
+  endOfMonth.setUTCHours(23, 59, 59, 999);
+
+  let scopeWhere: Prisma.WorkOrderWhereInput = {};
+  if (viewScope === 'division') scopeWhere = { OR: [{ reportedBy: { divisionId } }, { assignee: { divisionId } }] };
+
+  const where: Prisma.WorkOrderWhereInput = {
+    ...scopeWhere,
+    createdAt: { gte: startOfMonth, lte: endOfMonth },
+  };
+
+  const all = await prisma.workOrder.findMany({
+    where,
+    select: {
+      id: true, status: true, category: true, createdAt: true, completedAt: true,
+      assignee: { select: { id: true, fullName: true } },
+    },
+  });
+
+  const total = all.length;
+  const completed = all.filter((w) => w.status === WorkOrderStatus.DONE);
+  const completionRate = total === 0 ? 0 : Math.round((completed.length / total) * 100);
+
+  const resByCategory = new Map<string, { count: number; totalMinutes: number }>();
+  for (const w of completed) {
+    if (!w.completedAt) continue;
+    const minutes = Math.round((w.completedAt.getTime() - w.createdAt.getTime()) / 60000);
+    const entry = resByCategory.get(w.category) ?? { count: 0, totalMinutes: 0 };
+    entry.count += 1;
+    entry.totalMinutes += minutes;
+    resByCategory.set(w.category, entry);
+  }
+  const avgResolutionByCategory = Array.from(resByCategory.entries()).map(([category, { count, totalMinutes }]) => ({
+    category,
+    avgResolutionMinutes: Math.round(totalMinutes / count),
+    count,
+  }));
+
+  const byTechnician = new Map<string, { technicianId: string; fullName: string; assigned: number; completed: number }>();
+  for (const w of all) {
+    if (!w.assignee) continue;
+    const entry = byTechnician.get(w.assignee.id) ?? {
+      technicianId: w.assignee.id, fullName: w.assignee.fullName, assigned: 0, completed: 0,
+    };
+    entry.assigned += 1;
+    if (w.status === WorkOrderStatus.DONE) entry.completed += 1;
+    byTechnician.set(w.assignee.id, entry);
+  }
+
+  return {
+    total,
+    completed: completed.length,
+    completionRate,
+    avgResolutionByCategory,
+    byTechnician: Array.from(byTechnician.values()),
+  };
 }

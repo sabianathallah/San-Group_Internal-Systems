@@ -88,8 +88,10 @@ export default function Sidebar() {
     ...(canAnalytics ? [{ label: 'Analytics', to: ROUTES.ANALYTICS, icon: BarChart3 }] : []),
   ];
 
+  const canWorkOrderReports = perms.work_order?.edit !== 'own';
   const workOrderNav: NavItem[] = [
     { label: 'Work Orders', to: ROUTES.WORK_ORDERS, icon: Wrench },
+    ...(canWorkOrderReports ? [{ label: 'Reports', to: ROUTES.WORK_ORDERS_REPORTS, icon: BarChart3 }] : []),
   ];
 
   const hrisNav: NavItem[] = [

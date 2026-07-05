@@ -17,6 +17,7 @@ import PermissionPage from '@/pages/admin/PermissionPage';
 import AuditLogPage from '@/pages/admin/AuditLogPage';
 import NotificationsPage from '@/pages/NotificationsPage';
 import WorkOrderPage from '@/pages/WorkOrderPage';
+import WorkOrderReportsPage from '@/pages/WorkOrderReportsPage';
 import HRISOverviewPage from '@/pages/hris/HRISOverviewPage';
 import AttendancePage from '@/pages/hris/AttendancePage';
 import LeavePage from '@/pages/hris/LeavePage';
@@ -44,6 +45,14 @@ function HrisReportsRoute() {
   return <Outlet />;
 }
 
+function WorkOrderReportsRoute() {
+  const perms = usePermStore((s) => s.perms);
+  // No dedicated "view reports" permission for Work Order yet — reuse edit
+  // scope as a proxy for admin/supervisor-level access, same idea as HRIS.
+  if (perms.work_order.edit === 'own') return <Navigate to={ROUTES.WORK_ORDERS} replace />;
+  return <Outlet />;
+}
+
 export default function App() {
   return (
     <BrowserRouter>
@@ -64,6 +73,9 @@ export default function App() {
           <Route path={ROUTES.ANALYTICS}      element={<AnalyticsPage />}      />
           <Route path={ROUTES.NOTIFICATIONS} element={<NotificationsPage />} />
           <Route path={ROUTES.WORK_ORDERS}   element={<WorkOrderPage />}     />
+          <Route element={<WorkOrderReportsRoute />}>
+            <Route path={ROUTES.WORK_ORDERS_REPORTS} element={<WorkOrderReportsPage />} />
+          </Route>
           <Route path={ROUTES.HRIS}                 element={<HRISOverviewPage />}    />
           <Route path={ROUTES.HRIS_ATTENDANCE}      element={<AttendancePage />}      />
           <Route path={ROUTES.HRIS_LEAVE}           element={<LeavePage />}           />

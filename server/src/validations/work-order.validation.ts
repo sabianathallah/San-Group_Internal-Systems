@@ -33,6 +33,20 @@ export const changeStatusSchema = z.object({
   }),
 });
 
+export const reviewWorkOrderSchema = z.object({
+  body: z.object({
+    decision:    z.enum(['APPROVED', 'REJECTED']),
+    reviewNotes: z.string().max(1000).optional().nullable(),
+  }),
+});
+
+export const addAttachmentSchema = z.object({
+  body: z.object({
+    photoBase64: z.string().min(1, 'Foto wajib diisi'),
+    type:        z.enum(['BEFORE', 'AFTER', 'OTHER']).default('OTHER'),
+  }),
+});
+
 export const workOrderFilterSchema = z.object({
   query: z.object({
     page:        z.coerce.number().int().positive().optional(),
@@ -43,5 +57,14 @@ export const workOrderFilterSchema = z.object({
     category:    z.nativeEnum(WorkOrderCategory).optional(),
     assignedToId: z.string().uuid().optional(),
     view:        z.enum(['all', 'mine', 'reported', 'unassigned']).optional(),
+    dateFrom:    z.string().datetime({ offset: true }).optional(),
+    dateTo:      z.string().datetime({ offset: true }).optional(),
+  }),
+});
+
+export const workOrderReportsFilterSchema = z.object({
+  query: z.object({
+    month: z.coerce.number().int().min(1).max(12).optional(),
+    year:  z.coerce.number().int().min(2000).optional(),
   }),
 });

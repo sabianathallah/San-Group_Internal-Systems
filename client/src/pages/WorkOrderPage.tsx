@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   DndContext, DragOverlay, PointerSensor, useSensor, useSensors,
   useDraggable, useDroppable, type DragEndEvent, type DragStartEvent,
@@ -6,8 +6,9 @@ import {
 import {
   Wrench, Plus, ChevronDown, X, Check, Clock, AlertTriangle,
   MapPin, User, Calendar, List, Filter, RefreshCw, Loader2,
-  CheckCircle2, Circle, ArrowRight, Paperclip, History, ChevronUp,
-  Zap, AlertCircle, Ban,
+  CheckCircle2, Circle, ArrowRight, Camera, History, ChevronUp,
+  Zap, AlertCircle, Ban, LayoutGrid, Table2, ImageOff, ThumbsUp, ThumbsDown,
+  ShieldCheck, ClipboardCheck,
 } from 'lucide-react';
 import api from '@/lib/api';
 import { cn } from '@/lib/cn';
@@ -29,10 +30,14 @@ function hasScope(scope: Scope, isOwner: boolean, sameDivision: boolean): boolea
 }
 
 // ── Types ──────────────────────────────────────────────────
-type WOStatus   = 'OPEN' | 'ASSIGNED' | 'IN_PROGRESS' | 'PENDING_PARTS' | 'DONE' | 'CANCELLED';
+type WOStatus =
+  | 'OPEN' | 'VALIDATED' | 'ASSIGNED' | 'IN_PROGRESS' | 'PENDING_PARTS'
+  | 'PENDING_REVIEW' | 'DONE' | 'CANCELLED';
 type WOPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
 type WOCategory = 'ELECTRICAL' | 'PLUMBING' | 'HVAC' | 'CIVIL' | 'CLEANING' | 'SECURITY' | 'OTHER';
+type WOAttachmentType = 'BEFORE' | 'AFTER' | 'OTHER';
 type ViewFilter = 'all' | 'mine' | 'reported' | 'unassigned';
+type BoardMode = 'kanban' | 'table';
 
 interface WOUser {
   id: string; fullName: string; username: string; avatar: string | null; divisionId: string;
@@ -44,30 +49,35 @@ interface WOHistory {
 }
 
 interface WOAttachment {
-  id: string; fileName: string; filePath: string;
+  id: string; type: WOAttachmentType; fileName: string; filePath: string;
   fileSize: number; mimeType: string; createdAt: string; uploadedBy: WOUser;
 }
 
 interface WorkOrder {
-  id: string; title: string; description: string | null;
+  id: string; code: string; title: string; description: string | null;
   status: WOStatus; priority: WOPriority; category: WOCategory;
-  location: string | null; dueDate: string | null; completedAt: string | null;
+  location: string | null; dueDate: string | null; completedAt: string | null; closedAt: string | null;
   notes: string | null; createdAt: string; updatedAt: string;
-  reportedBy: WOUser; assignee: WOUser | null;
+  assignedAt: string | null; reviewedAt: string | null; reviewNotes: string | null;
+  reportedBy: WOUser; assignee: WOUser | null; assignedBy: WOUser | null; reviewedBy: WOUser | null;
   _count: { history: number; attachments: number };
   history?: WOHistory[]; attachments?: WOAttachment[];
 }
 
 // ── Config ─────────────────────────────────────────────────
-const BOARD_COLUMNS: WOStatus[] = ['OPEN', 'ASSIGNED', 'IN_PROGRESS', 'PENDING_PARTS', 'DONE', 'CANCELLED'];
+const BOARD_COLUMNS: WOStatus[] = [
+  'OPEN', 'VALIDATED', 'ASSIGNED', 'IN_PROGRESS', 'PENDING_PARTS', 'PENDING_REVIEW', 'DONE', 'CANCELLED',
+];
 
 const STATUS_CONFIG: Record<WOStatus, { label: string; color: string; bg: string; icon: React.ElementType }> = {
-  OPEN:          { label: 'Open',           color: 'text-slate-600',  bg: 'bg-slate-100',   icon: Circle       },
-  ASSIGNED:      { label: 'Assigned',       color: 'text-blue-600',   bg: 'bg-blue-50',     icon: User         },
-  IN_PROGRESS:   { label: 'In Progress',    color: 'text-amber-600',  bg: 'bg-amber-50',    icon: Clock        },
-  PENDING_PARTS: { label: 'Pending Parts',  color: 'text-orange-600', bg: 'bg-orange-50',   icon: AlertTriangle },
-  DONE:          { label: 'Done',           color: 'text-green-600',  bg: 'bg-green-50',    icon: CheckCircle2 },
-  CANCELLED:     { label: 'Cancelled',      color: 'text-red-500',    bg: 'bg-red-50',      icon: Ban          },
+  OPEN:           { label: 'Baru',            color: 'text-slate-600',  bg: 'bg-slate-100',   icon: Circle        },
+  VALIDATED:      { label: 'Divalidasi',      color: 'text-cyan-600',   bg: 'bg-cyan-50',     icon: ShieldCheck   },
+  ASSIGNED:       { label: 'Ditugaskan',      color: 'text-blue-600',   bg: 'bg-blue-50',     icon: User          },
+  IN_PROGRESS:    { label: 'Dikerjakan',      color: 'text-amber-600',  bg: 'bg-amber-50',    icon: Clock         },
+  PENDING_PARTS:  { label: 'Tunggu Sparepart',color: 'text-orange-600', bg: 'bg-orange-50',   icon: AlertTriangle },
+  PENDING_REVIEW: { label: 'Menunggu Review', color: 'text-purple-600', bg: 'bg-purple-50',   icon: ClipboardCheck },
+  DONE:           { label: 'Selesai',         color: 'text-green-600',  bg: 'bg-green-50',    icon: CheckCircle2  },
+  CANCELLED:      { label: 'Dibatalkan',      color: 'text-red-500',    bg: 'bg-red-50',      icon: Ban           },
 };
 
 const PRIORITY_CONFIG: Record<WOPriority, { label: string; dot: string; badge: string }> = {
@@ -87,13 +97,19 @@ const CATEGORY_CONFIG: Record<WOCategory, { label: string; icon: string }> = {
   OTHER:       { label: 'Other',       icon: '📋' },
 };
 
+// Mirrors server-side STATUS_TRANSITIONS in work-order.service.ts — kept in sync
+// manually. PENDING_REVIEW is reachable from IN_PROGRESS/PENDING_PARTS but gated
+// server-side on having at least one AFTER photo; leaving PENDING_REVIEW only
+// happens via the dedicated review action (approve/reject), never a plain status change.
 const STATUS_TRANSITIONS: Record<WOStatus, WOStatus[]> = {
-  OPEN:          ['ASSIGNED', 'CANCELLED'],
-  ASSIGNED:      ['IN_PROGRESS', 'OPEN', 'CANCELLED'],
-  IN_PROGRESS:   ['PENDING_PARTS', 'DONE', 'CANCELLED'],
-  PENDING_PARTS: ['IN_PROGRESS', 'DONE', 'CANCELLED'],
-  DONE:          [],
-  CANCELLED:     [],
+  OPEN:           ['VALIDATED', 'CANCELLED'],
+  VALIDATED:      ['ASSIGNED', 'CANCELLED'],
+  ASSIGNED:       ['IN_PROGRESS', 'VALIDATED', 'CANCELLED'],
+  IN_PROGRESS:    ['PENDING_PARTS', 'PENDING_REVIEW', 'CANCELLED'],
+  PENDING_PARTS:  ['IN_PROGRESS', 'PENDING_REVIEW', 'CANCELLED'],
+  PENDING_REVIEW: [],
+  DONE:           [],
+  CANCELLED:      [],
 };
 
 // ── Helpers ────────────────────────────────────────────────
@@ -131,6 +147,15 @@ function formatRelative(d: string) {
 function isOverdue(wo: WorkOrder) {
   return wo.dueDate && wo.status !== 'DONE' && wo.status !== 'CANCELLED'
     && new Date(wo.dueDate) < new Date();
+}
+
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
 }
 
 // ── Sub-components ─────────────────────────────────────────
@@ -251,7 +276,7 @@ function WorkOrderModal({
       >
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
           <h2 className="font-semibold text-gray-900">
-            {editItem ? 'Edit Work Order' : 'Buat Work Order'}
+            {editItem ? `Edit ${editItem.code}` : 'Buat Work Order'}
           </h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
         </div>
@@ -311,7 +336,7 @@ function WorkOrderModal({
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Deadline</label>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Deadline (SLA)</label>
               <input
                 type="datetime-local" value={form.dueDate}
                 onChange={(e) => set('dueDate', e.target.value)}
@@ -321,12 +346,12 @@ function WorkOrderModal({
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">Assign kepada</label>
+            <label className="block text-xs font-medium text-gray-700 mb-1">Assign ke Teknisi</label>
             <select
               value={form.assignedToId} onChange={(e) => set('assignedToId', e.target.value)}
               className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-navy/30"
             >
-              <option value="">— Belum diassign —</option>
+              <option value="">— Belum diassign (validasi dulu) —</option>
               {users.map((u) => (
                 <option key={u.id} value={u.id}>{u.fullName}</option>
               ))}
@@ -418,6 +443,9 @@ function StatusModal({
                   <Icon size={16} className={cfg.color} />
                   <div>
                     <p className="text-sm font-medium text-gray-800">{cfg.label}</p>
+                    {s === 'PENDING_REVIEW' && (
+                      <p className="text-[10px] text-gray-400">Butuh minimal 1 foto sesudah pengerjaan</p>
+                    )}
                   </div>
                   {selected === s && <Check size={14} className="ml-auto text-navy" />}
                 </button>
@@ -453,6 +481,117 @@ function StatusModal({
   );
 }
 
+// ── Review Modal (approve / reject a PENDING_REVIEW work order) ──
+function ReviewModal({
+  open, onClose, wo, onReviewed,
+}: {
+  open: boolean; onClose: () => void; wo: WorkOrder; onReviewed: (updated: WorkOrder) => void;
+}) {
+  const [decision, setDecision] = useState<'APPROVED' | 'REJECTED' | null>(null);
+  const [reviewNotes, setReviewNotes] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => { if (open) { setDecision(null); setReviewNotes(''); } }, [open]);
+  if (!open) return null;
+
+  const afterPhotos = (wo.attachments ?? []).filter((a) => a.type === 'AFTER');
+
+  async function handleSave() {
+    if (!decision) return;
+    if (decision === 'REJECTED' && !reviewNotes.trim()) {
+      toast.error('Alasan penolakan wajib diisi');
+      return;
+    }
+    setSaving(true);
+    try {
+      const res = await api.patch(`/work-orders/${wo.id}/review`, { decision, reviewNotes: reviewNotes.trim() || null });
+      onReviewed(res.data.data);
+      toast.success(decision === 'APPROVED' ? 'Work order disetujui dan ditutup' : 'Work order dikembalikan untuk revisi');
+      onClose();
+    } catch (err) { toast.error(extractErr(err)); } finally { setSaving(false); }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4" onClick={onClose}>
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+          <h2 className="font-semibold text-gray-900">Review Hasil Pekerjaan</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
+        </div>
+        <div className="p-5 space-y-4">
+          <p className="text-sm text-gray-600">{wo.code} — {wo.title}</p>
+
+          <div>
+            <p className="text-xs font-medium text-gray-700 mb-1.5">Foto Sesudah Pengerjaan</p>
+            {afterPhotos.length === 0 ? (
+              <p className="text-xs text-gray-400 flex items-center gap-1.5"><ImageOff size={13} /> Tidak ada foto</p>
+            ) : (
+              <div className="grid grid-cols-3 gap-2">
+                {afterPhotos.map((a) => (
+                  <a key={a.id} href={a.filePath} target="_blank" rel="noopener noreferrer">
+                    <img src={a.filePath} alt="Sesudah" className="w-full h-20 object-cover rounded-lg border border-gray-200" />
+                  </a>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              onClick={() => setDecision('APPROVED')}
+              className={cn(
+                'flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-lg border text-sm font-medium transition-colors',
+                decision === 'APPROVED' ? 'border-green-500 bg-green-50 text-green-700' : 'border-gray-200 text-gray-600 hover:bg-gray-50',
+              )}
+            >
+              <ThumbsUp size={14} /> Setujui
+            </button>
+            <button
+              onClick={() => setDecision('REJECTED')}
+              className={cn(
+                'flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-lg border text-sm font-medium transition-colors',
+                decision === 'REJECTED' ? 'border-red-500 bg-red-50 text-red-700' : 'border-gray-200 text-gray-600 hover:bg-gray-50',
+              )}
+            >
+              <ThumbsDown size={14} /> Tolak
+            </button>
+          </div>
+
+          {decision && (
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">
+                {decision === 'REJECTED' ? 'Alasan penolakan *' : 'Catatan (opsional)'}
+              </label>
+              <textarea
+                value={reviewNotes} onChange={(e) => setReviewNotes(e.target.value)}
+                rows={3}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-navy/30 resize-none"
+                placeholder={decision === 'REJECTED' ? 'Jelaskan apa yang perlu diperbaiki...' : 'Catatan tambahan...'}
+              />
+            </div>
+          )}
+
+          <div className="flex gap-2 pt-1">
+            <button onClick={onClose} className="flex-1 px-4 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50">
+              Batal
+            </button>
+            <button
+              onClick={handleSave} disabled={!decision || saving}
+              className={cn(
+                'flex-1 px-4 py-2 text-sm rounded-lg disabled:opacity-60 flex items-center justify-center gap-2 text-white',
+                decision === 'REJECTED' ? 'bg-red-500 hover:bg-red-600' : 'bg-navy hover:bg-navy/90',
+              )}
+            >
+              {saving ? <Loader2 size={14} className="animate-spin" /> : null}
+              {decision === 'REJECTED' ? 'Kirim Penolakan' : 'Setujui & Tutup WO'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Assignee Picker (used when dropping a card into the ASSIGNED column) ───
 function AssigneePickerModal({
   wo, users, onClose, onAssigned,
@@ -475,7 +614,7 @@ function AssigneePickerModal({
           <h2 className="font-semibold text-gray-900">Assign Work Order</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
         </div>
-        <p className="px-5 pt-3 text-xs text-gray-500">Pilih penerima tugas untuk &quot;{wo.title}&quot;</p>
+        <p className="px-5 pt-3 text-xs text-gray-500">Pilih teknisi untuk &quot;{wo.title}&quot;</p>
         <div className="px-5 pt-3 flex-shrink-0">
           <input
             autoFocus
@@ -521,7 +660,6 @@ function ConfirmFinalizeModal({
           <h2 className="font-semibold text-gray-900 mb-1">Tandai sebagai {cfg.label}?</h2>
           <p className="text-sm text-gray-500">
             &quot;{pending.wo.title}&quot; akan ditandai <span className={cn('font-medium', cfg.color)}>{cfg.label}</span>.
-            Status ini final dan tidak bisa diubah lagi setelah disimpan.
           </p>
         </div>
         <div className="flex gap-2 px-5 pb-5">
@@ -542,9 +680,9 @@ function ConfirmFinalizeModal({
 
 // ── Kanban Card ────────────────────────────────────────────
 function WOCard({
-  wo, selected, draggable, onSelect, overlay,
+  wo, selected, draggable, onSelect, overlay, large,
 }: {
-  wo: WorkOrder; selected: boolean; draggable: boolean; onSelect: () => void; overlay?: boolean;
+  wo: WorkOrder; selected: boolean; draggable: boolean; onSelect: () => void; overlay?: boolean; large?: boolean;
 }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: overlay ? `overlay-${wo.id}` : wo.id, disabled: !draggable || overlay,
@@ -559,7 +697,8 @@ function WOCard({
       onClick={onSelect}
       style={transform && !overlay ? { transform: `translate(${transform.x}px, ${transform.y}px)` } : undefined}
       className={cn(
-        'bg-white rounded-lg border p-3 shadow-sm cursor-pointer hover:shadow-md transition-shadow',
+        'bg-white rounded-lg border shadow-sm cursor-pointer hover:shadow-md transition-shadow',
+        large ? 'p-4' : 'p-3',
         selected ? 'border-navy ring-1 ring-navy/30' : 'border-gray-200',
         isDragging && !overlay && 'opacity-40',
         overlay && 'shadow-xl rotate-2 cursor-grabbing',
@@ -567,7 +706,10 @@ function WOCard({
       )}
     >
       <div className="flex items-start justify-between gap-2 mb-1.5">
-        <p className="text-sm font-medium text-gray-800 leading-snug flex-1">{wo.title}</p>
+        <div className="flex-1 min-w-0">
+          <p className="text-[10px] font-mono text-gray-400">{wo.code}</p>
+          <p className={cn('font-medium text-gray-800 leading-snug', large ? 'text-base' : 'text-sm')}>{wo.title}</p>
+        </div>
         <PriorityBadge priority={wo.priority} />
       </div>
       <div className="flex items-center gap-1.5 flex-wrap mb-1.5">
@@ -627,12 +769,157 @@ function WOColumn({
   );
 }
 
+// ── Table / List view ───────────────────────────────────────
+function WOTable({
+  workOrders, selectedId, onSelect,
+}: {
+  workOrders: WorkOrder[]; selectedId: string | null; onSelect: (id: string) => void;
+}) {
+  return (
+    <div className="flex-1 overflow-auto">
+      <table className="w-full text-sm">
+        <thead className="sticky top-0 bg-gray-50 z-10">
+          <tr className="text-left text-[11px] font-medium text-gray-500 uppercase tracking-wide">
+            <th className="px-4 py-2.5">Kode</th>
+            <th className="px-4 py-2.5">Judul</th>
+            <th className="px-4 py-2.5">Kategori</th>
+            <th className="px-4 py-2.5">Prioritas</th>
+            <th className="px-4 py-2.5">Status</th>
+            <th className="px-4 py-2.5">Teknisi</th>
+            <th className="px-4 py-2.5">Due</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-gray-100">
+          {workOrders.map((wo) => {
+            const overdue = isOverdue(wo);
+            return (
+              <tr
+                key={wo.id}
+                onClick={() => onSelect(wo.id)}
+                className={cn('cursor-pointer hover:bg-gray-50 transition-colors', selectedId === wo.id && 'bg-navy/5')}
+              >
+                <td className="px-4 py-2.5 font-mono text-xs text-gray-500 whitespace-nowrap">{wo.code}</td>
+                <td className="px-4 py-2.5 text-gray-800 font-medium max-w-xs truncate">{wo.title}</td>
+                <td className="px-4 py-2.5"><CategoryBadge category={wo.category} /></td>
+                <td className="px-4 py-2.5"><PriorityBadge priority={wo.priority} /></td>
+                <td className="px-4 py-2.5"><StatusBadge status={wo.status} /></td>
+                <td className="px-4 py-2.5">
+                  {wo.assignee ? (
+                    <div className="flex items-center gap-1.5">
+                      <Avatar user={wo.assignee} size={5} />
+                      <span className="text-xs text-gray-600 truncate">{wo.assignee.fullName}</span>
+                    </div>
+                  ) : <span className="text-xs text-gray-400">—</span>}
+                </td>
+                <td className={cn('px-4 py-2.5 text-xs whitespace-nowrap', overdue ? 'text-red-500 font-medium' : 'text-gray-500')}>
+                  {wo.dueDate ? formatDate(wo.dueDate) : '—'}
+                </td>
+              </tr>
+            );
+          })}
+          {workOrders.length === 0 && (
+            <tr><td colSpan={7} className="text-center text-gray-400 text-sm py-12">Tidak ada work order</td></tr>
+          )}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+// ── Photo gallery + upload (before / after) ─────────────────
+function PhotoSection({
+  wo, canUpload, onUploaded,
+}: {
+  wo: WorkOrder; canUpload: boolean; onUploaded: (updated: WorkOrder) => void;
+}) {
+  const [uploading, setUploading] = useState<WOAttachmentType | null>(null);
+  const beforeInputRef = useRef<HTMLInputElement>(null);
+  const afterInputRef  = useRef<HTMLInputElement>(null);
+
+  const before = (wo.attachments ?? []).filter((a) => a.type === 'BEFORE');
+  const after  = (wo.attachments ?? []).filter((a) => a.type === 'AFTER');
+
+  async function handleFile(type: WOAttachmentType, file?: File) {
+    if (!file) return;
+    setUploading(type);
+    try {
+      const photoBase64 = await fileToBase64(file);
+      const res = await api.post(`/work-orders/${wo.id}/attachments`, { photoBase64, type });
+      onUploaded({
+        ...wo,
+        attachments: [...(wo.attachments ?? []), res.data.data],
+        _count: { ...wo._count, attachments: wo._count.attachments + 1 },
+      });
+      toast.success('Foto berhasil diunggah');
+    } catch (err) { toast.error(extractErr(err)); } finally { setUploading(null); }
+  }
+
+  function PhotoGrid({ photos, emptyLabel }: { photos: WOAttachment[]; emptyLabel: string }) {
+    if (photos.length === 0) {
+      return <p className="text-xs text-gray-400 flex items-center gap-1.5 py-2"><ImageOff size={13} /> {emptyLabel}</p>;
+    }
+    return (
+      <div className="grid grid-cols-3 gap-2">
+        {photos.map((p) => (
+          <a key={p.id} href={p.filePath} target="_blank" rel="noopener noreferrer">
+            <img src={p.filePath} alt={p.type} className="w-full h-20 object-cover rounded-lg border border-gray-200" />
+          </a>
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <div className="grid grid-cols-2 gap-4">
+      <div>
+        <div className="flex items-center justify-between mb-1.5">
+          <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wide">Sebelum</p>
+          {canUpload && (
+            <button
+              onClick={() => beforeInputRef.current?.click()}
+              disabled={uploading === 'BEFORE'}
+              className="text-navy hover:text-navy/70 disabled:opacity-50"
+            >
+              {uploading === 'BEFORE' ? <Loader2 size={14} className="animate-spin" /> : <Camera size={14} />}
+            </button>
+          )}
+        </div>
+        <PhotoGrid photos={before} emptyLabel="Belum ada foto" />
+        <input
+          ref={beforeInputRef} type="file" accept="image/*" capture="environment" className="hidden"
+          onChange={(e) => handleFile('BEFORE', e.target.files?.[0])}
+        />
+      </div>
+      <div>
+        <div className="flex items-center justify-between mb-1.5">
+          <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wide">Sesudah</p>
+          {canUpload && (
+            <button
+              onClick={() => afterInputRef.current?.click()}
+              disabled={uploading === 'AFTER'}
+              className="text-navy hover:text-navy/70 disabled:opacity-50"
+            >
+              {uploading === 'AFTER' ? <Loader2 size={14} className="animate-spin" /> : <Camera size={14} />}
+            </button>
+          )}
+        </div>
+        <PhotoGrid photos={after} emptyLabel="Wajib sebelum submit review" />
+        <input
+          ref={afterInputRef} type="file" accept="image/*" capture="environment" className="hidden"
+          onChange={(e) => handleFile('AFTER', e.target.files?.[0])}
+        />
+      </div>
+    </div>
+  );
+}
+
 // ── WO Detail Panel ────────────────────────────────────────
 function WODetail({
-  wo, onClose, onEdit, onStatusChange, onDeleted, currentUserId, currentDivisionId, editScope, deleteScope,
+  wo, onClose, onEdit, onStatusChange, onReview, onDeleted, onUpdated,
+  currentUserId, currentDivisionId, editScope, deleteScope,
 }: {
   wo: WorkOrder; onClose: () => void; onEdit: () => void;
-  onStatusChange: () => void; onDeleted: () => void;
+  onStatusChange: () => void; onReview: () => void; onDeleted: () => void; onUpdated: (wo: WorkOrder) => void;
   currentUserId: string; currentDivisionId: string; editScope: Scope; deleteScope: Scope;
 }) {
   const [showHistory, setShowHistory] = useState(false);
@@ -648,7 +935,9 @@ function WODetail({
   // Status changes go through the 'edit' permission on the backend (same route guard),
   // and 'own' scope there additionally allows the assignee, not just the reporter.
   const canStatus  = hasScope(editScope, isReporter || isAssignee, sameDivision);
+  const canReview  = canStatus && wo.status === 'PENDING_REVIEW';
   const isFinal    = wo.status === 'DONE' || wo.status === 'CANCELLED';
+  const isPendingReview = wo.status === 'PENDING_REVIEW';
 
   async function handleDelete() {
     if (!confirmDel) { setConfirmDel(true); return; }
@@ -665,6 +954,7 @@ function WODetail({
       {/* Header */}
       <div className="flex items-start justify-between px-5 py-4 border-b border-gray-100 flex-shrink-0">
         <div className="flex-1 min-w-0 pr-4">
+          <p className="text-[11px] font-mono text-gray-400">{wo.code}</p>
           <h2 className="font-semibold text-gray-900 text-sm leading-snug">{wo.title}</h2>
           <div className="flex items-center gap-2 mt-1.5 flex-wrap">
             <StatusBadge status={wo.status} />
@@ -697,6 +987,12 @@ function WODetail({
               </div>
             ) : <span className="text-xs text-gray-400">Belum diassign</span>}
           </div>
+          {wo.assignedBy && (
+            <div className="space-y-1">
+              <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wide">Ditugaskan oleh</p>
+              <span className="text-xs text-gray-700">{wo.assignedBy.fullName}</span>
+            </div>
+          )}
           {wo.location && (
             <div className="space-y-1 col-span-2">
               <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wide">Lokasi</p>
@@ -717,10 +1013,10 @@ function WODetail({
               </p>
             </div>
           )}
-          {wo.completedAt && (
+          {wo.closedAt && (
             <div className="space-y-1">
-              <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wide">Selesai</p>
-              <p className="text-xs text-green-600 font-medium">{formatDate(wo.completedAt)}</p>
+              <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wide">Ditutup</p>
+              <p className="text-xs text-green-600 font-medium">{formatDate(wo.closedAt)}</p>
             </div>
           )}
         </div>
@@ -741,25 +1037,26 @@ function WODetail({
           </div>
         )}
 
-        {/* Attachments */}
-        {wo.attachments && wo.attachments.length > 0 && (
-          <div>
-            <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wide mb-2">
-              Lampiran ({wo.attachments.length})
+        {wo.reviewNotes && (
+          <div className={cn('rounded-lg p-3 border', wo.status === 'DONE' ? 'bg-green-50 border-green-100' : 'bg-red-50 border-red-100')}>
+            <p className={cn('text-[10px] font-medium uppercase tracking-wide mb-1', wo.status === 'DONE' ? 'text-green-700' : 'text-red-700')}>
+              Catatan Review {wo.reviewedBy && `— ${wo.reviewedBy.fullName}`}
             </p>
-            <div className="space-y-1">
-              {wo.attachments.map((a) => (
-                <a
-                  key={a.id}
-                  href={`${import.meta.env.VITE_API_BASE?.replace('/api', '') || ''}/uploads/${a.filePath}`}
-                  target="_blank" rel="noopener noreferrer"
-                  className="flex items-center gap-2 text-xs text-blue-600 hover:underline"
-                >
-                  <Paperclip size={12} /> {a.fileName}
-                  <span className="text-gray-400">({Math.round(a.fileSize / 1024)} KB)</span>
-                </a>
-              ))}
-            </div>
+            <p className="text-sm whitespace-pre-wrap text-gray-800">{wo.reviewNotes}</p>
+          </div>
+        )}
+
+        {/* Photo evidence */}
+        {!isFinal && wo.status !== 'OPEN' && wo.status !== 'VALIDATED' && (
+          <div>
+            <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wide mb-2">Bukti Foto</p>
+            <PhotoSection wo={wo} canUpload={canStatus && !isPendingReview} onUploaded={onUpdated} />
+          </div>
+        )}
+        {(isFinal || isPendingReview) && wo.attachments && wo.attachments.length > 0 && (
+          <div>
+            <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wide mb-2">Bukti Foto</p>
+            <PhotoSection wo={wo} canUpload={false} onUploaded={onUpdated} />
           </div>
         )}
 
@@ -803,11 +1100,19 @@ function WODetail({
       </div>
 
       {/* Actions */}
-      <div className="flex-shrink-0 border-t border-gray-100 px-5 py-3 flex items-center gap-2">
-        {canStatus && !isFinal && (
+      <div className="flex-shrink-0 border-t border-gray-100 px-5 py-3 flex items-center gap-2 flex-wrap">
+        {canReview && (
+          <button
+            onClick={onReview}
+            className="flex items-center gap-1.5 px-3 py-2 text-xs bg-purple-600 text-white rounded-lg hover:bg-purple-700"
+          >
+            <ClipboardCheck size={12} /> Review Hasil
+          </button>
+        )}
+        {canStatus && !isFinal && !isPendingReview && (
           <button
             onClick={onStatusChange}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-navy text-white rounded-lg hover:bg-navy/90"
+            className="flex items-center gap-1.5 px-3 py-2 text-xs bg-navy text-white rounded-lg hover:bg-navy/90"
           >
             <RefreshCw size={12} /> Ubah Status
           </button>
@@ -815,7 +1120,7 @@ function WODetail({
         {canEdit && !isFinal && (
           <button
             onClick={onEdit}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs border border-gray-200 rounded-lg hover:bg-gray-50"
+            className="flex items-center gap-1.5 px-3 py-2 text-xs border border-gray-200 rounded-lg hover:bg-gray-50"
           >
             Edit
           </button>
@@ -824,7 +1129,7 @@ function WODetail({
           <button
             onClick={handleDelete} disabled={deleting}
             className={cn(
-              'ml-auto flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg transition-colors',
+              'ml-auto flex items-center gap-1.5 px-3 py-2 text-xs rounded-lg transition-colors',
               confirmDel ? 'bg-red-500 text-white hover:bg-red-600' : 'border border-gray-200 text-gray-500 hover:bg-red-50 hover:text-red-500 hover:border-red-200',
             )}
           >
@@ -856,12 +1161,12 @@ function StatsBar({ stats }: {
       <div className="flex items-center gap-1.5 text-xs whitespace-nowrap">
         <Wrench size={12} className="text-navy" />
         <span className="font-semibold text-navy">{openCount}</span>
-        <span className="text-gray-500">Open</span>
+        <span className="text-gray-500">Aktif</span>
       </div>
       <div className="flex items-center gap-1.5 text-xs whitespace-nowrap">
         <CheckCircle2 size={12} className="text-green-500" />
         <span className="font-semibold text-green-600">{doneCount}</span>
-        <span className="text-gray-500">Done</span>
+        <span className="text-gray-500">Selesai</span>
       </div>
       {stats.overdue > 0 && (
         <div className="flex items-center gap-1.5 text-xs whitespace-nowrap">
@@ -894,13 +1199,19 @@ export default function WorkOrderPage() {
   const [loadingDetail, setLoadingDetail] = useState(false);
 
   const [view, setView]           = useState<ViewFilter>('all');
+  const [boardMode, setBoardMode] = useState<BoardMode>('kanban');
   const [priorityFilter, setPriorityFilter] = useState<WOPriority | ''>('');
+  const [categoryFilter, setCategoryFilter] = useState<WOCategory | ''>('');
+  const [assigneeFilter, setAssigneeFilter] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo]     = useState('');
   const [search, setSearch]       = useState('');
   const [showFilters, setShowFilters] = useState(false);
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editItem, setEditItem]   = useState<WorkOrder | null>(null);
   const [statusModalOpen, setStatusModalOpen] = useState(false);
+  const [reviewModalOpen, setReviewModalOpen] = useState(false);
 
   const [dragWO, setDragWO]           = useState<WorkOrder | null>(null);
   const [assignPickerWO, setAssignPickerWO] = useState<WorkOrder | null>(null);
@@ -925,6 +1236,10 @@ export default function WorkOrderPage() {
     try {
       const params: Record<string, string> = { view, limit: String(pageSize), page: String(pageArg) };
       if (priorityFilter) params.priority = priorityFilter;
+      if (categoryFilter) params.category = categoryFilter;
+      if (assigneeFilter) params.assignedToId = assigneeFilter;
+      if (dateFrom) params.dateFrom = new Date(dateFrom).toISOString();
+      if (dateTo)   params.dateTo   = new Date(dateTo).toISOString();
       if (search.trim())  params.search   = search.trim();
 
       const res = await api.get('/work-orders', { params });
@@ -933,7 +1248,7 @@ export default function WorkOrderPage() {
       setBoardPage(pageArg);
     } catch (err) { toast.error(extractErr(err)); }
     finally { (append ? setLoadingMore : setLoading)(false); }
-  }, [view, priorityFilter, search, pageSize]);
+  }, [view, priorityFilter, categoryFilter, assigneeFilter, dateFrom, dateTo, search, pageSize]);
 
   const fetchStats = useCallback(async () => {
     try {
@@ -983,6 +1298,11 @@ export default function WorkOrderPage() {
   function handleStatusChanged(wo: WorkOrder) {
     handleSaved(wo);
     setStatusModalOpen(false);
+  }
+
+  function handleReviewed(wo: WorkOrder) {
+    handleSaved(wo);
+    setReviewModalOpen(false);
   }
 
   function handleDeleted() {
@@ -1051,7 +1371,7 @@ export default function WorkOrderPage() {
   }
 
   function canDragWO(wo: WorkOrder): boolean {
-    if (STATUS_TRANSITIONS[wo.status].length === 0) return false; // DONE/CANCELLED are terminal
+    if (STATUS_TRANSITIONS[wo.status].length === 0) return false; // terminal statuses
     const isReporter   = wo.reportedBy.id === user?.id;
     const isAssignee   = wo.assignee?.id === user?.id;
     const sameDivision = wo.reportedBy.divisionId === user?.division?.id || wo.assignee?.divisionId === user?.division?.id;
@@ -1060,15 +1380,15 @@ export default function WorkOrderPage() {
 
   const sidebarViews: { id: ViewFilter; label: string }[] = [
     { id: 'all',        label: 'Semua WO'     },
-    { id: 'mine',       label: 'Ditugaskan ke Saya' },
+    { id: 'mine',       label: 'Tugas Saya' },
     { id: 'reported',   label: 'Saya Laporkan' },
     { id: 'unassigned', label: 'Belum Diassign' },
   ];
 
   return (
     <div className="flex h-full overflow-hidden -m-6">
-      {/* Left sidebar — view filters */}
-      <div className="w-52 flex-shrink-0 bg-white border-r border-gray-100 flex flex-col">
+      {/* Left sidebar — view filters (hidden on mobile, technicians get a flat list) */}
+      <div className="hidden lg:flex w-52 flex-shrink-0 bg-white border-r border-gray-100 flex-col">
         <div className="px-4 py-4 border-b border-gray-100">
           <div className="flex items-center gap-2">
             <Wrench size={18} className="text-navy" />
@@ -1108,17 +1428,47 @@ export default function WorkOrderPage() {
 
       {/* Main area */}
       <div className="flex flex-col flex-1 overflow-hidden">
+        {/* Mobile header — compact, big tap targets */}
+        <div className="lg:hidden flex items-center justify-between px-4 py-3 border-b border-gray-100 bg-white flex-shrink-0">
+          <div className="flex items-center gap-2">
+            <Wrench size={18} className="text-navy" />
+            <h1 className="font-semibold text-gray-900 text-sm">Work Orders</h1>
+          </div>
+          {woPerms.create && (
+            <button
+              onClick={() => { setEditItem(null); setModalOpen(true); }}
+              className="flex items-center justify-center gap-1.5 px-3 py-2 bg-navy text-white text-sm rounded-lg"
+            >
+              <Plus size={16} /> Buat
+            </button>
+          )}
+        </div>
+        <div className="lg:hidden flex gap-1.5 px-3 py-2 overflow-x-auto border-b border-gray-100 bg-white flex-shrink-0">
+          {sidebarViews.map((v) => (
+            <button
+              key={v.id}
+              onClick={() => { setView(v.id); setSelectedId(null); setSelectedWO(null); }}
+              className={cn(
+                'flex-shrink-0 px-3 py-2 rounded-lg text-xs font-medium whitespace-nowrap',
+                view === v.id ? 'bg-navy text-white' : 'bg-gray-100 text-gray-600',
+              )}
+            >
+              {v.label}
+            </button>
+          ))}
+        </div>
+
         {/* Stats */}
         <StatsBar stats={stats} />
 
         {/* Search + filter bar */}
-        <div className="flex items-center gap-2 px-3 py-2.5 border-b border-gray-100 flex-shrink-0 bg-white">
+        <div className="flex items-center gap-2 px-3 py-2.5 border-b border-gray-100 flex-shrink-0 bg-white flex-wrap">
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && fetchWOs()}
-            placeholder="Cari work order..."
-            className="flex-1 max-w-xs text-sm border border-gray-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-navy/30"
+            placeholder="Cari kode / judul work order..."
+            className="flex-1 min-w-[140px] max-w-xs text-sm border border-gray-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-navy/30"
           />
           <button
             onClick={() => setShowFilters((v) => !v)}
@@ -1131,17 +1481,66 @@ export default function WorkOrderPage() {
           </button>
           <PageSizeSelect value={pageSize} onChange={(n) => setPageSize(n)} options={[25, 50, 100]} />
 
-          {showFilters && (
-            <select
-              value={priorityFilter}
-              onChange={(e) => setPriorityFilter(e.target.value as WOPriority | '')}
-              className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white focus:outline-none"
+          {/* View mode toggle — desktop/admin only, mobile always gets the flat list */}
+          <div className="hidden lg:flex items-center rounded-lg border border-gray-200 overflow-hidden ml-auto">
+            <button
+              onClick={() => setBoardMode('kanban')}
+              className={cn('p-1.5', boardMode === 'kanban' ? 'bg-navy text-white' : 'text-gray-500 hover:bg-gray-50')}
+              title="Kanban"
             >
-              <option value="">Semua Prioritas</option>
-              {(Object.keys(PRIORITY_CONFIG) as WOPriority[]).map((p) => (
-                <option key={p} value={p}>{PRIORITY_CONFIG[p].label}</option>
-              ))}
-            </select>
+              <LayoutGrid size={14} />
+            </button>
+            <button
+              onClick={() => setBoardMode('table')}
+              className={cn('p-1.5', boardMode === 'table' ? 'bg-navy text-white' : 'text-gray-500 hover:bg-gray-50')}
+              title="Table"
+            >
+              <Table2 size={14} />
+            </button>
+          </div>
+
+          {showFilters && (
+            <div className="flex items-center gap-2 flex-wrap w-full">
+              <select
+                value={priorityFilter}
+                onChange={(e) => setPriorityFilter(e.target.value as WOPriority | '')}
+                className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white focus:outline-none"
+              >
+                <option value="">Semua Prioritas</option>
+                {(Object.keys(PRIORITY_CONFIG) as WOPriority[]).map((p) => (
+                  <option key={p} value={p}>{PRIORITY_CONFIG[p].label}</option>
+                ))}
+              </select>
+              <select
+                value={categoryFilter}
+                onChange={(e) => setCategoryFilter(e.target.value as WOCategory | '')}
+                className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white focus:outline-none"
+              >
+                <option value="">Semua Kategori</option>
+                {(Object.keys(CATEGORY_CONFIG) as WOCategory[]).map((c) => (
+                  <option key={c} value={c}>{CATEGORY_CONFIG[c].icon} {CATEGORY_CONFIG[c].label}</option>
+                ))}
+              </select>
+              <select
+                value={assigneeFilter}
+                onChange={(e) => setAssigneeFilter(e.target.value)}
+                className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white focus:outline-none"
+              >
+                <option value="">Semua Teknisi</option>
+                {users.map((u) => (
+                  <option key={u.id} value={u.id}>{u.fullName}</option>
+                ))}
+              </select>
+              <input
+                type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)}
+                className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white focus:outline-none"
+              />
+              <span className="text-xs text-gray-400">s/d</span>
+              <input
+                type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)}
+                className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white focus:outline-none"
+              />
+            </div>
           )}
         </div>
 
@@ -1166,41 +1565,59 @@ export default function WorkOrderPage() {
             <Loader2 size={20} className="animate-spin text-gray-300" />
           </div>
         ) : (
-          <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-            <div className="flex-1 overflow-x-auto">
-              <div className="flex gap-4 h-full px-4 py-4 min-w-max">
-                {BOARD_COLUMNS.map((status) => (
-                  <WOColumn
-                    key={status}
-                    status={status}
-                    workOrders={workOrders.filter((w) => w.status === status)}
-                    selectedId={selectedId}
-                    onSelect={handleSelect}
-                    canDragWO={canDragWO}
-                  />
-                ))}
-              </div>
+          <>
+            {/* Mobile: flat stacked list, large tap targets, no drag */}
+            <div className="lg:hidden flex-1 overflow-y-auto p-3 space-y-2.5">
+              {workOrders.length === 0 ? (
+                <p className="text-center text-sm text-gray-400 py-12">Tidak ada work order</p>
+              ) : workOrders.map((wo) => (
+                <WOCard key={wo.id} wo={wo} selected={selectedId === wo.id} draggable={false} large onSelect={() => handleSelect(wo.id)} />
+              ))}
             </div>
 
-            <DragOverlay dropAnimation={null}>
-              {dragWO && (
-                <div className="w-72">
-                  <WOCard wo={dragWO} selected={false} draggable={false} overlay onSelect={() => {}} />
-                </div>
+            {/* Desktop: Kanban or Table */}
+            <div className="hidden lg:flex flex-col flex-1 overflow-hidden">
+              {boardMode === 'table' ? (
+                <WOTable workOrders={workOrders} selectedId={selectedId} onSelect={handleSelect} />
+              ) : (
+                <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+                  <div className="flex-1 overflow-x-auto">
+                    <div className="flex gap-4 h-full px-4 py-4 min-w-max">
+                      {BOARD_COLUMNS.map((status) => (
+                        <WOColumn
+                          key={status}
+                          status={status}
+                          workOrders={workOrders.filter((w) => w.status === status)}
+                          selectedId={selectedId}
+                          onSelect={handleSelect}
+                          canDragWO={canDragWO}
+                        />
+                      ))}
+                    </div>
+                  </div>
+
+                  <DragOverlay dropAnimation={null}>
+                    {dragWO && (
+                      <div className="w-72">
+                        <WOCard wo={dragWO} selected={false} draggable={false} overlay onSelect={() => {}} />
+                      </div>
+                    )}
+                  </DragOverlay>
+                </DndContext>
               )}
-            </DragOverlay>
-          </DndContext>
+            </div>
+          </>
         )}
       </div>
 
-      {/* Detail drawer */}
+      {/* Detail panel — full-screen on mobile, side drawer on desktop */}
       {selectedWO && (
         <div
           className="fixed inset-0 z-40 flex justify-end"
           onClick={() => { setSelectedId(null); setSelectedWO(null); }}
         >
-          <div className="absolute inset-0 bg-black/20" />
-          <div className="relative w-full max-w-md h-full" onClick={(e) => e.stopPropagation()}>
+          <div className="absolute inset-0 bg-black/20 hidden lg:block" />
+          <div className="relative w-full lg:max-w-md h-full" onClick={(e) => e.stopPropagation()}>
             {loadingDetail ? (
               <div className="flex items-center justify-center h-full bg-white">
                 <Loader2 size={20} className="animate-spin text-gray-300" />
@@ -1211,7 +1628,9 @@ export default function WorkOrderPage() {
                 onClose={() => { setSelectedId(null); setSelectedWO(null); }}
                 onEdit={() => { setEditItem(selectedWO); setModalOpen(true); }}
                 onStatusChange={() => setStatusModalOpen(true)}
+                onReview={() => setReviewModalOpen(true)}
                 onDeleted={handleDeleted}
+                onUpdated={handleSaved}
                 currentUserId={user?.id ?? ''}
                 currentDivisionId={user?.division?.id ?? ''}
                 editScope={woPerms.edit}
@@ -1237,6 +1656,15 @@ export default function WorkOrderPage() {
           onClose={() => setStatusModalOpen(false)}
           wo={selectedWO}
           onChanged={handleStatusChanged}
+        />
+      )}
+
+      {selectedWO && (
+        <ReviewModal
+          open={reviewModalOpen}
+          onClose={() => setReviewModalOpen(false)}
+          wo={selectedWO}
+          onReviewed={handleReviewed}
         />
       )}
 
