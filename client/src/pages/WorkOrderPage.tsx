@@ -15,7 +15,7 @@ import { cn } from '@/lib/cn';
 import { toast } from '@/stores/toastStore';
 import { useAuthStore } from '@/stores/authStore';
 import { usePermStore } from '@/stores/permStore';
-import type { Scope } from '@/types/permissions';
+import type { Scope, WorkOrderPerms } from '@/types/permissions';
 import { PageSizeSelect } from '@/components/shared/PageSizeSelect';
 
 // ── Permission helper ──────────────────────────────────────
@@ -28,6 +28,22 @@ export function hasScope(scope: Scope, isOwner: boolean, sameDivision: boolean):
   if (scope === 'division') return sameDivision;
   if (scope === 'own')      return isOwner;
   return false;
+}
+
+// Decides which sidebar view a role should even see — driven entirely by
+// permission fields, never by role name. A back-office role with
+// canBeAssignee=false simply never gets offered "My Tasks" (it would always
+// be empty); "Unassigned"/"Pending Review" only make sense for roles with
+// authority beyond their own work (edit !== 'own'). Superadmin (level <= 1)
+// bypasses this the same way it bypasses every other permission check — that
+// exception lives in the level-ceiling rule already, not here.
+function canSeeWOView(viewId: 'all' | 'mine' | 'reported' | 'unassigned' | 'pendingReview', perms: WorkOrderPerms): boolean {
+  if (viewId === 'mine')          return perms.canBeAssignee;
+  if (viewId === 'reported')      return perms.create;
+  if (viewId === 'unassigned')    return perms.edit !== 'own';
+  if (viewId === 'pendingReview') return perms.edit !== 'own';
+  if (viewId === 'all')           return perms.edit !== 'own';
+  return true;
 }
 
 // ── Types ──────────────────────────────────────────────────
@@ -1173,7 +1189,13 @@ export default function WorkOrderPage() {
   const [selectedWO, setSelectedWO] = useState<WorkOrder | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
 
-  const [view, setView]           = useState<ViewFilter>('all');
+  // Default to the first view this role is actually allowed to see — e.g. a
+  // back-office role without canBeAssignee/edit-beyond-own would never see
+  // 'all' rendered as a tab, so defaulting to it would leave no tab highlighted.
+  const [view, setView] = useState<ViewFilter>(() => {
+    const order: ViewFilter[] = ['all', 'mine', 'reported', 'unassigned', 'pendingReview'];
+    return order.find((v) => canSeeWOView(v, woPerms)) ?? 'reported';
+  });
   const [boardMode, setBoardMode] = useState<BoardMode>('kanban');
   const [priorityFilter, setPriorityFilter] = useState<WOPriority | ''>('');
   const [categoryFilter, setCategoryFilter] = useState<WOCategory | ''>('');
@@ -1238,7 +1260,9 @@ export default function WorkOrderPage() {
     try {
       // Managers with company-wide scope see everyone; division-scoped roles
       // (e.g. field admins) only see/assign within their own division.
-      const params: Record<string, string | boolean> = { limit: '100', isActive: true };
+      // workOrderAssignee=true is enforced server-side too — this isn't just a
+      // display filter, roles with canBeAssignee=false can never be returned here.
+      const params: Record<string, string | boolean> = { limit: '100', isActive: true, workOrderAssignee: true };
       if (woPerms.edit !== 'all' && user?.division?.id) params.division = user.division.id;
       const res = await api.get('/users', { params });
       setUsers(res.data.data ?? []);
@@ -1348,13 +1372,14 @@ export default function WorkOrderPage() {
     return hasScope(woPerms.edit, isReporter || isAssignee, sameDivision);
   }
 
-  const sidebarViews: { id: ViewFilter; label: string }[] = [
+  const ALL_SIDEBAR_VIEWS: { id: ViewFilter; label: string }[] = [
     { id: 'all',           label: 'All Work Orders'  },
     { id: 'mine',          label: 'My Tasks'         },
     { id: 'reported',      label: 'Reported by Me'   },
     { id: 'unassigned',    label: 'Unassigned'       },
     { id: 'pendingReview', label: 'Pending Review'   },
   ];
+  const sidebarViews = ALL_SIDEBAR_VIEWS.filter((v) => canSeeWOView(v.id, woPerms));
 
   return (
     <div className="flex h-full overflow-hidden -m-6">

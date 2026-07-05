@@ -6,8 +6,24 @@ import { ParsedQs } from 'qs';
 import { prisma } from '@/config/database';
 import { parsePagination, buildMeta } from '@/helpers/pagination';
 import { AppError } from '@/middlewares/errorHandler.middleware';
+import { getPermissionsForRole } from '@/services/permission.service';
 
 const USER_SELECT = { id: true, fullName: true, username: true, avatar: true, divisionId: true } as const;
+
+// Defense in depth: the assignee picker already only lists eligible users, but
+// this re-checks server-side so a direct API call can't assign a work order to
+// a role with work_order.canBeAssignee=false (e.g. back-office staff).
+async function assertCanBeAssignee(userId: string): Promise<void> {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { role: { select: { id: true, level: true } } },
+  });
+  if (!user) throw new AppError('Assignee not found', 404);
+  const perms = await getPermissionsForRole(user.role.id, user.role.level);
+  if (!perms.work_order.canBeAssignee) {
+    throw new AppError('This user cannot be assigned as a work order executor', 400);
+  }
+}
 
 // Mirrors client-side STATUS_TRANSITIONS in WorkOrderPage.tsx — kept in sync manually.
 // PENDING_REVIEW is only ever entered via submitForReviewService (photo-gated) and
@@ -182,6 +198,8 @@ export async function createWorkOrderService(userId: string, body: Record<string
     assignedToId?: string | null;
   };
 
+  if (assignedToId) await assertCanBeAssignee(assignedToId);
+
   const code = await generateWorkOrderCode();
   // Creating with an assignee already implies the creator (an admin) has
   // vetted it — skip straight past OPEN/VALIDATED to ASSIGNED.
@@ -262,6 +280,8 @@ export async function updateWorkOrderService(
     category?: WorkOrderCategory; location?: string | null; dueDate?: string | null;
     assignedToId?: string | null; notes?: string | null;
   };
+
+  if (assignedToId) await assertCanBeAssignee(assignedToId);
 
   const prevAssignee = existing.assignedToId;
   const newAssignee  = assignedToId !== undefined ? (assignedToId ?? null) : existing.assignedToId;

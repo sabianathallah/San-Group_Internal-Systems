@@ -3,6 +3,7 @@ import { prisma } from '@/config/database';
 import { hashPassword } from '@/helpers/hash';
 import { parsePagination, buildMeta } from '@/helpers/pagination';
 import { AppError } from '@/middlewares/errorHandler.middleware';
+import { getPermissionsForRole } from '@/services/permission.service';
 import { ParsedQs } from 'qs';
 import path from 'path';
 import fs from 'fs';
@@ -22,10 +23,30 @@ const USER_SAFE_SELECT = {
   division: { select: { id: true, name: true, slug: true, color: true } },
 } as const;
 
+// Resolves which roles currently have work_order.canBeAssignee=true. Used to
+// filter the assignee picker (and to validate an assignment server-side) so a
+// role that's ineligible can never end up assigned — not just hidden in the UI.
+export async function getRoleIdsWithWorkOrderAssignee(): Promise<string[]> {
+  const roles = await prisma.role.findMany({ select: { id: true, level: true } });
+  const eligible = await Promise.all(
+    roles.map(async (role) => {
+      const perms = await getPermissionsForRole(role.id, role.level);
+      return perms.work_order.canBeAssignee ? role.id : null;
+    }),
+  );
+  return eligible.filter((id): id is string => id !== null);
+}
+
 export async function listUsersService(query: ParsedQs) {
   const { page, limit, skip, orderBy } = parsePagination(query, { createdAt: 'desc' });
 
   const where: Prisma.UserWhereInput = {};
+
+  // validate middleware (userFilterSchema) coerces this to a real boolean at
+  // runtime, but ParsedQs's static type doesn't reflect that — hence the cast.
+  if ((query.workOrderAssignee as unknown) === true) {
+    where.roleId = { in: await getRoleIdsWithWorkOrderAssignee() };
+  }
 
   if (query.search && typeof query.search === 'string') {
     where.OR = [

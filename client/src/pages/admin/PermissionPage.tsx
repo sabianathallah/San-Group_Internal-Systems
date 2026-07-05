@@ -27,7 +27,7 @@ interface HrisPerms {
   manageShifts: boolean; manageLocations: boolean; viewReports: Scope;
 }
 interface WorkOrderPerms {
-  view: Scope; create: boolean; edit: Scope; delete: Scope;
+  view: Scope; create: boolean; edit: Scope; delete: Scope; canBeAssignee: boolean;
 }
 interface UserMgmtPerms {
   create: boolean; edit: Scope; delete: Scope; toggleStatus: Scope;
@@ -837,6 +837,10 @@ export default function PermissionPage() {
                 <PermRow label="Delete work orders">
                   <ScopeSelector value={perms.work_order?.delete ?? 'own'} options={EDIT_SCOPE_OPTS}
                     onChange={(v) => update('work_order', 'delete', v)} disabled={isSuperAdmin || isReadOnly} />
+                </PermRow>
+                <PermRow label="Can be assigned as technician/executor">
+                  <Toggle checked={perms.work_order?.canBeAssignee ?? true} onChange={(v) => update('work_order', 'canBeAssignee', v)}
+                    disabled={isSuperAdmin || isReadOnly} />
                 </PermRow>
               </Section>
 

@@ -552,6 +552,7 @@ async function main() {
 
   // 1) DONE — AC lantai 3 selesai diperbaiki (ELECTRICAL, oleh engineer)
   const woAC = await prisma.workOrder.create({ data: {
+    code: 'WO/2026/001',
     title: 'Kerusakan AC Ruang Meeting Lantai 3',
     description: 'AC tidak bisa dinyalakan sejak pagi. Ruang meeting tidak dapat digunakan untuk rapat direksi siang ini.',
     status: WorkOrderStatus.DONE,
@@ -575,6 +576,7 @@ async function main() {
 
   // 2) IN_PROGRESS — kebocoran pipa toilet lantai 2 (PLUMBING)
   const woLeak = await prisma.workOrder.create({ data: {
+    code: 'WO/2026/002',
     title: 'Kebocoran Pipa Air Toilet Pria Lantai 2',
     description: 'Air merembes dari sambungan pipa di bawah wastafel. Lantai sudah tergenang, risiko terpeleset.',
     status: WorkOrderStatus.IN_PROGRESS,
@@ -593,6 +595,7 @@ async function main() {
 
   // 3) PENDING_PARTS — sistem HVAC lobby perlu filter baru (HVAC)
   const woHVAC = await prisma.workOrder.create({ data: {
+    code: 'WO/2026/003',
     title: 'Filter HVAC Lobby Utama Perlu Diganti',
     description: 'Kualitas udara lobby menurun, bau tidak sedap. Cek filter HVAC menunjukkan sudah sangat kotor dan perlu penggantian.',
     status: WorkOrderStatus.PENDING_PARTS,
@@ -613,6 +616,7 @@ async function main() {
 
   // 4) ASSIGNED — lampu parkir basement mati (ELECTRICAL)
   const woLamp = await prisma.workOrder.create({ data: {
+    code: 'WO/2026/004',
     title: 'Lampu Parkir Basement B2 Mati Sebagian',
     description: '6 unit lampu di area parkir B2 sektor C tidak menyala. Area menjadi gelap dan membahayakan pengguna parkir di malam hari.',
     status: WorkOrderStatus.ASSIGNED,
@@ -630,6 +634,7 @@ async function main() {
 
   // 5) OPEN — retak di dinding tangga darurat (CIVIL)
   const woCivil = await prisma.workOrder.create({ data: {
+    code: 'WO/2026/005',
     title: 'Retak Dinding Tangga Darurat Tower B Lantai 5',
     description: 'Ditemukan retakan horizontal sekitar 30cm pada dinding tangga darurat lantai 5. Perlu assessment struktural segera.',
     status: WorkOrderStatus.OPEN,
@@ -646,6 +651,7 @@ async function main() {
 
   // 6) OPEN — kebersihan area parkir (CLEANING)
   await prisma.workOrder.create({ data: {
+    code: 'WO/2026/006',
     title: 'Pembersihan Menyeluruh Area Parkir Basement B1',
     description: 'Area parkir B1 perlu pembersihan berkala. Debu dan kotoran menumpuk di sudut-sudut dan marka lantai sudah pudar.',
     status: WorkOrderStatus.OPEN,
@@ -662,6 +668,7 @@ async function main() {
 
   // 7) DONE — penggantian kunci pintu server room (SECURITY)
   const woSecurity = await prisma.workOrder.create({ data: {
+    code: 'WO/2026/007',
     title: 'Penggantian Kunci Pintu Server Room',
     description: 'Kunci pintu server room mengalami kerusakan mekanisme. Pintu tidak bisa dikunci dari dalam.',
     status: WorkOrderStatus.DONE,
@@ -683,6 +690,7 @@ async function main() {
 
   // 8) CANCELLED — rencana pengecatan yang dibatalkan
   await prisma.workOrder.create({ data: {
+    code: 'WO/2026/008',
     title: 'Pengecatan Ulang Tangga Darurat Tower A',
     description: 'Cat tangga darurat Tower A sudah pudar dan mengelupas di beberapa titik.',
     status: WorkOrderStatus.CANCELLED,

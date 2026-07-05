@@ -32,6 +32,9 @@ export interface WorkOrderPerms {
   create: boolean;
   edit: Scope;
   delete: Scope;
+  // Whether this role is eligible to be picked as a technician/executor.
+  // Enforced server-side too — this isn't just a UI toggle.
+  canBeAssignee: boolean;
 }
 export interface UserMgmtPerms {
   create: boolean;
@@ -71,7 +74,7 @@ export const DEFAULT_PERMS: PermissionConfig = {
   analytics:  { view: 'none' },
   audit_log:  { view: 'none' },
   hris:       { reviewLeave: 'none', reviewOvertime: 'none', editAttendance: 'none', manageShifts: false, manageLocations: false, viewReports: 'none' },
-  work_order: { view: 'own', create: true, edit: 'own', delete: 'own' },
+  work_order: { view: 'own', create: true, edit: 'own', delete: 'own', canBeAssignee: true },
   user_mgmt:     { create: false, edit: 'none', delete: 'none', toggleStatus: 'none' },
   role_mgmt:     { create: false, edit: 'none', delete: 'none' },
   division_mgmt: { create: false, edit: 'none', delete: 'none' },

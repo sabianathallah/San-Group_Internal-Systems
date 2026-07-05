@@ -24,5 +24,12 @@ export const userFilterSchema = z.object({
       .string()
       .optional()
       .transform((v) => (v === 'true' ? true : v === 'false' ? false : undefined)),
+    // Filters to only users whose role has work_order.canBeAssignee=true —
+    // used by the Work Order assignee picker so ineligible roles (e.g. pure
+    // back-office staff) can never be selected, not just hidden in the UI.
+    workOrderAssignee: z
+      .string()
+      .optional()
+      .transform((v) => v === 'true'),
   }),
 });

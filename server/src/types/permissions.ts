@@ -53,6 +53,11 @@ export interface WorkOrderPermissions {
   create: boolean; // can create new work orders
   edit: Scope;     // own = only own WOs; all = all WOs
   delete: Scope;   // same
+  // Whether this role is eligible to be picked as a technician/executor.
+  // Enforced server-side (assignee picker filter + assignment validation),
+  // not just a UI toggle — a role with this false can never end up assigned,
+  // even via a direct API call.
+  canBeAssignee: boolean;
 }
 
 // NOTE: for user/role/division management, a level-ceiling rule is ALWAYS
@@ -103,7 +108,7 @@ export const DEFAULT_PERMISSIONS: Record<number, PermissionConfig> = {
     analytics:  { view: 'all' },
     audit_log:  { view: 'all' },
     hris:       { reviewLeave: 'all',  reviewOvertime: 'all',  editAttendance: 'all',  manageShifts: true,  manageLocations: true,  viewReports: 'all' },
-    work_order: { view: 'all', create: true, edit: 'all', delete: 'all' },
+    work_order: { view: 'all', create: true, edit: 'all', delete: 'all', canBeAssignee: true },
     user_mgmt:     { create: true, edit: 'all', delete: 'all', toggleStatus: 'all' },
     role_mgmt:     { create: true, edit: 'all', delete: 'all' },
     division_mgmt: { create: true, edit: 'all', delete: 'all' },
@@ -116,7 +121,7 @@ export const DEFAULT_PERMISSIONS: Record<number, PermissionConfig> = {
     analytics:  { view: 'all' },
     audit_log:  { view: 'all' },
     hris:       { reviewLeave: 'all',  reviewOvertime: 'all',  editAttendance: 'all',  manageShifts: true,  manageLocations: true,  viewReports: 'all' },
-    work_order: { view: 'all', create: true, edit: 'all', delete: 'all' },
+    work_order: { view: 'all', create: true, edit: 'all', delete: 'all', canBeAssignee: true },
     // toggleStatus/delete default to 'none' here — matches the previous hardcoded
     // behaviour where only the true SUPER_ADMIN slug could deactivate/delete users.
     user_mgmt:     { create: true, edit: 'all', delete: 'none', toggleStatus: 'none' },
@@ -131,7 +136,7 @@ export const DEFAULT_PERMISSIONS: Record<number, PermissionConfig> = {
     analytics:  { view: 'division' },
     audit_log:  { view: 'division' },
     hris:       { reviewLeave: 'all',  reviewOvertime: 'all',  editAttendance: 'all',  manageShifts: false, manageLocations: false, viewReports: 'all' },
-    work_order: { view: 'all', create: true, edit: 'all', delete: 'all' },
+    work_order: { view: 'all', create: true, edit: 'all', delete: 'all', canBeAssignee: true },
     user_mgmt:     { create: false, edit: 'none', delete: 'none', toggleStatus: 'none' },
     role_mgmt:     { create: false, edit: 'none', delete: 'none' },
     division_mgmt: { create: false, edit: 'none', delete: 'none' },
@@ -144,7 +149,7 @@ export const DEFAULT_PERMISSIONS: Record<number, PermissionConfig> = {
     analytics:  { view: 'division' },
     audit_log:  { view: 'none' },
     hris:       { reviewLeave: 'division',  reviewOvertime: 'division',  editAttendance: 'division',  manageShifts: false, manageLocations: false, viewReports: 'division' },
-    work_order: { view: 'all', create: true, edit: 'all', delete: 'all' },
+    work_order: { view: 'all', create: true, edit: 'all', delete: 'all', canBeAssignee: true },
     user_mgmt:     { create: false, edit: 'none', delete: 'none', toggleStatus: 'none' },
     role_mgmt:     { create: false, edit: 'none', delete: 'none' },
     division_mgmt: { create: false, edit: 'none', delete: 'none' },
@@ -157,7 +162,7 @@ export const DEFAULT_PERMISSIONS: Record<number, PermissionConfig> = {
     analytics:  { view: 'none' },
     audit_log:  { view: 'none' },
     hris:       { reviewLeave: 'none', reviewOvertime: 'none', editAttendance: 'none', manageShifts: false, manageLocations: false, viewReports: 'none' },
-    work_order: { view: 'own', create: true, edit: 'own', delete: 'own' },
+    work_order: { view: 'own', create: true, edit: 'own', delete: 'own', canBeAssignee: true },
     user_mgmt:     { create: false, edit: 'none', delete: 'none', toggleStatus: 'none' },
     role_mgmt:     { create: false, edit: 'none', delete: 'none' },
     division_mgmt: { create: false, edit: 'none', delete: 'none' },
@@ -170,7 +175,7 @@ export const DEFAULT_PERMISSIONS: Record<number, PermissionConfig> = {
     analytics:  { view: 'none' },
     audit_log:  { view: 'none' },
     hris:       { reviewLeave: 'none', reviewOvertime: 'none', editAttendance: 'none', manageShifts: false, manageLocations: false, viewReports: 'none' },
-    work_order: { view: 'own', create: true, edit: 'own', delete: 'own' },
+    work_order: { view: 'own', create: true, edit: 'own', delete: 'own', canBeAssignee: true },
     user_mgmt:     { create: false, edit: 'none', delete: 'none', toggleStatus: 'none' },
     role_mgmt:     { create: false, edit: 'none', delete: 'none' },
     division_mgmt: { create: false, edit: 'none', delete: 'none' },

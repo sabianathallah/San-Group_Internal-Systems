@@ -5,16 +5,24 @@ jest.mock('@/config/database', () => ({
   prisma: mockDeep<PrismaClient>(),
 }));
 
+jest.mock('@/services/permission.service', () => ({
+  getPermissionsForRole: jest.fn(),
+}));
+
 import { prisma } from '@/config/database';
+import { getPermissionsForRole } from '@/services/permission.service';
 import {
   changeWorkOrderStatusService,
   reviewWorkOrderService,
   deleteWorkOrderService,
   getWorkOrderByIdService,
   listWorkOrdersService,
+  createWorkOrderService,
+  updateWorkOrderService,
 } from '@/services/work-order.service';
 
 const prismaMock = prisma as unknown as DeepMockProxy<PrismaClient>;
+const getPermissionsForRoleMock = getPermissionsForRole as jest.Mock;
 
 const REQUESTER_ID = 'user-uuid-1';
 const OTHER_USER_ID = 'user-uuid-2';
@@ -333,5 +341,43 @@ describe('listWorkOrdersService', () => {
     await listWorkOrdersService(REQUESTER_ID, 'all', DIVISION_A, { view: 'unassigned' } as never);
     expect(whereArg().assignedToId).toBeNull();
     expect(whereArg().status).toEqual({ notIn: [WorkOrderStatus.DONE, WorkOrderStatus.CANCELLED] });
+  });
+});
+
+// ── canBeAssignee enforcement ──────────────────────────────────
+describe('assignee eligibility (work_order.canBeAssignee)', () => {
+  const ASSIGNEE_ID = 'user-uuid-assignee';
+
+  beforeEach(() => {
+    prismaMock.user.findUnique.mockResolvedValue(
+      { role: { id: 'role-uuid-1', level: 5 } } as never,
+    );
+  });
+
+  it('rejects creating a WO pre-assigned to a role with canBeAssignee=false', async () => {
+    getPermissionsForRoleMock.mockResolvedValue({ work_order: { canBeAssignee: false } });
+
+    await expect(
+      createWorkOrderService(REQUESTER_ID, { title: 'AC rusak', assignedToId: ASSIGNEE_ID }),
+    ).rejects.toMatchObject({ statusCode: 400 });
+  });
+
+  it('allows creating a WO pre-assigned to a role with canBeAssignee=true', async () => {
+    getPermissionsForRoleMock.mockResolvedValue({ work_order: { canBeAssignee: true } });
+    prismaMock.$queryRaw.mockResolvedValue([{ counter: 1 }] as never);
+    prismaMock.workOrder.create.mockResolvedValue(mockWO({ assignedToId: ASSIGNEE_ID }) as never);
+
+    await expect(
+      createWorkOrderService(REQUESTER_ID, { title: 'AC rusak', assignedToId: ASSIGNEE_ID }),
+    ).resolves.toBeDefined();
+  });
+
+  it('rejects assigning an existing WO to a role with canBeAssignee=false', async () => {
+    getPermissionsForRoleMock.mockResolvedValue({ work_order: { canBeAssignee: false } });
+    prismaMock.workOrder.findUnique.mockResolvedValue(mockWO({ status: WorkOrderStatus.OPEN }) as never);
+
+    await expect(
+      updateWorkOrderService('wo-uuid-1', REQUESTER_ID, 'all', DIVISION_A, { assignedToId: ASSIGNEE_ID }),
+    ).rejects.toMatchObject({ statusCode: 400 });
   });
 });
