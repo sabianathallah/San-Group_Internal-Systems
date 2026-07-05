@@ -87,12 +87,10 @@ function PhotoLightbox({ url, onClose }: { url: string; onClose: () => void }) {
 function LogTable({
   records,
   showUser,
-  lightboxUrl,
   onPhotoClick,
 }: {
   records: AttendanceRecord[];
   showUser: boolean;
-  lightboxUrl: string | null;
   onPhotoClick: (url: string | null) => void;
 }) {
   if (records.length === 0) {
@@ -427,14 +425,12 @@ export default function AttendancePage() {
             <LogTable
               records={logRecords}
               showUser={false}
-              lightboxUrl={lightboxUrl}
               onPhotoClick={setLightboxUrl}
             />
           ) : (
             <LogTable
               records={teamLogRecords}
               showUser={true}
-              lightboxUrl={lightboxUrl}
               onPhotoClick={setLightboxUrl}
             />
           )}

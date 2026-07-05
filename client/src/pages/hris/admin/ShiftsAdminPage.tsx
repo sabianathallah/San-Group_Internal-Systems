@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import {
   CalendarClock, Plus, Pencil, Trash2, Loader2, X, CheckCircle2,
-  Users, UserMinus, Search, ChevronDown, ChevronUp,
+  Users, UserMinus, Search,
 } from 'lucide-react';
 import api from '@/lib/api';
 import { cn } from '@/lib/cn';
@@ -257,7 +257,6 @@ export default function ShiftsAdminPage() {
   const [loading, setLoading]   = useState(false);
   const [formOpen, setFormOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<Shift | null>(null);
-  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const loadShifts = useCallback(async () => {
     setLoading(true);

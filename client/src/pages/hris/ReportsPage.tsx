@@ -10,8 +10,6 @@ import { usePermStore } from '@/stores/permStore';
 import { toast } from '@/stores/toastStore';
 
 // ── Types ──────────────────────────────────────────────────────
-type AttStatus = 'PRESENT' | 'LATE' | 'WFH' | 'PERMISSION' | 'ABSENT' | 'HOLIDAY';
-
 interface ReportRow {
   userId: string;
   fullName: string;
@@ -42,24 +40,6 @@ function fmtHours(mins: number) {
 
 function getInitials(name: string) {
   return name.split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase();
-}
-
-const ATT_COLORS: Record<AttStatus, string> = {
-  PRESENT:    'bg-green-500',
-  LATE:       'bg-orange-400',
-  WFH:        'bg-blue-400',
-  PERMISSION: 'bg-purple-400',
-  ABSENT:     'bg-red-400',
-  HOLIDAY:    'bg-gray-300',
-};
-
-function AttBadge({ label, count, color }: { label: string; count: number; color: string }) {
-  if (count === 0) return null;
-  return (
-    <span className={cn('inline-flex items-center gap-1 text-[11px] font-medium px-1.5 py-0.5 rounded text-white', color)}>
-      {count} {label}
-    </span>
-  );
 }
 
 // ── Export CSV ─────────────────────────────────────────────────
