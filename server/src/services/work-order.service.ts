@@ -102,10 +102,13 @@ async function generateWorkOrderCode(): Promise<string> {
   return `WO/${year}/${String(counter).padStart(3, '0')}`;
 }
 
+const CLOSED_STATUSES = [WorkOrderStatus.DONE, WorkOrderStatus.CANCELLED] as const;
+
 export async function listWorkOrdersService(userId: string, viewScope: string, divisionId: string, query: ParsedQs) {
   const { page, limit, skip } = parsePagination(query, { createdAt: 'desc' });
 
   const view = (query.view as string) || 'all';
+  const historyScope = query.scope === 'history';
   const where: Prisma.WorkOrderWhereInput = {};
 
   // 'own' scope: only WOs the user created or is assigned to
@@ -118,9 +121,14 @@ export async function listWorkOrdersService(userId: string, viewScope: string, d
     where.OR = [{ reportedBy: { divisionId } }, { assignee: { divisionId } }];
   }
 
+  // The active board only ever shows work still in flight; DONE/CANCELLED move
+  // to the separate History view (?scope=history) once closed, so the board
+  // doesn't keep growing with records nobody needs to act on anymore.
+  where.status = historyScope ? { in: [...CLOSED_STATUSES] } : { notIn: [...CLOSED_STATUSES] };
+
   if (view === 'mine')       { where.assignedToId = userId; }
   if (view === 'reported')   { where.reportedById = userId; }
-  if (view === 'unassigned') { where.assignedToId = null; where.status = { not: WorkOrderStatus.DONE }; }
+  if (view === 'unassigned') { where.assignedToId = null; }
 
   if (query.status   && typeof query.status   === 'string') where.status   = query.status   as WorkOrderStatus;
   if (query.priority && typeof query.priority === 'string') where.priority = query.priority as WorkOrderPriority;
@@ -150,10 +158,10 @@ export async function listWorkOrdersService(userId: string, viewScope: string, d
 
 export async function getWorkOrderByIdService(id: string, userId: string, viewScope: string, divisionId: string) {
   const wo = await prisma.workOrder.findUnique({ where: { id }, select: WO_DETAIL_SELECT });
-  if (!wo) throw new AppError('Work order tidak ditemukan', 404);
+  if (!wo) throw new AppError('Work order not found', 404);
 
   if (viewScope === 'own' && wo.reportedBy.id !== userId && wo.assignee?.id !== userId) {
-    throw new AppError('Akses ditolak', 403);
+    throw new AppError('Access denied', 403);
   }
 
   if (
@@ -161,7 +169,7 @@ export async function getWorkOrderByIdService(id: string, userId: string, viewSc
     wo.reportedBy.divisionId !== divisionId &&
     wo.assignee?.divisionId !== divisionId
   ) {
-    throw new AppError('Akses ditolak', 403);
+    throw new AppError('Access denied', 403);
   }
 
   return wo;
@@ -196,7 +204,7 @@ export async function createWorkOrderService(userId: string, body: Record<string
       history: {
         create: {
           toStatus:   initialStatus,
-          note:       'Work order dibuat',
+          note:       'Work order created',
           changedById: userId,
         },
       },
@@ -209,8 +217,8 @@ export async function createWorkOrderService(userId: string, body: Record<string
       NotificationType.WO_ASSIGNED,
       userId,
       assignedToId,
-      `Work order baru: ${title}`,
-      `Kamu ditugaskan untuk menangani work order ini.`,
+      `New work order: ${title}`,
+      `You have been assigned to handle this work order.`,
       wo.id,
     );
   }
@@ -233,20 +241,20 @@ export async function updateWorkOrderService(
       assignee:   { select: { divisionId: true } },
     },
   });
-  if (!existing) throw new AppError('Work order tidak ditemukan', 404);
+  if (!existing) throw new AppError('Work order not found', 404);
 
   if (editScope === 'own' && existing.reportedById !== userId) {
-    throw new AppError('Hanya pembuat WO yang bisa mengedit', 403);
+    throw new AppError('Only the reporter can edit this work order', 403);
   }
   if (
     editScope === 'division' &&
     existing.reportedBy.divisionId !== divisionId &&
     existing.assignee?.divisionId !== divisionId
   ) {
-    throw new AppError('Akses ditolak', 403);
+    throw new AppError('Access denied', 403);
   }
   if (existing.status === WorkOrderStatus.DONE || existing.status === WorkOrderStatus.CANCELLED) {
-    throw new AppError('WO yang sudah selesai atau dibatalkan tidak bisa diedit', 400);
+    throw new AppError('Completed or cancelled work orders cannot be edited', 400);
   }
 
   const { title, description, priority, category, location, dueDate, assignedToId, notes } = body as {
@@ -291,7 +299,7 @@ export async function updateWorkOrderService(
       userId,
       newAssignee,
       `Work order: ${wo.title}`,
-      'Kamu ditugaskan untuk menangani work order ini.',
+      'You have been assigned to handle this work order.',
       wo.id,
     );
   }
@@ -315,21 +323,21 @@ export async function changeWorkOrderStatusService(
       attachments: { select: { type: true } },
     },
   });
-  if (!existing) throw new AppError('Work order tidak ditemukan', 404);
+  if (!existing) throw new AppError('Work order not found', 404);
 
   if (editScope === 'own' && existing.assignedToId !== userId && existing.reportedById !== userId) {
-    throw new AppError('Akses ditolak', 403);
+    throw new AppError('Access denied', 403);
   }
   if (
     editScope === 'division' &&
     existing.reportedBy.divisionId !== divisionId &&
     existing.assignee?.divisionId !== divisionId
   ) {
-    throw new AppError('Akses ditolak', 403);
+    throw new AppError('Access denied', 403);
   }
 
   const { status, note } = body;
-  if (existing.status === status) throw new AppError('Status sudah sama', 400);
+  if (existing.status === status) throw new AppError('Status is already the same', 400);
 
   // PENDING_REVIEW is a special case: reachable from IN_PROGRESS/PENDING_PARTS,
   // but only once at least one "after" photo has been uploaded as proof of work.
@@ -339,14 +347,14 @@ export async function changeWorkOrderStatusService(
 
   if (isSubmitForReview) {
     if (!canSubmitForReview) {
-      throw new AppError(`Tidak bisa ubah status dari ${existing.status} ke ${status}`, 400);
+      throw new AppError(`Cannot change status from ${existing.status} to ${status}`, 400);
     }
     const hasAfterPhoto = existing.attachments.some((a) => a.type === WorkOrderAttachmentType.AFTER);
     if (!hasAfterPhoto) {
-      throw new AppError('Minimal 1 foto sesudah pengerjaan (after) wajib diunggah sebelum submit review', 400);
+      throw new AppError('At least 1 "after" photo must be uploaded before submitting for review', 400);
     }
   } else if (!STATUS_TRANSITIONS[existing.status].includes(status)) {
-    throw new AppError(`Tidak bisa ubah status dari ${existing.status} ke ${status}`, 400);
+    throw new AppError(`Cannot change status from ${existing.status} to ${status}`, 400);
   }
 
   const wo = await prisma.workOrder.update({
@@ -370,8 +378,8 @@ export async function changeWorkOrderStatusService(
       NotificationType.WO_STATUS_CHANGED,
       userId,
       existing.reportedById,
-      `WO "${existing.title}" — status diperbarui`,
-      `Status menjadi: ${status.replace('_', ' ')}`,
+      `WO "${existing.title}" — status updated`,
+      `Status changed to: ${status.replace('_', ' ')}`,
       id,
     );
   }
@@ -393,21 +401,24 @@ export async function reviewWorkOrderService(
       assignee:   { select: { divisionId: true } },
     },
   });
-  if (!existing) throw new AppError('Work order tidak ditemukan', 404);
+  if (!existing) throw new AppError('Work order not found', 404);
   if (existing.status !== WorkOrderStatus.PENDING_REVIEW) {
-    throw new AppError('Work order ini tidak sedang menunggu review', 400);
+    throw new AppError('This work order is not pending review', 400);
+  }
+  if (existing.assignedToId === reviewerId) {
+    throw new AppError('You cannot review your own work order', 403);
   }
   if (
     reviewScope === 'division' &&
     existing.reportedBy.divisionId !== divisionId &&
     existing.assignee?.divisionId !== divisionId
   ) {
-    throw new AppError('Akses ditolak', 403);
+    throw new AppError('Access denied', 403);
   }
 
   const { decision, reviewNotes } = body;
   if (decision === 'REJECTED' && !reviewNotes?.trim()) {
-    throw new AppError('Alasan penolakan wajib diisi', 400);
+    throw new AppError('A rejection reason is required', 400);
   }
 
   const nextStatus = decision === 'APPROVED' ? WorkOrderStatus.DONE : WorkOrderStatus.IN_PROGRESS;
@@ -425,7 +436,7 @@ export async function reviewWorkOrderService(
         create: {
           fromStatus:  WorkOrderStatus.PENDING_REVIEW,
           toStatus:    nextStatus,
-          note:        reviewNotes ?? (decision === 'APPROVED' ? 'Disetujui' : null),
+          note:        reviewNotes ?? (decision === 'APPROVED' ? 'Approved' : null),
           changedById: reviewerId,
         },
       },
@@ -438,8 +449,8 @@ export async function reviewWorkOrderService(
       decision === 'APPROVED' ? NotificationType.WO_COMPLETED : NotificationType.WO_STATUS_CHANGED,
       reviewerId,
       existing.assignedToId,
-      decision === 'APPROVED' ? `WO "${existing.title}" disetujui` : `WO "${existing.title}" ditolak — perlu revisi`,
-      decision === 'APPROVED' ? 'Pekerjaan kamu sudah diverifikasi dan ditutup.' : `Alasan: ${reviewNotes}`,
+      decision === 'APPROVED' ? `WO "${existing.title}" approved` : `WO "${existing.title}" rejected — needs revision`,
+      decision === 'APPROVED' ? 'Your work has been verified and closed.' : `Reason: ${reviewNotes}`,
       id,
     );
   }
@@ -462,19 +473,19 @@ export async function addWorkOrderAttachmentService(
       assignee:   { select: { divisionId: true } },
     },
   });
-  if (!existing) throw new AppError('Work order tidak ditemukan', 404);
+  if (!existing) throw new AppError('Work order not found', 404);
   if (editScope === 'own' && existing.assignedToId !== userId && existing.reportedById !== userId) {
-    throw new AppError('Akses ditolak', 403);
+    throw new AppError('Access denied', 403);
   }
   if (
     editScope === 'division' &&
     existing.reportedBy.divisionId !== divisionId &&
     existing.assignee?.divisionId !== divisionId
   ) {
-    throw new AppError('Akses ditolak', 403);
+    throw new AppError('Access denied', 403);
   }
   if (existing.status === WorkOrderStatus.DONE || existing.status === WorkOrderStatus.CANCELLED) {
-    throw new AppError('WO yang sudah selesai atau dibatalkan tidak bisa ditambah lampiran', 400);
+    throw new AppError('Completed or cancelled work orders cannot have attachments added', 400);
   }
 
   return prisma.workOrderAttachment.create({
@@ -495,16 +506,16 @@ export async function deleteWorkOrderService(id: string, userId: string, deleteS
       assignee:   { select: { divisionId: true } },
     },
   });
-  if (!existing) throw new AppError('Work order tidak ditemukan', 404);
+  if (!existing) throw new AppError('Work order not found', 404);
   if (deleteScope === 'own' && existing.reportedById !== userId) {
-    throw new AppError('Hanya pembuat WO yang bisa menghapus', 403);
+    throw new AppError('Only the reporter can delete this work order', 403);
   }
   if (
     deleteScope === 'division' &&
     existing.reportedBy.divisionId !== divisionId &&
     existing.assignee?.divisionId !== divisionId
   ) {
-    throw new AppError('Akses ditolak', 403);
+    throw new AppError('Access denied', 403);
   }
 
   await prisma.workOrder.delete({ where: { id } });

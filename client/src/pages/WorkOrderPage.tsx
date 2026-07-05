@@ -22,7 +22,8 @@ import { PageSizeSelect } from '@/components/shared/PageSizeSelect';
 // Mirrors the server-side scope check in work-order.service.ts: 'all' always
 // passes, 'division' passes if the WO's reporter/assignee shares the user's
 // division, 'own' passes the caller-supplied ownership check, 'none' never passes.
-function hasScope(scope: Scope, isOwner: boolean, sameDivision: boolean): boolean {
+// Exported for reuse by WorkOrderHistoryPage — same permission model, one source of truth.
+export function hasScope(scope: Scope, isOwner: boolean, sameDivision: boolean): boolean {
   if (scope === 'all')      return true;
   if (scope === 'division') return sameDivision;
   if (scope === 'own')      return isOwner;
@@ -30,16 +31,17 @@ function hasScope(scope: Scope, isOwner: boolean, sameDivision: boolean): boolea
 }
 
 // ── Types ──────────────────────────────────────────────────
-type WOStatus =
+// Exported: WorkOrderHistoryPage shares this exact shape and vocabulary.
+export type WOStatus =
   | 'OPEN' | 'VALIDATED' | 'ASSIGNED' | 'IN_PROGRESS' | 'PENDING_PARTS'
   | 'PENDING_REVIEW' | 'DONE' | 'CANCELLED';
-type WOPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
-type WOCategory = 'ELECTRICAL' | 'PLUMBING' | 'HVAC' | 'CIVIL' | 'CLEANING' | 'SECURITY' | 'OTHER';
+export type WOPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
+export type WOCategory = 'ELECTRICAL' | 'PLUMBING' | 'HVAC' | 'CIVIL' | 'CLEANING' | 'SECURITY' | 'OTHER';
 type WOAttachmentType = 'BEFORE' | 'AFTER' | 'OTHER';
-type ViewFilter = 'all' | 'mine' | 'reported' | 'unassigned';
+type ViewFilter = 'all' | 'mine' | 'reported' | 'unassigned' | 'pendingReview';
 type BoardMode = 'kanban' | 'table';
 
-interface WOUser {
+export interface WOUser {
   id: string; fullName: string; username: string; avatar: string | null; divisionId: string;
 }
 
@@ -53,7 +55,7 @@ interface WOAttachment {
   fileSize: number; mimeType: string; createdAt: string; uploadedBy: WOUser;
 }
 
-interface WorkOrder {
+export interface WorkOrder {
   id: string; code: string; title: string; description: string | null;
   status: WOStatus; priority: WOPriority; category: WOCategory;
   location: string | null; dueDate: string | null; completedAt: string | null; closedAt: string | null;
@@ -65,29 +67,32 @@ interface WorkOrder {
 }
 
 // ── Config ─────────────────────────────────────────────────
+// The active board (this page) only ever shows work still in flight. DONE and
+// CANCELLED are terminal/historical — they live in WorkOrderHistoryPage
+// (?scope=history) instead, so this board doesn't keep growing forever.
 const BOARD_COLUMNS: WOStatus[] = [
-  'OPEN', 'VALIDATED', 'ASSIGNED', 'IN_PROGRESS', 'PENDING_PARTS', 'PENDING_REVIEW', 'DONE', 'CANCELLED',
+  'OPEN', 'VALIDATED', 'ASSIGNED', 'IN_PROGRESS', 'PENDING_PARTS', 'PENDING_REVIEW',
 ];
 
-const STATUS_CONFIG: Record<WOStatus, { label: string; color: string; bg: string; icon: React.ElementType }> = {
-  OPEN:           { label: 'Baru',            color: 'text-slate-600',  bg: 'bg-slate-100',   icon: Circle        },
-  VALIDATED:      { label: 'Divalidasi',      color: 'text-cyan-600',   bg: 'bg-cyan-50',     icon: ShieldCheck   },
-  ASSIGNED:       { label: 'Ditugaskan',      color: 'text-blue-600',   bg: 'bg-blue-50',     icon: User          },
-  IN_PROGRESS:    { label: 'Dikerjakan',      color: 'text-amber-600',  bg: 'bg-amber-50',    icon: Clock         },
-  PENDING_PARTS:  { label: 'Tunggu Sparepart',color: 'text-orange-600', bg: 'bg-orange-50',   icon: AlertTriangle },
-  PENDING_REVIEW: { label: 'Menunggu Review', color: 'text-purple-600', bg: 'bg-purple-50',   icon: ClipboardCheck },
-  DONE:           { label: 'Selesai',         color: 'text-green-600',  bg: 'bg-green-50',    icon: CheckCircle2  },
-  CANCELLED:      { label: 'Dibatalkan',      color: 'text-red-500',    bg: 'bg-red-50',      icon: Ban           },
+export const STATUS_CONFIG: Record<WOStatus, { label: string; color: string; bg: string; icon: React.ElementType }> = {
+  OPEN:           { label: 'New',            color: 'text-slate-600',  bg: 'bg-slate-100',   icon: Circle        },
+  VALIDATED:      { label: 'Validated',      color: 'text-cyan-600',   bg: 'bg-cyan-50',     icon: ShieldCheck   },
+  ASSIGNED:       { label: 'Assigned',       color: 'text-blue-600',   bg: 'bg-blue-50',     icon: User          },
+  IN_PROGRESS:    { label: 'In Progress',    color: 'text-amber-600',  bg: 'bg-amber-50',    icon: Clock         },
+  PENDING_PARTS:  { label: 'Pending Parts',  color: 'text-orange-600', bg: 'bg-orange-50',   icon: AlertTriangle },
+  PENDING_REVIEW: { label: 'Pending Review', color: 'text-purple-600', bg: 'bg-purple-50',   icon: ClipboardCheck },
+  DONE:           { label: 'Done',           color: 'text-green-600',  bg: 'bg-green-50',    icon: CheckCircle2  },
+  CANCELLED:      { label: 'Cancelled',      color: 'text-red-500',    bg: 'bg-red-50',      icon: Ban           },
 };
 
-const PRIORITY_CONFIG: Record<WOPriority, { label: string; dot: string; badge: string }> = {
+export const PRIORITY_CONFIG: Record<WOPriority, { label: string; dot: string; badge: string }> = {
   LOW:    { label: 'Low',    dot: 'bg-gray-400',   badge: 'bg-gray-100 text-gray-600'   },
   MEDIUM: { label: 'Medium', dot: 'bg-blue-400',   badge: 'bg-blue-50 text-blue-600'   },
   HIGH:   { label: 'High',   dot: 'bg-orange-400', badge: 'bg-orange-50 text-orange-600' },
   URGENT: { label: 'Urgent', dot: 'bg-red-500',    badge: 'bg-red-50 text-red-600'     },
 };
 
-const CATEGORY_CONFIG: Record<WOCategory, { label: string; icon: string }> = {
+export const CATEGORY_CONFIG: Record<WOCategory, { label: string; icon: string }> = {
   ELECTRICAL:  { label: 'Electrical',  icon: '⚡' },
   PLUMBING:    { label: 'Plumbing',    icon: '🔧' },
   HVAC:        { label: 'HVAC',        icon: '❄️' },
@@ -113,7 +118,7 @@ const STATUS_TRANSITIONS: Record<WOStatus, WOStatus[]> = {
 };
 
 // ── Helpers ────────────────────────────────────────────────
-function extractErr(err: unknown): string {
+export function extractErr(err: unknown): string {
   if (err && typeof err === 'object') {
     const e = err as Record<string, unknown>;
     if (e.response && typeof e.response === 'object') {
@@ -125,26 +130,26 @@ function extractErr(err: unknown): string {
     }
     if (typeof e.message === 'string') return e.message;
   }
-  return 'Terjadi kesalahan';
+  return 'Something went wrong';
 }
 
-function formatDate(d: string | null) {
+export function formatDate(d: string | null) {
   if (!d) return null;
-  return new Date(d).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
+  return new Date(d).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
 function formatRelative(d: string) {
   const diff = Date.now() - new Date(d).getTime();
   const mins = Math.floor(diff / 60000);
-  if (mins < 1)   return 'baru saja';
-  if (mins < 60)  return `${mins} menit lalu`;
+  if (mins < 1)   return 'just now';
+  if (mins < 60)  return `${mins}m ago`;
   const hrs = Math.floor(mins / 60);
-  if (hrs < 24)   return `${hrs} jam lalu`;
+  if (hrs < 24)   return `${hrs}h ago`;
   const days = Math.floor(hrs / 24);
-  return `${days} hari lalu`;
+  return `${days}d ago`;
 }
 
-function isOverdue(wo: WorkOrder) {
+export function isOverdue(wo: WorkOrder) {
   return wo.dueDate && wo.status !== 'DONE' && wo.status !== 'CANCELLED'
     && new Date(wo.dueDate) < new Date();
 }
@@ -159,7 +164,7 @@ function fileToBase64(file: File): Promise<string> {
 }
 
 // ── Sub-components ─────────────────────────────────────────
-function PriorityBadge({ priority }: { priority: WOPriority }) {
+export function PriorityBadge({ priority }: { priority: WOPriority }) {
   const cfg = PRIORITY_CONFIG[priority];
   return (
     <span className={cn('inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-full', cfg.badge)}>
@@ -169,7 +174,7 @@ function PriorityBadge({ priority }: { priority: WOPriority }) {
   );
 }
 
-function StatusBadge({ status }: { status: WOStatus }) {
+export function StatusBadge({ status }: { status: WOStatus }) {
   const cfg = STATUS_CONFIG[status];
   const Icon = cfg.icon;
   return (
@@ -180,7 +185,7 @@ function StatusBadge({ status }: { status: WOStatus }) {
   );
 }
 
-function CategoryBadge({ category }: { category: WOCategory }) {
+export function CategoryBadge({ category }: { category: WOCategory }) {
   const cfg = CATEGORY_CONFIG[category];
   return (
     <span className="inline-flex items-center gap-1 text-[10px] text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded-full">
@@ -190,7 +195,7 @@ function CategoryBadge({ category }: { category: WOCategory }) {
   );
 }
 
-function Avatar({ user, size = 6 }: { user: WOUser | null; size?: number }) {
+export function Avatar({ user, size = 6 }: { user: WOUser | null; size?: number }) {
   if (!user) return <div className={cn('rounded-full bg-gray-200', `w-${size} h-${size}`)} />;
   return user.avatar
     ? <img src={user.avatar} alt={user.fullName} className={cn('rounded-full object-cover flex-shrink-0', `w-${size} h-${size}`)} />
@@ -246,7 +251,7 @@ function WorkOrderModal({
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!form.title.trim()) { toast.error('Judul wajib diisi'); return; }
+    if (!form.title.trim()) { toast.error('Title is required'); return; }
     setSaving(true);
     try {
       const payload = {
@@ -263,7 +268,7 @@ function WorkOrderModal({
         ? await api.patch(`/work-orders/${editItem.id}`, payload)
         : await api.post('/work-orders', payload);
       onSaved(res.data.data);
-      toast.success(editItem ? 'Work order diperbarui' : 'Work order dibuat');
+      toast.success(editItem ? 'Work order updated' : 'Work order created');
       onClose();
     } catch (err) { toast.error(extractErr(err)); } finally { setSaving(false); }
   }
@@ -276,34 +281,34 @@ function WorkOrderModal({
       >
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
           <h2 className="font-semibold text-gray-900">
-            {editItem ? `Edit ${editItem.code}` : 'Buat Work Order'}
+            {editItem ? `Edit ${editItem.code}` : 'Create Work Order'}
           </h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
         </div>
 
         <form onSubmit={handleSubmit} className="p-5 space-y-4">
           <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">Judul *</label>
+            <label className="block text-xs font-medium text-gray-700 mb-1">Title *</label>
             <input
               value={form.title} onChange={(e) => set('title', e.target.value)}
               className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-navy/30"
-              placeholder="Deskripsi singkat masalah..."
+              placeholder="Short description of the issue..."
             />
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">Deskripsi</label>
+            <label className="block text-xs font-medium text-gray-700 mb-1">Description</label>
             <textarea
               value={form.description} onChange={(e) => set('description', e.target.value)}
               rows={3}
               className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-navy/30 resize-none"
-              placeholder="Detail lebih lanjut tentang masalah..."
+              placeholder="More detail about the issue..."
             />
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Prioritas</label>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Priority</label>
               <select
                 value={form.priority} onChange={(e) => set('priority', e.target.value as WOPriority)}
                 className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-navy/30"
@@ -314,7 +319,7 @@ function WorkOrderModal({
               </select>
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Kategori</label>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Category</label>
               <select
                 value={form.category} onChange={(e) => set('category', e.target.value as WOCategory)}
                 className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-navy/30"
@@ -328,15 +333,15 @@ function WorkOrderModal({
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Lokasi</label>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Location</label>
               <input
                 value={form.location} onChange={(e) => set('location', e.target.value)}
                 className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-navy/30"
-                placeholder="Gedung / lantai / ruangan"
+                placeholder="Building / floor / room"
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Deadline (SLA)</label>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Due Date (SLA)</label>
               <input
                 type="datetime-local" value={form.dueDate}
                 onChange={(e) => set('dueDate', e.target.value)}
@@ -346,12 +351,12 @@ function WorkOrderModal({
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">Assign ke Teknisi</label>
+            <label className="block text-xs font-medium text-gray-700 mb-1">Assign to Technician</label>
             <select
               value={form.assignedToId} onChange={(e) => set('assignedToId', e.target.value)}
               className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-navy/30"
             >
-              <option value="">— Belum diassign (validasi dulu) —</option>
+              <option value="">— Unassigned —</option>
               {users.map((u) => (
                 <option key={u.id} value={u.id}>{u.fullName}</option>
               ))}
@@ -360,26 +365,26 @@ function WorkOrderModal({
 
           {editItem && (
             <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Catatan Teknisi</label>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Technician Notes</label>
               <textarea
                 value={form.notes} onChange={(e) => set('notes', e.target.value)}
                 rows={2}
                 className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-navy/30 resize-none"
-                placeholder="Catatan internal untuk teknisi..."
+                placeholder="Internal notes for the technician..."
               />
             </div>
           )}
 
           <div className="flex gap-2 pt-1">
             <button type="button" onClick={onClose} className="flex-1 px-4 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50">
-              Batal
+              Cancel
             </button>
             <button
               type="submit" disabled={saving}
               className="flex-1 px-4 py-2 text-sm bg-navy text-white rounded-lg hover:bg-navy/90 disabled:opacity-60 flex items-center justify-center gap-2"
             >
               {saving ? <Loader2 size={14} className="animate-spin" /> : null}
-              {editItem ? 'Simpan' : 'Buat WO'}
+              {editItem ? 'Save' : 'Create WO'}
             </button>
           </div>
         </form>
@@ -409,7 +414,7 @@ function StatusModal({
     try {
       const res = await api.patch(`/work-orders/${wo.id}/status`, { status: selected, note: note.trim() || null });
       onChanged(res.data.data);
-      toast.success('Status diperbarui');
+      toast.success('Status updated');
       onClose();
     } catch (err) { toast.error(extractErr(err)); } finally { setSaving(false); }
   }
@@ -418,12 +423,12 @@ function StatusModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4" onClick={onClose}>
       <div className="bg-white rounded-xl shadow-xl w-full max-w-sm" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
-          <h2 className="font-semibold text-gray-900">Ubah Status</h2>
+          <h2 className="font-semibold text-gray-900">Change Status</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
         </div>
         <div className="p-5 space-y-4">
           {transitions.length === 0 && (
-            <p className="text-sm text-gray-500 text-center py-2">Status ini sudah final.</p>
+            <p className="text-sm text-gray-500 text-center py-2">This status is final.</p>
           )}
           <div className="space-y-2">
             {transitions.map((s) => {
@@ -444,7 +449,7 @@ function StatusModal({
                   <div>
                     <p className="text-sm font-medium text-gray-800">{cfg.label}</p>
                     {s === 'PENDING_REVIEW' && (
-                      <p className="text-[10px] text-gray-400">Butuh minimal 1 foto sesudah pengerjaan</p>
+                      <p className="text-[10px] text-gray-400">Requires at least 1 "after" photo</p>
                     )}
                   </div>
                   {selected === s && <Check size={14} className="ml-auto text-navy" />}
@@ -454,25 +459,25 @@ function StatusModal({
           </div>
           {selected && (
             <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Catatan (opsional)</label>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Note (optional)</label>
               <textarea
                 value={note} onChange={(e) => setNote(e.target.value)}
                 rows={2}
                 className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-navy/30 resize-none"
-                placeholder="Alasan perubahan status..."
+                placeholder="Reason for the status change..."
               />
             </div>
           )}
           <div className="flex gap-2">
             <button onClick={onClose} className="flex-1 px-4 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50">
-              Batal
+              Cancel
             </button>
             <button
               onClick={handleSave} disabled={!selected || saving}
               className="flex-1 px-4 py-2 text-sm bg-navy text-white rounded-lg hover:bg-navy/90 disabled:opacity-60 flex items-center justify-center gap-2"
             >
               {saving ? <Loader2 size={14} className="animate-spin" /> : null}
-              Simpan
+              Save
             </button>
           </div>
         </div>
@@ -499,14 +504,14 @@ function ReviewModal({
   async function handleSave() {
     if (!decision) return;
     if (decision === 'REJECTED' && !reviewNotes.trim()) {
-      toast.error('Alasan penolakan wajib diisi');
+      toast.error('A rejection reason is required');
       return;
     }
     setSaving(true);
     try {
       const res = await api.patch(`/work-orders/${wo.id}/review`, { decision, reviewNotes: reviewNotes.trim() || null });
       onReviewed(res.data.data);
-      toast.success(decision === 'APPROVED' ? 'Work order disetujui dan ditutup' : 'Work order dikembalikan untuk revisi');
+      toast.success(decision === 'APPROVED' ? 'Work order approved and closed' : 'Work order sent back for revision');
       onClose();
     } catch (err) { toast.error(extractErr(err)); } finally { setSaving(false); }
   }
@@ -515,21 +520,21 @@ function ReviewModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4" onClick={onClose}>
       <div className="bg-white rounded-xl shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
-          <h2 className="font-semibold text-gray-900">Review Hasil Pekerjaan</h2>
+          <h2 className="font-semibold text-gray-900">Review Completed Work</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
         </div>
         <div className="p-5 space-y-4">
           <p className="text-sm text-gray-600">{wo.code} — {wo.title}</p>
 
           <div>
-            <p className="text-xs font-medium text-gray-700 mb-1.5">Foto Sesudah Pengerjaan</p>
+            <p className="text-xs font-medium text-gray-700 mb-1.5">After-work Photos</p>
             {afterPhotos.length === 0 ? (
-              <p className="text-xs text-gray-400 flex items-center gap-1.5"><ImageOff size={13} /> Tidak ada foto</p>
+              <p className="text-xs text-gray-400 flex items-center gap-1.5"><ImageOff size={13} /> No photos</p>
             ) : (
               <div className="grid grid-cols-3 gap-2">
                 {afterPhotos.map((a) => (
                   <a key={a.id} href={a.filePath} target="_blank" rel="noopener noreferrer">
-                    <img src={a.filePath} alt="Sesudah" className="w-full h-20 object-cover rounded-lg border border-gray-200" />
+                    <img src={a.filePath} alt="After" className="w-full h-20 object-cover rounded-lg border border-gray-200" />
                   </a>
                 ))}
               </div>
@@ -544,7 +549,7 @@ function ReviewModal({
                 decision === 'APPROVED' ? 'border-green-500 bg-green-50 text-green-700' : 'border-gray-200 text-gray-600 hover:bg-gray-50',
               )}
             >
-              <ThumbsUp size={14} /> Setujui
+              <ThumbsUp size={14} /> Approve
             </button>
             <button
               onClick={() => setDecision('REJECTED')}
@@ -553,27 +558,27 @@ function ReviewModal({
                 decision === 'REJECTED' ? 'border-red-500 bg-red-50 text-red-700' : 'border-gray-200 text-gray-600 hover:bg-gray-50',
               )}
             >
-              <ThumbsDown size={14} /> Tolak
+              <ThumbsDown size={14} /> Reject
             </button>
           </div>
 
           {decision && (
             <div>
               <label className="block text-xs font-medium text-gray-700 mb-1">
-                {decision === 'REJECTED' ? 'Alasan penolakan *' : 'Catatan (opsional)'}
+                {decision === 'REJECTED' ? 'Rejection reason *' : 'Note (optional)'}
               </label>
               <textarea
                 value={reviewNotes} onChange={(e) => setReviewNotes(e.target.value)}
                 rows={3}
                 className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-navy/30 resize-none"
-                placeholder={decision === 'REJECTED' ? 'Jelaskan apa yang perlu diperbaiki...' : 'Catatan tambahan...'}
+                placeholder={decision === 'REJECTED' ? 'Explain what needs to be fixed...' : 'Additional notes...'}
               />
             </div>
           )}
 
           <div className="flex gap-2 pt-1">
             <button onClick={onClose} className="flex-1 px-4 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50">
-              Batal
+              Cancel
             </button>
             <button
               onClick={handleSave} disabled={!decision || saving}
@@ -583,7 +588,7 @@ function ReviewModal({
               )}
             >
               {saving ? <Loader2 size={14} className="animate-spin" /> : null}
-              {decision === 'REJECTED' ? 'Kirim Penolakan' : 'Setujui & Tutup WO'}
+              {decision === 'REJECTED' ? 'Send Rejection' : 'Approve & Close WO'}
             </button>
           </div>
         </div>
@@ -614,13 +619,13 @@ function AssigneePickerModal({
           <h2 className="font-semibold text-gray-900">Assign Work Order</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
         </div>
-        <p className="px-5 pt-3 text-xs text-gray-500">Pilih teknisi untuk &quot;{wo.title}&quot;</p>
+        <p className="px-5 pt-3 text-xs text-gray-500">Pick a technician for &quot;{wo.title}&quot;</p>
         <div className="px-5 pt-3 flex-shrink-0">
           <input
             autoFocus
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Cari nama..."
+            placeholder="Search name..."
             className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-navy/30"
           />
         </div>
@@ -636,42 +641,8 @@ function AssigneePickerModal({
             </button>
           ))}
           {filtered.length === 0 && (
-            <p className="text-center text-xs text-gray-400 py-6">Tidak ada karyawan yang cocok</p>
+            <p className="text-center text-xs text-gray-400 py-6">No matching employee</p>
           )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ── Finalize Confirmation (DONE / CANCELLED are terminal) ──
-function ConfirmFinalizeModal({
-  pending, onClose, onConfirm,
-}: {
-  pending: { wo: WorkOrder; status: WOStatus } | null;
-  onClose: () => void; onConfirm: () => void;
-}) {
-  if (!pending) return null;
-  const cfg = STATUS_CONFIG[pending.status];
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4" onClick={onClose}>
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-sm" onClick={(e) => e.stopPropagation()}>
-        <div className="p-5">
-          <h2 className="font-semibold text-gray-900 mb-1">Tandai sebagai {cfg.label}?</h2>
-          <p className="text-sm text-gray-500">
-            &quot;{pending.wo.title}&quot; akan ditandai <span className={cn('font-medium', cfg.color)}>{cfg.label}</span>.
-          </p>
-        </div>
-        <div className="flex gap-2 px-5 pb-5">
-          <button onClick={onClose} className="flex-1 px-4 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50">
-            Batal
-          </button>
-          <button
-            onClick={onConfirm}
-            className="flex-1 px-4 py-2 text-sm bg-navy text-white rounded-lg hover:bg-navy/90"
-          >
-            Ya, {cfg.label}
-          </button>
         </div>
       </div>
     </div>
@@ -726,7 +697,7 @@ function WOCard({
             <Calendar size={10} /> {formatDate(wo.dueDate)}
           </span>
         )}
-        <span className="text-[10px] text-gray-400 truncate">oleh {wo.reportedBy.fullName}</span>
+        <span className="text-[10px] text-gray-400 truncate">by {wo.reportedBy.fullName}</span>
         {wo.assignee && <div className="ml-auto flex-shrink-0"><Avatar user={wo.assignee} size={5} /></div>}
       </div>
     </div>
@@ -762,7 +733,7 @@ function WOColumn({
           <WOCard key={wo.id} wo={wo} selected={selectedId === wo.id} draggable={canDragWO(wo)} onSelect={() => onSelect(wo.id)} />
         ))}
         {workOrders.length === 0 && (
-          <p className="text-center text-[11px] text-gray-300 py-6">Kosong</p>
+          <p className="text-center text-[11px] text-gray-300 py-6">Empty</p>
         )}
       </div>
     </div>
@@ -770,7 +741,7 @@ function WOColumn({
 }
 
 // ── Table / List view ───────────────────────────────────────
-function WOTable({
+export function WOTable({
   workOrders, selectedId, onSelect,
 }: {
   workOrders: WorkOrder[]; selectedId: string | null; onSelect: (id: string) => void;
@@ -780,12 +751,12 @@ function WOTable({
       <table className="w-full text-sm">
         <thead className="sticky top-0 bg-gray-50 z-10">
           <tr className="text-left text-[11px] font-medium text-gray-500 uppercase tracking-wide">
-            <th className="px-4 py-2.5">Kode</th>
-            <th className="px-4 py-2.5">Judul</th>
-            <th className="px-4 py-2.5">Kategori</th>
-            <th className="px-4 py-2.5">Prioritas</th>
+            <th className="px-4 py-2.5">Code</th>
+            <th className="px-4 py-2.5">Title</th>
+            <th className="px-4 py-2.5">Category</th>
+            <th className="px-4 py-2.5">Priority</th>
             <th className="px-4 py-2.5">Status</th>
-            <th className="px-4 py-2.5">Teknisi</th>
+            <th className="px-4 py-2.5">Technician</th>
             <th className="px-4 py-2.5">Due</th>
           </tr>
         </thead>
@@ -818,7 +789,7 @@ function WOTable({
             );
           })}
           {workOrders.length === 0 && (
-            <tr><td colSpan={7} className="text-center text-gray-400 text-sm py-12">Tidak ada work order</td></tr>
+            <tr><td colSpan={7} className="text-center text-gray-400 text-sm py-12">No work orders</td></tr>
           )}
         </tbody>
       </table>
@@ -850,7 +821,7 @@ function PhotoSection({
         attachments: [...(wo.attachments ?? []), res.data.data],
         _count: { ...wo._count, attachments: wo._count.attachments + 1 },
       });
-      toast.success('Foto berhasil diunggah');
+      toast.success('Photo uploaded');
     } catch (err) { toast.error(extractErr(err)); } finally { setUploading(null); }
   }
 
@@ -873,7 +844,7 @@ function PhotoSection({
     <div className="grid grid-cols-2 gap-4">
       <div>
         <div className="flex items-center justify-between mb-1.5">
-          <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wide">Sebelum</p>
+          <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wide">Before</p>
           {canUpload && (
             <button
               onClick={() => beforeInputRef.current?.click()}
@@ -884,7 +855,7 @@ function PhotoSection({
             </button>
           )}
         </div>
-        <PhotoGrid photos={before} emptyLabel="Belum ada foto" />
+        <PhotoGrid photos={before} emptyLabel="No photo yet" />
         <input
           ref={beforeInputRef} type="file" accept="image/*" capture="environment" className="hidden"
           onChange={(e) => handleFile('BEFORE', e.target.files?.[0])}
@@ -892,7 +863,7 @@ function PhotoSection({
       </div>
       <div>
         <div className="flex items-center justify-between mb-1.5">
-          <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wide">Sesudah</p>
+          <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wide">After</p>
           {canUpload && (
             <button
               onClick={() => afterInputRef.current?.click()}
@@ -903,7 +874,7 @@ function PhotoSection({
             </button>
           )}
         </div>
-        <PhotoGrid photos={after} emptyLabel="Wajib sebelum submit review" />
+        <PhotoGrid photos={after} emptyLabel="Required before submitting for review" />
         <input
           ref={afterInputRef} type="file" accept="image/*" capture="environment" className="hidden"
           onChange={(e) => handleFile('AFTER', e.target.files?.[0])}
@@ -914,7 +885,7 @@ function PhotoSection({
 }
 
 // ── WO Detail Panel ────────────────────────────────────────
-function WODetail({
+export function WODetail({
   wo, onClose, onEdit, onStatusChange, onReview, onDeleted, onUpdated,
   currentUserId, currentDivisionId, editScope, deleteScope,
 }: {
@@ -935,7 +906,9 @@ function WODetail({
   // Status changes go through the 'edit' permission on the backend (same route guard),
   // and 'own' scope there additionally allows the assignee, not just the reporter.
   const canStatus  = hasScope(editScope, isReporter || isAssignee, sameDivision);
-  const canReview  = canStatus && wo.status === 'PENDING_REVIEW';
+  // Reviewing your own work order is blocked server-side too — the assignee (whoever
+  // did the work) can never be the one who approves/rejects it, regardless of scope.
+  const canReview  = canStatus && !isAssignee && wo.status === 'PENDING_REVIEW';
   const isFinal    = wo.status === 'DONE' || wo.status === 'CANCELLED';
   const isPendingReview = wo.status === 'PENDING_REVIEW';
 
@@ -944,7 +917,7 @@ function WODetail({
     setDeleting(true);
     try {
       await api.delete(`/work-orders/${wo.id}`);
-      toast.success('Work order dihapus');
+      toast.success('Work order deleted');
       onDeleted();
     } catch (err) { toast.error(extractErr(err)); } finally { setDeleting(false); setConfirmDel(false); }
   }
@@ -972,42 +945,42 @@ function WODetail({
         {/* Meta grid */}
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1">
-            <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wide">Dilaporkan oleh</p>
+            <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wide">Reported by</p>
             <div className="flex items-center gap-2">
               <Avatar user={wo.reportedBy} size={6} />
               <span className="text-xs text-gray-700">{wo.reportedBy.fullName}</span>
             </div>
           </div>
           <div className="space-y-1">
-            <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wide">Ditugaskan ke</p>
+            <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wide">Assigned to</p>
             {wo.assignee ? (
               <div className="flex items-center gap-2">
                 <Avatar user={wo.assignee} size={6} />
                 <span className="text-xs text-gray-700">{wo.assignee.fullName}</span>
               </div>
-            ) : <span className="text-xs text-gray-400">Belum diassign</span>}
+            ) : <span className="text-xs text-gray-400">Unassigned</span>}
           </div>
           {wo.assignedBy && (
             <div className="space-y-1">
-              <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wide">Ditugaskan oleh</p>
+              <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wide">Assigned by</p>
               <span className="text-xs text-gray-700">{wo.assignedBy.fullName}</span>
             </div>
           )}
           {wo.location && (
             <div className="space-y-1 col-span-2">
-              <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wide">Lokasi</p>
+              <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wide">Location</p>
               <div className="flex items-center gap-1.5 text-xs text-gray-700">
                 <MapPin size={12} className="text-gray-400" /> {wo.location}
               </div>
             </div>
           )}
           <div className="space-y-1">
-            <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wide">Dibuat</p>
+            <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wide">Created</p>
             <p className="text-xs text-gray-700">{formatDate(wo.createdAt)}</p>
           </div>
           {wo.dueDate && (
             <div className="space-y-1">
-              <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wide">Deadline</p>
+              <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wide">Due Date</p>
               <p className={cn('text-xs', isOverdue(wo) ? 'text-red-500 font-medium' : 'text-gray-700')}>
                 {formatDate(wo.dueDate)} {isOverdue(wo) && '⚠️'}
               </p>
@@ -1015,7 +988,7 @@ function WODetail({
           )}
           {wo.closedAt && (
             <div className="space-y-1">
-              <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wide">Ditutup</p>
+              <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wide">Closed</p>
               <p className="text-xs text-green-600 font-medium">{formatDate(wo.closedAt)}</p>
             </div>
           )}
@@ -1024,7 +997,7 @@ function WODetail({
         {/* Description */}
         {wo.description && (
           <div>
-            <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wide mb-1.5">Deskripsi</p>
+            <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wide mb-1.5">Description</p>
             <p className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">{wo.description}</p>
           </div>
         )}
@@ -1032,7 +1005,7 @@ function WODetail({
         {/* Notes */}
         {wo.notes && (
           <div className="bg-amber-50 border border-amber-100 rounded-lg p-3">
-            <p className="text-[10px] font-medium text-amber-700 uppercase tracking-wide mb-1">Catatan Teknisi</p>
+            <p className="text-[10px] font-medium text-amber-700 uppercase tracking-wide mb-1">Technician Notes</p>
             <p className="text-sm text-amber-900 whitespace-pre-wrap">{wo.notes}</p>
           </div>
         )}
@@ -1040,7 +1013,7 @@ function WODetail({
         {wo.reviewNotes && (
           <div className={cn('rounded-lg p-3 border', wo.status === 'DONE' ? 'bg-green-50 border-green-100' : 'bg-red-50 border-red-100')}>
             <p className={cn('text-[10px] font-medium uppercase tracking-wide mb-1', wo.status === 'DONE' ? 'text-green-700' : 'text-red-700')}>
-              Catatan Review {wo.reviewedBy && `— ${wo.reviewedBy.fullName}`}
+              Review Note {wo.reviewedBy && `— ${wo.reviewedBy.fullName}`}
             </p>
             <p className="text-sm whitespace-pre-wrap text-gray-800">{wo.reviewNotes}</p>
           </div>
@@ -1049,13 +1022,13 @@ function WODetail({
         {/* Photo evidence */}
         {!isFinal && wo.status !== 'OPEN' && wo.status !== 'VALIDATED' && (
           <div>
-            <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wide mb-2">Bukti Foto</p>
+            <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wide mb-2">Photo Evidence</p>
             <PhotoSection wo={wo} canUpload={canStatus && !isPendingReview} onUploaded={onUpdated} />
           </div>
         )}
         {(isFinal || isPendingReview) && wo.attachments && wo.attachments.length > 0 && (
           <div>
-            <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wide mb-2">Bukti Foto</p>
+            <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wide mb-2">Photo Evidence</p>
             <PhotoSection wo={wo} canUpload={false} onUploaded={onUpdated} />
           </div>
         )}
@@ -1068,7 +1041,7 @@ function WODetail({
               className="flex items-center gap-1.5 text-[10px] font-medium text-gray-400 uppercase tracking-wide hover:text-gray-600 w-full"
             >
               <History size={12} />
-              Riwayat ({wo.history.length})
+              History ({wo.history.length})
               {showHistory ? <ChevronUp size={12} className="ml-auto" /> : <ChevronDown size={12} className="ml-auto" />}
             </button>
             {showHistory && (
@@ -1081,7 +1054,7 @@ function WODetail({
                         <span className="font-medium text-gray-700">{h.changedBy.fullName}</span>
                         {h.fromStatus && (
                           <>
-                            <span className="text-gray-400">mengubah dari</span>
+                            <span className="text-gray-400">changed from</span>
                             <StatusBadge status={h.fromStatus} />
                             <ArrowRight size={10} className="text-gray-300" />
                           </>
@@ -1106,7 +1079,7 @@ function WODetail({
             onClick={onReview}
             className="flex items-center gap-1.5 px-3 py-2 text-xs bg-purple-600 text-white rounded-lg hover:bg-purple-700"
           >
-            <ClipboardCheck size={12} /> Review Hasil
+            <ClipboardCheck size={12} /> Review Work
           </button>
         )}
         {canStatus && !isFinal && !isPendingReview && (
@@ -1114,7 +1087,7 @@ function WODetail({
             onClick={onStatusChange}
             className="flex items-center gap-1.5 px-3 py-2 text-xs bg-navy text-white rounded-lg hover:bg-navy/90"
           >
-            <RefreshCw size={12} /> Ubah Status
+            <RefreshCw size={12} /> Change Status
           </button>
         )}
         {canEdit && !isFinal && (
@@ -1134,7 +1107,7 @@ function WODetail({
             )}
           >
             {deleting ? <Loader2 size={12} className="animate-spin" /> : null}
-            {confirmDel ? 'Klik lagi untuk hapus' : 'Hapus'}
+            {confirmDel ? 'Click again to delete' : 'Delete'}
           </button>
         )}
       </div>
@@ -1153,7 +1126,7 @@ function StatsBar({ stats }: {
   if (!stats) return null;
 
   const openCount = stats.byStatus.filter((s) => s.status !== 'DONE' && s.status !== 'CANCELLED').reduce((a, b) => a + b._count, 0);
-  const doneCount = stats.byStatus.find((s) => s.status === 'DONE')?._count ?? 0;
+  const pendingReviewCount = stats.byStatus.find((s) => s.status === 'PENDING_REVIEW')?._count ?? 0;
   const urgentCount = stats.byPriority.find((p) => p.priority === 'URGENT')?._count ?? 0;
 
   return (
@@ -1161,13 +1134,15 @@ function StatsBar({ stats }: {
       <div className="flex items-center gap-1.5 text-xs whitespace-nowrap">
         <Wrench size={12} className="text-navy" />
         <span className="font-semibold text-navy">{openCount}</span>
-        <span className="text-gray-500">Aktif</span>
+        <span className="text-gray-500">Active</span>
       </div>
-      <div className="flex items-center gap-1.5 text-xs whitespace-nowrap">
-        <CheckCircle2 size={12} className="text-green-500" />
-        <span className="font-semibold text-green-600">{doneCount}</span>
-        <span className="text-gray-500">Selesai</span>
-      </div>
+      {pendingReviewCount > 0 && (
+        <div className="flex items-center gap-1.5 text-xs whitespace-nowrap">
+          <ClipboardCheck size={12} className="text-purple-500" />
+          <span className="font-semibold text-purple-600">{pendingReviewCount}</span>
+          <span className="text-gray-500">Pending Review</span>
+        </div>
+      )}
       {stats.overdue > 0 && (
         <div className="flex items-center gap-1.5 text-xs whitespace-nowrap">
           <AlertCircle size={12} className="text-red-500" />
@@ -1215,7 +1190,6 @@ export default function WorkOrderPage() {
 
   const [dragWO, setDragWO]           = useState<WorkOrder | null>(null);
   const [assignPickerWO, setAssignPickerWO] = useState<WorkOrder | null>(null);
-  const [pendingFinalize, setPendingFinalize] = useState<{ wo: WorkOrder; status: WOStatus } | null>(null);
 
   const [users, setUsers]   = useState<WOUser[]>([]);
   const [totalCount, setTotalCount] = useState(0);
@@ -1234,7 +1208,10 @@ export default function WorkOrderPage() {
   const fetchWOs = useCallback(async (pageArg = 1, append = false) => {
     (append ? setLoadingMore : setLoading)(true);
     try {
-      const params: Record<string, string> = { view, limit: String(pageSize), page: String(pageArg) };
+      // scope=active — DONE/CANCELLED work orders live in WorkOrderHistoryPage instead.
+      const params: Record<string, string> = { scope: 'active', limit: String(pageSize), page: String(pageArg) };
+      if (view === 'pendingReview') params.status = 'PENDING_REVIEW';
+      else params.view = view;
       if (priorityFilter) params.priority = priorityFilter;
       if (categoryFilter) params.category = categoryFilter;
       if (assigneeFilter) params.assignedToId = assigneeFilter;
@@ -1260,7 +1237,7 @@ export default function WorkOrderPage() {
   const fetchUsers = useCallback(async () => {
     try {
       // Managers with company-wide scope see everyone; division-scoped roles
-      // (e.g. Admin Lapangan) only see/assign within their own division.
+      // (e.g. field admins) only see/assign within their own division.
       const params: Record<string, string | boolean> = { limit: '100', isActive: true };
       if (woPerms.edit !== 'all' && user?.division?.id) params.division = user.division.id;
       const res = await api.get('/users', { params });
@@ -1319,7 +1296,7 @@ export default function WorkOrderPage() {
     try {
       const res = await api.patch(`/work-orders/${wo.id}/status`, { status, note: null });
       handleSaved(res.data.data);
-      toast.success('Status diperbarui');
+      toast.success('Status updated');
     } catch (err) {
       setWorkOrders((prev) => prev.map((w) => (w.id === wo.id ? { ...w, status: prevStatus } : w)));
       toast.error(extractErr(err));
@@ -1331,7 +1308,7 @@ export default function WorkOrderPage() {
     try {
       const res = await api.patch(`/work-orders/${assignPickerWO.id}`, { assignedToId: userId });
       handleSaved(res.data.data);
-      toast.success('Work order ditugaskan');
+      toast.success('Work order assigned');
     } catch (err) { toast.error(extractErr(err)); } finally { setAssignPickerWO(null); }
   }
 
@@ -1351,19 +1328,12 @@ export default function WorkOrderPage() {
     if (targetStatus === wo.status) return;
 
     if (!STATUS_TRANSITIONS[wo.status].includes(targetStatus)) {
-      toast.error('Perpindahan status ini tidak diizinkan');
+      toast.error('This status transition is not allowed');
       return;
     }
 
     if (targetStatus === 'ASSIGNED' && !wo.assignee) {
       setAssignPickerWO(wo);
-      return;
-    }
-
-    // DONE/CANCELLED are terminal — confirm before finalizing so an accidental
-    // drag can't close a work order with no way back.
-    if (targetStatus === 'DONE' || targetStatus === 'CANCELLED') {
-      setPendingFinalize({ wo, status: targetStatus });
       return;
     }
 
@@ -1379,10 +1349,11 @@ export default function WorkOrderPage() {
   }
 
   const sidebarViews: { id: ViewFilter; label: string }[] = [
-    { id: 'all',        label: 'Semua WO'     },
-    { id: 'mine',       label: 'Tugas Saya' },
-    { id: 'reported',   label: 'Saya Laporkan' },
-    { id: 'unassigned', label: 'Belum Diassign' },
+    { id: 'all',           label: 'All Work Orders'  },
+    { id: 'mine',          label: 'My Tasks'         },
+    { id: 'reported',      label: 'Reported by Me'   },
+    { id: 'unassigned',    label: 'Unassigned'       },
+    { id: 'pendingReview', label: 'Pending Review'   },
   ];
 
   return (
@@ -1420,7 +1391,7 @@ export default function WorkOrderPage() {
               onClick={() => { setEditItem(null); setModalOpen(true); }}
               className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-navy text-white text-sm rounded-lg hover:bg-navy/90"
             >
-              <Plus size={16} /> Buat WO
+              <Plus size={16} /> Create WO
             </button>
           </div>
         )}
@@ -1439,7 +1410,7 @@ export default function WorkOrderPage() {
               onClick={() => { setEditItem(null); setModalOpen(true); }}
               className="flex items-center justify-center gap-1.5 px-3 py-2 bg-navy text-white text-sm rounded-lg"
             >
-              <Plus size={16} /> Buat
+              <Plus size={16} /> Create
             </button>
           )}
         </div>
@@ -1467,7 +1438,7 @@ export default function WorkOrderPage() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && fetchWOs()}
-            placeholder="Cari kode / judul work order..."
+            placeholder="Search code / title..."
             className="flex-1 min-w-[140px] max-w-xs text-sm border border-gray-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-navy/30"
           />
           <button
@@ -1506,7 +1477,7 @@ export default function WorkOrderPage() {
                 onChange={(e) => setPriorityFilter(e.target.value as WOPriority | '')}
                 className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white focus:outline-none"
               >
-                <option value="">Semua Prioritas</option>
+                <option value="">All Priorities</option>
                 {(Object.keys(PRIORITY_CONFIG) as WOPriority[]).map((p) => (
                   <option key={p} value={p}>{PRIORITY_CONFIG[p].label}</option>
                 ))}
@@ -1516,7 +1487,7 @@ export default function WorkOrderPage() {
                 onChange={(e) => setCategoryFilter(e.target.value as WOCategory | '')}
                 className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white focus:outline-none"
               >
-                <option value="">Semua Kategori</option>
+                <option value="">All Categories</option>
                 {(Object.keys(CATEGORY_CONFIG) as WOCategory[]).map((c) => (
                   <option key={c} value={c}>{CATEGORY_CONFIG[c].icon} {CATEGORY_CONFIG[c].label}</option>
                 ))}
@@ -1526,7 +1497,7 @@ export default function WorkOrderPage() {
                 onChange={(e) => setAssigneeFilter(e.target.value)}
                 className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white focus:outline-none"
               >
-                <option value="">Semua Teknisi</option>
+                <option value="">All Technicians</option>
                 {users.map((u) => (
                   <option key={u.id} value={u.id}>{u.fullName}</option>
                 ))}
@@ -1535,7 +1506,7 @@ export default function WorkOrderPage() {
                 type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)}
                 className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white focus:outline-none"
               />
-              <span className="text-xs text-gray-400">s/d</span>
+              <span className="text-xs text-gray-400">to</span>
               <input
                 type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)}
                 className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white focus:outline-none"
@@ -1547,14 +1518,14 @@ export default function WorkOrderPage() {
         {totalCount > workOrders.length && (
           <div className="flex items-center gap-2 px-4 py-1.5 text-[11px] text-amber-700 bg-amber-50 border-b border-amber-100 flex-shrink-0">
             <AlertTriangle size={11} />
-            <span>Menampilkan {workOrders.length} dari {totalCount} work order.</span>
+            <span>Showing {workOrders.length} of {totalCount} work orders.</span>
             <button
               onClick={() => fetchWOs(boardPage + 1, true)}
               disabled={loadingMore}
               className="ml-auto flex items-center gap-1 font-medium text-amber-800 hover:underline disabled:opacity-60"
             >
               {loadingMore ? <Loader2 size={11} className="animate-spin" /> : null}
-              Muat lebih banyak
+              Load more
             </button>
           </div>
         )}
@@ -1569,7 +1540,7 @@ export default function WorkOrderPage() {
             {/* Mobile: flat stacked list, large tap targets, no drag */}
             <div className="lg:hidden flex-1 overflow-y-auto p-3 space-y-2.5">
               {workOrders.length === 0 ? (
-                <p className="text-center text-sm text-gray-400 py-12">Tidak ada work order</p>
+                <p className="text-center text-sm text-gray-400 py-12">No work orders</p>
               ) : workOrders.map((wo) => (
                 <WOCard key={wo.id} wo={wo} selected={selectedId === wo.id} draggable={false} large onSelect={() => handleSelect(wo.id)} />
               ))}
@@ -1673,16 +1644,6 @@ export default function WorkOrderPage() {
         users={users}
         onClose={() => setAssignPickerWO(null)}
         onAssigned={assignAndActivate}
-      />
-
-      <ConfirmFinalizeModal
-        pending={pendingFinalize}
-        onClose={() => setPendingFinalize(null)}
-        onConfirm={() => {
-          if (!pendingFinalize) return;
-          applyStatusChange(pendingFinalize.wo, pendingFinalize.status);
-          setPendingFinalize(null);
-        }}
       />
     </div>
   );

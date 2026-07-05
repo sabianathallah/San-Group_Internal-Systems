@@ -17,6 +17,7 @@ import PermissionPage from '@/pages/admin/PermissionPage';
 import AuditLogPage from '@/pages/admin/AuditLogPage';
 import NotificationsPage from '@/pages/NotificationsPage';
 import WorkOrderPage from '@/pages/WorkOrderPage';
+import WorkOrderHistoryPage from '@/pages/WorkOrderHistoryPage';
 import WorkOrderReportsPage from '@/pages/WorkOrderReportsPage';
 import HRISOverviewPage from '@/pages/hris/HRISOverviewPage';
 import AttendancePage from '@/pages/hris/AttendancePage';
@@ -47,9 +48,10 @@ function HrisReportsRoute() {
 
 function WorkOrderReportsRoute() {
   const perms = usePermStore((s) => s.perms);
-  // No dedicated "view reports" permission for Work Order yet — reuse edit
-  // scope as a proxy for admin/supervisor-level access, same idea as HRIS.
-  if (perms.work_order.edit === 'own') return <Navigate to={ROUTES.WORK_ORDERS} replace />;
+  // The /reports endpoint gates on the 'view' permission server-side (not 'edit'),
+  // so the client-side guard has to check the same scope or the two can disagree
+  // (e.g. a division-scoped editor who only has 'own' view would wrongly pass here).
+  if (perms.work_order.view === 'own') return <Navigate to={ROUTES.WORK_ORDERS} replace />;
   return <Outlet />;
 }
 
@@ -73,6 +75,7 @@ export default function App() {
           <Route path={ROUTES.ANALYTICS}      element={<AnalyticsPage />}      />
           <Route path={ROUTES.NOTIFICATIONS} element={<NotificationsPage />} />
           <Route path={ROUTES.WORK_ORDERS}   element={<WorkOrderPage />}     />
+          <Route path={ROUTES.WORK_ORDERS_HISTORY} element={<WorkOrderHistoryPage />} />
           <Route element={<WorkOrderReportsRoute />}>
             <Route path={ROUTES.WORK_ORDERS_REPORTS} element={<WorkOrderReportsPage />} />
           </Route>

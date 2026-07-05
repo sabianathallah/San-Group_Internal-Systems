@@ -3,7 +3,7 @@ import { WorkOrderCategory, WorkOrderPriority, WorkOrderStatus } from '@prisma/c
 
 export const createWorkOrderSchema = z.object({
   body: z.object({
-    title:       z.string().min(1, 'Judul wajib diisi').max(255),
+    title:       z.string().min(1, 'Title is required').max(255),
     description: z.string().max(5000).optional().nullable(),
     priority:    z.nativeEnum(WorkOrderPriority).optional(),
     category:    z.nativeEnum(WorkOrderCategory).optional(),
@@ -42,7 +42,7 @@ export const reviewWorkOrderSchema = z.object({
 
 export const addAttachmentSchema = z.object({
   body: z.object({
-    photoBase64: z.string().min(1, 'Foto wajib diisi'),
+    photoBase64: z.string().min(1, 'Photo is required'),
     type:        z.enum(['BEFORE', 'AFTER', 'OTHER']).default('OTHER'),
   }),
 });
@@ -57,6 +57,7 @@ export const workOrderFilterSchema = z.object({
     category:    z.nativeEnum(WorkOrderCategory).optional(),
     assignedToId: z.string().uuid().optional(),
     view:        z.enum(['all', 'mine', 'reported', 'unassigned']).optional(),
+    scope:       z.enum(['active', 'history']).optional(),
     dateFrom:    z.string().datetime({ offset: true }).optional(),
     dateTo:      z.string().datetime({ offset: true }).optional(),
   }),

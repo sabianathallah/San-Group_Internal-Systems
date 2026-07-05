@@ -14,6 +14,7 @@ export const ROUTES = {
   ADMIN_AUDIT_LOG:    '/admin/audit-log',
   NOTIFICATIONS:      '/notifications',
   WORK_ORDERS:         '/work-orders',
+  WORK_ORDERS_HISTORY: '/work-orders/history',
   WORK_ORDERS_REPORTS: '/work-orders/reports',
   HRIS:                  '/hris',
   HRIS_ATTENDANCE:       '/hris/attendance',

@@ -20,6 +20,7 @@ import {
   Timer,
   MapPin,
   CalendarClock,
+  Archive,
 } from 'lucide-react';
 import { useUiStore } from '@/stores/uiStore';
 import { useAuthStore } from '@/stores/authStore';
@@ -88,9 +89,10 @@ export default function Sidebar() {
     ...(canAnalytics ? [{ label: 'Analytics', to: ROUTES.ANALYTICS, icon: BarChart3 }] : []),
   ];
 
-  const canWorkOrderReports = perms.work_order?.edit !== 'own';
+  const canWorkOrderReports = perms.work_order?.view !== 'own';
   const workOrderNav: NavItem[] = [
-    { label: 'Work Orders', to: ROUTES.WORK_ORDERS, icon: Wrench },
+    { label: 'Work Orders', to: ROUTES.WORK_ORDERS,         icon: Wrench  },
+    { label: 'History',     to: ROUTES.WORK_ORDERS_HISTORY, icon: Archive },
     ...(canWorkOrderReports ? [{ label: 'Reports', to: ROUTES.WORK_ORDERS_REPORTS, icon: BarChart3 }] : []),
   ];
 
@@ -259,6 +261,11 @@ function SidebarLink({ item, open, badge }: { item: NavItem; open: boolean; badg
   return (
     <NavLink
       to={item.to}
+      // NavLink matches by path prefix by default, so without `end` a parent
+      // route (e.g. /work-orders, /hris) stays highlighted on every sibling
+      // sub-route (/work-orders/history, /hris/attendance, ...). Each nav item
+      // here is a distinct page, not a nested layout, so exact matching is correct.
+      end
       className={({ isActive }) =>
         cn(
           'flex items-center gap-3 px-2 py-2 rounded text-sm transition-colors duration-150',

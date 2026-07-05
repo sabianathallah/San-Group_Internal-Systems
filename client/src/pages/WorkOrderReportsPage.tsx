@@ -21,8 +21,8 @@ interface Report {
 function fmtDuration(mins: number) {
   const days = Math.floor(mins / (60 * 24));
   const hrs  = Math.floor((mins % (60 * 24)) / 60);
-  if (days > 0) return `${days}h ${hrs}j`;
-  return `${hrs}j ${mins % 60}m`;
+  if (days > 0) return `${days}d ${hrs}h`;
+  return `${hrs}h ${mins % 60}m`;
 }
 
 export default function WorkOrderReportsPage() {
@@ -52,7 +52,7 @@ export default function WorkOrderReportsPage() {
     else setMonth((m) => m + 1);
   }
 
-  const monthLabel = new Date(year, month - 1).toLocaleDateString('id-ID', { month: 'long', year: 'numeric' });
+  const monthLabel = new Date(year, month - 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 
   return (
     <div className="space-y-5 max-w-5xl">
@@ -60,9 +60,9 @@ export default function WorkOrderReportsPage() {
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-            <BarChart3 size={20} className="text-navy" /> Laporan Work Order
+            <BarChart3 size={20} className="text-navy" /> Work Order Report
           </h1>
-          <p className="text-sm text-gray-500 mt-0.5">Completion rate, waktu penyelesaian, dan performa teknisi</p>
+          <p className="text-sm text-gray-500 mt-0.5">Completion rate, resolution time, and technician performance</p>
         </div>
         <div className="flex items-center gap-1 bg-white border border-gray-200 rounded-lg px-1 flex-shrink-0">
           <button onClick={prevMonth} className="p-2 text-gray-400 hover:text-gray-700 transition-colors">
@@ -82,7 +82,7 @@ export default function WorkOrderReportsPage() {
       ) : !report || report.total === 0 ? (
         <div className="text-center py-16">
           <BarChart3 size={32} className="text-gray-200 mx-auto mb-3" />
-          <p className="text-gray-400 text-sm">Tidak ada work order pada periode ini</p>
+          <p className="text-gray-400 text-sm">No work orders in this period</p>
         </div>
       ) : (
         <>
@@ -91,12 +91,12 @@ export default function WorkOrderReportsPage() {
             <div className="rounded-xl p-4 bg-navy/5">
               <Wrench size={16} className="text-navy mb-1" />
               <p className="text-2xl font-bold text-navy">{report.total}</p>
-              <p className="text-xs text-gray-600 mt-0.5">Total Work Order</p>
+              <p className="text-xs text-gray-600 mt-0.5">Total Work Orders</p>
             </div>
             <div className="rounded-xl p-4 bg-green-50">
               <CheckCircle2 size={16} className="text-green-600 mb-1" />
               <p className="text-2xl font-bold text-green-600">{report.completed}</p>
-              <p className="text-xs text-gray-600 mt-0.5">Selesai</p>
+              <p className="text-xs text-gray-600 mt-0.5">Completed</p>
             </div>
             <div className="rounded-xl p-4 bg-amber-50">
               <Clock size={16} className="text-amber-600 mb-1" />
@@ -108,17 +108,17 @@ export default function WorkOrderReportsPage() {
           {/* Avg resolution by category */}
           <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
             <div className="px-4 py-3 border-b border-gray-100">
-              <h2 className="text-sm font-semibold text-gray-800">Rata-rata Waktu Penyelesaian per Kategori</h2>
+              <h2 className="text-sm font-semibold text-gray-800">Average Resolution Time by Category</h2>
             </div>
             {report.avgResolutionByCategory.length === 0 ? (
-              <p className="text-center text-sm text-gray-400 py-8">Belum ada WO yang selesai</p>
+              <p className="text-center text-sm text-gray-400 py-8">No completed work orders yet</p>
             ) : (
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-gray-100 bg-gray-50/60">
-                    <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide">Kategori</th>
-                    <th className="text-center px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide">Jumlah Selesai</th>
-                    <th className="text-center px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide">Rata-rata Waktu</th>
+                    <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide">Category</th>
+                    <th className="text-center px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide">Completed</th>
+                    <th className="text-center px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide">Avg. Time</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
@@ -137,17 +137,17 @@ export default function WorkOrderReportsPage() {
           {/* Per-technician performance */}
           <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
             <div className="px-4 py-3 border-b border-gray-100">
-              <h2 className="text-sm font-semibold text-gray-800">Performa Teknisi</h2>
+              <h2 className="text-sm font-semibold text-gray-800">Technician Performance</h2>
             </div>
             {report.byTechnician.length === 0 ? (
-              <p className="text-center text-sm text-gray-400 py-8">Belum ada WO yang diassign</p>
+              <p className="text-center text-sm text-gray-400 py-8">No work orders assigned yet</p>
             ) : (
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-gray-100 bg-gray-50/60">
-                    <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide">Teknisi</th>
-                    <th className="text-center px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide">Ditugaskan</th>
-                    <th className="text-center px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide">Selesai</th>
+                    <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide">Technician</th>
+                    <th className="text-center px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide">Assigned</th>
+                    <th className="text-center px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide">Completed</th>
                     <th className="text-center px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide">Completion Rate</th>
                   </tr>
                 </thead>

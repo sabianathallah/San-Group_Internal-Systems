@@ -11,6 +11,7 @@ import {
   reviewWorkOrderService,
   deleteWorkOrderService,
   getWorkOrderByIdService,
+  listWorkOrdersService,
 } from '@/services/work-order.service';
 
 const prismaMock = prisma as unknown as DeepMockProxy<PrismaClient>;
@@ -299,5 +300,38 @@ describe('reviewWorkOrderService', () => {
     await expect(
       reviewWorkOrderService('wo-uuid-1', REQUESTER_ID, 'division', DIVISION_A, { decision: 'APPROVED' }),
     ).rejects.toMatchObject({ statusCode: 403 });
+  });
+});
+
+// ── listWorkOrdersService — Active/History split ──────────────
+describe('listWorkOrdersService', () => {
+  beforeEach(() => {
+    prismaMock.$transaction.mockResolvedValue([[], 0]);
+  });
+
+  function whereArg() {
+    const call = prismaMock.workOrder.findMany.mock.calls[0][0] as { where: { status: unknown; assignedToId?: unknown } };
+    return call.where;
+  }
+
+  it('excludes DONE/CANCELLED by default (active board)', async () => {
+    await listWorkOrdersService(REQUESTER_ID, 'all', DIVISION_A, {});
+    expect(whereArg().status).toEqual({ notIn: [WorkOrderStatus.DONE, WorkOrderStatus.CANCELLED] });
+  });
+
+  it('shows only DONE/CANCELLED when scope=history', async () => {
+    await listWorkOrdersService(REQUESTER_ID, 'all', DIVISION_A, { scope: 'history' } as never);
+    expect(whereArg().status).toEqual({ in: [WorkOrderStatus.DONE, WorkOrderStatus.CANCELLED] });
+  });
+
+  it('an explicit status filter overrides the active/history default', async () => {
+    await listWorkOrdersService(REQUESTER_ID, 'all', DIVISION_A, { status: 'IN_PROGRESS' } as never);
+    expect(whereArg().status).toBe('IN_PROGRESS');
+  });
+
+  it("'unassigned' view excludes both DONE and CANCELLED, not just DONE", async () => {
+    await listWorkOrdersService(REQUESTER_ID, 'all', DIVISION_A, { view: 'unassigned' } as never);
+    expect(whereArg().assignedToId).toBeNull();
+    expect(whereArg().status).toEqual({ notIn: [WorkOrderStatus.DONE, WorkOrderStatus.CANCELLED] });
   });
 });
