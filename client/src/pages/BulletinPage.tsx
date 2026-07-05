@@ -3,12 +3,14 @@ import {
   Megaphone, Plus, Search, X,
   AlertTriangle, Info, Calendar, Eye, EyeOff,
   Loader2, Trash2, Edit2, CheckCircle2, Clock, ToggleLeft, ToggleRight,
+  ChevronLeft, ChevronRight,
 } from 'lucide-react';
 import api from '@/lib/api';
 import { useAuthStore } from '@/stores/authStore';
 import { usePermStore } from '@/stores/permStore';
 import { useToastStore } from '@/stores/toastStore';
 import { cn } from '@/lib/cn';
+import { PageSizeSelect } from '@/components/shared/PageSizeSelect';
 
 // ── Types ──────────────────────────────────────────────────
 type BulletinCategory = 'ANNOUNCEMENT' | 'HOLIDAY' | 'MAINTENANCE' | 'EVENT' | 'GENERAL';
@@ -127,6 +129,8 @@ export default function BulletinPage() {
   const [searchInput,  setSearchInput]  = useState('');
   const [search,       setSearch]       = useState('');
   const [showDrafts,   setShowDrafts]   = useState(false);
+  const [page,         setPage]         = useState(1);
+  const [pageSize,     setPageSize]     = useState(20);
 
   const [selected, setSelected] = useState<Bulletin | null>(null);
   const [showForm, setShowForm] = useState(false);
@@ -142,7 +146,7 @@ export default function BulletinPage() {
     setLoading(true);
     setError(null);
     try {
-      const params: Record<string, string> = { limit: '50' };
+      const params: Record<string, string> = { limit: String(pageSize), page: String(page) };
       if (category !== 'ALL') params.category = category;
       if (search)             params.search   = search;
       if (isAdmin && showDrafts) params.isPublished = 'false';
@@ -155,12 +159,14 @@ export default function BulletinPage() {
     } finally {
       setLoading(false);
     }
-  }, [category, search, isAdmin, showDrafts]);
+  }, [category, search, isAdmin, showDrafts, page, pageSize]);
 
   useEffect(() => { fetchBulletins(); }, [fetchBulletins]);
 
+  function handlePageSizeChange(n: number) { setPageSize(n); setPage(1); }
+
   useEffect(() => {
-    const t = setTimeout(() => setSearch(searchInput), 400);
+    const t = setTimeout(() => { setSearch(searchInput); setPage(1); }, 400);
     return () => clearTimeout(t);
   }, [searchInput]);
 
@@ -288,7 +294,7 @@ export default function BulletinPage() {
           {CATEGORY_TABS.map((tab) => (
             <button
               key={tab.value}
-              onClick={() => setCategory(tab.value)}
+              onClick={() => { setCategory(tab.value); setPage(1); }}
               className={cn(
                 'px-2.5 h-6 text-xs rounded transition-colors',
                 category === tab.value
@@ -305,7 +311,7 @@ export default function BulletinPage() {
           {/* Admin: draft toggle */}
           {isAdmin && (
             <button
-              onClick={() => setShowDrafts((p) => !p)}
+              onClick={() => { setShowDrafts((p) => !p); setPage(1); }}
               className={cn(
                 'flex items-center gap-1.5 text-xs mb-3 self-start px-2.5 py-1 rounded transition-colors',
                 showDrafts ? 'bg-warning-light text-warning' : 'text-gray-400 hover:text-gray-600',
@@ -340,6 +346,26 @@ export default function BulletinPage() {
               ))
             )}
           </div>
+
+          {/* Pagination */}
+          {!loading && !error && meta && (
+            <div className="flex items-center justify-between gap-2 pt-2 flex-shrink-0">
+              <PageSizeSelect value={pageSize} onChange={handlePageSizeChange} />
+              {meta.totalPages > 1 && (
+                <div className="flex items-center gap-2">
+                  <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1}
+                    className="p-2 text-gray-400 hover:text-gray-700 disabled:opacity-30 transition-colors">
+                    <ChevronLeft size={16} />
+                  </button>
+                  <span className="text-sm text-gray-500">{page} / {meta.totalPages}</span>
+                  <button onClick={() => setPage((p) => Math.min(meta.totalPages, p + 1))} disabled={page === meta.totalPages}
+                    className="p-2 text-gray-400 hover:text-gray-700 disabled:opacity-30 transition-colors">
+                    <ChevronRight size={16} />
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
         </>}
 
         {activeTab === 'scheduled' && (

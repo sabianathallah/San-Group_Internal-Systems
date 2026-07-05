@@ -36,16 +36,19 @@ function groupByDate(notifications: Notification[]): { label: string; items: Not
 export default function NotificationsPage() {
   const navigate    = useNavigate();
   const fetch       = useNotificationStore((s) => s.fetch);
+  const loadMore    = useNotificationStore((s) => s.loadMore);
   const markRead    = useNotificationStore((s) => s.markRead);
   const markAllRead = useNotificationStore((s) => s.markAllRead);
   const notifications = useNotificationStore((s) => s.notifications);
   const unreadCount   = useNotificationStore((s) => s.unreadCount);
   const loading       = useNotificationStore((s) => s.loading);
+  const loadingMore   = useNotificationStore((s) => s.loadingMore);
+  const meta          = useNotificationStore((s) => s.meta);
 
   const [initialLoad, setInitialLoad] = useState(true);
 
   useEffect(() => {
-    fetch(100).finally(() => setInitialLoad(false));
+    fetch(50).finally(() => setInitialLoad(false));
   }, [fetch]);
 
   const groups = groupByDate(notifications);
@@ -158,6 +161,19 @@ export default function NotificationsPage() {
               </div>
             </div>
           ))}
+
+          {meta && meta.page < meta.totalPages && (
+            <div className="flex justify-center pt-2">
+              <button
+                onClick={() => loadMore()}
+                disabled={loadingMore}
+                className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-navy px-3 py-1.5 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+              >
+                {loadingMore ? <Loader2 size={12} className="animate-spin" /> : null}
+                Load more
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>

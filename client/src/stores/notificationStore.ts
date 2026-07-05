@@ -12,11 +12,16 @@ export interface Notification {
   actor:     { id: string; fullName: string; avatar: string | null } | null;
 }
 
+interface NotificationMeta { total: number; page: number; limit: number; totalPages: number }
+
 interface NotificationState {
   notifications: Notification[];
   unreadCount:   number;
   loading:       boolean;
+  loadingMore:   boolean;
+  meta:          NotificationMeta | null;
   fetch:         (limit?: number) => Promise<void>;
+  loadMore:      () => Promise<void>;
   poll:          () => Promise<Notification[]>; // returns newly arrived unread notifications
   markRead:      (id: string) => Promise<void>;
   markAllRead:   () => Promise<void>;
@@ -26,17 +31,34 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
   notifications: [],
   unreadCount:   0,
   loading:       false,
+  loadingMore:   false,
+  meta:          null,
 
   fetch: async (limit = 30) => {
     set({ loading: true });
     try {
-      const res = await api.get('/notifications', { params: { limit } });
+      const res = await api.get('/notifications', { params: { limit, page: 1 } });
       const list: Notification[] = res.data.data ?? [];
-      set({ notifications: list, unreadCount: list.filter((n) => !n.isRead).length });
+      set({ notifications: list, unreadCount: list.filter((n) => !n.isRead).length, meta: res.data.meta ?? null });
     } catch {
       // silently ignore — bell stays empty on error
     } finally {
       set({ loading: false });
+    }
+  },
+
+  loadMore: async () => {
+    const { meta } = get();
+    if (!meta || meta.page >= meta.totalPages) return;
+    set({ loadingMore: true });
+    try {
+      const res = await api.get('/notifications', { params: { limit: meta.limit, page: meta.page + 1 } });
+      const more: Notification[] = res.data.data ?? [];
+      set((s) => ({ notifications: [...s.notifications, ...more], meta: res.data.meta ?? s.meta }));
+    } catch {
+      // ignore — user can retry
+    } finally {
+      set({ loadingMore: false });
     }
   },
 
@@ -48,7 +70,7 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
       const list: Notification[] = listRes.data.data ?? [];
       const newNotifs = list.filter((n) => !prevIds.has(n.id) && !n.isRead);
       if (newNotifs.length > 0) {
-        set({ notifications: list, unreadCount: list.filter((n) => !n.isRead).length });
+        set({ notifications: list, unreadCount: list.filter((n) => !n.isRead).length, meta: listRes.data.meta ?? null });
       }
       return newNotifs;
     } catch { return []; }

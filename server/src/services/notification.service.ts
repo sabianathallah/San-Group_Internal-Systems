@@ -1,5 +1,7 @@
+import { ParsedQs } from 'qs';
 import { prisma } from '@/config/database';
 import { AppError } from '@/middlewares/errorHandler.middleware';
+import { parsePagination, buildMeta } from '@/helpers/pagination';
 
 const NOTIF_SELECT = {
   id:        true,
@@ -12,13 +14,20 @@ const NOTIF_SELECT = {
   actor: { select: { id: true, fullName: true, avatar: true } },
 } as const;
 
-export async function listNotificationsService(userId: string, limit = 30) {
-  return prisma.notification.findMany({
-    where: { userId },
-    select: NOTIF_SELECT,
-    orderBy: { createdAt: 'desc' },
-    take: Math.min(limit, 100),
-  });
+export async function listNotificationsService(userId: string, query: ParsedQs) {
+  const { page, limit, skip } = parsePagination(query, { createdAt: 'desc' });
+
+  const [notifications, total] = await prisma.$transaction([
+    prisma.notification.findMany({
+      where: { userId },
+      select: NOTIF_SELECT,
+      orderBy: { createdAt: 'desc' },
+      skip, take: limit,
+    }),
+    prisma.notification.count({ where: { userId } }),
+  ]);
+
+  return { notifications, meta: buildMeta(total, page, limit) };
 }
 
 export async function markNotificationReadService(id: string, userId: string) {
