@@ -192,9 +192,11 @@ function LogTable({
 
 // ── Main Page ──────────────────────────────────────────────────
 export default function AttendancePage() {
-  useAuthStore((s) => s.user);
+  const user = useAuthStore((s) => s.user);
   const perms = usePermStore((s) => s.perms);
-  const canSeeTeam = perms.hris.editAttendance;
+  const attendanceScope = perms.hris.editAttendance;
+  const canSeeTeam = attendanceScope === 'division' || attendanceScope === 'all';
+  const teamLabel = attendanceScope === 'division' ? `Team — ${user?.division?.name ?? 'Divisi'}` : 'Team — Semua';
 
   const now = new Date();
   const [month, setMonth]           = useState(now.getMonth() + 1);
@@ -283,7 +285,7 @@ export default function AttendancePage() {
                   onClick={() => setViewMode('team')}
                   className={cn('px-3 py-1.5 flex items-center gap-1.5 transition-colors', viewMode === 'team' ? 'bg-navy text-white' : 'text-gray-600 hover:bg-gray-50')}
                 >
-                  <Users size={13} /> Team
+                  <Users size={13} /> {teamLabel}
                 </button>
               </div>
             )}

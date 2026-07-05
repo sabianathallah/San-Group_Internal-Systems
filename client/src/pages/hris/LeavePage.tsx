@@ -2,12 +2,14 @@ import { useEffect, useState, useCallback } from 'react';
 import {
   Plus, X, Loader2, CheckCircle2, XCircle,
   CalendarRange, RefreshCw, ChevronDown, Users, Clock,
+  ChevronLeft, ChevronRight,
 } from 'lucide-react';
 import api from '@/lib/api';
 import { cn } from '@/lib/cn';
 import { useAuthStore } from '@/stores/authStore';
 import { usePermStore } from '@/stores/permStore';
 import { toast } from '@/stores/toastStore';
+import { PageSizeSelect } from '@/components/shared/PageSizeSelect';
 
 // ── Types ──────────────────────────────────────────────────────
 type LeaveStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED';
@@ -32,6 +34,8 @@ interface LeaveRequest {
   user: { id: string; fullName: string; avatar: string | null };
   reviewedBy: { id: string; fullName: string } | null;
 }
+
+interface Meta { total: number; page: number; limit: number; totalPages: number }
 
 // ── Helpers ────────────────────────────────────────────────────
 const STATUS_STYLE: Record<LeaveStatus, { label: string; cls: string }> = {
@@ -269,36 +273,47 @@ function ReviewModal({
 export default function LeavePage() {
   const user = useAuthStore((s) => s.user);
   const perms = usePermStore((s) => s.perms);
-  const isManager = perms.hris.reviewLeave;
+  const isManager = perms.hris.reviewLeave !== 'none';
 
   const [leaveTypes,   setLeaveTypes]   = useState<LeaveType[]>([]);
   const [balances,     setBalances]     = useState<LeaveBalance[]>([]);
   const [requests,     setRequests]     = useState<LeaveRequest[]>([]);
+  const [meta,         setMeta]         = useState<Meta | null>(null);
   const [loading,      setLoading]      = useState(true);
   const [createOpen,   setCreateOpen]   = useState(false);
   const [reviewTarget, setReviewTarget] = useState<LeaveRequest | null>(null);
   const [viewMode,     setViewMode]     = useState<'mine' | 'team'>('mine');
   const [statusFilter, setStatusFilter] = useState<LeaveStatus | ''>('');
+  const [year,         setYear]         = useState(new Date().getFullYear());
+  const [page,         setPage]         = useState(1);
+  const [pageSize,     setPageSize]     = useState(20);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const params: Record<string, unknown> = { limit: 50, year: new Date().getFullYear() };
+      const params: Record<string, unknown> = { limit: pageSize, year, page };
       if (statusFilter) params.status = statusFilter;
+      if (viewMode === 'mine' && user?.id) params.userId = user.id;
 
       const [typesRes, balRes, reqRes] = await Promise.all([
         api.get('/hris/leave-types'),
-        api.get('/hris/leave-balances'),
+        api.get('/hris/leave-balances', { params: { year } }),
         api.get('/hris/leave-requests', { params }),
       ]);
       setLeaveTypes(typesRes.data.data);
       setBalances(balRes.data.data);
       setRequests(reqRes.data.data);
+      setMeta(reqRes.data.meta);
     } catch { /* silent */ }
     finally { setLoading(false); }
-  }, [statusFilter]);
+  }, [statusFilter, year, page, pageSize, viewMode, user?.id]);
+
+  function handlePageSizeChange(n: number) { setPageSize(n); setPage(1); }
 
   useEffect(() => { load(); }, [load]);
+
+  function prevYear() { setYear((y) => y - 1); setPage(1); }
+  function nextYear() { setYear((y) => Math.min(new Date().getFullYear(), y + 1)); setPage(1); }
 
   async function handleCancel(id: string) {
     try {
@@ -323,10 +338,10 @@ export default function LeavePage() {
         <div className="flex items-center gap-2">
           {isManager && (
             <div className="flex rounded-lg border border-gray-200 overflow-hidden text-sm">
-              <button onClick={() => setViewMode('mine')} className={cn('px-3 py-1.5 flex items-center gap-1.5 transition-colors', viewMode === 'mine' ? 'bg-navy text-white' : 'text-gray-600 hover:bg-gray-50')}>
+              <button onClick={() => { setViewMode('mine'); setPage(1); }} className={cn('px-3 py-1.5 flex items-center gap-1.5 transition-colors', viewMode === 'mine' ? 'bg-navy text-white' : 'text-gray-600 hover:bg-gray-50')}>
                 <Clock size={13} /> Me
               </button>
-              <button onClick={() => setViewMode('team')} className={cn('px-3 py-1.5 flex items-center gap-1.5 transition-colors', viewMode === 'team' ? 'bg-navy text-white' : 'text-gray-600 hover:bg-gray-50')}>
+              <button onClick={() => { setViewMode('team'); setPage(1); }} className={cn('px-3 py-1.5 flex items-center gap-1.5 transition-colors', viewMode === 'team' ? 'bg-navy text-white' : 'text-gray-600 hover:bg-gray-50')}>
                 <Users size={13} /> Team
               </button>
             </div>
@@ -374,22 +389,33 @@ export default function LeavePage() {
         </div>
       )}
 
-      {/* Filter */}
-      <div className="flex gap-2 flex-wrap">
-        {(['', 'PENDING', 'APPROVED', 'REJECTED', 'CANCELLED'] as const).map((s) => (
-          <button
-            key={s}
-            onClick={() => setStatusFilter(s as LeaveStatus | '')}
-            className={cn(
-              'px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors',
-              statusFilter === s
-                ? 'bg-navy text-white border-navy'
-                : 'text-gray-600 border-gray-200 hover:bg-gray-50',
-            )}
-          >
-            {s === '' ? 'All' : STATUS_STYLE[s as LeaveStatus].label}
+      {/* Year nav + Filter */}
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <div className="flex items-center gap-2">
+          <button onClick={prevYear} className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors">
+            <ChevronLeft size={16} className="text-gray-500" />
           </button>
-        ))}
+          <span className="text-sm font-semibold text-gray-700 min-w-[48px] text-center">{year}</span>
+          <button onClick={nextYear} disabled={year >= new Date().getFullYear()} className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors disabled:opacity-30">
+            <ChevronRight size={16} className="text-gray-500" />
+          </button>
+        </div>
+        <div className="flex gap-2 flex-wrap">
+          {(['', 'PENDING', 'APPROVED', 'REJECTED', 'CANCELLED'] as const).map((s) => (
+            <button
+              key={s}
+              onClick={() => { setStatusFilter(s as LeaveStatus | ''); setPage(1); }}
+              className={cn(
+                'px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors',
+                statusFilter === s
+                  ? 'bg-navy text-white border-navy'
+                  : 'text-gray-600 border-gray-200 hover:bg-gray-50',
+              )}
+            >
+              {s === '' ? 'All' : STATUS_STYLE[s as LeaveStatus].label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* List */}
@@ -462,6 +488,26 @@ export default function LeavePage() {
           </div>
         )}
       </div>
+
+      {/* Pagination */}
+      {meta && (
+        <div className="flex items-center justify-between gap-2">
+          <PageSizeSelect value={pageSize} onChange={handlePageSizeChange} />
+          {meta.totalPages > 1 && (
+            <div className="flex items-center gap-2">
+              <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1}
+                className="p-2 text-gray-400 hover:text-gray-700 disabled:opacity-30 transition-colors">
+                <ChevronLeft size={16} />
+              </button>
+              <span className="text-sm text-gray-500">{page} / {meta.totalPages}</span>
+              <button onClick={() => setPage((p) => Math.min(meta.totalPages, p + 1))} disabled={page === meta.totalPages}
+                className="p-2 text-gray-400 hover:text-gray-700 disabled:opacity-30 transition-colors">
+                <ChevronRight size={16} />
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Modals */}
       <CreateLeaveModal

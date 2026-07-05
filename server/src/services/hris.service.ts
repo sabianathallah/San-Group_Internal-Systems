@@ -98,17 +98,20 @@ export async function getLeaveBalancesService(userId: string, year: number) {
 // ── Leave Requests ─────────────────────────────────────────────
 
 export async function listLeaveRequestsService(
-  callerId: string, canReview: boolean, query: ParsedQs,
+  callerId: string, reviewScope: string, divisionId: string, query: ParsedQs,
 ) {
   const { page, limit, skip } = parsePagination(query);
   const year   = query.year   ? Number(query.year)   : new Date().getFullYear();
   const status = query.status as LeaveStatus | undefined;
 
   const where: Prisma.LeaveRequestWhereInput = {};
-  if (!canReview) {
+  if (reviewScope === 'all') {
+    if (query.userId) where.userId = query.userId as string;
+  } else if (reviewScope === 'division') {
+    where.user = { divisionId };
+    if (query.userId) where.userId = query.userId as string;
+  } else {
     where.userId = callerId;
-  } else if (query.userId) {
-    where.userId = query.userId as string;
   }
   if (status) where.status = status;
   where.startDate = { gte: new Date(`${year}-01-01`), lte: new Date(`${year}-12-31`) };
@@ -144,29 +147,42 @@ export async function createLeaveRequestService(
 
   const year = start.getUTCFullYear();
 
-  if (leaveType.maxDaysPerYear > 0) {
-    let balance = await prisma.leaveBalance.findUnique({
-      where: { userId_leaveTypeId_year: { userId, leaveTypeId, year } },
-    });
-    if (!balance) {
-      balance = await prisma.leaveBalance.create({
-        data: { userId, leaveTypeId, year, totalDays: leaveType.maxDaysPerYear },
-      });
-    }
-    const remaining = balance.totalDays - balance.usedDays - balance.pendingDays;
-    if (totalDays > remaining) {
-      throw new AppError(`Saldo cuti tidak cukup. Tersisa ${remaining} hari`, 400);
-    }
-    await prisma.leaveBalance.update({
-      where: { userId_leaveTypeId_year: { userId, leaveTypeId, year } },
-      data:  { pendingDays: { increment: totalDays } },
-    });
-  }
+  let request;
+  try {
+    request = await prisma.$transaction(async (tx) => {
+      if (leaveType.maxDaysPerYear > 0) {
+        let balance = await tx.leaveBalance.findUnique({
+          where: { userId_leaveTypeId_year: { userId, leaveTypeId, year } },
+        });
+        if (!balance) {
+          balance = await tx.leaveBalance.create({
+            data: { userId, leaveTypeId, year, totalDays: leaveType.maxDaysPerYear },
+          });
+        }
+        const remaining = balance.totalDays - balance.usedDays - balance.pendingDays;
+        if (totalDays > remaining) {
+          throw new AppError(`Saldo cuti tidak cukup. Tersisa ${remaining} hari`, 400);
+        }
+        await tx.leaveBalance.update({
+          where: { userId_leaveTypeId_year: { userId, leaveTypeId, year } },
+          data:  { pendingDays: { increment: totalDays } },
+        });
+      }
 
-  const request = await prisma.leaveRequest.create({
-    data: { userId, leaveTypeId, startDate: start, endDate: end, totalDays, reason },
-    include: { user: { select: USER_SELECT }, leaveType: true },
-  });
+      return tx.leaveRequest.create({
+        data: { userId, leaveTypeId, startDate: start, endDate: end, totalDays, reason },
+        include: { user: { select: USER_SELECT }, leaveType: true },
+      });
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+  } catch (err) {
+    // P2034: write conflict/deadlock under Serializable isolation — two concurrent
+    // submissions raced on the same balance row, safer to ask the user to retry
+    // than to risk a negative balance.
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2034') {
+      throw new AppError('Ada pengajuan lain yang bersamaan, silakan coba lagi', 409);
+    }
+    throw err;
+  }
 
   const requester = await prisma.user.findUnique({ where: { id: userId }, select: { divisionId: true, fullName: true } });
   if (requester) {
@@ -188,14 +204,20 @@ export async function createLeaveRequestService(
 }
 
 export async function reviewLeaveRequestService(
-  id: string, reviewerId: string,
+  id: string, reviewerId: string, reviewScope: string, divisionId: string,
   body: { status: 'APPROVED' | 'REJECTED'; reviewNote?: string | null },
 ) {
 
-  const req = await prisma.leaveRequest.findUnique({ where: { id }, include: { leaveType: true } });
+  const req = await prisma.leaveRequest.findUnique({
+    where: { id },
+    include: { leaveType: true, user: { select: { divisionId: true } } },
+  });
   if (!req) throw new AppError('Pengajuan cuti tidak ditemukan', 404);
   if (req.status !== LeaveStatus.PENDING) throw new AppError('Pengajuan ini sudah diproses', 400);
   if (req.userId === reviewerId) throw new AppError('Tidak bisa mereview pengajuan cuti sendiri', 403);
+  if (reviewScope === 'division' && req.user.divisionId !== divisionId) {
+    throw new AppError('Akses ditolak', 403);
+  }
 
   const { status, reviewNote } = body;
   const year = new Date(req.startDate).getUTCFullYear();
@@ -290,7 +312,7 @@ export async function checkInService(
     where: { id: userId },
     include: { shift: true },
   });
-  let activeShift = userRecord?.shift ?? null;
+  let activeShift = userRecord?.shift?.isActive ? userRecord.shift : null;
   if (!activeShift) {
     activeShift = await prisma.shift.findFirst({ where: { isDefault: true, isActive: true } });
   }
@@ -315,9 +337,12 @@ export async function checkInService(
   const { lat, lng, locationName, outOfAreaReason } = body;
   let resolvedIsOutOfArea = false;
 
-  if (lat != null && lng != null && body.status !== 'WFH') {
+  if (body.status !== 'WFH') {
     const locations = await prisma.officeLocation.findMany({ where: { isActive: true } });
-    if (locations.length > 0) {
+    if (locations.length > 0 && (lat == null || lng == null)) {
+      throw new AppError('Lokasi tidak terdeteksi. Aktifkan GPS dan coba check-in lagi.', 422);
+    }
+    if (locations.length > 0 && lat != null && lng != null) {
       let nearestDist = Infinity;
       let nearestLoc = locations[0];
       let withinAny = false;
@@ -398,7 +423,7 @@ export async function checkOutService(userId: string, body: { note?: string | nu
 }
 
 export async function listAttendanceService(
-  callerId: string, canManage: boolean, query: ParsedQs,
+  callerId: string, manageScope: string, divisionId: string, query: ParsedQs,
 ) {
   const { page, limit, skip } = parsePagination(query);
   const now   = new Date();
@@ -410,8 +435,14 @@ export async function listAttendanceService(
   endOfMonth.setUTCHours(23, 59, 59, 999);
 
   const where: Prisma.AttendanceWhereInput = { date: { gte: startOfMonth, lte: endOfMonth } };
-  if (!canManage) { where.userId = callerId; }
-  else if (query.userId) { where.userId = query.userId as string; }
+  if (manageScope === 'all') {
+    if (query.userId) where.userId = query.userId as string;
+  } else if (manageScope === 'division') {
+    where.user = { divisionId };
+    if (query.userId) where.userId = query.userId as string;
+  } else {
+    where.userId = callerId;
+  }
   if (query.status) where.status = query.status as AttendanceStatus;
 
   const [items, total] = await prisma.$transaction([
@@ -458,11 +489,17 @@ export async function getAttendanceSummaryService(userId: string, month: number,
 }
 
 export async function adminUpdateAttendanceService(
-  id: string,
+  id: string, editScope: string, divisionId: string,
   body: { status?: AttendanceStatus; note?: string | null; checkIn?: string | null; checkOut?: string | null },
 ) {
-  const existing = await prisma.attendance.findUnique({ where: { id } });
+  const existing = await prisma.attendance.findUnique({
+    where: { id },
+    include: { user: { select: { divisionId: true } } },
+  });
   if (!existing) throw new AppError('Record absensi tidak ditemukan', 404);
+  if (editScope === 'division' && existing.user.divisionId !== divisionId) {
+    throw new AppError('Akses ditolak', 403);
+  }
 
   const checkIn  = body.checkIn  ? new Date(body.checkIn)  : undefined;
   const checkOut = body.checkOut ? new Date(body.checkOut) : undefined;
@@ -574,7 +611,9 @@ export async function deleteOfficeLocationService(id: string) {
 
 // ── Overtime ───────────────────────────────────────────────────
 
-export async function listOvertimeRequestsService(callerId: string, canReview: boolean, query: ParsedQs) {
+export async function listOvertimeRequestsService(
+  callerId: string, reviewScope: string, divisionId: string, query: ParsedQs,
+) {
   const { page, limit, skip } = parsePagination(query);
   const now   = new Date();
   const month = query.month ? Number(query.month) : now.getMonth() + 1;
@@ -585,8 +624,14 @@ export async function listOvertimeRequestsService(callerId: string, canReview: b
   endOfMonth.setUTCHours(23, 59, 59, 999);
 
   const where: Prisma.OvertimeRequestWhereInput = { date: { gte: startOfMonth, lte: endOfMonth } };
-  if (!canReview) { where.userId = callerId; }
-  else if (query.userId) { where.userId = query.userId as string; }
+  if (reviewScope === 'all') {
+    if (query.userId) where.userId = query.userId as string;
+  } else if (reviewScope === 'division') {
+    where.user = { divisionId };
+    if (query.userId) where.userId = query.userId as string;
+  } else {
+    where.userId = callerId;
+  }
   if (query.status) where.status = query.status as OvertimeStatus;
 
   const [items, total] = await prisma.$transaction([
@@ -642,13 +687,19 @@ export async function createOvertimeRequestService(userId: string, body: {
 }
 
 export async function reviewOvertimeRequestService(
-  id: string, reviewerId: string,
+  id: string, reviewerId: string, reviewScope: string, divisionId: string,
   body: { status: 'APPROVED' | 'REJECTED'; reviewNote?: string | null },
 ) {
-  const ot = await prisma.overtimeRequest.findUnique({ where: { id } });
+  const ot = await prisma.overtimeRequest.findUnique({
+    where: { id },
+    include: { user: { select: { divisionId: true } } },
+  });
   if (!ot) throw new AppError('Pengajuan lembur tidak ditemukan', 404);
   if (ot.status !== OvertimeStatus.PENDING) throw new AppError('Pengajuan ini sudah diproses', 400);
   if (ot.userId === reviewerId) throw new AppError('Tidak bisa mereview pengajuan lembur sendiri', 403);
+  if (reviewScope === 'division' && ot.user.divisionId !== divisionId) {
+    throw new AppError('Akses ditolak', 403);
+  }
 
   const updated = await prisma.overtimeRequest.update({
     where: { id },

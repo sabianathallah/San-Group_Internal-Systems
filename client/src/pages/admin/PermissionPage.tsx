@@ -23,7 +23,7 @@ interface NotePerms {
 interface AnalyticsPerms { view: Scope; }
 interface AuditLogPerms  { view: Scope; }
 interface HrisPerms {
-  reviewLeave: boolean; reviewOvertime: boolean; editAttendance: boolean;
+  reviewLeave: Scope; reviewOvertime: Scope; editAttendance: Scope;
   manageShifts: boolean; manageLocations: boolean; viewReports: Scope;
 }
 interface WorkOrderPerms {
@@ -786,16 +786,16 @@ export default function PermissionPage() {
 
               <Section title="HRIS">
                 <PermRow label="Review leave requests">
-                  <Toggle checked={perms.hris?.reviewLeave ?? false} onChange={(v) => update('hris', 'reviewLeave', v)}
-                    disabled={isSuperAdmin || isReadOnly} />
+                  <ScopeSelector value={perms.hris?.reviewLeave ?? 'none'} options={VIEW_DB_SCOPE_OPTS}
+                    onChange={(v) => update('hris', 'reviewLeave', v)} disabled={isSuperAdmin || isReadOnly} />
                 </PermRow>
                 <PermRow label="Review overtime requests">
-                  <Toggle checked={perms.hris?.reviewOvertime ?? false} onChange={(v) => update('hris', 'reviewOvertime', v)}
-                    disabled={isSuperAdmin || isReadOnly} />
+                  <ScopeSelector value={perms.hris?.reviewOvertime ?? 'none'} options={VIEW_DB_SCOPE_OPTS}
+                    onChange={(v) => update('hris', 'reviewOvertime', v)} disabled={isSuperAdmin || isReadOnly} />
                 </PermRow>
                 <PermRow label="Edit attendance records">
-                  <Toggle checked={perms.hris?.editAttendance ?? false} onChange={(v) => update('hris', 'editAttendance', v)}
-                    disabled={isSuperAdmin || isReadOnly} />
+                  <ScopeSelector value={perms.hris?.editAttendance ?? 'none'} options={VIEW_DB_SCOPE_OPTS}
+                    onChange={(v) => update('hris', 'editAttendance', v)} disabled={isSuperAdmin || isReadOnly} />
                 </PermRow>
                 <PermRow label="Manage shifts">
                   <Toggle checked={perms.hris?.manageShifts ?? false} onChange={(v) => update('hris', 'manageShifts', v)}

@@ -8,6 +8,7 @@ import { cn } from '@/lib/cn';
 import { useAuthStore } from '@/stores/authStore';
 import { usePermStore } from '@/stores/permStore';
 import { toast } from '@/stores/toastStore';
+import { PageSizeSelect } from '@/components/shared/PageSizeSelect';
 
 // ── Types ──────────────────────────────────────────────────────
 type OTStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED';
@@ -214,7 +215,7 @@ const TABS: { label: string; value: string }[] = [
 export default function OvertimePage() {
   const user = useAuthStore((s) => s.user);
   const perms = usePermStore((s) => s.perms);
-  const isManager = perms.hris.reviewOvertime;
+  const isManager = perms.hris.reviewOvertime !== 'none';
 
   const now = new Date();
   const [month, setMonth] = useState(now.getMonth() + 1);
@@ -226,13 +227,14 @@ export default function OvertimePage() {
   const [meta, setMeta]         = useState<Meta | null>(null);
   const [loading, setLoading]   = useState(false);
   const [page, setPage]         = useState(1);
+  const [pageSize, setPageSize] = useState(20);
   const [createOpen, setCreateOpen] = useState(false);
   const [reviewTarget, setReviewTarget] = useState<OvertimeRequest | null>(null);
 
   const fetch = useCallback(async () => {
     setLoading(true);
     try {
-      const params: Record<string, string | number> = { month, year, page, limit: 20 };
+      const params: Record<string, string | number> = { month, year, page, limit: pageSize };
       if (activeTab) params.status = activeTab;
       if (isManager && viewMode === 'team') { /* no userId filter — see all */ }
       else params.userId = user!.id;
@@ -241,9 +243,11 @@ export default function OvertimePage() {
       setMeta(res.data.meta);
     } catch { /* silent */ }
     finally { setLoading(false); }
-  }, [month, year, activeTab, viewMode, page, user, isManager]);
+  }, [month, year, activeTab, viewMode, page, pageSize, user, isManager]);
 
   useEffect(() => { fetch(); }, [fetch]);
+
+  function handlePageSizeChange(n: number) { setPageSize(n); setPage(1); }
 
   function prevMonth() {
     if (month === 1) { setMonth(12); setYear((y) => y - 1); }
@@ -425,17 +429,22 @@ export default function OvertimePage() {
         )}
 
         {/* Pagination */}
-        {meta && meta.totalPages > 1 && (
-          <div className="flex items-center justify-center gap-2 pt-2">
-            <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1}
-              className="p-2 text-gray-400 hover:text-gray-700 disabled:opacity-30 transition-colors">
-              <ChevronLeft size={16} />
-            </button>
-            <span className="text-sm text-gray-500">{page} / {meta.totalPages}</span>
-            <button onClick={() => setPage((p) => Math.min(meta.totalPages, p + 1))} disabled={page === meta.totalPages}
-              className="p-2 text-gray-400 hover:text-gray-700 disabled:opacity-30 transition-colors">
-              <ChevronRight size={16} />
-            </button>
+        {meta && (
+          <div className="flex items-center justify-between gap-2 pt-2">
+            <PageSizeSelect value={pageSize} onChange={handlePageSizeChange} />
+            {meta.totalPages > 1 && (
+              <div className="flex items-center gap-2">
+                <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1}
+                  className="p-2 text-gray-400 hover:text-gray-700 disabled:opacity-30 transition-colors">
+                  <ChevronLeft size={16} />
+                </button>
+                <span className="text-sm text-gray-500">{page} / {meta.totalPages}</span>
+                <button onClick={() => setPage((p) => Math.min(meta.totalPages, p + 1))} disabled={page === meta.totalPages}
+                  className="p-2 text-gray-400 hover:text-gray-700 disabled:opacity-30 transition-colors">
+                  <ChevronRight size={16} />
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>

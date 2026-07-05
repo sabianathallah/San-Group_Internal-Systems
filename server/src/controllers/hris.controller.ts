@@ -58,9 +58,9 @@ export async function getLeaveBalances(req: AuthRequest, res: Response, next: Ne
 
 export async function listLeaveRequests(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
-    const { userId, roleId, roleLevel } = req.user!;
+    const { userId, roleId, roleLevel, divisionId } = req.user!;
     const perms = await getPermissionsForRole(roleId, roleLevel);
-    const result = await listLeaveRequestsService(userId, perms.hris.reviewLeave, req.query);
+    const result = await listLeaveRequestsService(userId, perms.hris.reviewLeave, divisionId, req.query);
     successResponse(res, result.leaveRequests, 'Daftar cuti berhasil diambil', 200, result.meta);
   } catch (err) { next(err); }
 }
@@ -74,7 +74,9 @@ export async function createLeaveRequest(req: AuthRequest, res: Response, next: 
 
 export async function reviewLeaveRequest(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
-    const result = await reviewLeaveRequestService(String(req.params.id), req.user!.userId, req.body);
+    const { userId, divisionId } = req.user!;
+    const reviewScope = req.permScope ?? 'all';
+    const result = await reviewLeaveRequestService(String(req.params.id), userId, reviewScope, divisionId, req.body);
     successResponse(res, result, 'Pengajuan cuti berhasil diproses');
   } catch (err) { next(err); }
 }
@@ -122,9 +124,9 @@ export async function checkOut(req: AuthRequest, res: Response, next: NextFuncti
 
 export async function listAttendance(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
-    const { userId, roleId, roleLevel } = req.user!;
+    const { userId, roleId, roleLevel, divisionId } = req.user!;
     const perms = await getPermissionsForRole(roleId, roleLevel);
-    const result = await listAttendanceService(userId, perms.hris.editAttendance, req.query);
+    const result = await listAttendanceService(userId, perms.hris.editAttendance, divisionId, req.query);
     successResponse(res, result.attendance, 'Data absensi berhasil diambil', 200, result.meta);
   } catch (err) { next(err); }
 }
@@ -142,7 +144,9 @@ export async function getAttendanceSummary(req: AuthRequest, res: Response, next
 
 export async function updateAttendance(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
-    const record = await adminUpdateAttendanceService(String(req.params.id), req.body);
+    const { divisionId } = req.user!;
+    const editScope = req.permScope ?? 'all';
+    const record = await adminUpdateAttendanceService(String(req.params.id), editScope, divisionId, req.body);
     successResponse(res, record, 'Absensi berhasil diperbarui');
   } catch (err) { next(err); }
 }
@@ -226,9 +230,9 @@ export async function deleteOfficeLocation(req: AuthRequest, res: Response, next
 
 export async function listOvertimes(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
-    const { userId, roleId, roleLevel } = req.user!;
+    const { userId, roleId, roleLevel, divisionId } = req.user!;
     const perms = await getPermissionsForRole(roleId, roleLevel);
-    const result = await listOvertimeRequestsService(userId, perms.hris.reviewOvertime, req.query);
+    const result = await listOvertimeRequestsService(userId, perms.hris.reviewOvertime, divisionId, req.query);
     successResponse(res, result.overtimes, 'Daftar lembur berhasil diambil', 200, result.meta);
   } catch (err) { next(err); }
 }
@@ -242,7 +246,9 @@ export async function createOvertime(req: AuthRequest, res: Response, next: Next
 
 export async function reviewOvertime(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
-    const data = await reviewOvertimeRequestService(String(req.params.id), req.user!.userId, req.body);
+    const { userId, divisionId } = req.user!;
+    const reviewScope = req.permScope ?? 'all';
+    const data = await reviewOvertimeRequestService(String(req.params.id), userId, reviewScope, divisionId, req.body);
     successResponse(res, data, 'Pengajuan lembur berhasil diproses');
   } catch (err) { next(err); }
 }

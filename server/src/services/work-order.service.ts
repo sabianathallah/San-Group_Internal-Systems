@@ -6,6 +6,16 @@ import { AppError } from '@/middlewares/errorHandler.middleware';
 
 const USER_SELECT = { id: true, fullName: true, username: true, avatar: true, divisionId: true } as const;
 
+// Mirrors client-side STATUS_TRANSITIONS in WorkOrderPage.tsx — kept in sync manually.
+const STATUS_TRANSITIONS: Record<WorkOrderStatus, WorkOrderStatus[]> = {
+  OPEN:          [WorkOrderStatus.ASSIGNED, WorkOrderStatus.CANCELLED],
+  ASSIGNED:      [WorkOrderStatus.IN_PROGRESS, WorkOrderStatus.OPEN, WorkOrderStatus.CANCELLED],
+  IN_PROGRESS:   [WorkOrderStatus.PENDING_PARTS, WorkOrderStatus.DONE, WorkOrderStatus.CANCELLED],
+  PENDING_PARTS: [WorkOrderStatus.IN_PROGRESS, WorkOrderStatus.DONE, WorkOrderStatus.CANCELLED],
+  DONE:          [],
+  CANCELLED:     [],
+};
+
 const WO_SELECT = {
   id: true,
   title: true,
@@ -63,7 +73,7 @@ async function sendWONotification(
   });
 }
 
-export async function listWorkOrdersService(userId: string, viewScope: string, query: ParsedQs) {
+export async function listWorkOrdersService(userId: string, viewScope: string, divisionId: string, query: ParsedQs) {
   const { page, limit, skip } = parsePagination(query, { createdAt: 'desc' });
 
   const view = (query.view as string) || 'all';
@@ -72,6 +82,11 @@ export async function listWorkOrdersService(userId: string, viewScope: string, q
   // 'own' scope: only WOs the user created or is assigned to
   if (viewScope === 'own') {
     where.OR = [{ reportedById: userId }, { assignedToId: userId }];
+  }
+
+  // 'division' scope: only WOs reported or assigned within the user's division
+  if (viewScope === 'division') {
+    where.OR = [{ reportedBy: { divisionId } }, { assignee: { divisionId } }];
   }
 
   if (view === 'mine')       { where.assignedToId = userId; }
@@ -97,11 +112,19 @@ export async function listWorkOrdersService(userId: string, viewScope: string, q
   return { workOrders, meta: buildMeta(total, page, limit) };
 }
 
-export async function getWorkOrderByIdService(id: string, userId: string, viewScope: string) {
+export async function getWorkOrderByIdService(id: string, userId: string, viewScope: string, divisionId: string) {
   const wo = await prisma.workOrder.findUnique({ where: { id }, select: WO_DETAIL_SELECT });
   if (!wo) throw new AppError('Work order tidak ditemukan', 404);
 
   if (viewScope === 'own' && wo.reportedBy.id !== userId && wo.assignee?.id !== userId) {
+    throw new AppError('Akses ditolak', 403);
+  }
+
+  if (
+    viewScope === 'division' &&
+    wo.reportedBy.divisionId !== divisionId &&
+    wo.assignee?.divisionId !== divisionId
+  ) {
     throw new AppError('Akses ditolak', 403);
   }
 
@@ -155,16 +178,28 @@ export async function updateWorkOrderService(
   id: string,
   userId: string,
   editScope: string,
+  divisionId: string,
   body: Record<string, unknown>,
 ) {
   const existing = await prisma.workOrder.findUnique({
     where: { id },
-    select: { id: true, reportedById: true, assignedToId: true, status: true, title: true },
+    select: {
+      id: true, reportedById: true, assignedToId: true, status: true, title: true,
+      reportedBy: { select: { divisionId: true } },
+      assignee:   { select: { divisionId: true } },
+    },
   });
   if (!existing) throw new AppError('Work order tidak ditemukan', 404);
 
   if (editScope === 'own' && existing.reportedById !== userId) {
     throw new AppError('Hanya pembuat WO yang bisa mengedit', 403);
+  }
+  if (
+    editScope === 'division' &&
+    existing.reportedBy.divisionId !== divisionId &&
+    existing.assignee?.divisionId !== divisionId
+  ) {
+    throw new AppError('Akses ditolak', 403);
   }
   if (existing.status === WorkOrderStatus.DONE || existing.status === WorkOrderStatus.CANCELLED) {
     throw new AppError('WO yang sudah selesai atau dibatalkan tidak bisa diedit', 400);
@@ -219,20 +254,35 @@ export async function changeWorkOrderStatusService(
   id: string,
   userId: string,
   editScope: string,
+  divisionId: string,
   body: { status: WorkOrderStatus; note?: string | null },
 ) {
   const existing = await prisma.workOrder.findUnique({
     where: { id },
-    select: { id: true, reportedById: true, assignedToId: true, status: true, title: true },
+    select: {
+      id: true, reportedById: true, assignedToId: true, status: true, title: true,
+      reportedBy: { select: { divisionId: true } },
+      assignee:   { select: { divisionId: true } },
+    },
   });
   if (!existing) throw new AppError('Work order tidak ditemukan', 404);
 
   if (editScope === 'own' && existing.assignedToId !== userId && existing.reportedById !== userId) {
     throw new AppError('Akses ditolak', 403);
   }
+  if (
+    editScope === 'division' &&
+    existing.reportedBy.divisionId !== divisionId &&
+    existing.assignee?.divisionId !== divisionId
+  ) {
+    throw new AppError('Akses ditolak', 403);
+  }
 
   const { status, note } = body;
   if (existing.status === status) throw new AppError('Status sudah sama', 400);
+  if (!STATUS_TRANSITIONS[existing.status].includes(status)) {
+    throw new AppError(`Tidak bisa ubah status dari ${existing.status} ke ${status}`, 400);
+  }
 
   const completedAt = status === WorkOrderStatus.DONE ? new Date() : null;
 
@@ -268,22 +318,34 @@ export async function changeWorkOrderStatusService(
   return wo;
 }
 
-export async function deleteWorkOrderService(id: string, userId: string, deleteScope: string) {
+export async function deleteWorkOrderService(id: string, userId: string, deleteScope: string, divisionId: string) {
   const existing = await prisma.workOrder.findUnique({
     where: { id },
-    select: { id: true, reportedById: true },
+    select: {
+      id: true, reportedById: true,
+      reportedBy: { select: { divisionId: true } },
+      assignee:   { select: { divisionId: true } },
+    },
   });
   if (!existing) throw new AppError('Work order tidak ditemukan', 404);
   if (deleteScope === 'own' && existing.reportedById !== userId) {
     throw new AppError('Hanya pembuat WO yang bisa menghapus', 403);
   }
+  if (
+    deleteScope === 'division' &&
+    existing.reportedBy.divisionId !== divisionId &&
+    existing.assignee?.divisionId !== divisionId
+  ) {
+    throw new AppError('Akses ditolak', 403);
+  }
 
   await prisma.workOrder.delete({ where: { id } });
 }
 
-export async function getWorkOrderStatsService(userId: string, viewScope: string) {
-  const where: Prisma.WorkOrderWhereInput =
-    viewScope === 'own' ? { OR: [{ reportedById: userId }, { assignedToId: userId }] } : {};
+export async function getWorkOrderStatsService(userId: string, viewScope: string, divisionId: string) {
+  let where: Prisma.WorkOrderWhereInput = {};
+  if (viewScope === 'own')      where = { OR: [{ reportedById: userId }, { assignedToId: userId }] };
+  if (viewScope === 'division') where = { OR: [{ reportedBy: { divisionId } }, { assignee: { divisionId } }] };
 
   const [byStatus, byPriority, overdue] = await prisma.$transaction([
     prisma.workOrder.groupBy({ by: ['status'], where, _count: true, orderBy: { status: 'asc' } }),

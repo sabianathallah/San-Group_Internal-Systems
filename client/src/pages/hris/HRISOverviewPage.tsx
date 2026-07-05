@@ -488,7 +488,7 @@ export default function HRISOverviewPage() {
     const status = pendingCheckInStatus.current;
 
     if (!navigator.geolocation) {
-      await doCheckIn({ status, photoDataUrl: photo });
+      toast.error('Perangkat kamu tidak mendukung lokasi. Aktifkan GPS untuk check-in.');
       return;
     }
 
@@ -498,8 +498,8 @@ export default function HRISOverviewPage() {
         const locationName = await reverseGeocode(lat, lng);
         await doCheckIn({ status, lat, lng, locationName, photoDataUrl: photo });
       },
-      async () => {
-        await doCheckIn({ status, photoDataUrl: photo });
+      () => {
+        toast.error('Gagal mendapatkan lokasi. Aktifkan izin lokasi lalu coba lagi.');
       },
       { timeout: 10000, enableHighAccuracy: true },
     );

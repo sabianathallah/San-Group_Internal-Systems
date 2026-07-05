@@ -40,9 +40,9 @@ export interface AuditLogPermissions {
 }
 
 export interface HrisPermissions {
-  reviewLeave: boolean;      // approve / reject leave requests
-  reviewOvertime: boolean;   // approve / reject overtime requests
-  editAttendance: boolean;   // admin-edit any attendance record
+  reviewLeave: Scope;        // approve / reject leave requests (none/division/all — self-review is always blocked)
+  reviewOvertime: Scope;     // approve / reject overtime requests (none/division/all)
+  editAttendance: Scope;     // admin-edit any attendance record (none/division/all)
   manageShifts: boolean;     // CRUD shifts + assign to users
   manageLocations: boolean;  // CRUD office locations
   viewReports: Scope;        // attendance reports (none/division/all)
@@ -75,7 +75,7 @@ export const DEFAULT_PERMISSIONS: Record<number, PermissionConfig> = {
     note:       { view: 'all',      create: true,  edit: 'all',      delete: 'all' },
     analytics:  { view: 'all' },
     audit_log:  { view: 'all' },
-    hris:       { reviewLeave: true,  reviewOvertime: true,  editAttendance: true,  manageShifts: true,  manageLocations: true,  viewReports: 'all' },
+    hris:       { reviewLeave: 'all',  reviewOvertime: 'all',  editAttendance: 'all',  manageShifts: true,  manageLocations: true,  viewReports: 'all' },
     work_order: { view: 'all', create: true, edit: 'all', delete: 'all' },
   },
   2: {
@@ -85,7 +85,7 @@ export const DEFAULT_PERMISSIONS: Record<number, PermissionConfig> = {
     note:       { view: 'all',      create: true,  edit: 'all',      delete: 'all' },
     analytics:  { view: 'all' },
     audit_log:  { view: 'all' },
-    hris:       { reviewLeave: true,  reviewOvertime: true,  editAttendance: true,  manageShifts: true,  manageLocations: true,  viewReports: 'all' },
+    hris:       { reviewLeave: 'all',  reviewOvertime: 'all',  editAttendance: 'all',  manageShifts: true,  manageLocations: true,  viewReports: 'all' },
     work_order: { view: 'all', create: true, edit: 'all', delete: 'all' },
   },
   3: {
@@ -95,7 +95,7 @@ export const DEFAULT_PERMISSIONS: Record<number, PermissionConfig> = {
     note:       { view: 'division', create: true,  edit: 'own',      delete: 'own' },
     analytics:  { view: 'division' },
     audit_log:  { view: 'division' },
-    hris:       { reviewLeave: true,  reviewOvertime: true,  editAttendance: true,  manageShifts: false, manageLocations: false, viewReports: 'all' },
+    hris:       { reviewLeave: 'all',  reviewOvertime: 'all',  editAttendance: 'all',  manageShifts: false, manageLocations: false, viewReports: 'all' },
     work_order: { view: 'all', create: true, edit: 'all', delete: 'all' },
   },
   4: {
@@ -105,7 +105,7 @@ export const DEFAULT_PERMISSIONS: Record<number, PermissionConfig> = {
     note:       { view: 'division', create: true,  edit: 'own',      delete: 'own' },
     analytics:  { view: 'division' },
     audit_log:  { view: 'none' },
-    hris:       { reviewLeave: true,  reviewOvertime: true,  editAttendance: true,  manageShifts: false, manageLocations: false, viewReports: 'division' },
+    hris:       { reviewLeave: 'division',  reviewOvertime: 'division',  editAttendance: 'division',  manageShifts: false, manageLocations: false, viewReports: 'division' },
     work_order: { view: 'all', create: true, edit: 'all', delete: 'all' },
   },
   5: {
@@ -115,7 +115,7 @@ export const DEFAULT_PERMISSIONS: Record<number, PermissionConfig> = {
     note:       { view: 'own',      create: true,  edit: 'own',      delete: 'own' },
     analytics:  { view: 'none' },
     audit_log:  { view: 'none' },
-    hris:       { reviewLeave: false, reviewOvertime: false, editAttendance: false, manageShifts: false, manageLocations: false, viewReports: 'none' },
+    hris:       { reviewLeave: 'none', reviewOvertime: 'none', editAttendance: 'none', manageShifts: false, manageLocations: false, viewReports: 'none' },
     work_order: { view: 'own', create: true, edit: 'own', delete: 'own' },
   },
   6: {
@@ -125,7 +125,7 @@ export const DEFAULT_PERMISSIONS: Record<number, PermissionConfig> = {
     note:       { view: 'own',      create: true,  edit: 'own',      delete: 'own' },
     analytics:  { view: 'none' },
     audit_log:  { view: 'none' },
-    hris:       { reviewLeave: false, reviewOvertime: false, editAttendance: false, manageShifts: false, manageLocations: false, viewReports: 'none' },
+    hris:       { reviewLeave: 'none', reviewOvertime: 'none', editAttendance: 'none', manageShifts: false, manageLocations: false, viewReports: 'none' },
     work_order: { view: 'own', create: true, edit: 'own', delete: 'own' },
   },
 };

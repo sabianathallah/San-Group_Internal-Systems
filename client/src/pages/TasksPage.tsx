@@ -22,6 +22,7 @@ import { usePermStore } from '@/stores/permStore';
 import { toast } from '@/stores/toastStore';
 import { isInMyDay, localToday } from '@/stores/taskStore';
 import { cn } from '@/lib/cn';
+import { PageSizeSelect } from '@/components/shared/PageSizeSelect';
 
 // ── Types ──────────────────────────────────────────────────
 type AssignmentStatus = 'PENDING' | 'ACCEPTED' | 'REJECTED';
@@ -2311,6 +2312,7 @@ export default function TasksPage() {
   const [loadingDivisions,  setLoadingDivisions]   = useState(false);
   const [pageMeta,     setPageMeta]     = useState<{ page: number; totalPages: number } | null>(null);
   const [loadingMore,  setLoadingMore]  = useState(false);
+  const [pageSize,     setPageSize]     = useState(100);
   const [suggestions,  setSuggestions]  = useState<Task[]>([]);
   const [suggestOpen,  setSuggestOpen]  = useState(true);
   const [completedTasks, setCompletedTasks] = useState<Task[]>([]);
@@ -2377,7 +2379,7 @@ export default function TasksPage() {
     if (sidebarView === 'completed') return;
     if (page === 1) setLoading(true); else setLoadingMore(true);
     try {
-      const params: Record<string, string> = { limit: '100', page: String(page) };
+      const params: Record<string, string> = { limit: String(pageSize), page: String(page) };
       if (debSearch) params.search = debSearch;
       let endpoint = '/tasks';
       if (sidebarView === 'team') {
@@ -2400,7 +2402,7 @@ export default function TasksPage() {
       setTasks((prev) => page === 1 ? fetched : [...prev, ...fetched]);
     } catch (err) { toast.error(extractErr(err)); }
     finally { setLoading(false); setLoadingMore(false); }
-  }, [sidebarView, debSearch, selectedDivision]);
+  }, [sidebarView, debSearch, selectedDivision, pageSize]);
 
   useEffect(() => { loadTasks(); }, [loadTasks]);
 
@@ -2992,18 +2994,20 @@ export default function TasksPage() {
               />
             )}
 
-            {/* Load more */}
-            {!loading && !(sidebarView === 'browse' && browseMode === 'division' && !selectedDivision)
-              && pageMeta && pageMeta.page < pageMeta.totalPages && (
-              <div className="flex justify-center py-2 border-t border-gray-100 flex-shrink-0">
-                <button
-                  onClick={() => loadTasks(pageMeta.page + 1)}
-                  disabled={loadingMore}
-                  className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-navy px-3 py-1.5 rounded-lg hover:bg-gray-50 disabled:opacity-50"
-                >
-                  {loadingMore ? <Loader2 size={12} className="animate-spin" /> : <ChevronDown size={12} />}
-                  Load more
-                </button>
+            {/* Pagination */}
+            {!loading && !(sidebarView === 'browse' && browseMode === 'division' && !selectedDivision) && pageMeta && (
+              <div className="flex items-center justify-between gap-2 py-2 px-3 border-t border-gray-100 flex-shrink-0">
+                <PageSizeSelect value={pageSize} onChange={setPageSize} options={[25, 50, 100]} />
+                {pageMeta.page < pageMeta.totalPages && (
+                  <button
+                    onClick={() => loadTasks(pageMeta.page + 1)}
+                    disabled={loadingMore}
+                    className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-navy px-3 py-1.5 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+                  >
+                    {loadingMore ? <Loader2 size={12} className="animate-spin" /> : <ChevronDown size={12} />}
+                    Load more
+                  </button>
+                )}
               </div>
             )}
           </div>

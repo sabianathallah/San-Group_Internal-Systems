@@ -1,5 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
+  DndContext, DragOverlay, PointerSensor, useSensor, useSensors,
+  useDraggable, useDroppable, type DragEndEvent, type DragStartEvent,
+} from '@dnd-kit/core';
+import {
   Wrench, Plus, ChevronDown, X, Check, Clock, AlertTriangle,
   MapPin, User, Calendar, List, Filter, RefreshCw, Loader2,
   CheckCircle2, Circle, ArrowRight, Paperclip, History, ChevronUp,
@@ -9,6 +13,20 @@ import api from '@/lib/api';
 import { cn } from '@/lib/cn';
 import { toast } from '@/stores/toastStore';
 import { useAuthStore } from '@/stores/authStore';
+import { usePermStore } from '@/stores/permStore';
+import type { Scope } from '@/types/permissions';
+import { PageSizeSelect } from '@/components/shared/PageSizeSelect';
+
+// ── Permission helper ──────────────────────────────────────
+// Mirrors the server-side scope check in work-order.service.ts: 'all' always
+// passes, 'division' passes if the WO's reporter/assignee shares the user's
+// division, 'own' passes the caller-supplied ownership check, 'none' never passes.
+function hasScope(scope: Scope, isOwner: boolean, sameDivision: boolean): boolean {
+  if (scope === 'all')      return true;
+  if (scope === 'division') return sameDivision;
+  if (scope === 'own')      return isOwner;
+  return false;
+}
 
 // ── Types ──────────────────────────────────────────────────
 type WOStatus   = 'OPEN' | 'ASSIGNED' | 'IN_PROGRESS' | 'PENDING_PARTS' | 'DONE' | 'CANCELLED';
@@ -41,6 +59,8 @@ interface WorkOrder {
 }
 
 // ── Config ─────────────────────────────────────────────────
+const BOARD_COLUMNS: WOStatus[] = ['OPEN', 'ASSIGNED', 'IN_PROGRESS', 'PENDING_PARTS', 'DONE', 'CANCELLED'];
+
 const STATUS_CONFIG: Record<WOStatus, { label: string; color: string; bg: string; icon: React.ElementType }> = {
   OPEN:          { label: 'Open',           color: 'text-slate-600',  bg: 'bg-slate-100',   icon: Circle       },
   ASSIGNED:      { label: 'Assigned',       color: 'text-blue-600',   bg: 'bg-blue-50',     icon: User         },
@@ -433,75 +453,201 @@ function StatusModal({
   );
 }
 
-// ── WO List Item ───────────────────────────────────────────
-function WOListItem({
-  wo, selected, onSelect,
+// ── Assignee Picker (used when dropping a card into the ASSIGNED column) ───
+function AssigneePickerModal({
+  wo, users, onClose, onAssigned,
 }: {
-  wo: WorkOrder; selected: boolean; onSelect: () => void;
+  wo: WorkOrder | null; users: WOUser[]; onClose: () => void; onAssigned: (userId: string) => void;
 }) {
-  const overdue = isOverdue(wo);
+  const [search, setSearch] = useState('');
+  useEffect(() => { if (wo) setSearch(''); }, [wo]);
+
+  if (!wo) return null;
+
+  const filtered = search.trim()
+    ? users.filter((u) => u.fullName.toLowerCase().includes(search.trim().toLowerCase()))
+    : users;
+
   return (
-    <button
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4" onClick={onClose}>
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-sm max-h-[80vh] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 flex-shrink-0">
+          <h2 className="font-semibold text-gray-900">Assign Work Order</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
+        </div>
+        <p className="px-5 pt-3 text-xs text-gray-500">Pilih penerima tugas untuk &quot;{wo.title}&quot;</p>
+        <div className="px-5 pt-3 flex-shrink-0">
+          <input
+            autoFocus
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Cari nama..."
+            className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-navy/30"
+          />
+        </div>
+        <div className="p-3 space-y-0.5 overflow-y-auto">
+          {filtered.map((u) => (
+            <button
+              key={u.id}
+              onClick={() => onAssigned(u.id)}
+              className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-gray-50 text-left"
+            >
+              <Avatar user={u} size={7} />
+              <span className="text-sm text-gray-700">{u.fullName}</span>
+            </button>
+          ))}
+          {filtered.length === 0 && (
+            <p className="text-center text-xs text-gray-400 py-6">Tidak ada karyawan yang cocok</p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Finalize Confirmation (DONE / CANCELLED are terminal) ──
+function ConfirmFinalizeModal({
+  pending, onClose, onConfirm,
+}: {
+  pending: { wo: WorkOrder; status: WOStatus } | null;
+  onClose: () => void; onConfirm: () => void;
+}) {
+  if (!pending) return null;
+  const cfg = STATUS_CONFIG[pending.status];
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4" onClick={onClose}>
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-sm" onClick={(e) => e.stopPropagation()}>
+        <div className="p-5">
+          <h2 className="font-semibold text-gray-900 mb-1">Tandai sebagai {cfg.label}?</h2>
+          <p className="text-sm text-gray-500">
+            &quot;{pending.wo.title}&quot; akan ditandai <span className={cn('font-medium', cfg.color)}>{cfg.label}</span>.
+            Status ini final dan tidak bisa diubah lagi setelah disimpan.
+          </p>
+        </div>
+        <div className="flex gap-2 px-5 pb-5">
+          <button onClick={onClose} className="flex-1 px-4 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50">
+            Batal
+          </button>
+          <button
+            onClick={onConfirm}
+            className="flex-1 px-4 py-2 text-sm bg-navy text-white rounded-lg hover:bg-navy/90"
+          >
+            Ya, {cfg.label}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Kanban Card ────────────────────────────────────────────
+function WOCard({
+  wo, selected, draggable, onSelect, overlay,
+}: {
+  wo: WorkOrder; selected: boolean; draggable: boolean; onSelect: () => void; overlay?: boolean;
+}) {
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+    id: overlay ? `overlay-${wo.id}` : wo.id, disabled: !draggable || overlay,
+  });
+  const overdue = isOverdue(wo);
+
+  return (
+    <div
+      ref={setNodeRef}
+      {...listeners}
+      {...attributes}
       onClick={onSelect}
+      style={transform && !overlay ? { transform: `translate(${transform.x}px, ${transform.y}px)` } : undefined}
       className={cn(
-        'flex items-start gap-3 w-full px-4 py-3 text-left border-l-2 transition-colors',
-        selected
-          ? 'bg-navy/5 border-l-navy'
-          : 'bg-white hover:bg-gray-50 border-l-transparent',
+        'bg-white rounded-lg border p-3 shadow-sm cursor-pointer hover:shadow-md transition-shadow',
+        selected ? 'border-navy ring-1 ring-navy/30' : 'border-gray-200',
+        isDragging && !overlay && 'opacity-40',
+        overlay && 'shadow-xl rotate-2 cursor-grabbing',
+        draggable && !overlay && 'touch-none',
       )}
     >
-      <div className="mt-0.5 flex-shrink-0">
-        {(() => { const Ic = STATUS_CONFIG[wo.status].icon; return <Ic size={16} className={STATUS_CONFIG[wo.status].color} />; })()}
+      <div className="flex items-start justify-between gap-2 mb-1.5">
+        <p className="text-sm font-medium text-gray-800 leading-snug flex-1">{wo.title}</p>
+        <PriorityBadge priority={wo.priority} />
       </div>
-      <div className="flex-1 min-w-0">
-        <div className="flex items-start justify-between gap-2">
-          <p className={cn('text-sm font-medium text-gray-800 truncate', wo.status === 'DONE' && 'line-through text-gray-400')}>
-            {wo.title}
-          </p>
-          <PriorityBadge priority={wo.priority} />
-        </div>
-        <div className="flex items-center gap-2 mt-1 flex-wrap">
-          <CategoryBadge category={wo.category} />
-          {wo.location && (
-            <span className="flex items-center gap-0.5 text-[10px] text-gray-400">
-              <MapPin size={10} /> {wo.location}
-            </span>
-          )}
-          {wo.dueDate && (
-            <span className={cn('flex items-center gap-0.5 text-[10px]', overdue ? 'text-red-500 font-medium' : 'text-gray-400')}>
-              <Calendar size={10} /> {formatDate(wo.dueDate)}
-              {overdue && ' (overdue)'}
-            </span>
-          )}
-        </div>
-        <div className="flex items-center gap-2 mt-1">
-          <span className="text-[10px] text-gray-400">oleh {wo.reportedBy.fullName}</span>
-          {wo.assignee && (
-            <span className="flex items-center gap-0.5 text-[10px] text-gray-500">
-              → {wo.assignee.fullName}
-            </span>
-          )}
-        </div>
+      <div className="flex items-center gap-1.5 flex-wrap mb-1.5">
+        <CategoryBadge category={wo.category} />
+        {wo.location && (
+          <span className="flex items-center gap-0.5 text-[10px] text-gray-400">
+            <MapPin size={10} /> {wo.location}
+          </span>
+        )}
       </div>
-    </button>
+      <div className="flex items-center gap-2">
+        {wo.dueDate && (
+          <span className={cn('flex items-center gap-0.5 text-[10px]', overdue ? 'text-red-500 font-medium' : 'text-gray-400')}>
+            <Calendar size={10} /> {formatDate(wo.dueDate)}
+          </span>
+        )}
+        <span className="text-[10px] text-gray-400 truncate">oleh {wo.reportedBy.fullName}</span>
+        {wo.assignee && <div className="ml-auto flex-shrink-0"><Avatar user={wo.assignee} size={5} /></div>}
+      </div>
+    </div>
+  );
+}
+
+// ── Kanban Column ──────────────────────────────────────────
+function WOColumn({
+  status, workOrders, selectedId, onSelect, canDragWO,
+}: {
+  status: WOStatus; workOrders: WorkOrder[]; selectedId: string | null; onSelect: (id: string) => void;
+  canDragWO: (wo: WorkOrder) => boolean;
+}) {
+  const { setNodeRef, isOver } = useDroppable({ id: status });
+  const cfg  = STATUS_CONFIG[status];
+  const Icon = cfg.icon;
+
+  return (
+    <div className="flex flex-col w-72 flex-shrink-0">
+      <div className={cn('flex items-center gap-2 px-3 py-2 rounded-t-lg mb-2 flex-shrink-0', cfg.bg)}>
+        <Icon size={13} className={cfg.color} />
+        <span className={cn('text-xs font-semibold', cfg.color)}>{cfg.label}</span>
+        <span className="text-[10px] text-gray-400 ml-auto">{workOrders.length}</span>
+      </div>
+      <div
+        ref={setNodeRef}
+        className={cn(
+          'flex-1 overflow-y-auto space-y-2 pb-2 px-0.5 rounded-lg transition-colors min-h-[140px]',
+          isOver && 'bg-navy/5 ring-2 ring-navy/20',
+        )}
+      >
+        {workOrders.map((wo) => (
+          <WOCard key={wo.id} wo={wo} selected={selectedId === wo.id} draggable={canDragWO(wo)} onSelect={() => onSelect(wo.id)} />
+        ))}
+        {workOrders.length === 0 && (
+          <p className="text-center text-[11px] text-gray-300 py-6">Kosong</p>
+        )}
+      </div>
+    </div>
   );
 }
 
 // ── WO Detail Panel ────────────────────────────────────────
 function WODetail({
-  wo, onClose, onEdit, onStatusChange, onDeleted, currentUserId, roleLevel,
+  wo, onClose, onEdit, onStatusChange, onDeleted, currentUserId, currentDivisionId, editScope, deleteScope,
 }: {
   wo: WorkOrder; onClose: () => void; onEdit: () => void;
   onStatusChange: () => void; onDeleted: () => void;
-  currentUserId: string; roleLevel: number;
+  currentUserId: string; currentDivisionId: string; editScope: Scope; deleteScope: Scope;
 }) {
   const [showHistory, setShowHistory] = useState(false);
   const [deleting, setDeleting]       = useState(false);
   const [confirmDel, setConfirmDel]   = useState(false);
 
-  const canEdit    = roleLevel <= 4 || wo.reportedBy.id === currentUserId;
-  const canDelete  = roleLevel <= 4 || wo.reportedBy.id === currentUserId;
-  const canStatus  = roleLevel <= 4 || wo.assignee?.id === currentUserId || wo.reportedBy.id === currentUserId;
+  const isReporter    = wo.reportedBy.id === currentUserId;
+  const isAssignee    = wo.assignee?.id === currentUserId;
+  const sameDivision  = wo.reportedBy.divisionId === currentDivisionId || wo.assignee?.divisionId === currentDivisionId;
+
+  const canEdit    = hasScope(editScope, isReporter, sameDivision);
+  const canDelete  = hasScope(deleteScope, isReporter, sameDivision);
+  // Status changes go through the 'edit' permission on the backend (same route guard),
+  // and 'own' scope there additionally allows the assignee, not just the reporter.
+  const canStatus  = hasScope(editScope, isReporter || isAssignee, sameDivision);
   const isFinal    = wo.status === 'DONE' || wo.status === 'CANCELLED';
 
   async function handleDelete() {
@@ -515,7 +661,7 @@ function WODetail({
   }
 
   return (
-    <div className="flex flex-col h-full bg-white border-l border-gray-100 overflow-hidden">
+    <div className="flex flex-col h-full bg-white shadow-xl overflow-hidden">
       {/* Header */}
       <div className="flex items-start justify-between px-5 py-4 border-b border-gray-100 flex-shrink-0">
         <div className="flex-1 min-w-0 pr-4">
@@ -708,7 +854,8 @@ function StatsBar({ stats }: {
   return (
     <div className="flex items-center gap-4 px-4 py-2 bg-white border-b border-gray-100 flex-shrink-0 overflow-x-auto">
       <div className="flex items-center gap-1.5 text-xs whitespace-nowrap">
-        <span className="font-semibold text-gray-800">{openCount}</span>
+        <Wrench size={12} className="text-navy" />
+        <span className="font-semibold text-navy">{openCount}</span>
         <span className="text-gray-500">Open</span>
       </div>
       <div className="flex items-center gap-1.5 text-xs whitespace-nowrap">
@@ -736,8 +883,9 @@ function StatsBar({ stats }: {
 
 // ── Main Page ──────────────────────────────────────────────
 export default function WorkOrderPage() {
-  const user     = useAuthStore((s) => s.user);
-  const roleLevel = user?.role?.level ?? 99;
+  const user      = useAuthStore((s) => s.user);
+  const perms     = usePermStore((s) => s.perms);
+  const woPerms   = perms.work_order;
 
   const [workOrders, setWorkOrders] = useState<WorkOrder[]>([]);
   const [loading, setLoading]       = useState(true);
@@ -746,7 +894,6 @@ export default function WorkOrderPage() {
   const [loadingDetail, setLoadingDetail] = useState(false);
 
   const [view, setView]           = useState<ViewFilter>('all');
-  const [statusFilter, setStatusFilter] = useState<WOStatus | ''>('');
   const [priorityFilter, setPriorityFilter] = useState<WOPriority | ''>('');
   const [search, setSearch]       = useState('');
   const [showFilters, setShowFilters] = useState(false);
@@ -755,34 +902,38 @@ export default function WorkOrderPage() {
   const [editItem, setEditItem]   = useState<WorkOrder | null>(null);
   const [statusModalOpen, setStatusModalOpen] = useState(false);
 
+  const [dragWO, setDragWO]           = useState<WorkOrder | null>(null);
+  const [assignPickerWO, setAssignPickerWO] = useState<WorkOrder | null>(null);
+  const [pendingFinalize, setPendingFinalize] = useState<{ wo: WorkOrder; status: WOStatus } | null>(null);
+
   const [users, setUsers]   = useState<WOUser[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
   const [stats, setStats]   = useState<{
     byStatus: { status: WOStatus; _count: number }[];
     byPriority: { priority: WOPriority; _count: number }[];
     overdue: number;
   } | null>(null);
 
-  const [total, setTotal]   = useState(0);
-  const [page, setPage]     = useState(1);
-  const PAGE_SIZE = 30;
+  const [boardPage, setBoardPage] = useState(1);
+  const [pageSize, setPageSize] = useState(100);
+  const [loadingMore, setLoadingMore] = useState(false);
 
-  const fetchWOs = useCallback(async (p = 1) => {
-    setLoading(true);
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
+
+  const fetchWOs = useCallback(async (pageArg = 1, append = false) => {
+    (append ? setLoadingMore : setLoading)(true);
     try {
-      const params: Record<string, string> = {
-        view, page: String(p), limit: String(PAGE_SIZE),
-      };
-      if (statusFilter)   params.status   = statusFilter;
+      const params: Record<string, string> = { view, limit: String(pageSize), page: String(pageArg) };
       if (priorityFilter) params.priority = priorityFilter;
       if (search.trim())  params.search   = search.trim();
 
       const res = await api.get('/work-orders', { params });
-      setWorkOrders(res.data.data);
-      setTotal(res.data.meta?.total ?? 0);
-      setPage(p);
+      setWorkOrders((prev) => (append ? [...prev, ...res.data.data] : res.data.data));
+      setTotalCount(res.data.meta?.total ?? res.data.data.length);
+      setBoardPage(pageArg);
     } catch (err) { toast.error(extractErr(err)); }
-    finally { setLoading(false); }
-  }, [view, statusFilter, priorityFilter, search]);
+    finally { (append ? setLoadingMore : setLoading)(false); }
+  }, [view, priorityFilter, search, pageSize]);
 
   const fetchStats = useCallback(async () => {
     try {
@@ -793,12 +944,16 @@ export default function WorkOrderPage() {
 
   const fetchUsers = useCallback(async () => {
     try {
-      const res = await api.get('/users', { params: { limit: 200, isActive: true } });
+      // Managers with company-wide scope see everyone; division-scoped roles
+      // (e.g. Admin Lapangan) only see/assign within their own division.
+      const params: Record<string, string | boolean> = { limit: '100', isActive: true };
+      if (woPerms.edit !== 'all' && user?.division?.id) params.division = user.division.id;
+      const res = await api.get('/users', { params });
       setUsers(res.data.data ?? []);
     } catch { /* ignore */ }
-  }, []);
+  }, [woPerms.edit, user?.division?.id]);
 
-  useEffect(() => { fetchWOs(1); }, [fetchWOs]);
+  useEffect(() => { fetchWOs(); }, [fetchWOs]);
   useEffect(() => { fetchStats(); fetchUsers(); }, [fetchStats, fetchUsers]);
 
   const fetchDetail = useCallback(async (id: string) => {
@@ -837,7 +992,71 @@ export default function WorkOrderPage() {
     fetchStats();
   }
 
-  const hasMore = workOrders.length < total;
+  async function applyStatusChange(wo: WorkOrder, status: WOStatus) {
+    const prevStatus = wo.status;
+    // Optimistic: move the card immediately so the drag feels instant, revert on failure.
+    setWorkOrders((prev) => prev.map((w) => (w.id === wo.id ? { ...w, status } : w)));
+    try {
+      const res = await api.patch(`/work-orders/${wo.id}/status`, { status, note: null });
+      handleSaved(res.data.data);
+      toast.success('Status diperbarui');
+    } catch (err) {
+      setWorkOrders((prev) => prev.map((w) => (w.id === wo.id ? { ...w, status: prevStatus } : w)));
+      toast.error(extractErr(err));
+    }
+  }
+
+  async function assignAndActivate(userId: string) {
+    if (!assignPickerWO) return;
+    try {
+      const res = await api.patch(`/work-orders/${assignPickerWO.id}`, { assignedToId: userId });
+      handleSaved(res.data.data);
+      toast.success('Work order ditugaskan');
+    } catch (err) { toast.error(extractErr(err)); } finally { setAssignPickerWO(null); }
+  }
+
+  function handleDragStart(e: DragStartEvent) {
+    setDragWO(workOrders.find((w) => w.id === e.active.id) ?? null);
+  }
+
+  function handleDragEnd(e: DragEndEvent) {
+    setDragWO(null);
+    const { active, over } = e;
+    if (!over) return;
+
+    const wo = workOrders.find((w) => w.id === active.id);
+    if (!wo) return;
+
+    const targetStatus = over.id as WOStatus;
+    if (targetStatus === wo.status) return;
+
+    if (!STATUS_TRANSITIONS[wo.status].includes(targetStatus)) {
+      toast.error('Perpindahan status ini tidak diizinkan');
+      return;
+    }
+
+    if (targetStatus === 'ASSIGNED' && !wo.assignee) {
+      setAssignPickerWO(wo);
+      return;
+    }
+
+    // DONE/CANCELLED are terminal — confirm before finalizing so an accidental
+    // drag can't close a work order with no way back.
+    if (targetStatus === 'DONE' || targetStatus === 'CANCELLED') {
+      setPendingFinalize({ wo, status: targetStatus });
+      return;
+    }
+
+    applyStatusChange(wo, targetStatus);
+  }
+
+  function canDragWO(wo: WorkOrder): boolean {
+    if (STATUS_TRANSITIONS[wo.status].length === 0) return false; // DONE/CANCELLED are terminal
+    const isReporter   = wo.reportedBy.id === user?.id;
+    const isAssignee   = wo.assignee?.id === user?.id;
+    const sameDivision = wo.reportedBy.divisionId === user?.division?.id || wo.assignee?.divisionId === user?.division?.id;
+    return hasScope(woPerms.edit, isReporter || isAssignee, sameDivision);
+  }
 
   const sidebarViews: { id: ViewFilter; label: string }[] = [
     { id: 'all',        label: 'Semua WO'     },
@@ -873,118 +1092,117 @@ export default function WorkOrderPage() {
               {v.label}
             </button>
           ))}
-
-          <div className="mt-4 px-4">
-            <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wide mb-2">Status</p>
-            {(Object.keys(STATUS_CONFIG) as WOStatus[]).map((s) => {
-              const cfg = STATUS_CONFIG[s];
-              const Icon = cfg.icon;
-              return (
-                <button
-                  key={s}
-                  onClick={() => setStatusFilter((prev) => prev === s ? '' : s)}
-                  className={cn(
-                    'flex items-center gap-2 w-full px-2 py-1.5 rounded-lg text-xs transition-colors mb-0.5',
-                    statusFilter === s ? 'bg-navy/5 text-navy font-medium' : 'text-gray-600 hover:bg-gray-50',
-                  )}
-                >
-                  <Icon size={12} className={cfg.color} />
-                  {cfg.label}
-                </button>
-              );
-            })}
-          </div>
         </nav>
 
-        <div className="p-4 border-t border-gray-100">
-          <button
-            onClick={() => { setEditItem(null); setModalOpen(true); }}
-            className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-navy text-white text-sm rounded-lg hover:bg-navy/90"
-          >
-            <Plus size={16} /> Buat WO
-          </button>
-        </div>
+        {woPerms.create && (
+          <div className="p-4 border-t border-gray-100">
+            <button
+              onClick={() => { setEditItem(null); setModalOpen(true); }}
+              className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-navy text-white text-sm rounded-lg hover:bg-navy/90"
+            >
+              <Plus size={16} /> Buat WO
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Main area */}
-      <div className="flex flex-1 overflow-hidden">
-        {/* List panel */}
-        <div className={cn('flex flex-col border-r border-gray-100 overflow-hidden', selectedWO ? 'w-80 flex-shrink-0' : 'flex-1')}>
-          {/* Stats */}
-          <StatsBar stats={stats} />
+      <div className="flex flex-col flex-1 overflow-hidden">
+        {/* Stats */}
+        <StatsBar stats={stats} />
 
-          {/* Search + filter bar */}
-          <div className="flex items-center gap-2 px-3 py-2.5 border-b border-gray-100 flex-shrink-0 bg-white">
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && fetchWOs(1)}
-              placeholder="Cari work order..."
-              className="flex-1 text-sm border border-gray-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-navy/30"
-            />
-            <button
-              onClick={() => setShowFilters((v) => !v)}
-              className={cn('p-1.5 rounded-lg border transition-colors', showFilters ? 'border-navy bg-navy/5 text-navy' : 'border-gray-200 text-gray-500 hover:bg-gray-50')}
-            >
-              <Filter size={14} />
-            </button>
-            <button onClick={() => fetchWOs(1)} className="p-1.5 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50">
-              <RefreshCw size={14} />
-            </button>
-          </div>
+        {/* Search + filter bar */}
+        <div className="flex items-center gap-2 px-3 py-2.5 border-b border-gray-100 flex-shrink-0 bg-white">
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && fetchWOs()}
+            placeholder="Cari work order..."
+            className="flex-1 max-w-xs text-sm border border-gray-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-navy/30"
+          />
+          <button
+            onClick={() => setShowFilters((v) => !v)}
+            className={cn('p-1.5 rounded-lg border transition-colors', showFilters ? 'border-navy bg-navy/5 text-navy' : 'border-gray-200 text-gray-500 hover:bg-gray-50')}
+          >
+            <Filter size={14} />
+          </button>
+          <button onClick={() => fetchWOs()} className="p-1.5 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50">
+            <RefreshCw size={14} />
+          </button>
+          <PageSizeSelect value={pageSize} onChange={(n) => setPageSize(n)} options={[25, 50, 100]} />
 
           {showFilters && (
-            <div className="px-3 py-2 border-b border-gray-100 flex items-center gap-2 flex-shrink-0 bg-gray-50">
-              <select
-                value={priorityFilter}
-                onChange={(e) => setPriorityFilter(e.target.value as WOPriority | '')}
-                className="text-xs border border-gray-200 rounded-lg px-2 py-1 bg-white focus:outline-none"
-              >
-                <option value="">Semua Prioritas</option>
-                {(Object.keys(PRIORITY_CONFIG) as WOPriority[]).map((p) => (
-                  <option key={p} value={p}>{PRIORITY_CONFIG[p].label}</option>
-                ))}
-              </select>
-            </div>
+            <select
+              value={priorityFilter}
+              onChange={(e) => setPriorityFilter(e.target.value as WOPriority | '')}
+              className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white focus:outline-none"
+            >
+              <option value="">Semua Prioritas</option>
+              {(Object.keys(PRIORITY_CONFIG) as WOPriority[]).map((p) => (
+                <option key={p} value={p}>{PRIORITY_CONFIG[p].label}</option>
+              ))}
+            </select>
           )}
-
-          {/* List */}
-          <div className="flex-1 overflow-y-auto divide-y divide-gray-50">
-            {loading && workOrders.length === 0 && (
-              <div className="flex items-center justify-center py-12">
-                <Loader2 size={20} className="animate-spin text-gray-300" />
-              </div>
-            )}
-            {!loading && workOrders.length === 0 && (
-              <div className="flex flex-col items-center justify-center py-16 text-gray-400">
-                <Wrench size={32} className="text-gray-200 mb-2" />
-                <p className="text-sm">Tidak ada work order</p>
-              </div>
-            )}
-            {workOrders.map((wo) => (
-              <WOListItem
-                key={wo.id}
-                wo={wo}
-                selected={selectedId === wo.id}
-                onSelect={() => handleSelect(wo.id)}
-              />
-            ))}
-            {hasMore && (
-              <button
-                onClick={() => fetchWOs(page + 1)}
-                className="w-full py-3 text-xs text-gray-500 hover:bg-gray-50"
-              >
-                Muat lebih banyak
-              </button>
-            )}
-          </div>
         </div>
 
-        {/* Detail panel */}
-        {selectedWO && (
-          <div className="flex-1 overflow-hidden">
+        {totalCount > workOrders.length && (
+          <div className="flex items-center gap-2 px-4 py-1.5 text-[11px] text-amber-700 bg-amber-50 border-b border-amber-100 flex-shrink-0">
+            <AlertTriangle size={11} />
+            <span>Menampilkan {workOrders.length} dari {totalCount} work order.</span>
+            <button
+              onClick={() => fetchWOs(boardPage + 1, true)}
+              disabled={loadingMore}
+              className="ml-auto flex items-center gap-1 font-medium text-amber-800 hover:underline disabled:opacity-60"
+            >
+              {loadingMore ? <Loader2 size={11} className="animate-spin" /> : null}
+              Muat lebih banyak
+            </button>
+          </div>
+        )}
+
+        {/* Board */}
+        {loading && workOrders.length === 0 ? (
+          <div className="flex-1 flex items-center justify-center">
+            <Loader2 size={20} className="animate-spin text-gray-300" />
+          </div>
+        ) : (
+          <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+            <div className="flex-1 overflow-x-auto">
+              <div className="flex gap-4 h-full px-4 py-4 min-w-max">
+                {BOARD_COLUMNS.map((status) => (
+                  <WOColumn
+                    key={status}
+                    status={status}
+                    workOrders={workOrders.filter((w) => w.status === status)}
+                    selectedId={selectedId}
+                    onSelect={handleSelect}
+                    canDragWO={canDragWO}
+                  />
+                ))}
+              </div>
+            </div>
+
+            <DragOverlay dropAnimation={null}>
+              {dragWO && (
+                <div className="w-72">
+                  <WOCard wo={dragWO} selected={false} draggable={false} overlay onSelect={() => {}} />
+                </div>
+              )}
+            </DragOverlay>
+          </DndContext>
+        )}
+      </div>
+
+      {/* Detail drawer */}
+      {selectedWO && (
+        <div
+          className="fixed inset-0 z-40 flex justify-end"
+          onClick={() => { setSelectedId(null); setSelectedWO(null); }}
+        >
+          <div className="absolute inset-0 bg-black/20" />
+          <div className="relative w-full max-w-md h-full" onClick={(e) => e.stopPropagation()}>
             {loadingDetail ? (
-              <div className="flex items-center justify-center h-full">
+              <div className="flex items-center justify-center h-full bg-white">
                 <Loader2 size={20} className="animate-spin text-gray-300" />
               </div>
             ) : (
@@ -995,12 +1213,14 @@ export default function WorkOrderPage() {
                 onStatusChange={() => setStatusModalOpen(true)}
                 onDeleted={handleDeleted}
                 currentUserId={user?.id ?? ''}
-                roleLevel={roleLevel}
+                currentDivisionId={user?.division?.id ?? ''}
+                editScope={woPerms.edit}
+                deleteScope={woPerms.delete}
               />
             )}
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Modals */}
       <WorkOrderModal
@@ -1019,6 +1239,23 @@ export default function WorkOrderPage() {
           onChanged={handleStatusChanged}
         />
       )}
+
+      <AssigneePickerModal
+        wo={assignPickerWO}
+        users={users}
+        onClose={() => setAssignPickerWO(null)}
+        onAssigned={assignAndActivate}
+      />
+
+      <ConfirmFinalizeModal
+        pending={pendingFinalize}
+        onClose={() => setPendingFinalize(null)}
+        onConfirm={() => {
+          if (!pendingFinalize) return;
+          applyStatusChange(pendingFinalize.wo, pendingFinalize.status);
+          setPendingFinalize(null);
+        }}
+      />
     </div>
   );
 }
