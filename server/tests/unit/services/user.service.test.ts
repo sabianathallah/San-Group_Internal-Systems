@@ -39,6 +39,11 @@ const MOCK_USER = {
 };
 
 const REQUESTER_ID = 'requester-uuid';
+// requesterLevel 1 (true SuperAdmin) + scope 'all' bypass the level-ceiling and
+// division-scope rules added later, so these tests keep exercising the original
+// not-found/self-guard/SUPER_ADMIN-immunity behavior in isolation.
+const REQUESTER_LEVEL = 1;
+const REQUESTER_DIVISION_ID = 'requester-division-uuid';
 
 beforeEach(() => {
   mockReset(prismaMock);
@@ -93,7 +98,7 @@ describe('createUserService', () => {
     prismaMock.division.findUnique.mockResolvedValue(MOCK_DIVISION as never);
     prismaMock.user.create.mockResolvedValue(MOCK_USER as never);
 
-    const result = await createUserService({
+    const result = await createUserService(REQUESTER_LEVEL, {
       email: 'new@sangroup.id',
       username: 'newuser',
       password: 'Password123',
@@ -110,7 +115,7 @@ describe('createUserService', () => {
     prismaMock.user.findFirst.mockResolvedValue(MOCK_USER as never);
 
     await expect(
-      createUserService({
+      createUserService(REQUESTER_LEVEL, {
         email: 'test@sangroup.id',
         username: 'other',
         password: 'Password123',
@@ -125,7 +130,7 @@ describe('createUserService', () => {
     prismaMock.user.findFirst.mockResolvedValue({ ...MOCK_USER, email: 'other@x.com' } as never);
 
     await expect(
-      createUserService({
+      createUserService(REQUESTER_LEVEL, {
         email: 'brand@new.id',
         username: 'testuser',
         password: 'Password123',
@@ -143,7 +148,10 @@ describe('updateUserService', () => {
     prismaMock.user.findUnique.mockResolvedValue(MOCK_USER as never);
     prismaMock.user.update.mockResolvedValue({ ...MOCK_USER, fullName: 'Updated Name' } as never);
 
-    const result = await updateUserService(MOCK_USER.id, { fullName: 'Updated Name' });
+    const result = await updateUserService(
+      MOCK_USER.id, REQUESTER_ID, REQUESTER_LEVEL, 'all', REQUESTER_DIVISION_ID,
+      { fullName: 'Updated Name' },
+    );
 
     expect(result.fullName).toBe('Updated Name');
   });
@@ -151,7 +159,9 @@ describe('updateUserService', () => {
   it('throws 404 when user not found', async () => {
     prismaMock.user.findUnique.mockResolvedValue(null);
 
-    await expect(updateUserService('bad-id', { fullName: 'X' })).rejects.toMatchObject({
+    await expect(
+      updateUserService('bad-id', REQUESTER_ID, REQUESTER_LEVEL, 'all', REQUESTER_DIVISION_ID, { fullName: 'X' }),
+    ).rejects.toMatchObject({
       statusCode: 404,
     });
   });
@@ -163,7 +173,9 @@ describe('toggleUserService', () => {
     prismaMock.user.findUnique.mockResolvedValue({ ...MOCK_USER, isActive: true } as never);
     prismaMock.user.update.mockResolvedValue({ ...MOCK_USER, isActive: false } as never);
 
-    const result = await toggleUserService(MOCK_USER.id, REQUESTER_ID);
+    const result = await toggleUserService(
+      MOCK_USER.id, REQUESTER_ID, REQUESTER_LEVEL, 'all', REQUESTER_DIVISION_ID,
+    );
 
     expect(result.isActive).toBe(false);
   });
@@ -171,7 +183,9 @@ describe('toggleUserService', () => {
   it('throws 400 if toggling own account', async () => {
     prismaMock.user.findUnique.mockResolvedValue({ ...MOCK_USER, id: REQUESTER_ID } as never);
 
-    await expect(toggleUserService(REQUESTER_ID, REQUESTER_ID)).rejects.toMatchObject({
+    await expect(
+      toggleUserService(REQUESTER_ID, REQUESTER_ID, REQUESTER_LEVEL, 'all', REQUESTER_DIVISION_ID),
+    ).rejects.toMatchObject({
       statusCode: 400,
     });
   });
@@ -182,7 +196,9 @@ describe('toggleUserService', () => {
       role: { ...MOCK_ROLE, slug: 'SUPER_ADMIN', level: 1 },
     } as never);
 
-    await expect(toggleUserService(MOCK_USER.id, REQUESTER_ID)).rejects.toMatchObject({
+    await expect(
+      toggleUserService(MOCK_USER.id, REQUESTER_ID, REQUESTER_LEVEL, 'all', REQUESTER_DIVISION_ID),
+    ).rejects.toMatchObject({
       statusCode: 403,
     });
   });
@@ -190,7 +206,9 @@ describe('toggleUserService', () => {
   it('throws 404 when user not found', async () => {
     prismaMock.user.findUnique.mockResolvedValue(null);
 
-    await expect(toggleUserService('bad-id', REQUESTER_ID)).rejects.toMatchObject({
+    await expect(
+      toggleUserService('bad-id', REQUESTER_ID, REQUESTER_LEVEL, 'all', REQUESTER_DIVISION_ID),
+    ).rejects.toMatchObject({
       statusCode: 404,
     });
   });
@@ -202,7 +220,9 @@ describe('deleteUserService', () => {
     prismaMock.user.findUnique.mockResolvedValue(MOCK_USER as never);
     prismaMock.user.update.mockResolvedValue({ ...MOCK_USER, isActive: false } as never);
 
-    const result = await deleteUserService(MOCK_USER.id, REQUESTER_ID);
+    const result = await deleteUserService(
+      MOCK_USER.id, REQUESTER_ID, REQUESTER_LEVEL, 'all', REQUESTER_DIVISION_ID,
+    );
 
     expect(result.isActive).toBe(false);
     expect(prismaMock.user.update).toHaveBeenCalledWith(
@@ -213,7 +233,9 @@ describe('deleteUserService', () => {
   it('throws 400 if deleting own account', async () => {
     prismaMock.user.findUnique.mockResolvedValue({ ...MOCK_USER, id: REQUESTER_ID } as never);
 
-    await expect(deleteUserService(REQUESTER_ID, REQUESTER_ID)).rejects.toMatchObject({
+    await expect(
+      deleteUserService(REQUESTER_ID, REQUESTER_ID, REQUESTER_LEVEL, 'all', REQUESTER_DIVISION_ID),
+    ).rejects.toMatchObject({
       statusCode: 400,
     });
   });
@@ -224,7 +246,9 @@ describe('deleteUserService', () => {
       role: { ...MOCK_ROLE, slug: 'SUPER_ADMIN', level: 1 },
     } as never);
 
-    await expect(deleteUserService(MOCK_USER.id, REQUESTER_ID)).rejects.toMatchObject({
+    await expect(
+      deleteUserService(MOCK_USER.id, REQUESTER_ID, REQUESTER_LEVEL, 'all', REQUESTER_DIVISION_ID),
+    ).rejects.toMatchObject({
       statusCode: 403,
     });
   });

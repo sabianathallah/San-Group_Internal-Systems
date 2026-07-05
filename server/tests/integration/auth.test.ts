@@ -91,7 +91,7 @@ describe('POST /api/auth/login', () => {
       .send({ identifier: '', password: 'Password123' });
 
     expect(res.status).toBe(422);
-    expect(res.body.errors).toBeDefined();
+    expect(res.body.data).toBeDefined();
   });
 
   it('422 — validasi: body kosong', async () => {
@@ -256,7 +256,7 @@ describe('PATCH /api/auth/change-password', () => {
       });
 
     expect(res.status).toBe(422);
-    expect(res.body.errors).toBeDefined();
+    expect(res.body.data).toBeDefined();
   });
 
   it('401 — tanpa autentikasi', async () => {

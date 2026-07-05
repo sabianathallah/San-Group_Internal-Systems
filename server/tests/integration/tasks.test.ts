@@ -73,7 +73,7 @@ describe('POST /api/tasks', () => {
       .send({ title: '' });
 
     expect(res.status).toBe(422);
-    expect(res.body.errors).toBeDefined();
+    expect(res.body.data).toBeDefined();
   });
 
   it('401 — tanpa token', async () => {
