@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import {
-  BarChart3, ChevronLeft, ChevronRight, Loader2, CheckCircle2, Wrench, Clock,
+  BarChart3, ChevronLeft, ChevronRight, Loader2, CheckCircle2, Wrench, Clock, Download,
 } from 'lucide-react';
 import api from '@/lib/api';
 import { cn } from '@/lib/cn';
@@ -25,12 +25,38 @@ function fmtDuration(mins: number) {
   return `${hrs}h ${mins % 60}m`;
 }
 
+// ── Export CSV ─────────────────────────────────────────────────
+function exportCSV(report: Report, monthLabel: string) {
+  const header = ['Section', 'Name', 'Count/Assigned', 'Completed', 'Avg Resolution / Rate'];
+  const rows: string[][] = [
+    ['Summary', 'Total Work Orders', String(report.total), '', ''],
+    ['Summary', 'Completed', String(report.completed), '', ''],
+    ['Summary', 'Completion Rate', `${report.completionRate}%`, '', ''],
+    ...report.avgResolutionByCategory.map((c) => [
+      'Category', CATEGORY_LABELS[c.category] ?? c.category, String(c.count), '', fmtDuration(c.avgResolutionMinutes),
+    ]),
+    ...report.byTechnician.map((t) => [
+      'Technician', t.fullName, String(t.assigned), String(t.completed),
+      t.assigned === 0 ? '0%' : `${Math.round((t.completed / t.assigned) * 100)}%`,
+    ]),
+  ];
+  const csv = [header, ...rows].map((r) => r.map((v) => `"${v.replace(/"/g, '""')}"`).join(',')).join('\n');
+  const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `work-order-report-${monthLabel.replace(' ', '-')}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 export default function WorkOrderReportsPage() {
   const now = new Date();
   const [month, setMonth] = useState(now.getMonth() + 1);
   const [year, setYear]   = useState(now.getFullYear());
   const [report, setReport] = useState<Report | null>(null);
   const [loading, setLoading] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   const fetch = useCallback(async () => {
     setLoading(true);
@@ -64,13 +90,23 @@ export default function WorkOrderReportsPage() {
           </h1>
           <p className="text-sm text-gray-500 mt-0.5">Completion rate, resolution time, and technician performance</p>
         </div>
-        <div className="flex items-center gap-1 bg-white border border-gray-200 rounded-lg px-1 flex-shrink-0">
-          <button onClick={prevMonth} className="p-2 text-gray-400 hover:text-gray-700 transition-colors">
-            <ChevronLeft size={16} />
-          </button>
-          <span className="text-sm font-medium text-gray-700 px-2 capitalize min-w-[130px] text-center">{monthLabel}</span>
-          <button onClick={nextMonth} className="p-2 text-gray-400 hover:text-gray-700 transition-colors">
-            <ChevronRight size={16} />
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <div className="flex items-center gap-1 bg-white border border-gray-200 rounded-lg px-1">
+            <button onClick={prevMonth} className="p-2 text-gray-400 hover:text-gray-700 transition-colors">
+              <ChevronLeft size={16} />
+            </button>
+            <span className="text-sm font-medium text-gray-700 px-2 capitalize min-w-[130px] text-center">{monthLabel}</span>
+            <button onClick={nextMonth} className="p-2 text-gray-400 hover:text-gray-700 transition-colors">
+              <ChevronRight size={16} />
+            </button>
+          </div>
+          <button
+            onClick={() => { if (!report) return; setExporting(true); exportCSV(report, monthLabel); setExporting(false); }}
+            disabled={exporting || !report || report.total === 0}
+            className="flex items-center gap-1.5 text-sm font-medium px-3 py-2 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            {exporting ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+            Export CSV
           </button>
         </div>
       </div>

@@ -92,21 +92,32 @@ export async function addWorkOrderAttachment(req: AuthRequest, res: Response, ne
     const editScope = req.permScope ?? 'all';
     const { photoBase64, type } = req.body as { photoBase64: string; type: 'BEFORE' | 'AFTER' | 'OTHER' };
 
-    const result = await cloudinary.uploader.upload(photoBase64, {
-      folder:          'san-group/work-orders',
-      allowed_formats: ['jpg', 'jpeg', 'png', 'webp'],
-      transformation:  [{ width: 1600, height: 1600, crop: 'limit', quality: 'auto:good' }],
-      public_id:       `wo_${req.params.id}_${Date.now()}`,
-    });
+    // BEFORE attachments (the initial problem report) may be a photo or a short
+    // video; AFTER/OTHER (proof of work) stay photo-only as before.
+    const isVideo = type === 'BEFORE' && /^data:video\//.test(photoBase64);
+
+    const result = await cloudinary.uploader.upload(photoBase64, isVideo
+      ? {
+        folder:          'san-group/work-orders',
+        resource_type:   'video',
+        allowed_formats: ['mp4', 'mov', 'webm'],
+        public_id:       `wo_${req.params.id}_${Date.now()}`,
+      }
+      : {
+        folder:          'san-group/work-orders',
+        allowed_formats: ['jpg', 'jpeg', 'png', 'webp'],
+        transformation:  [{ width: 1600, height: 1600, crop: 'limit', quality: 'auto:good' }],
+        public_id:       `wo_${req.params.id}_${Date.now()}`,
+      });
 
     const attachment = await addWorkOrderAttachmentService(String(req.params.id), userId, editScope, divisionId, {
       type,
       fileName: result.public_id,
       filePath: result.secure_url,
       fileSize: result.bytes ?? 0,
-      mimeType: `image/${result.format}`,
+      mimeType: isVideo ? `video/${result.format}` : `image/${result.format}`,
     });
-    successResponse(res, attachment, 'Photo uploaded successfully', 201);
+    successResponse(res, attachment, isVideo ? 'Video uploaded successfully' : 'Photo uploaded successfully', 201);
   } catch (err) { next(err); }
 }
 

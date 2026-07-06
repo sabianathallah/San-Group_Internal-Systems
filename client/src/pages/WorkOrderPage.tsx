@@ -8,7 +8,7 @@ import {
   MapPin, User, Calendar, List, Filter, RefreshCw, Loader2,
   CheckCircle2, Circle, ArrowRight, Camera, History, ChevronUp,
   Zap, AlertCircle, Ban, LayoutGrid, Table2, ImageOff, ThumbsUp, ThumbsDown,
-  ShieldCheck, ClipboardCheck,
+  ShieldCheck, ClipboardCheck, Download,
 } from 'lucide-react';
 import api from '@/lib/api';
 import { cn } from '@/lib/cn';
@@ -168,6 +168,27 @@ function formatRelative(d: string) {
 export function isOverdue(wo: WorkOrder) {
   return wo.dueDate && wo.status !== 'DONE' && wo.status !== 'CANCELLED'
     && new Date(wo.dueDate) < new Date();
+}
+
+function csvCell(v: string) {
+  return `"${v.replace(/"/g, '""')}"`;
+}
+
+function exportWorkOrdersCSV(workOrders: WorkOrder[]) {
+  const header = ['Code', 'Title', 'Status', 'Priority', 'Category', 'Location', 'Reported By', 'Assignee', 'Due Date', 'Created At'];
+  const rows = workOrders.map((wo) => [
+    wo.code, wo.title, STATUS_CONFIG[wo.status].label, PRIORITY_CONFIG[wo.priority].label,
+    CATEGORY_CONFIG[wo.category].label, wo.location ?? '', wo.reportedBy.fullName,
+    wo.assignee?.fullName ?? '', formatDate(wo.dueDate) ?? '', formatDate(wo.createdAt) ?? '',
+  ]);
+  const csv = [header, ...rows].map((r) => r.map((v) => csvCell(String(v))).join(',')).join('\n');
+  const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `work-orders-${new Date().toISOString().slice(0, 10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 function fileToBase64(file: File): Promise<string> {
@@ -837,7 +858,7 @@ function PhotoSection({
         attachments: [...(wo.attachments ?? []), res.data.data],
         _count: { ...wo._count, attachments: wo._count.attachments + 1 },
       });
-      toast.success('Photo uploaded');
+      toast.success(file.type.startsWith('video/') ? 'Video uploaded' : 'Photo uploaded');
     } catch (err) { toast.error(extractErr(err)); } finally { setUploading(null); }
   }
 
@@ -849,7 +870,9 @@ function PhotoSection({
       <div className="grid grid-cols-3 gap-2">
         {photos.map((p) => (
           <a key={p.id} href={p.filePath} target="_blank" rel="noopener noreferrer">
-            <img src={p.filePath} alt={p.type} className="w-full h-20 object-cover rounded-lg border border-gray-200" />
+            {p.mimeType.startsWith('video/')
+              ? <video src={p.filePath} className="w-full h-20 object-cover rounded-lg border border-gray-200" muted />
+              : <img src={p.filePath} alt={p.type} className="w-full h-20 object-cover rounded-lg border border-gray-200" />}
           </a>
         ))}
       </div>
@@ -873,7 +896,7 @@ function PhotoSection({
         </div>
         <PhotoGrid photos={before} emptyLabel="No photo yet" />
         <input
-          ref={beforeInputRef} type="file" accept="image/*" capture="environment" className="hidden"
+          ref={beforeInputRef} type="file" accept="image/*,video/*" capture="environment" className="hidden"
           onChange={(e) => handleFile('BEFORE', e.target.files?.[0])}
         />
       </div>
@@ -1474,6 +1497,14 @@ export default function WorkOrderPage() {
           </button>
           <button onClick={() => fetchWOs()} className="p-1.5 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50">
             <RefreshCw size={14} />
+          </button>
+          <button
+            onClick={() => exportWorkOrdersCSV(workOrders)}
+            disabled={workOrders.length === 0}
+            title="Export visible work orders to CSV"
+            className="p-1.5 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            <Download size={14} />
           </button>
           <PageSizeSelect value={pageSize} onChange={(n) => setPageSize(n)} options={[25, 50, 100]} />
 
