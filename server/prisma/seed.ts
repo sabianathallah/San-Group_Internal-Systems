@@ -707,6 +707,106 @@ async function main() {
     ]},
   }});
 
+  // 9) VALIDATED — laporan gas divalidasi PM, belum ditugaskan ke teknisi
+  await prisma.workOrder.create({ data: {
+    code: 'WO/2026/009',
+    title: 'Laporan Kebocoran Gas Dapur Kantin Karyawan',
+    description: 'Tercium bau gas menyengat di area dapur kantin. Perlu pengecekan segera oleh tim teknis sebelum area dibuka kembali.',
+    status: WorkOrderStatus.VALIDATED,
+    priority: WorkOrderPriority.URGENT,
+    category: WorkOrderCategory.OTHER,
+    location: 'Tower A — Lantai 1, Kantin Karyawan',
+    dueDate: days(0),
+    reportedById: hr.id,
+    assignedToId: null,
+    history: { create: [
+      { fromStatus: null,                    toStatus: WorkOrderStatus.OPEN,      note: 'Work order dibuat',                                                          changedById: hr.id, createdAt: days(0) },
+      { fromStatus: WorkOrderStatus.OPEN,    toStatus: WorkOrderStatus.VALIDATED, note: 'Dikonfirmasi valid oleh Property Manager, menunggu penugasan teknisi.', changedById: pm.id, createdAt: days(0) },
+    ]},
+  }});
+
+  // 10) PENDING_REVIEW — panel listrik sudah diperbaiki, menunggu verifikasi reviewer
+  const woPanel = await prisma.workOrder.create({ data: {
+    code: 'WO/2026/010',
+    title: 'Kerusakan Panel Listrik Utama Gedung B',
+    description: 'Panel listrik utama gedung B mengeluarkan percikan api kecil saat beban puncak. Berpotensi bahaya kebakaran.',
+    status: WorkOrderStatus.PENDING_REVIEW,
+    priority: WorkOrderPriority.URGENT,
+    category: WorkOrderCategory.ELECTRICAL,
+    location: 'Tower B — Ruang Panel Listrik Lantai 1',
+    dueDate: days(-1),
+    reportedById: admin.id,
+    assignedToId: engineer.id,
+    attachments: { create: [
+      { type: 'BEFORE', fileName: 'panel-before.jpg', filePath: 'https://picsum.photos/seed/wo010-before/800/600', fileSize: 245678, mimeType: 'image/jpeg', uploadedById: admin.id,    createdAt: days(-2) },
+      { type: 'AFTER',  fileName: 'panel-after.jpg',  filePath: 'https://picsum.photos/seed/wo010-after/800/600',  fileSize: 268123, mimeType: 'image/jpeg', uploadedById: engineer.id, createdAt: days(0)  },
+    ]},
+    history: { create: [
+      { fromStatus: null,                        toStatus: WorkOrderStatus.OPEN,           note: 'Work order dibuat',                                            changedById: admin.id,    createdAt: days(-2) },
+      { fromStatus: WorkOrderStatus.OPEN,        toStatus: WorkOrderStatus.ASSIGNED,       note: 'Ditugaskan ke Chief Engineer',                                 changedById: admin.id,    createdAt: days(-2) },
+      { fromStatus: WorkOrderStatus.ASSIGNED,    toStatus: WorkOrderStatus.IN_PROGRESS,    note: 'Perbaikan panel sedang dikerjakan',                            changedById: engineer.id, createdAt: days(-1) },
+      { fromStatus: WorkOrderStatus.IN_PROGRESS, toStatus: WorkOrderStatus.PENDING_REVIEW, note: 'Panel sudah diperbaiki dan diuji aman. Menunggu verifikasi.', changedById: engineer.id, createdAt: days(0)  },
+    ]},
+  }});
+
+  // 11) DONE via review approval — genset cadangan, lengkap dengan video "before" & foto "after"
+  const woGenset = await prisma.workOrder.create({ data: {
+    code: 'WO/2026/011',
+    title: 'Perbaikan Genset Cadangan Tower A',
+    description: 'Genset cadangan tidak menyala otomatis saat listrik PLN padam minggu lalu. Perlu diagnosa dan perbaikan.',
+    status: WorkOrderStatus.DONE,
+    priority: WorkOrderPriority.HIGH,
+    category: WorkOrderCategory.ELECTRICAL,
+    location: 'Tower A — Ruang Genset Basement',
+    dueDate: days(-3),
+    completedAt: days(-1),
+    closedAt: days(-1),
+    reportedById: pm.id,
+    assignedToId: engineer.id,
+    reviewedById: admin.id,
+    reviewedAt: days(-1),
+    reviewNotes: 'Sudah diuji coba manual dan otomatis, genset menyala normal saat simulasi pemadaman. Approved.',
+    attachments: { create: [
+      { type: 'BEFORE', fileName: 'genset-before.mp4', filePath: 'https://www.w3schools.com/html/mov_bbb.mp4',       fileSize: 1583231, mimeType: 'video/mp4',  uploadedById: pm.id,       createdAt: days(-5) },
+      { type: 'AFTER',  fileName: 'genset-after.jpg',   filePath: 'https://picsum.photos/seed/wo011-after/800/600', fileSize: 301245,  mimeType: 'image/jpeg', uploadedById: engineer.id, createdAt: days(-2) },
+    ]},
+    history: { create: [
+      { fromStatus: null,                        toStatus: WorkOrderStatus.OPEN,           note: 'Work order dibuat',                                                         changedById: pm.id,       createdAt: days(-5) },
+      { fromStatus: WorkOrderStatus.OPEN,        toStatus: WorkOrderStatus.ASSIGNED,       note: 'Ditugaskan ke Chief Engineer',                                              changedById: admin.id,    createdAt: days(-5) },
+      { fromStatus: WorkOrderStatus.ASSIGNED,    toStatus: WorkOrderStatus.IN_PROGRESS,    note: 'Diagnosa & perbaikan genset dimulai',                                       changedById: engineer.id, createdAt: days(-4) },
+      { fromStatus: WorkOrderStatus.IN_PROGRESS, toStatus: WorkOrderStatus.PENDING_REVIEW, note: 'Genset sudah diperbaiki, video kondisi awal & foto hasil perbaikan terlampir.', changedById: engineer.id, createdAt: days(-2) },
+      { fromStatus: WorkOrderStatus.PENDING_REVIEW, toStatus: WorkOrderStatus.DONE,        note: 'Sudah diuji coba manual dan otomatis, genset menyala normal. Approved.',      changedById: admin.id,    createdAt: days(-1) },
+    ]},
+  }});
+
+  // 12) REJECTED sekali, kembali IN_PROGRESS — AC presisi ruang server perlu pengerjaan ulang
+  const woServerAC = await prisma.workOrder.create({ data: {
+    code: 'WO/2026/012',
+    title: 'Pendinginan AC Presisi Ruang Server Data Center',
+    description: 'Suhu ruang server data center di atas ambang batas standar, berisiko terhadap perangkat server.',
+    status: WorkOrderStatus.IN_PROGRESS,
+    priority: WorkOrderPriority.URGENT,
+    category: WorkOrderCategory.HVAC,
+    location: 'Tower A — Lantai 4, Ruang Server',
+    dueDate: days(1),
+    reportedById: admin.id,
+    assignedToId: engineer.id,
+    reviewedById: admin.id,
+    reviewedAt: days(-1),
+    reviewNotes: 'Suhu masih di atas standar 22°C setelah pengecekan awal. Tolong cek ulang thermostat dan tambahan unit pendingin cadangan.',
+    attachments: { create: [
+      { type: 'BEFORE', fileName: 'server-room-before.jpg',    filePath: 'https://picsum.photos/seed/wo012-before/800/600', fileSize: 212345, mimeType: 'image/jpeg', uploadedById: admin.id,    createdAt: days(-3) },
+      { type: 'AFTER',  fileName: 'server-room-after-v1.jpg',  filePath: 'https://picsum.photos/seed/wo012-after1/800/600', fileSize: 198765, mimeType: 'image/jpeg', uploadedById: engineer.id, createdAt: days(-1) },
+    ]},
+    history: { create: [
+      { fromStatus: null,                        toStatus: WorkOrderStatus.OPEN,           note: 'Work order dibuat',                                            changedById: admin.id,    createdAt: days(-3) },
+      { fromStatus: WorkOrderStatus.OPEN,        toStatus: WorkOrderStatus.ASSIGNED,       note: 'Ditugaskan ke Chief Engineer',                                 changedById: admin.id,    createdAt: days(-3) },
+      { fromStatus: WorkOrderStatus.ASSIGNED,    toStatus: WorkOrderStatus.IN_PROGRESS,    note: 'Servis unit AC presisi dimulai',                               changedById: engineer.id, createdAt: days(-2) },
+      { fromStatus: WorkOrderStatus.IN_PROGRESS, toStatus: WorkOrderStatus.PENDING_REVIEW, note: 'Unit AC presisi sudah diservis, suhu sudah turun ke 24°C.',    changedById: engineer.id, createdAt: days(-1) },
+      { fromStatus: WorkOrderStatus.PENDING_REVIEW, toStatus: WorkOrderStatus.IN_PROGRESS, note: 'Suhu masih di atas standar 22°C. Perlu cek ulang thermostat.', changedById: admin.id,    createdAt: days(-1) },
+    ]},
+  }});
+
   console.log('✅ Work orders & histories created');
 
   // ── Notifications ──────────────────────────────────────────
@@ -733,6 +833,9 @@ async function main() {
     { type: NotificationType.WO_STATUS_CHANGED, title: 'Status WO Diperbarui',   message: 'WO "Kebocoran Pipa Air Toilet Pria Lantai 2" — status menjadi: IN PROGRESS.',                   link: `/work-orders/${woLeak.id}`,     isRead: false, userId: pm.id,       actorId: engineer.id },
     { type: NotificationType.WO_STATUS_CHANGED, title: 'Status WO Diperbarui',   message: 'WO "Filter HVAC Lobby Utama Perlu Diganti" — status menjadi: PENDING PARTS. Menunggu spare part.', link: `/work-orders/${woHVAC.id}`,  isRead: false, userId: admin.id,    actorId: engineer.id },
     { type: NotificationType.WO_ASSIGNED,      title: 'Work Order Baru Dilaporkan', message: 'Dimas Wijaya membuat WO urgent: "Retak Dinding Tangga Darurat Tower B Lantai 5". Belum ada assignee.', link: `/work-orders/${woCivil.id}`, isRead: false, userId: admin.id, actorId: pm.id },
+    { type: NotificationType.WO_STATUS_CHANGED, title: 'Menunggu Review',        message: 'Reza Maulana mengirim WO "Kerusakan Panel Listrik Utama Gedung B" untuk direview.',              link: `/work-orders/${woPanel.id}`,     isRead: false, userId: admin.id,    actorId: engineer.id },
+    { type: NotificationType.WO_COMPLETED,     title: 'Work Order Disetujui',    message: 'Super Admin menyetujui WO "Perbaikan Genset Cadangan Tower A" — sudah ditutup.',                  link: `/work-orders/${woGenset.id}`,    isRead: false, userId: engineer.id, actorId: admin.id    },
+    { type: NotificationType.WO_STATUS_CHANGED, title: 'Work Order Ditolak',      message: 'Super Admin menolak hasil pengerjaan "Pendinginan AC Presisi Ruang Server Data Center": Suhu masih di atas standar.', link: `/work-orders/${woServerAC.id}`, isRead: false, userId: engineer.id, actorId: admin.id },
     // Overtime notifications
     { type: NotificationType.OVERTIME_SUBMITTED, title: 'Pengajuan Lembur Baru', message: 'Reza Maulana mengajukan lembur hari ini (3j 0m).', link: '/hris/overtime', isRead: false, userId: admin.id, actorId: engineer.id },
     { type: NotificationType.OVERTIME_APPROVED,  title: 'Lembur Disetujui',      message: 'Super Admin menyetujui pengajuan lembur kamu.',  link: '/hris/overtime', isRead: false, userId: pm.id,      actorId: admin.id    },
