@@ -98,11 +98,21 @@ export default function Sidebar() {
     ...(canAnalytics ? [{ label: 'Analytics', to: ROUTES.ANALYTICS, icon: BarChart3 }] : []),
   ];
 
+  // Same everyday/Administration split as HRIS: one visual rule app-wide —
+  // what you see is what you may access, and admin tooling sits under a label.
   const canWorkOrderReports = perms.work_order?.view !== 'own';
-  const workOrderNav: NavItem[] = [
-    { label: 'Work Orders', to: ROUTES.WORK_ORDERS,         icon: Wrench  },
-    { label: 'History',     to: ROUTES.WORK_ORDERS_HISTORY, icon: Archive },
-    ...(canWorkOrderReports ? [{ label: 'Reports', to: ROUTES.WORK_ORDERS_REPORTS, icon: BarChart3 }] : []),
+  const workOrderNav: NavSection[] = [
+    {
+      label: null,
+      items: [
+        { label: 'Work Orders', to: ROUTES.WORK_ORDERS,         icon: Wrench  },
+        { label: 'History',     to: ROUTES.WORK_ORDERS_HISTORY, icon: Archive },
+      ],
+    },
+    ...(canWorkOrderReports ? [{
+      label: 'Administration',
+      items: [{ label: 'Reports', to: ROUTES.WORK_ORDERS_REPORTS, icon: BarChart3 }],
+    }] : []),
   ];
 
   // Everyday HRIS items for everyone; management tooling in its own
@@ -135,7 +145,7 @@ export default function Sidebar() {
   ];
 
   const navSections: NavSection[] =
-    activeModule === 'work-orders' ? [{ label: null, items: workOrderNav }] :
+    activeModule === 'work-orders' ? workOrderNav :
     activeModule === 'hris'        ? hrisNav :
     activeModule === 'admin'       ? [{ label: null, items: adminNav }] :
     [{ label: null, items: internalNav }];
