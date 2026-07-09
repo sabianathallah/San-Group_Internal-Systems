@@ -43,6 +43,8 @@ import {
   createLateExcuseRequestService,
   reviewLateExcuseRequestService,
   cancelLateExcuseRequestService,
+  grantCompOffService,
+  listCompOffGrantsService,
 } from '@/services/hris.service';
 
 // ── Leave Types ────────────────────────────────────────────────
@@ -78,7 +80,21 @@ export async function listLeaveRequests(req: AuthRequest, res: Response, next: N
 
 export async function createLeaveRequest(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
-    const request = await createLeaveRequestService(req.user!.userId, req.body);
+    // Supporting document (surat dokter, undangan, dll) — same base64 →
+    // Cloudinary flow as the check-in photo.
+    let attachmentUrl: string | null = null;
+    let attachmentName: string | null = null;
+    if (req.body.attachmentBase64) {
+      const result = await cloudinary.uploader.upload(req.body.attachmentBase64, {
+        folder:          'san-group/leave-docs',
+        allowed_formats: ['jpg', 'jpeg', 'png', 'webp', 'pdf'],
+        public_id:       `leave_${Date.now()}`,
+      });
+      attachmentUrl  = result.secure_url;
+      attachmentName = req.body.attachmentName ?? null;
+    }
+    const { attachmentBase64: _dropped, ...rest } = req.body;
+    const request = await createLeaveRequestService(req.user!.userId, { ...rest, attachmentUrl, attachmentName });
     successResponse(res, request, 'Pengajuan cuti berhasil dibuat', 201);
   } catch (err) { next(err); }
 }
@@ -372,5 +388,24 @@ export async function cancelLateExcuseRequest(req: AuthRequest, res: Response, n
   try {
     await cancelLateExcuseRequestService(String(req.params.id), req.user!.userId);
     successResponse(res, null, 'Pengajuan izin telat dibatalkan');
+  } catch (err) { next(err); }
+}
+
+
+// ── Comp-Off Grants (ganti off) ────────────────────────────────
+
+export async function grantCompOff(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const data = await grantCompOffService(req.user!.userId, req.body);
+    successResponse(res, data, 'Ganti off berhasil diberikan', 201);
+  } catch (err) { next(err); }
+}
+
+export async function listCompOffGrants(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { userId, roleId, roleLevel, divisionId } = req.user!;
+    const perms = await getPermissionsForRole(roleId, roleLevel);
+    const result = await listCompOffGrantsService(userId, perms.hris.reviewLeave, divisionId, req.query);
+    successResponse(res, result.grants, 'Daftar ganti off berhasil diambil', 200, result.meta);
   } catch (err) { next(err); }
 }

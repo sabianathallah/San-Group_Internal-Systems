@@ -15,6 +15,7 @@ export const createUserSchema = z.object({
       .regex(/[0-9]/, 'Harus ada angka'),
     fullName: z.string().min(2).max(100),
     phone: z.string().optional(),
+    joinDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Format tanggal harus YYYY-MM-DD').optional().nullable(),
     roleId:     z.string().uuid('roleId harus UUID yang valid'),
     divisionId: z.string().uuid('divisionId harus UUID yang valid'),
   }),
@@ -24,6 +25,7 @@ export const updateUserSchema = z.object({
   body: z.object({
     fullName:   z.string().min(2).max(100).optional(),
     phone:      z.string().optional().nullable(),
+    joinDate:   z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Format tanggal harus YYYY-MM-DD').optional().nullable(),
     roleId:     z.string().uuid('roleId harus UUID yang valid').optional(),
     divisionId: z.string().uuid('divisionId harus UUID yang valid').optional(),
   }),

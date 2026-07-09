@@ -17,6 +17,7 @@ import {
   reviewRequestSchema,
   requestFilterSchema,
   createLateExcuseSchema,
+  grantCompOffSchema,
 } from '@/validations/hris.validation';
 import {
   listLeaveTypes, getLeaveBalances,
@@ -37,6 +38,8 @@ import {
   createLateExcuseRequest,
   reviewLateExcuseRequest,
   cancelLateExcuseRequest,
+  grantCompOff,
+  listCompOffGrants,
 } from '@/controllers/hris.controller';
 
 const router = Router();
@@ -97,5 +100,9 @@ router.get  ('/late-excuses',            validate(requestFilterSchema, ['query']
 router.post ('/late-excuses',            validate(createLateExcuseSchema), createLateExcuseRequest);
 router.patch('/late-excuses/:id/review', checkPerm('hris', 'editAttendance'), validate(uuidParamSchema, ['params']), validate(reviewRequestSchema), reviewLateExcuseRequest);
 router.patch('/late-excuses/:id/cancel', validate(uuidParamSchema, ['params']), cancelLateExcuseRequest);
+
+// ── Comp-Off Grants (ganti off) ────────────────────────────────
+router.get ('/comp-off', validate(requestFilterSchema, ['query']), listCompOffGrants);
+router.post('/comp-off', checkPerm('hris', 'reviewLeave'), validate(grantCompOffSchema), grantCompOff);
 
 export default router;

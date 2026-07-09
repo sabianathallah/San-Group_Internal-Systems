@@ -45,6 +45,8 @@ export const createLeaveRequestSchema = z.object({
     startDate:   z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Format YYYY-MM-DD'),
     endDate:     z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Format YYYY-MM-DD'),
     reason:      z.string().min(1).max(1000),
+    attachmentBase64: z.string().optional().nullable(),
+    attachmentName:   z.string().max(255).optional().nullable(),
   }),
 });
 
@@ -206,5 +208,16 @@ export const createLateExcuseSchema = z.object({
     date:         z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Format tanggal harus YYYY-MM-DD'),
     expectedTime: z.string().regex(/^\d{2}:\d{2}$/, 'Format jam harus HH:MM').optional().nullable(),
     reason:       z.string().min(5, 'Alasan minimal 5 karakter').max(1000),
+  }),
+});
+
+
+// ── Comp-Off Grants ────────────────────────────────────────────
+
+export const grantCompOffSchema = z.object({
+  body: z.object({
+    userId: z.string().uuid(),
+    days:   z.coerce.number().int().min(1).max(10),
+    reason: z.string().min(5, 'Alasan minimal 5 karakter').max(500),
   }),
 });

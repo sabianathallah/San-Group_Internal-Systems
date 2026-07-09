@@ -35,6 +35,7 @@ beforeEach(() => {
   prismaMock.holiday.findMany.mockResolvedValue([] as never);
   prismaMock.leaveRequest.findFirst.mockResolvedValue(null);
   prismaMock.lateExcuseRequest.findFirst.mockResolvedValue(null);
+  prismaMock.user.findMany.mockResolvedValue([] as never); // no managers to notify
 });
 
 // ── checkInService — geofencing ──────────────────────────────
@@ -183,6 +184,38 @@ describe('createLeaveRequestService', () => {
     ).rejects.toMatchObject({ statusCode: 400 });
     expect(prismaMock.leaveBalance.update).not.toHaveBeenCalled();
     expect(prismaMock.leaveRequest.create).not.toHaveBeenCalled();
+  });
+
+  it('rejects a doc-required leave without an attachment (sick > 1 day)', async () => {
+    prismaMock.leaveType.findUnique.mockResolvedValue({
+      ...LEAVE_TYPE, maxDaysPerYear: 0, requiresDoc: true, requiresDocAfterDays: 1,
+    } as never);
+
+    await expect(
+      createLeaveRequestService(USER_ID, {
+        leaveTypeId: 'lt-1', startDate: '2026-08-03', endDate: '2026-08-05', reason: 'Sakit demam',
+      }),
+    ).rejects.toMatchObject({ statusCode: 400 });
+    expect(prismaMock.leaveRequest.create).not.toHaveBeenCalled();
+  });
+
+  it('flags the request unpaid and skips the quota when tenure is under the requirement', async () => {
+    prismaMock.leaveType.findUnique.mockResolvedValue({
+      ...LEAVE_TYPE, tenureMonthsRequired: 12,
+    } as never);
+    // joinDate ~5 months before the leave start
+    prismaMock.user.findUnique.mockResolvedValue({ joinDate: new Date('2026-03-01T00:00:00.000Z') } as never);
+    prismaMock.leaveRequest.create.mockResolvedValue({ id: 'lr-2', isUnpaid: true } as never);
+
+    const result = await createLeaveRequestService(USER_ID, {
+      leaveTypeId: 'lt-1', startDate: '2026-08-03', endDate: '2026-08-07', reason: 'Liburan',
+    });
+
+    expect(result).toMatchObject({ isUnpaid: true });
+    expect(prismaMock.leaveBalance.update).not.toHaveBeenCalled();
+    expect(prismaMock.leaveRequest.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ isUnpaid: true }) }),
+    );
   });
 
   it('surfaces a concurrent-submission conflict as a 409', async () => {

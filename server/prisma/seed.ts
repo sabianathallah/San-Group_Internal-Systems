@@ -68,6 +68,7 @@ async function main() {
       email: 'admin@sangroup.id', username: 'superadmin',
       password: await hash('admin123'), fullName: 'Super Admin', phone: '08100000000',
       roleId: roleSuper, divisionId: divManagement, isActive: true,
+      joinDate: new Date('2023-01-09T00:00:00.000Z'),
     },
   });
   const director = await prisma.user.upsert({
@@ -77,6 +78,7 @@ async function main() {
       email: 'director.retail@sangroup.id', username: 'director.retail',
       password: await hash('password123'), fullName: 'Andi Pratama', phone: '08111111111',
       roleId: roleDirector, divisionId: divRetail, isActive: true,
+      joinDate: new Date('2022-06-01T00:00:00.000Z'),
     },
   });
   const pm = await prisma.user.upsert({
@@ -86,6 +88,7 @@ async function main() {
       email: 'pm@sangroup.id', username: 'property.manager',
       password: await hash('password123'), fullName: 'Dimas Wijaya', phone: '08111222222',
       roleId: rolePM, divisionId: divProperty, isActive: true,
+      joinDate: new Date('2024-02-15T00:00:00.000Z'),
     },
   });
   const hr = await prisma.user.upsert({
@@ -95,6 +98,7 @@ async function main() {
       email: 'hr@sangroup.id', username: 'hr.manager',
       password: await hash('password123'), fullName: 'Sari Dewi', phone: '08122222222',
       roleId: roleHR, divisionId: divHR, isActive: true,
+      joinDate: new Date('2023-09-01T00:00:00.000Z'),
     },
   });
   const finance = await prisma.user.upsert({
@@ -104,6 +108,7 @@ async function main() {
       email: 'finance@sangroup.id', username: 'finance.manager',
       password: await hash('password123'), fullName: 'Budi Santoso', phone: '08133333333',
       roleId: roleFinance, divisionId: divFinance, isActive: true,
+      joinDate: new Date('2024-11-20T00:00:00.000Z'),
     },
   });
   const engineer = await prisma.user.upsert({
@@ -113,6 +118,7 @@ async function main() {
       email: 'engineer@sangroup.id', username: 'chief.engineer',
       password: await hash('password123'), fullName: 'Reza Maulana', phone: '08144444444',
       roleId: roleChief, divisionId: divEngineering, isActive: true,
+      joinDate: new Date('2026-03-01T00:00:00.000Z'),
     },
   });
   console.log('✅ Users created');
@@ -392,7 +398,8 @@ async function main() {
   await prisma.shift.deleteMany({});
 
   // Shifts
-  const shiftOffice = await prisma.shift.create({ data: { name: 'Office Staff', startTime: '08:00', endTime: '17:00', lateThresholdMinutes: 0, isDefault: true, color: '#3b82f6' } });
+  // Kebijakan client: jam kerja 09:00–18:00
+  const shiftOffice = await prisma.shift.create({ data: { name: 'Office Staff', startTime: '09:00', endTime: '18:00', lateThresholdMinutes: 0, isDefault: true, color: '#3b82f6' } });
   await prisma.shift.create({ data: { name: 'Security', startTime: '07:00', endTime: '19:00', lateThresholdMinutes: 0, color: '#ef4444' } });
   await prisma.shift.create({ data: { name: 'Shift Siang', startTime: '12:00', endTime: '21:00', lateThresholdMinutes: 0, color: '#f59e0b' } });
 
@@ -407,10 +414,16 @@ async function main() {
   console.log('✅ Shifts & office locations created');
 
   // Leave types
-  const ltAnnual = await prisma.leaveType.create({ data: { name: 'Annual Leave',    slug: 'ANNUAL',      color: '#6366f1', maxDaysPerYear: 12, isPaid: true, requiresDoc: false, position: 0 } });
-  const ltSick   = await prisma.leaveType.create({ data: { name: 'Sick Leave',      slug: 'SICK',        color: '#ef4444', maxDaysPerYear: 0,  isPaid: true, requiresDoc: true,  position: 1 } });
+  // Kebijakan client: kuota 12/tahun, carry-over hangus akhir Maret, kuota aktif setelah 1 tahun kerja
+  const ltAnnual = await prisma.leaveType.create({ data: { name: 'Annual Leave',    slug: 'ANNUAL',      color: '#6366f1', maxDaysPerYear: 12, isPaid: true, requiresDoc: false, allowCarryOver: true, tenureMonthsRequired: 12, position: 0 } });
+  // Sakit > 1 hari wajib surat dokter
+  const ltSick   = await prisma.leaveType.create({ data: { name: 'Sick Leave',      slug: 'SICK',        color: '#ef4444', maxDaysPerYear: 0,  isPaid: true, requiresDoc: true, requiresDocAfterDays: 1, position: 1 } });
   const ltEmerg  = await prisma.leaveType.create({ data: { name: 'Emergency Leave', slug: 'EMERGENCY',   color: '#f97316', maxDaysPerYear: 3,  isPaid: true, requiresDoc: false, position: 2 } });
   const ltWFH    = await prisma.leaveType.create({ data: { name: 'WFH Special',     slug: 'WFH_SPECIAL', color: '#3b82f6', maxDaysPerYear: 6,  isPaid: true, requiresDoc: false, position: 3 } });
+  // Cuti resmi/pemerintah (nikah dll) — selalu wajib lampiran pendukung
+  await prisma.leaveType.create({ data: { name: 'Cuti Khusus',      slug: 'SPECIAL',     color: '#8b5cf6', maxDaysPerYear: 0,  isPaid: true, requiresDoc: true, requiresDocAfterDays: 0, position: 4 } });
+  // Ganti off — saldo dari grant HRD (kerja weekend/tanggal merah), bukan kuota tahunan
+  await prisma.leaveType.create({ data: { name: 'Ganti Off',        slug: 'COMP_OFF',    color: '#10b981', maxDaysPerYear: 0,  isPaid: true, requiresDoc: false, earnedBalance: true, position: 5 } });
 
   // Leave balances (year 2026) for all 6 users
   const allUsers = [admin, director, pm, hr, finance, engineer];

@@ -207,6 +207,7 @@ model User {
   phone       String?
   avatar      String?
   isActive    Boolean   @default(true)
+  joinDate    DateTime? @db.Date // tanggal mulai kerja — dasar aturan tenure cuti
   lastLoginAt DateTime?
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
@@ -253,6 +254,8 @@ model User {
   reviewedShiftChanges       ShiftChangeRequest[]    @relation("SCRReviewer")
   lateExcuseRequests         LateExcuseRequest[]     @relation("LERRequester")
   reviewedLateExcuses        LateExcuseRequest[]     @relation("LERReviewer")
+  compOffGrants              CompOffGrant[]          @relation("COGUser")
+  grantedCompOffs            CompOffGrant[]          @relation("COGGrantedBy")
 
   @@index([email])
   @@index([username])
@@ -746,6 +749,14 @@ model LeaveType {
   maxDaysPerYear Int   @default(0) // 0 = unlimited
   isPaid      Boolean  @default(true)
   requiresDoc Boolean  @default(false)
+  // Doc only mandatory when totalDays exceeds this (SICK: 1 -> doc needed for >1 day; 0 -> always)
+  requiresDocAfterDays Int @default(0)
+  // Unused balance carries into next year, usable until March 31 then expires
+  allowCarryOver Boolean @default(false)
+  // Minimum months of tenure before this quota applies; below it requests become unpaid
+  tenureMonthsRequired Int @default(0)
+  // Balance starts at 0 and is earned via comp-off grants instead of a yearly quota
+  earnedBalance Boolean @default(false)
   isActive    Boolean  @default(true)
   position    Int      @default(0)
   createdAt   DateTime @default(now())
@@ -767,6 +778,9 @@ model LeaveBalance {
   totalDays   Int
   usedDays    Int       @default(0)
   pendingDays Int       @default(0)
+  // Portion of totalDays that came from last year's remainder; zeroed (and the
+  // unused part removed from totalDays) after March 31
+  carriedOverDays Int   @default(0)
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
@@ -787,6 +801,10 @@ model LeaveRequest {
   totalDays    Int
   reason       String
   status       LeaveStatus @default(PENDING)
+  // Tenure below the leave type's requirement: no quota deducted, salary cut applies
+  isUnpaid     Boolean     @default(false)
+  attachmentUrl  String?
+  attachmentName String?
   reviewNote   String?
   reviewedById String?
   reviewedBy   User?       @relation("LRReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
@@ -798,6 +816,22 @@ model LeaveRequest {
   @@index([leaveTypeId])
   @@index([status])
   @@map("leave_requests")
+}
+
+// Audit trail of comp-off ("ganti off") credits: HR grants extra off days for
+// working weekends/holidays; the days land on the earned-balance leave type.
+model CompOffGrant {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation("COGUser", fields: [userId], references: [id], onDelete: Cascade)
+  days        Int
+  reason      String
+  grantedById String
+  grantedBy   User     @relation("COGGrantedBy", fields: [grantedById], references: [id])
+  createdAt   DateTime @default(now())
+
+  @@index([userId])
+  @@map("comp_off_grants")
 }
 
 model Shift {

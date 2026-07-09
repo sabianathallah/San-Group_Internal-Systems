@@ -17,17 +17,20 @@ type LeaveStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED';
 interface LeaveType {
   id: string; name: string; slug: string; color: string;
   maxDaysPerYear: number; isPaid: boolean; requiresDoc: boolean;
+  requiresDocAfterDays: number; allowCarryOver: boolean;
+  tenureMonthsRequired: number; earnedBalance: boolean;
 }
 
 interface LeaveBalance {
   leaveType: LeaveType;
   totalDays: number; usedDays: number;
-  pendingDays: number; remainingDays: number | null;
+  pendingDays: number; carriedOverDays: number; remainingDays: number | null;
 }
 
 interface LeaveRequest {
   id: string; status: LeaveStatus;
   startDate: string; endDate: string; totalDays: number; reason: string;
+  isUnpaid: boolean; attachmentUrl: string | null; attachmentName: string | null;
   reviewNote: string | null; reviewedAt: string | null;
   createdAt: string;
   leaveType: LeaveType;
@@ -71,25 +74,49 @@ function CreateLeaveModal({
   onCreated: () => void;
 }) {
   const [form, setForm] = useState({ leaveTypeId: '', startDate: '', endDate: '', reason: '' });
+  const [attachment, setAttachment] = useState<{ base64: string; name: string } | null>(null);
   const [saving, setSaving] = useState(false);
 
   const totalDays = form.startDate && form.endDate ? countWeekdays(form.startDate, form.endDate) : 0;
   const selType   = leaveTypes.find((t) => t.id === form.leaveTypeId);
   const selBal    = balances.find((b) => b.leaveType.id === form.leaveTypeId);
+  // Document mandatory when the type requires one and the request exceeds the
+  // free-days threshold (SICK: >1 day; Cuti Khusus: always).
+  const docRequired = !!selType?.requiresDoc && totalDays > (selType?.requiresDocAfterDays ?? 0);
 
   useEffect(() => {
-    if (open) setForm({ leaveTypeId: leaveTypes[0]?.id ?? '', startDate: '', endDate: '', reason: '' });
+    if (open) {
+      setForm({ leaveTypeId: leaveTypes[0]?.id ?? '', startDate: '', endDate: '', reason: '' });
+      setAttachment(null);
+    }
   }, [open, leaveTypes]);
+
+  function handleFile(file?: File) {
+    if (!file) { setAttachment(null); return; }
+    if (file.size > 5 * 1024 * 1024) { toast.error('Maximum file size is 5 MB'); return; }
+    const reader = new FileReader();
+    reader.onload = () => setAttachment({ base64: reader.result as string, name: file.name });
+    reader.readAsDataURL(file);
+  }
 
   if (!open) return null;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!form.leaveTypeId || !form.startDate || !form.endDate || !form.reason.trim()) return;
+    if (docRequired && !attachment) { toast.error('A supporting document is required for this leave'); return; }
     setSaving(true);
     try {
-      await api.post('/hris/leave-requests', form);
-      toast.success('Leave request submitted');
+      const res = await api.post('/hris/leave-requests', {
+        ...form,
+        attachmentBase64: attachment?.base64 ?? null,
+        attachmentName:   attachment?.name ?? null,
+      });
+      if (res.data.data?.isUnpaid) {
+        toast.success('Request submitted as UNPAID leave (tenure below 1 year — salary deduction applies)');
+      } else {
+        toast.success('Leave request submitted');
+      }
       onCreated();
       onClose();
     } catch (err: unknown) {
@@ -128,7 +155,9 @@ function CreateLeaveModal({
               <p className="text-xs text-gray-400 mt-1">Remaining balance: <strong className="text-gray-600">{selBal.remainingDays} days</strong></p>
             )}
             {selType?.requiresDoc && (
-              <p className="text-xs text-orange-500 mt-1">⚠ Requires supporting document</p>
+              <p className="text-xs text-orange-500 mt-1">
+                ⚠ Requires supporting document{(selType.requiresDocAfterDays ?? 0) > 0 ? ` when longer than ${selType.requiresDocAfterDays} day(s)` : ''}
+              </p>
             )}
           </div>
 
@@ -161,6 +190,19 @@ function CreateLeaveModal({
               Total: <strong className="text-gray-800">{totalDays} working days</strong>
             </p>
           )}
+
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1.5">
+              Supporting Document {docRequired ? <span className="text-red-500">*</span> : <span className="text-gray-400">(optional)</span>}
+            </label>
+            <input
+              type="file"
+              accept="image/*,.pdf"
+              onChange={(e) => handleFile(e.target.files?.[0])}
+              className="w-full text-xs text-gray-500 file:mr-3 file:px-3 file:py-1.5 file:rounded-lg file:border-0 file:bg-navy/10 file:text-navy file:text-xs file:font-medium hover:file:bg-navy/20"
+            />
+            {attachment && <p className="text-xs text-gray-400 mt-1">📎 {attachment.name}</p>}
+          </div>
 
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1.5">Reason</label>
@@ -234,6 +276,17 @@ function ReviewModal({
               {' · '}{fmtDate(request.startDate)} — {fmtDate(request.endDate)} ({request.totalDays} days)
             </p>
             <p className="text-xs text-gray-500">{request.reason}</p>
+            {request.isUnpaid && (
+              <p className="text-xs font-medium text-orange-600 bg-orange-50 rounded px-2 py-1 inline-block">
+                UNPAID — tenure below requirement, salary deduction applies
+              </p>
+            )}
+            {request.attachmentUrl && (
+              <a href={request.attachmentUrl} target="_blank" rel="noopener noreferrer"
+                className="text-xs text-navy hover:underline inline-flex items-center gap-1">
+                📎 {request.attachmentName ?? 'View attachment'}
+              </a>
+            )}
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1.5">Note (optional)</label>
@@ -269,6 +322,83 @@ function ReviewModal({
   );
 }
 
+// ── Grant Comp-Off Modal (ganti off — HR only) ─────────────────
+function GrantCompOffModal({ onClose, onDone }: { onClose: () => void; onDone: () => void }) {
+  const [users, setUsers] = useState<{ id: string; fullName: string }[]>([]);
+  const [form, setForm] = useState({ userId: '', days: 1, reason: '' });
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    api.get('/users', { params: { limit: 100, isActive: true } })
+      .then((res) => setUsers(res.data.data ?? []))
+      .catch(() => { /* silent */ });
+  }, []);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!form.userId || form.reason.trim().length < 5) return;
+    setSaving(true);
+    try {
+      await api.post('/hris/comp-off', { userId: form.userId, days: form.days, reason: form.reason.trim() });
+      toast.success('Comp-off granted');
+      onDone();
+      onClose();
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'Failed to grant comp-off';
+      toast.error(msg);
+    } finally { setSaving(false); }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-md">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+          <h2 className="text-base font-semibold text-gray-800">Grant Comp-Off (Ganti Off)</h2>
+          <button onClick={onClose} className="p-1 rounded hover:bg-gray-100 transition-colors">
+            <X size={16} className="text-gray-500" />
+          </button>
+        </div>
+        <form onSubmit={handleSubmit} className="p-5 space-y-4">
+          <p className="text-xs text-gray-500 bg-gray-50 rounded-lg px-3 py-2">
+            Give extra off days for working weekends or public holidays. The days
+            land on the employee&apos;s <span className="font-medium">Ganti Off</span> balance.
+          </p>
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1.5">Employee</label>
+            <select value={form.userId} onChange={(e) => setForm((f) => ({ ...f, userId: e.target.value }))}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-navy/20" required>
+              <option value="">— Select employee —</option>
+              {users.map((u) => <option key={u.id} value={u.id}>{u.fullName}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1.5">Days</label>
+            <input type="number" min={1} max={10} value={form.days}
+              onChange={(e) => setForm((f) => ({ ...f, days: Number(e.target.value) }))}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-navy/20" required />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1.5">Reason</label>
+            <textarea value={form.reason} onChange={(e) => setForm((f) => ({ ...f, reason: e.target.value }))}
+              rows={2} placeholder="e.g. worked Saturday July 5 (building event)"
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-navy/20" required />
+          </div>
+          <div className="flex gap-2 pt-1">
+            <button type="button" onClick={onClose} className="flex-1 px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
+              Cancel
+            </button>
+            <button type="submit" disabled={saving || !form.userId || form.reason.trim().length < 5}
+              className="flex-1 px-4 py-2 text-sm font-medium bg-navy text-white rounded-lg hover:bg-navy/90 transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
+              {saving && <Loader2 size={13} className="animate-spin" />}
+              Grant
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 // ── Main Page ──────────────────────────────────────────────────
 export default function LeavePage() {
   const user = useAuthStore((s) => s.user);
@@ -281,6 +411,7 @@ export default function LeavePage() {
   const [meta,         setMeta]         = useState<Meta | null>(null);
   const [loading,      setLoading]      = useState(true);
   const [createOpen,   setCreateOpen]   = useState(false);
+  const [grantOpen,    setGrantOpen]    = useState(false);
   const [reviewTarget, setReviewTarget] = useState<LeaveRequest | null>(null);
   const [viewMode,     setViewMode]     = useState<'mine' | 'team'>('mine');
   const [statusFilter, setStatusFilter] = useState<LeaveStatus | ''>('');
@@ -349,6 +480,14 @@ export default function LeavePage() {
           <button onClick={load} className="p-2 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 transition-colors">
             <RefreshCw size={15} className={loading ? 'animate-spin' : ''} />
           </button>
+          {isManager && (
+            <button
+              onClick={() => setGrantOpen(true)}
+              className="flex items-center gap-1.5 px-3 py-2 border border-gray-200 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors"
+            >
+              <Plus size={15} /> Ganti Off
+            </button>
+          )}
           <button
             onClick={() => setCreateOpen(true)}
             className="flex items-center gap-1.5 px-3 py-2 bg-navy text-white rounded-lg text-sm font-medium hover:bg-navy/90 transition-colors"
@@ -371,6 +510,9 @@ export default function LeavePage() {
                 <>
                   <p className="text-2xl font-bold text-gray-900">{b.remainingDays}</p>
                   <p className="text-xs text-gray-400 mt-0.5">of {b.totalDays} days · {b.usedDays} used</p>
+                  {b.carriedOverDays > 0 && (
+                    <p className="text-[11px] text-amber-600 mt-0.5">incl. {b.carriedOverDays} carried over — expires Mar 31</p>
+                  )}
                   <div className="h-1 bg-gray-100 rounded-full mt-2 overflow-hidden">
                     <div
                       className="h-full rounded-full"
@@ -448,11 +590,22 @@ export default function LeavePage() {
                         <span className={cn('text-[11px] font-medium px-2 py-0.5 rounded-full border', cfg.cls)}>
                           {cfg.label}
                         </span>
+                        {r.isUnpaid && (
+                          <span className="text-[11px] font-medium px-2 py-0.5 rounded-full border bg-orange-50 text-orange-600 border-orange-200">
+                            Unpaid
+                          </span>
+                        )}
                       </div>
                       <p className="text-xs text-gray-500 mt-1">
                         {fmtDate(r.startDate)} — {fmtDate(r.endDate)} · <strong>{r.totalDays} working days</strong>
                       </p>
                       <p className="text-xs text-gray-400 mt-0.5 line-clamp-1">{r.reason}</p>
+                      {r.attachmentUrl && (
+                        <a href={r.attachmentUrl} target="_blank" rel="noopener noreferrer"
+                          className="text-xs text-navy hover:underline inline-flex items-center gap-1 mt-0.5">
+                          📎 {r.attachmentName ?? 'Attachment'}
+                        </a>
+                      )}
                       {r.reviewNote && (
                         <p className="text-xs text-gray-500 mt-1 italic bg-gray-50 rounded px-2 py-1">"{r.reviewNote}"</p>
                       )}
@@ -517,6 +670,7 @@ export default function LeavePage() {
         balances={balances}
         onCreated={load}
       />
+      {grantOpen && <GrantCompOffModal onClose={() => setGrantOpen(false)} onDone={load} />}
       {reviewTarget && (
         <ReviewModal
           request={reviewTarget}

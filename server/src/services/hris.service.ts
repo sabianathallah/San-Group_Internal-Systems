@@ -46,6 +46,70 @@ export async function getHolidaySet(start: Date, end: Date): Promise<Set<string>
   return new Set(holidays.map((h) => h.date.toISOString().slice(0, 10)));
 }
 
+// Whole months elapsed between two dates (date-of-month aware) — tenure rule.
+function monthsBetween(from: Date, to: Date): number {
+  let months = (to.getUTCFullYear() - from.getUTCFullYear()) * 12 + (to.getUTCMonth() - from.getUTCMonth());
+  if (to.getUTCDate() < from.getUTCDate()) months -= 1;
+  return months;
+}
+
+type LeaveTypePolicy = {
+  id: string; maxDaysPerYear: number; allowCarryOver: boolean; earnedBalance: boolean;
+};
+
+// Balance rows exist for yearly-quota types AND earned types (comp-off, which
+// starts at 0 and grows via grants). Unlimited types (e.g. sick) have none.
+function isBalanceTracked(lt: { maxDaysPerYear: number; earnedBalance: boolean }): boolean {
+  return lt.maxDaysPerYear > 0 || lt.earnedBalance;
+}
+
+// Returns the (created-on-first-touch) balance row for a user/type/year, with
+// two policy rules applied:
+//  1. Carry-over: on first touch of a new year, last year's remainder is added
+//     to totalDays and recorded in carriedOverDays.
+//  2. Expiry: past March 31 (WIB), the still-unused part of the carried days
+//     is removed again — consumption counts against carried days first.
+async function materializeBalance(
+  db: Prisma.TransactionClient,
+  userId: string,
+  leaveType: LeaveTypePolicy,
+  year: number,
+) {
+  let balance = await db.leaveBalance.findUnique({
+    where: { userId_leaveTypeId_year: { userId, leaveTypeId: leaveType.id, year } },
+  });
+
+  if (!balance) {
+    let carry = 0;
+    if (leaveType.allowCarryOver && leaveType.maxDaysPerYear > 0) {
+      const prev = await db.leaveBalance.findUnique({
+        where: { userId_leaveTypeId_year: { userId, leaveTypeId: leaveType.id, year: year - 1 } },
+      });
+      if (prev) carry = Math.max(0, prev.totalDays - prev.usedDays - prev.pendingDays);
+    }
+    balance = await db.leaveBalance.create({
+      data: {
+        userId,
+        leaveTypeId: leaveType.id,
+        year,
+        totalDays: (leaveType.earnedBalance ? 0 : leaveType.maxDaysPerYear) + carry,
+        carriedOverDays: carry,
+      },
+    });
+  }
+
+  if (balance.carriedOverDays > 0 && todayJakarta() >= `${year}-04-01`) {
+    const consumed = balance.usedDays + balance.pendingDays;
+    const expired = Math.max(0, balance.carriedOverDays - consumed);
+    balance = await db.leaveBalance.update({
+      where: { id: balance.id },
+      data: { totalDays: { decrement: expired }, carriedOverDays: 0 },
+    });
+  }
+
+  return balance;
+}
+
 function haversineMeters(lat1: number, lng1: number, lat2: number, lng2: number): number {
   const R = 6371000;
   const dLat = (lat2 - lat1) * Math.PI / 180;
@@ -92,18 +156,33 @@ export async function getLeaveBalancesService(userId: string, year: number) {
     include: { leaveType: true },
   });
 
-  return types.map((lt) => {
-    const bal = balances.find((b) => b.leaveTypeId === lt.id);
-    return {
-      leaveType: lt,
-      totalDays:   bal?.totalDays   ?? lt.maxDaysPerYear,
-      usedDays:    bal?.usedDays    ?? 0,
-      pendingDays: bal?.pendingDays ?? 0,
-      remainingDays: lt.maxDaysPerYear === 0
-        ? null
-        : (bal?.totalDays ?? lt.maxDaysPerYear) - (bal?.usedDays ?? 0) - (bal?.pendingDays ?? 0),
-    };
-  });
+  const result = [];
+  for (const lt of types) {
+    if (isBalanceTracked(lt)) {
+      // Materializing here keeps display and request-time numbers identical
+      // (both go through the same carry-over + expiry rules).
+      const bal = await materializeBalance(prisma, userId, lt, year);
+      result.push({
+        leaveType: lt,
+        totalDays:       bal.totalDays,
+        usedDays:        bal.usedDays,
+        pendingDays:     bal.pendingDays,
+        carriedOverDays: bal.carriedOverDays,
+        remainingDays:   bal.totalDays - bal.usedDays - bal.pendingDays,
+      });
+    } else {
+      const bal = balances.find((b) => b.leaveTypeId === lt.id);
+      result.push({
+        leaveType: lt,
+        totalDays:       bal?.totalDays   ?? 0,
+        usedDays:        bal?.usedDays    ?? 0,
+        pendingDays:     bal?.pendingDays ?? 0,
+        carriedOverDays: 0,
+        remainingDays:   null, // unlimited
+      });
+    }
+  }
+  return result;
 }
 
 // ── Leave Requests ─────────────────────────────────────────────
@@ -142,9 +221,14 @@ export async function listLeaveRequestsService(
 
 export async function createLeaveRequestService(
   userId: string,
-  body: { leaveTypeId: string; startDate: string; endDate: string; reason: string },
+  body: {
+    leaveTypeId: string; startDate: string; endDate: string; reason: string;
+    attachmentUrl?: string | null; attachmentName?: string | null;
+  },
 ) {
   const { leaveTypeId, startDate, endDate, reason } = body;
+  const attachmentUrl  = body.attachmentUrl ?? null;
+  const attachmentName = body.attachmentName ?? null;
   const start = parseDate(startDate);
   const end   = parseDate(endDate);
 
@@ -159,6 +243,23 @@ export async function createLeaveRequestService(
 
   const leaveType = await prisma.leaveType.findUnique({ where: { id: leaveTypeId } });
   if (!leaveType || !leaveType.isActive) throw new AppError('Jenis cuti tidak ditemukan', 404);
+
+  // Supporting document rule (surat dokter for sick > 1 day, undangan for
+  // special leave, etc.) — requiresDocAfterDays sets the day threshold.
+  if (leaveType.requiresDoc && totalDays > leaveType.requiresDocAfterDays && !attachmentUrl) {
+    const suffix = leaveType.requiresDocAfterDays > 0 ? ` lebih dari ${leaveType.requiresDocAfterDays} hari` : '';
+    throw new AppError(`${leaveType.name}${suffix} wajib melampirkan dokumen pendukung`, 400);
+  }
+
+  // Tenure rule: below the type's required tenure the request is still
+  // allowed but flagged unpaid (potong gaji) and never touches the quota.
+  let isUnpaid = false;
+  if (leaveType.tenureMonthsRequired > 0) {
+    const me = await prisma.user.findUnique({ where: { id: userId }, select: { joinDate: true } });
+    if (me?.joinDate && monthsBetween(me.joinDate, start) < leaveType.tenureMonthsRequired) {
+      isUnpaid = true;
+    }
+  }
 
   const year = start.getUTCFullYear();
 
@@ -184,27 +285,20 @@ export async function createLeaveRequestService(
         );
       }
 
-      if (leaveType.maxDaysPerYear > 0) {
-        let balance = await tx.leaveBalance.findUnique({
-          where: { userId_leaveTypeId_year: { userId, leaveTypeId, year } },
-        });
-        if (!balance) {
-          balance = await tx.leaveBalance.create({
-            data: { userId, leaveTypeId, year, totalDays: leaveType.maxDaysPerYear },
-          });
-        }
+      if (isBalanceTracked(leaveType) && !isUnpaid) {
+        const balance = await materializeBalance(tx, userId, leaveType, year);
         const remaining = balance.totalDays - balance.usedDays - balance.pendingDays;
         if (totalDays > remaining) {
           throw new AppError(`Saldo cuti tidak cukup. Tersisa ${remaining} hari`, 400);
         }
         await tx.leaveBalance.update({
-          where: { userId_leaveTypeId_year: { userId, leaveTypeId, year } },
+          where: { id: balance.id },
           data:  { pendingDays: { increment: totalDays } },
         });
       }
 
       return tx.leaveRequest.create({
-        data: { userId, leaveTypeId, startDate: start, endDate: end, totalDays, reason },
+        data: { userId, leaveTypeId, startDate: start, endDate: end, totalDays, reason, isUnpaid, attachmentUrl, attachmentName },
         include: { user: { select: USER_SELECT }, leaveType: true },
       });
     }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
@@ -261,7 +355,7 @@ export async function reviewLeaveRequestService(
       where: { id },
       data: { status, reviewNote: reviewNote ?? null, reviewedById: reviewerId, reviewedAt: new Date() },
     });
-    if (req.leaveType.maxDaysPerYear > 0) {
+    if (isBalanceTracked(req.leaveType) && !req.isUnpaid) {
       if (status === 'APPROVED') {
         await tx.leaveBalance.update({
           where: { userId_leaveTypeId_year: { userId: req.userId, leaveTypeId: req.leaveTypeId, year } },
@@ -300,7 +394,7 @@ export async function cancelLeaveRequestService(id: string, userId: string) {
 
   await prisma.$transaction(async (tx) => {
     await tx.leaveRequest.update({ where: { id }, data: { status: LeaveStatus.CANCELLED } });
-    if (req.leaveType.maxDaysPerYear > 0) {
+    if (isBalanceTracked(req.leaveType) && !req.isUnpaid) {
       await tx.leaveBalance.update({
         where: { userId_leaveTypeId_year: { userId, leaveTypeId: req.leaveTypeId, year } },
         data:  { pendingDays: { decrement: req.totalDays } },
@@ -1138,4 +1232,68 @@ export async function cancelLateExcuseRequestService(id: string, userId: string)
   if (req.userId !== userId) throw new AppError('Bukan pengajuan kamu', 403);
   if (req.status !== RequestStatus.PENDING) throw new AppError('Hanya pengajuan PENDING yang bisa dibatalkan', 400);
   return prisma.lateExcuseRequest.update({ where: { id }, data: { status: RequestStatus.CANCELLED } });
+}
+
+// ── Comp-Off Grants (ganti off) ────────────────────────────────
+
+export async function grantCompOffService(
+  granterId: string,
+  body: { userId: string; days: number; reason: string },
+) {
+  const leaveType = await prisma.leaveType.findFirst({ where: { earnedBalance: true, isActive: true } });
+  if (!leaveType) throw new AppError('Jenis cuti Ganti Off belum dikonfigurasi', 400);
+  if (body.userId === granterId) throw new AppError('Tidak bisa memberi ganti off ke diri sendiri', 403);
+
+  const target = await prisma.user.findUnique({ where: { id: body.userId }, select: { id: true, isActive: true } });
+  if (!target || !target.isActive) throw new AppError('User tidak ditemukan', 404);
+
+  const year = Number(todayJakarta().slice(0, 4));
+
+  const grant = await prisma.$transaction(async (tx) => {
+    const balance = await materializeBalance(tx, body.userId, leaveType, year);
+    await tx.leaveBalance.update({
+      where: { id: balance.id },
+      data:  { totalDays: { increment: body.days } },
+    });
+    return tx.compOffGrant.create({
+      data: { userId: body.userId, days: body.days, reason: body.reason, grantedById: granterId },
+      include: { user: { select: USER_SELECT }, grantedBy: { select: USER_SELECT } },
+    });
+  });
+
+  await sendHRISNotif(
+    NotificationType.SYSTEM, granterId, body.userId,
+    'Ganti Off Diberikan',
+    `Kamu mendapat ${body.days} hari ganti off: ${body.reason}`,
+    '/hris/leave',
+  );
+
+  return grant;
+}
+
+export async function listCompOffGrantsService(
+  callerId: string, reviewScope: string, divisionId: string, query: ParsedQs,
+) {
+  const { page, limit, skip } = parsePagination(query);
+
+  const where: Prisma.CompOffGrantWhereInput = {};
+  if (reviewScope === 'all') {
+    if (query.userId) where.userId = query.userId as string;
+  } else if (reviewScope === 'division') {
+    where.user = { divisionId };
+    if (query.userId) where.userId = query.userId as string;
+  } else {
+    where.userId = callerId;
+  }
+
+  const [items, total] = await prisma.$transaction([
+    prisma.compOffGrant.findMany({
+      where, skip, take: limit,
+      include: { user: { select: USER_SELECT }, grantedBy: { select: USER_SELECT } },
+      orderBy: { createdAt: 'desc' },
+    }),
+    prisma.compOffGrant.count({ where }),
+  ]);
+
+  return { grants: items, meta: buildMeta(total, page, limit) };
 }

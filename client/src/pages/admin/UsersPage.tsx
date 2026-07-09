@@ -29,6 +29,7 @@ interface UserRow {
   username:    string;
   fullName:    string;
   phone:       string | null;
+  joinDate:    string | null;
   avatar:      string | null;
   role:        RoleOption;
   division:    DivisionOption;
@@ -281,9 +282,9 @@ function Avatar({ user }: { user: UserRow }) {
 
 // ── User Form Modal ────────────────────────────────────────
 type ModalMode = 'create' | 'edit';
-interface CreateForm { fullName: string; email: string; username: string; password: string; phone: string; roleId: string; divisionId: string; }
-interface EditForm   { fullName: string; phone: string; roleId: string; divisionId: string; }
-const EMPTY_CREATE: CreateForm = { fullName: '', email: '', username: '', password: '', phone: '', roleId: '', divisionId: '' };
+interface CreateForm { fullName: string; email: string; username: string; password: string; phone: string; joinDate: string; roleId: string; divisionId: string; }
+interface EditForm   { fullName: string; phone: string; joinDate: string; roleId: string; divisionId: string; }
+const EMPTY_CREATE: CreateForm = { fullName: '', email: '', username: '', password: '', phone: '', joinDate: '', roleId: '', divisionId: '' };
 
 function UserFormModal({ open, mode, user, roles, divisions, onClose, onSaved }: {
   open: boolean; mode: ModalMode; user: UserRow | null;
@@ -291,7 +292,7 @@ function UserFormModal({ open, mode, user, roles, divisions, onClose, onSaved }:
   onClose: () => void; onSaved: (u: UserRow) => void;
 }) {
   const [createForm, setCreate] = useState<CreateForm>(EMPTY_CREATE);
-  const [editForm,   setEdit]   = useState<EditForm>({ fullName: '', phone: '', roleId: '', divisionId: '' });
+  const [editForm,   setEdit]   = useState<EditForm>({ fullName: '', phone: '', joinDate: '', roleId: '', divisionId: '' });
   const [saving, setSaving]     = useState(false);
   const [error, setError]       = useState('');
 
@@ -299,7 +300,7 @@ function UserFormModal({ open, mode, user, roles, divisions, onClose, onSaved }:
     if (!open) return;
     setError('');
     if (mode === 'edit' && user) {
-      setEdit({ fullName: user.fullName, phone: user.phone ?? '', roleId: user.role?.id ?? '', divisionId: user.division?.id ?? '' });
+      setEdit({ fullName: user.fullName, phone: user.phone ?? '', joinDate: user.joinDate ? user.joinDate.slice(0, 10) : '', roleId: user.role?.id ?? '', divisionId: user.division?.id ?? '' });
     } else {
       setCreate(EMPTY_CREATE);
     }
@@ -315,12 +316,13 @@ function UserFormModal({ open, mode, user, roles, divisions, onClose, onSaved }:
         const res = await api.post('/users', {
           fullName: createForm.fullName.trim(), email: createForm.email.trim(),
           username: createForm.username.trim(), password: createForm.password,
-          phone: createForm.phone.trim() || undefined, roleId: createForm.roleId, divisionId: createForm.divisionId,
+          phone: createForm.phone.trim() || undefined, joinDate: createForm.joinDate || null,
+          roleId: createForm.roleId, divisionId: createForm.divisionId,
         });
         onSaved(res.data.data);
       } else {
         const res = await api.patch(`/users/${user!.id}`, {
-          fullName: editForm.fullName.trim(), phone: editForm.phone.trim() || null,
+          fullName: editForm.fullName.trim(), phone: editForm.phone.trim() || null, joinDate: editForm.joinDate || null,
           roleId: editForm.roleId || undefined, divisionId: editForm.divisionId || undefined,
         });
         onSaved(res.data.data);
@@ -386,6 +388,11 @@ function UserFormModal({ open, mode, user, roles, divisions, onClose, onSaved }:
                     onChange={(e) => setCreate((f) => ({ ...f, phone: e.target.value }))} className={inputCls} />
                 </Field>
               </div>
+              <Field label="Join Date">
+                <input type="date" value={createForm.joinDate}
+                  onChange={(e) => setCreate((f) => ({ ...f, joinDate: e.target.value }))} className={inputCls} />
+                <p className="text-[11px] text-gray-400 mt-1">Basis of the leave tenure rule — annual quota applies after 1 year of employment</p>
+              </Field>
               <div className="grid grid-cols-2 gap-4">
                 <Field label="Role" required>
                   <select value={createForm.roleId} onChange={(e) => setCreate((f) => ({ ...f, roleId: e.target.value }))} className={selectCls}>
@@ -412,6 +419,10 @@ function UserFormModal({ open, mode, user, roles, divisions, onClose, onSaved }:
               <Field label="No. Telepon">
                 <input type="text" placeholder="08xxxxxxxx" value={editForm.phone}
                   onChange={(e) => setEdit((f) => ({ ...f, phone: e.target.value }))} className={inputCls} />
+              </Field>
+              <Field label="Join Date">
+                <input type="date" value={editForm.joinDate}
+                  onChange={(e) => setEdit((f) => ({ ...f, joinDate: e.target.value }))} className={inputCls} />
               </Field>
               <div className="grid grid-cols-2 gap-4">
                 <Field label="Role" required>

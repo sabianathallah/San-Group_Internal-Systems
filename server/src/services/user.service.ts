@@ -14,6 +14,7 @@ const USER_SAFE_SELECT = {
   username: true,
   fullName: true,
   phone: true,
+  joinDate: true,
   avatar: true,
   isActive: true,
   lastLoginAt: true,
@@ -102,6 +103,7 @@ export async function createUserService(requesterLevel: number, data: {
   password: string;
   fullName: string;
   phone?: string;
+  joinDate?: string | null;
   roleId: string;
   divisionId: string;
 }) {
@@ -135,6 +137,7 @@ export async function createUserService(requesterLevel: number, data: {
       password:   hashed,
       fullName:   data.fullName,
       phone:      data.phone,
+      joinDate:   data.joinDate ? new Date(data.joinDate + 'T00:00:00.000Z') : null,
       roleId:     data.roleId,
       divisionId: data.divisionId,
     },
@@ -151,6 +154,7 @@ export async function updateUserService(
   data: {
     fullName?: string;
     phone?: string | null;
+    joinDate?: string | null;
     roleId?: string;
     divisionId?: string;
   },
@@ -189,9 +193,13 @@ export async function updateUserService(
     if (!division) throw new AppError('Divisi tidak ditemukan', 404);
   }
 
+  const { joinDate, ...rest } = data;
   return prisma.user.update({
     where: { id },
-    data,
+    data: {
+      ...rest,
+      ...(joinDate !== undefined && { joinDate: joinDate ? new Date(joinDate + 'T00:00:00.000Z') : null }),
+    },
     select: USER_SAFE_SELECT,
   });
 }
