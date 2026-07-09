@@ -739,7 +739,7 @@ export default function HRISOverviewPage() {
                         <span className="text-xs text-gray-400"> / {b.totalDays} days</span>
                       </div>
                     ) : (
-                      <span className="text-xs text-gray-400">Unlimited</span>
+                      <span className="text-xs text-gray-400" title="No fixed quota — every request still needs approval">As needed</span>
                     )}
                   </div>
                   {b.remainingDays !== null && (

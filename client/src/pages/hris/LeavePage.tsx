@@ -81,7 +81,7 @@ function CreateLeaveModal({
   const selType   = leaveTypes.find((t) => t.id === form.leaveTypeId);
   const selBal    = balances.find((b) => b.leaveType.id === form.leaveTypeId);
   // Document mandatory when the type requires one and the request exceeds the
-  // free-days threshold (SICK: >1 day; Cuti Khusus: always).
+  // free-days threshold (SICK: >1 day; Special Leave: always).
   const docRequired = !!selType?.requiresDoc && totalDays > (selType?.requiresDocAfterDays ?? 0);
 
   useEffect(() => {
@@ -322,7 +322,7 @@ function ReviewModal({
   );
 }
 
-// ── Grant Comp-Off Modal (ganti off — HR only) ─────────────────
+// ── Grant Comp-Off Modal (HR only) ─────────────────────────────
 function GrantCompOffModal({ onClose, onDone }: { onClose: () => void; onDone: () => void }) {
   const [users, setUsers] = useState<{ id: string; fullName: string }[]>([]);
   const [form, setForm] = useState({ userId: '', days: 1, reason: '' });
@@ -353,7 +353,7 @@ function GrantCompOffModal({ onClose, onDone }: { onClose: () => void; onDone: (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
       <div className="bg-white rounded-xl shadow-xl w-full max-w-md">
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
-          <h2 className="text-base font-semibold text-gray-800">Grant Comp-Off (Ganti Off)</h2>
+          <h2 className="text-base font-semibold text-gray-800">Grant Comp Off</h2>
           <button onClick={onClose} className="p-1 rounded hover:bg-gray-100 transition-colors">
             <X size={16} className="text-gray-500" />
           </button>
@@ -361,7 +361,7 @@ function GrantCompOffModal({ onClose, onDone }: { onClose: () => void; onDone: (
         <form onSubmit={handleSubmit} className="p-5 space-y-4">
           <p className="text-xs text-gray-500 bg-gray-50 rounded-lg px-3 py-2">
             Give extra off days for working weekends or public holidays. The days
-            land on the employee&apos;s <span className="font-medium">Ganti Off</span> balance.
+            land on the employee&apos;s <span className="font-medium">Comp Off</span> balance.
           </p>
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1.5">Employee</label>
@@ -485,7 +485,7 @@ export default function LeavePage() {
               onClick={() => setGrantOpen(true)}
               className="flex items-center gap-1.5 px-3 py-2 border border-gray-200 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors"
             >
-              <Plus size={15} /> Ganti Off
+              <Plus size={15} /> Comp Off
             </button>
           )}
           <button
@@ -524,7 +524,10 @@ export default function LeavePage() {
                   </div>
                 </>
               ) : (
-                <p className="text-sm font-semibold text-gray-500 mt-1">Unlimited</p>
+                <>
+                  <p className="text-sm font-semibold text-gray-600 mt-1">As needed</p>
+                  <p className="text-[11px] text-gray-400 mt-0.5">No fixed quota — every request still needs approval{b.leaveType.requiresDoc ? ' + document' : ''}</p>
+                </>
               )}
             </div>
           ))}

@@ -420,9 +420,9 @@ async function main() {
   const ltEmerg  = await prisma.leaveType.create({ data: { name: 'Emergency Leave', slug: 'EMERGENCY',   color: '#f97316', maxDaysPerYear: 3,  isPaid: true, requiresDoc: false, position: 2 } });
   const ltWFH    = await prisma.leaveType.create({ data: { name: 'WFH Special',     slug: 'WFH_SPECIAL', color: '#3b82f6', maxDaysPerYear: 6,  isPaid: true, requiresDoc: false, position: 3 } });
   // Cuti resmi/pemerintah (nikah dll) — selalu wajib lampiran pendukung
-  await prisma.leaveType.create({ data: { name: 'Cuti Khusus',      slug: 'SPECIAL',     color: '#8b5cf6', maxDaysPerYear: 0,  isPaid: true, requiresDoc: true, requiresDocAfterDays: 0, position: 4 } });
+  await prisma.leaveType.create({ data: { name: 'Special Leave',    slug: 'SPECIAL',     color: '#8b5cf6', maxDaysPerYear: 0,  isPaid: true, requiresDoc: true, requiresDocAfterDays: 0, position: 4 } });
   // Ganti off — saldo dari grant HRD (kerja weekend/tanggal merah), bukan kuota tahunan
-  await prisma.leaveType.create({ data: { name: 'Ganti Off',        slug: 'COMP_OFF',    color: '#10b981', maxDaysPerYear: 0,  isPaid: true, requiresDoc: false, earnedBalance: true, position: 5 } });
+  await prisma.leaveType.create({ data: { name: 'Comp Off',         slug: 'COMP_OFF',    color: '#10b981', maxDaysPerYear: 0,  isPaid: true, requiresDoc: false, earnedBalance: true, position: 5 } });
 
   // Leave balances (year 2026) for all 6 users
   const allUsers = [admin, director, pm, hr, finance, engineer];
