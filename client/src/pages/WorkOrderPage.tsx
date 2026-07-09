@@ -1423,6 +1423,8 @@ export default function WorkOrderPage() {
     byStatus: { status: WOStatus; _count: number }[];
     byPriority: { priority: WOPriority; _count: number }[];
     overdue: number;
+    unassigned: number;
+    mine: number;
   } | null>(null);
 
   const [boardPage, setBoardPage] = useState(1);
@@ -1607,14 +1609,40 @@ export default function WorkOrderPage() {
     return hasScope(woPerms.edit, isReporter || isAssignee, sameDivision);
   }
 
-  const ALL_SIDEBAR_VIEWS: { id: ViewFilter; label: string }[] = [
-    { id: 'all',           label: 'All Work Orders'  },
-    { id: 'mine',          label: 'My Tasks'         },
-    { id: 'reported',      label: 'Reported by Me'   },
-    { id: 'unassigned',    label: 'Unassigned'       },
-    { id: 'pendingReview', label: 'Pending Review'   },
+  // Views grouped by intent: "My Work" is personal, "Management" is the
+  // queues an admin has to drain. Staff with 'own' scope only ever see the
+  // first group (labels are hidden when just one group is visible).
+  const VIEW_SECTIONS: { label: string; views: { id: ViewFilter; label: string }[] }[] = [
+    {
+      label: 'My Work',
+      views: [
+        { id: 'mine',     label: 'My Tasks'       },
+        { id: 'reported', label: 'Reported by Me' },
+      ],
+    },
+    {
+      label: 'Management',
+      views: [
+        { id: 'all',           label: 'All Work Orders' },
+        { id: 'unassigned',    label: 'Unassigned'      },
+        { id: 'pendingReview', label: 'Pending Review'  },
+      ],
+    },
   ];
-  const sidebarViews = ALL_SIDEBAR_VIEWS.filter((v) => canSeeWOView(v.id, woPerms));
+  const visibleSections = VIEW_SECTIONS
+    .map((sec) => ({ ...sec, views: sec.views.filter((v) => canSeeWOView(v.id, woPerms)) }))
+    .filter((sec) => sec.views.length > 0);
+  const showSectionLabels = visibleSections.length > 1;
+  const sidebarViews = visibleSections.flatMap((sec) => sec.views);
+
+  // Live queue sizes on the nav — an admin sees waiting work without clicking.
+  function viewCount(id: ViewFilter): number | undefined {
+    if (!stats) return undefined;
+    if (id === 'mine')          return stats.mine || undefined;
+    if (id === 'unassigned')    return stats.unassigned || undefined;
+    if (id === 'pendingReview') return stats.byStatus.find((b) => b.status === 'PENDING_REVIEW')?._count || undefined;
+    return undefined;
+  }
 
   return (
     <div className="flex h-full overflow-hidden -m-6">
@@ -1628,20 +1656,40 @@ export default function WorkOrderPage() {
         </div>
 
         <nav className="flex-1 overflow-y-auto py-2">
-          {sidebarViews.map((v) => (
-            <button
-              key={v.id}
-              onClick={() => { setView(v.id); setSelectedId(null); setSelectedWO(null); }}
-              className={cn(
-                'flex items-center gap-2 w-full px-4 py-2 text-sm transition-colors',
-                view === v.id
-                  ? 'bg-navy/5 text-navy font-medium border-r-2 border-r-navy'
-                  : 'text-gray-600 hover:bg-gray-50',
+          {visibleSections.map((sec, idx) => (
+            <div key={sec.label}>
+              {showSectionLabels && (
+                <p className={cn('px-4 mb-1 text-[10px] font-semibold text-gray-400 uppercase tracking-wider', idx > 0 ? 'mt-4' : 'mt-1')}>
+                  {sec.label}
+                </p>
               )}
-            >
-              <List size={14} />
-              {v.label}
-            </button>
+              {sec.views.map((v) => {
+                const n = viewCount(v.id);
+                return (
+                  <button
+                    key={v.id}
+                    onClick={() => { setView(v.id); setSelectedId(null); setSelectedWO(null); }}
+                    className={cn(
+                      'flex items-center gap-2 w-full px-4 py-2 text-sm transition-colors',
+                      view === v.id
+                        ? 'bg-navy/5 text-navy font-medium border-r-2 border-r-navy'
+                        : 'text-gray-600 hover:bg-gray-50',
+                    )}
+                  >
+                    <List size={14} />
+                    <span className="flex-1 text-left truncate">{v.label}</span>
+                    {n !== undefined && (
+                      <span className={cn(
+                        'text-[10px] font-semibold min-w-[18px] h-[18px] px-1 rounded-full flex items-center justify-center',
+                        v.id === 'mine' ? 'bg-gray-100 text-gray-600' : 'bg-amber-100 text-amber-700',
+                      )}>
+                        {n > 99 ? '99+' : n}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
           ))}
         </nav>
 
@@ -1684,7 +1732,7 @@ export default function WorkOrderPage() {
                 view === v.id ? 'bg-navy text-white' : 'bg-gray-100 text-gray-600',
               )}
             >
-              {v.label}
+              {v.label}{viewCount(v.id) !== undefined ? ` · ${viewCount(v.id)}` : ''}
             </button>
           ))}
         </div>

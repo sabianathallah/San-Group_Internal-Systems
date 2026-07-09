@@ -627,19 +627,19 @@ export async function getWorkOrderStatsService(userId: string, viewScope: string
   if (viewScope === 'own')      where = { OR: [{ reportedById: userId }, { assignedToId: userId }] };
   if (viewScope === 'division') where = { OR: [{ reportedBy: { divisionId } }, { assignee: { divisionId } }] };
 
-  const [byStatus, byPriority, overdue] = await prisma.$transaction([
+  const activeStatus = { notIn: [WorkOrderStatus.DONE, WorkOrderStatus.CANCELLED] };
+  const [byStatus, byPriority, overdue, unassigned, mine] = await prisma.$transaction([
     prisma.workOrder.groupBy({ by: ['status'], where, _count: true, orderBy: { status: 'asc' } }),
     prisma.workOrder.groupBy({ by: ['priority'], where, _count: true, orderBy: { priority: 'asc' } }),
     prisma.workOrder.count({
-      where: {
-        ...where,
-        dueDate: { lt: new Date() },
-        status:  { notIn: [WorkOrderStatus.DONE, WorkOrderStatus.CANCELLED] },
-      },
+      where: { ...where, dueDate: { lt: new Date() }, status: activeStatus },
     }),
+    // Queue sizes for the board's view navigation badges
+    prisma.workOrder.count({ where: { ...where, assignedToId: null, status: activeStatus } }),
+    prisma.workOrder.count({ where: { ...where, assignedToId: userId, status: activeStatus } }),
   ]);
 
-  return { byStatus, byPriority, overdue };
+  return { byStatus, byPriority, overdue, unassigned, mine };
 }
 
 // ── Reporting ────────────────────────────────────────────────
