@@ -547,18 +547,35 @@ export async function checkOutService(userId: string, body: { note?: string | nu
   const today   = todayJakarta();
   const dateVal = parseDate(today);
 
-  const existing = await prisma.attendance.findUnique({
+  let target = await prisma.attendance.findUnique({
     where: { userId_date: { userId, date: dateVal } },
   });
-  if (!existing?.checkIn) throw new AppError('Kamu belum check-in hari ini', 400);
-  if (existing.checkOut)  throw new AppError('Kamu sudah check-out hari ini', 400);
+  let targetDate = dateVal;
+
+  // Overnight shift: a guard who clocked in at 22:00 checks out past
+  // midnight — today has no open record, but yesterday's is still open.
+  // Close that one instead of rejecting the checkout.
+  if (!target?.checkIn) {
+    const yesterday = new Date(dateVal);
+    yesterday.setUTCDate(yesterday.getUTCDate() - 1);
+    const prev = await prisma.attendance.findUnique({
+      where: { userId_date: { userId, date: yesterday } },
+    });
+    if (prev?.checkIn && !prev.checkOut) {
+      target = prev;
+      targetDate = yesterday;
+    } else {
+      throw new AppError('Kamu belum check-in hari ini', 400);
+    }
+  }
+  if (target.checkOut) throw new AppError('Kamu sudah check-out hari ini', 400);
 
   const now = new Date();
-  const workMinutes = Math.floor((now.getTime() - existing.checkIn.getTime()) / 60000);
+  const workMinutes = Math.floor((now.getTime() - target.checkIn!.getTime()) / 60000);
 
   return prisma.attendance.update({
-    where: { userId_date: { userId, date: dateVal } },
-    data:  { checkOut: now, workMinutes, note: body.note ?? existing.note },
+    where: { userId_date: { userId, date: targetDate } },
+    data:  { checkOut: now, workMinutes, note: body.note ?? target.note },
   });
 }
 

@@ -241,6 +241,19 @@ function ReviewModal({
 }: { request: LeaveRequest; onClose: () => void; onDone: () => void }) {
   const [note, setNote]     = useState('');
   const [saving, setSaving] = useState(false);
+  // The approver should see the requester's balance while deciding — the
+  // server already validated it at submission, this is decision context.
+  const [reqBalance, setReqBalance] = useState<LeaveBalance | null | 'loading'>('loading');
+
+  useEffect(() => {
+    const year = new Date(request.startDate).getFullYear();
+    api.get('/hris/leave-balances', { params: { userId: request.user.id, year } })
+      .then((res) => {
+        const balances: LeaveBalance[] = res.data.data ?? [];
+        setReqBalance(balances.find((b) => b.leaveType.id === request.leaveType.id) ?? null);
+      })
+      .catch(() => setReqBalance(null));
+  }, [request]);
 
   async function handle(status: 'APPROVED' | 'REJECTED') {
     setSaving(true);
@@ -276,6 +289,17 @@ function ReviewModal({
               {' · '}{fmtDate(request.startDate)} — {fmtDate(request.endDate)} ({request.totalDays} days)
             </p>
             <p className="text-xs text-gray-500">{request.reason}</p>
+            {reqBalance !== 'loading' && reqBalance && !request.isUnpaid && (
+              <p className="text-xs text-gray-600">
+                Remaining balance:{' '}
+                {reqBalance.remainingDays === null
+                  ? 'no fixed quota'
+                  : <strong>{reqBalance.remainingDays} of {reqBalance.totalDays} days</strong>}
+                {reqBalance.remainingDays !== null && request.status === 'PENDING' && (
+                  <span className="text-gray-400"> (incl. {request.totalDays} pending for this request)</span>
+                )}
+              </p>
+            )}
             {request.isUnpaid && (
               <p className="text-xs font-medium text-orange-600 bg-orange-50 rounded px-2 py-1 inline-block">
                 UNPAID — tenure below requirement, salary deduction applies

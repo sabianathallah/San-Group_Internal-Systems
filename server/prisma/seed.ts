@@ -393,6 +393,7 @@ async function main() {
   await prisma.leaveRequest.deleteMany({});
   await prisma.leaveBalance.deleteMany({});
   await prisma.leaveType.deleteMany({});
+  await prisma.holiday.deleteMany({});
   await prisma.officeLocation.deleteMany({});
   await prisma.shift.deleteMany({});
 
@@ -411,6 +412,23 @@ async function main() {
     await prisma.user.update({ where: { id: u.id }, data: { shiftId: shiftOffice.id } });
   }
   console.log('✅ Shifts & office locations created');
+
+  // Fixed-date national holidays (movable ones — Idul Fitri, Nyepi, Waisak,
+  // etc. — must be entered yearly by HR via the Holidays admin page).
+  const seedYear = new Date().getFullYear();
+  const FIXED_HOLIDAYS: [number, number, string][] = [
+    [1, 1,   "New Year's Day"],
+    [5, 1,   'Labour Day'],
+    [6, 1,   'Pancasila Day'],
+    [8, 17,  'Independence Day'],
+    [12, 25, 'Christmas Day'],
+  ];
+  for (const [m, d, name] of FIXED_HOLIDAYS) {
+    await prisma.holiday.create({
+      data: { date: new Date(Date.UTC(seedYear, m - 1, d)), name },
+    });
+  }
+  console.log('✅ Fixed-date holidays created');
 
   // Leave types
   // Kebijakan client: kuota 12/tahun, carry-over hangus akhir Maret, kuota aktif setelah 1 tahun kerja

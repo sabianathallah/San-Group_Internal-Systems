@@ -43,6 +43,7 @@ interface LeaveBalance {
   totalDays: number;
   usedDays: number;
   pendingDays: number;
+  carriedOverDays: number;
   remainingDays: number | null;
 }
 
@@ -752,6 +753,9 @@ export default function HRISOverviewPage() {
                         }}
                       />
                     </div>
+                  )}
+                  {b.carriedOverDays > 0 && (
+                    <p className="text-[11px] text-amber-600 mt-1">incl. {b.carriedOverDays} carried over — expires Mar 31</p>
                   )}
                   {b.pendingDays > 0 && (
                     <p className="text-xs text-gray-400 mt-1">{b.pendingDays} days pending approval</p>
