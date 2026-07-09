@@ -87,6 +87,15 @@ enum LeaveStatus {
   CANCELLED
 }
 
+// Shared by ShiftChangeRequest and LateExcuseRequest — same review lifecycle
+// as leave/overtime.
+enum RequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
 enum WorkOrderStatus {
   OPEN
   VALIDATED
@@ -240,6 +249,10 @@ model User {
   leaveBalances              LeaveBalance[]
   overtimeRequests           OvertimeRequest[]       @relation("OTRequester")
   reviewedOvertimes          OvertimeRequest[]       @relation("OTReviewer")
+  shiftChangeRequests        ShiftChangeRequest[]    @relation("SCRRequester")
+  reviewedShiftChanges       ShiftChangeRequest[]    @relation("SCRReviewer")
+  lateExcuseRequests         LateExcuseRequest[]     @relation("LERRequester")
+  reviewedLateExcuses        LateExcuseRequest[]     @relation("LERReviewer")
 
   @@index([email])
   @@index([username])
@@ -801,6 +814,7 @@ model Shift {
 
   users       User[]
   attendances Attendance[]
+  shiftChangeRequests ShiftChangeRequest[] @relation("SCRRequestedShift")
 
   @@map("shifts")
 }
@@ -855,6 +869,66 @@ model Attendance {
   @@index([shiftId])
   @@index([officeLocationId])
   @@map("attendance")
+}
+
+// Company holiday calendar (tanggal merah). Consulted by leave-day counting,
+// the auto-absent job, and attendance-rate reports so all three agree on
+// which days count as working days.
+model Holiday {
+  id        String   @id @default(uuid())
+  date      DateTime @unique @db.Date
+  name      String
+  createdAt DateTime @default(now())
+
+  @@map("holidays")
+}
+
+// Staff-initiated shift/timetable change, reviewed by HR — the "apply
+// perubahan jadwal ke HRD, approve/reject" flow from the contract scope.
+// Approval applies requestedShift to the user starting effectiveDate.
+model ShiftChangeRequest {
+  id               String        @id @default(uuid())
+  userId           String
+  user             User          @relation("SCRRequester", fields: [userId], references: [id], onDelete: Cascade)
+  requestedShiftId String
+  requestedShift   Shift         @relation("SCRRequestedShift", fields: [requestedShiftId], references: [id])
+  effectiveDate    DateTime      @db.Date
+  reason           String
+  status           RequestStatus @default(PENDING)
+  reviewNote       String?
+  reviewedById     String?
+  reviewedBy       User?         @relation("SCRReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+  reviewedAt       DateTime?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  @@index([userId])
+  @@index([status])
+  @@map("shift_change_requests")
+}
+
+// Advance notice of lateness (izin telat di muka) — submitted BEFORE
+// check-in for known cases (e.g. morning doctor visit). An APPROVED excuse
+// for the date makes that day's check-in count as on time.
+model LateExcuseRequest {
+  id           String        @id @default(uuid())
+  userId       String
+  user         User          @relation("LERRequester", fields: [userId], references: [id], onDelete: Cascade)
+  date         DateTime      @db.Date
+  expectedTime String?
+  reason       String
+  status       RequestStatus @default(PENDING)
+  reviewNote   String?
+  reviewedById String?
+  reviewedBy   User?         @relation("LERReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+  reviewedAt   DateTime?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  @@index([userId])
+  @@index([date])
+  @@index([status])
+  @@map("late_excuse_requests")
 }
 
 model OvertimeRequest {

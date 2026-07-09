@@ -12,6 +12,11 @@ import {
   createOfficeLocationSchema, updateOfficeLocationSchema,
   createOvertimeSchema, reviewOvertimeSchema, overtimeFilterSchema,
   reportsFilterSchema,
+  createHolidaySchema,
+  createShiftChangeSchema,
+  reviewRequestSchema,
+  requestFilterSchema,
+  createLateExcuseSchema,
 } from '@/validations/hris.validation';
 import {
   listLeaveTypes, getLeaveBalances,
@@ -21,6 +26,17 @@ import {
   listOfficeLocations, createOfficeLocation, updateOfficeLocation, deleteOfficeLocation,
   listOvertimes, createOvertime, reviewOvertime, cancelOvertime,
   getAttendanceReports,
+  listHolidays,
+  createHoliday,
+  deleteHoliday,
+  listShiftChangeRequests,
+  createShiftChangeRequest,
+  reviewShiftChangeRequest,
+  cancelShiftChangeRequest,
+  listLateExcuseRequests,
+  createLateExcuseRequest,
+  reviewLateExcuseRequest,
+  cancelLateExcuseRequest,
 } from '@/controllers/hris.controller';
 
 const router = Router();
@@ -64,5 +80,22 @@ router.patch ('/overtime/:id/cancel', validate(uuidParamSchema, ['params']), can
 
 // ── Reports ────────────────────────────────────────────────────
 router.get('/reports/attendance', checkPerm('hris', 'viewReports'), validate(reportsFilterSchema, ['query']), getAttendanceReports);
+
+// ── Holidays (company calendar) ────────────────────────────────
+router.get   ('/holidays',     listHolidays);
+router.post  ('/holidays',     checkPerm('hris', 'manageShifts'), validate(createHolidaySchema), createHoliday);
+router.delete('/holidays/:id', checkPerm('hris', 'manageShifts'), validate(uuidParamSchema, ['params']), deleteHoliday);
+
+// ── Shift Change Requests (timetable) ──────────────────────────
+router.get  ('/shift-changes',            validate(requestFilterSchema, ['query']), listShiftChangeRequests);
+router.post ('/shift-changes',            validate(createShiftChangeSchema), createShiftChangeRequest);
+router.patch('/shift-changes/:id/review', checkPerm('hris', 'manageShifts'), validate(uuidParamSchema, ['params']), validate(reviewRequestSchema), reviewShiftChangeRequest);
+router.patch('/shift-changes/:id/cancel', validate(uuidParamSchema, ['params']), cancelShiftChangeRequest);
+
+// ── Late Excuse Requests (izin telat di muka) ──────────────────
+router.get  ('/late-excuses',            validate(requestFilterSchema, ['query']), listLateExcuseRequests);
+router.post ('/late-excuses',            validate(createLateExcuseSchema), createLateExcuseRequest);
+router.patch('/late-excuses/:id/review', checkPerm('hris', 'editAttendance'), validate(uuidParamSchema, ['params']), validate(reviewRequestSchema), reviewLateExcuseRequest);
+router.patch('/late-excuses/:id/cancel', validate(uuidParamSchema, ['params']), cancelLateExcuseRequest);
 
 export default router;

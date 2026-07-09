@@ -32,6 +32,17 @@ import {
   reviewOvertimeRequestService,
   cancelOvertimeRequestService,
   getAttendanceReportsService,
+  listHolidaysService,
+  createHolidayService,
+  deleteHolidayService,
+  listShiftChangeRequestsService,
+  createShiftChangeRequestService,
+  reviewShiftChangeRequestService,
+  cancelShiftChangeRequestService,
+  listLateExcuseRequestsService,
+  createLateExcuseRequestService,
+  reviewLateExcuseRequestService,
+  cancelLateExcuseRequestService,
 } from '@/services/hris.service';
 
 // ── Leave Types ────────────────────────────────────────────────
@@ -268,5 +279,98 @@ export async function getAttendanceReports(req: AuthRequest, res: Response, next
     const permScope = req.permScope ?? 'all';
     const result = await getAttendanceReportsService(userId, permScope, req.query);
     successResponse(res, result, 'Laporan absensi berhasil diambil');
+  } catch (err) { next(err); }
+}
+
+// ── Holidays ───────────────────────────────────────────────────
+
+export async function listHolidays(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const year = req.query.year ? Number(req.query.year) : new Date().getFullYear();
+    const data = await listHolidaysService(year);
+    successResponse(res, data, 'Daftar hari libur berhasil diambil');
+  } catch (err) { next(err); }
+}
+
+export async function createHoliday(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const data = await createHolidayService(req.body);
+    successResponse(res, data, 'Hari libur berhasil ditambahkan', 201);
+  } catch (err) { next(err); }
+}
+
+export async function deleteHoliday(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+  try {
+    await deleteHolidayService(String(req.params.id));
+    successResponse(res, null, 'Hari libur dihapus');
+  } catch (err) { next(err); }
+}
+
+// ── Shift Change Requests ──────────────────────────────────────
+
+export async function listShiftChangeRequests(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { userId, roleId, roleLevel, divisionId } = req.user!;
+    const perms = await getPermissionsForRole(roleId, roleLevel);
+    // manageShifts is a boolean permission — holders review company-wide.
+    const scope = perms.hris.manageShifts ? 'all' : 'own';
+    const result = await listShiftChangeRequestsService(userId, scope, divisionId, req.query);
+    successResponse(res, result.shiftChangeRequests, 'Daftar pengajuan shift berhasil diambil', 200, result.meta);
+  } catch (err) { next(err); }
+}
+
+export async function createShiftChangeRequest(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const data = await createShiftChangeRequestService(req.user!.userId, req.body);
+    successResponse(res, data, 'Pengajuan perubahan shift berhasil dibuat', 201);
+  } catch (err) { next(err); }
+}
+
+export async function reviewShiftChangeRequest(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { userId, divisionId } = req.user!;
+    const data = await reviewShiftChangeRequestService(String(req.params.id), userId, 'all', divisionId, req.body);
+    successResponse(res, data, 'Pengajuan shift berhasil diproses');
+  } catch (err) { next(err); }
+}
+
+export async function cancelShiftChangeRequest(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+  try {
+    await cancelShiftChangeRequestService(String(req.params.id), req.user!.userId);
+    successResponse(res, null, 'Pengajuan shift dibatalkan');
+  } catch (err) { next(err); }
+}
+
+// ── Late Excuse Requests ───────────────────────────────────────
+
+export async function listLateExcuseRequests(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { userId, roleId, roleLevel, divisionId } = req.user!;
+    const perms = await getPermissionsForRole(roleId, roleLevel);
+    const result = await listLateExcuseRequestsService(userId, perms.hris.editAttendance, divisionId, req.query);
+    successResponse(res, result.lateExcuseRequests, 'Daftar izin telat berhasil diambil', 200, result.meta);
+  } catch (err) { next(err); }
+}
+
+export async function createLateExcuseRequest(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const data = await createLateExcuseRequestService(req.user!.userId, req.body);
+    successResponse(res, data, 'Pengajuan izin telat berhasil dibuat', 201);
+  } catch (err) { next(err); }
+}
+
+export async function reviewLateExcuseRequest(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { userId, divisionId } = req.user!;
+    const reviewScope = req.permScope ?? 'all';
+    const data = await reviewLateExcuseRequestService(String(req.params.id), userId, reviewScope, divisionId, req.body);
+    successResponse(res, data, 'Pengajuan izin telat berhasil diproses');
+  } catch (err) { next(err); }
+}
+
+export async function cancelLateExcuseRequest(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+  try {
+    await cancelLateExcuseRequestService(String(req.params.id), req.user!.userId);
+    successResponse(res, null, 'Pengajuan izin telat dibatalkan');
   } catch (err) { next(err); }
 }

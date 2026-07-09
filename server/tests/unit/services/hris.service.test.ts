@@ -30,6 +30,11 @@ beforeEach(() => {
   prismaMock.$transaction.mockImplementation(((arg: unknown) =>
     typeof arg === 'function' ? (arg as (tx: unknown) => unknown)(prismaMock) : Promise.all(arg as Promise<unknown>[])
   ) as never);
+  // Defaults for lookups most flows consult: no company holidays, no existing
+  // overlapping leave, no approved late excuse.
+  prismaMock.holiday.findMany.mockResolvedValue([] as never);
+  prismaMock.leaveRequest.findFirst.mockResolvedValue(null);
+  prismaMock.lateExcuseRequest.findFirst.mockResolvedValue(null);
 });
 
 // ── checkInService — geofencing ──────────────────────────────
@@ -161,6 +166,23 @@ describe('createLeaveRequestService', () => {
     expect(prismaMock.leaveBalance.update).toHaveBeenCalledWith(
       expect.objectContaining({ data: { pendingDays: { increment: 5 } } }),
     );
+  });
+
+  it('rejects a range overlapping an existing PENDING/APPROVED leave', async () => {
+    prismaMock.leaveType.findUnique.mockResolvedValue(LEAVE_TYPE as never);
+    prismaMock.leaveRequest.findFirst.mockResolvedValue({
+      startDate: new Date('2026-08-05T00:00:00.000Z'),
+      endDate:   new Date('2026-08-06T00:00:00.000Z'),
+      status:    'APPROVED',
+    } as never);
+
+    await expect(
+      createLeaveRequestService(USER_ID, {
+        leaveTypeId: 'lt-1', startDate: '2026-08-03', endDate: '2026-08-07', reason: 'Liburan',
+      }),
+    ).rejects.toMatchObject({ statusCode: 400 });
+    expect(prismaMock.leaveBalance.update).not.toHaveBeenCalled();
+    expect(prismaMock.leaveRequest.create).not.toHaveBeenCalled();
   });
 
   it('surfaces a concurrent-submission conflict as a 409', async () => {

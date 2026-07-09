@@ -20,6 +20,8 @@ import {
   Timer,
   MapPin,
   CalendarClock,
+  CalendarOff,
+  ClipboardEdit,
   Archive,
 } from 'lucide-react';
 import { useUiStore } from '@/stores/uiStore';
@@ -101,10 +103,12 @@ export default function Sidebar() {
     { label: 'Attendance',  to: ROUTES.HRIS_ATTENDANCE,   icon: Clock         },
     { label: 'Leave',       to: ROUTES.HRIS_LEAVE,        icon: CalendarRange },
     { label: 'Overtime',    to: ROUTES.HRIS_OVERTIME,     icon: Timer         },
+    { label: 'Requests',    to: ROUTES.HRIS_REQUESTS,     icon: ClipboardEdit },
     ...(canReports ? [{ label: 'Reports', to: ROUTES.HRIS_REPORTS, icon: BarChart3 }] : []),
     ...(isHRAdmin ? [
       { label: 'Shifts',    to: ROUTES.HRIS_ADMIN_SHIFTS,    icon: CalendarClock },
       { label: 'Locations', to: ROUTES.HRIS_ADMIN_LOCATIONS, icon: MapPin        },
+      { label: 'Holidays',  to: ROUTES.HRIS_ADMIN_HOLIDAYS,  icon: CalendarOff   },
     ] : []),
   ];
 

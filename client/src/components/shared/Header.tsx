@@ -29,6 +29,8 @@ const BREADCRUMB_MAP: Record<string, string> = {
   '/hris/attendance':       'Attendance',
   '/hris/leave':            'Leave',
   '/hris/overtime':         'Overtime',
+  '/hris/requests':         'Requests',
+  '/hris/admin/holidays':   'Holidays',
   '/hris/reports':          'Attendance Report',
   '/hris/admin/shifts':     'Manage Shifts',
   '/hris/admin/locations':  'Office Locations',

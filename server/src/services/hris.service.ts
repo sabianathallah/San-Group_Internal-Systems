@@ -1,4 +1,4 @@
-import { AttendanceStatus, LeaveStatus, NotificationType, OvertimeStatus, Prisma } from '@prisma/client';
+import { AttendanceStatus, LeaveStatus, NotificationType, OvertimeStatus, Prisma, RequestStatus } from '@prisma/client';
 import { prisma } from '@/config/database';
 import { AppError } from '@/middlewares/errorHandler.middleware';
 import { parsePagination, buildMeta } from '@/helpers/pagination';
@@ -24,15 +24,26 @@ function parseDate(s: string): Date {
   return new Date(s + 'T00:00:00.000Z');
 }
 
-function countWeekdays(start: Date, end: Date): number {
+// Working days = Mon–Fri minus company holidays (tanggal merah). The holiday
+// set uses YYYY-MM-DD keys — same everywhere this is consulted (leave-day
+// counting, auto-absent job, attendance reports) so they always agree.
+function countWorkdays(start: Date, end: Date, holidays: Set<string>): number {
   let count = 0;
   const cur = new Date(start);
   while (cur <= end) {
     const day = cur.getUTCDay();
-    if (day !== 0 && day !== 6) count++;
+    if (day !== 0 && day !== 6 && !holidays.has(cur.toISOString().slice(0, 10))) count++;
     cur.setUTCDate(cur.getUTCDate() + 1);
   }
   return count;
+}
+
+export async function getHolidaySet(start: Date, end: Date): Promise<Set<string>> {
+  const holidays = await prisma.holiday.findMany({
+    where: { date: { gte: start, lte: end } },
+    select: { date: true },
+  });
+  return new Set(holidays.map((h) => h.date.toISOString().slice(0, 10)));
 }
 
 function haversineMeters(lat1: number, lng1: number, lat2: number, lng2: number): number {
@@ -138,8 +149,12 @@ export async function createLeaveRequestService(
   const end   = parseDate(endDate);
 
   if (end < start) throw new AppError('Tanggal akhir harus setelah tanggal mulai', 400);
+  if (start.getUTCFullYear() !== end.getUTCFullYear()) {
+    throw new AppError('Cuti lintas tahun tidak didukung — ajukan terpisah per tahun', 400);
+  }
 
-  const totalDays = countWeekdays(start, end);
+  const holidays = await getHolidaySet(start, end);
+  const totalDays = countWorkdays(start, end, holidays);
   if (totalDays === 0) throw new AppError('Tidak ada hari kerja dalam rentang tanggal tersebut', 400);
 
   const leaveType = await prisma.leaveType.findUnique({ where: { id: leaveTypeId } });
@@ -150,6 +165,25 @@ export async function createLeaveRequestService(
   let request;
   try {
     request = await prisma.$transaction(async (tx) => {
+      // Guard against double-booking: any PENDING/APPROVED leave whose range
+      // touches this one would deduct the balance twice.
+      const overlap = await tx.leaveRequest.findFirst({
+        where: {
+          userId,
+          status:    { in: [LeaveStatus.PENDING, LeaveStatus.APPROVED] },
+          startDate: { lte: end },
+          endDate:   { gte: start },
+        },
+        select: { startDate: true, endDate: true, status: true },
+      });
+      if (overlap) {
+        const fmt = (d: Date) => d.toISOString().slice(0, 10);
+        throw new AppError(
+          `Rentang tanggal bertabrakan dengan pengajuan cuti kamu yang ${overlap.status === 'PENDING' ? 'masih menunggu' : 'sudah disetujui'} (${fmt(overlap.startDate)} s/d ${fmt(overlap.endDate)})`,
+          400,
+        );
+      }
+
       if (leaveType.maxDaysPerYear > 0) {
         let balance = await tx.leaveBalance.findUnique({
           where: { userId_leaveTypeId_year: { userId, leaveTypeId, year } },
@@ -330,6 +364,18 @@ export async function checkInService(
     const nowMin = jkt.getUTCHours() * 60 + jkt.getUTCMinutes();
     isLate = nowMin > cutoff;
     lateMinutes = isLate ? nowMin - cutoff : 0;
+  }
+
+  // An APPROVED advance late-excuse for today neutralises the late flag —
+  // the lateness was known and sanctioned beforehand.
+  if (isLate) {
+    const excuse = await prisma.lateExcuseRequest.findFirst({
+      where: { userId, date: dateVal, status: RequestStatus.APPROVED },
+    });
+    if (excuse) {
+      isLate = false;
+      lateMinutes = 0;
+    }
   }
 
   // Geofencing check (only if GPS provided)
@@ -804,13 +850,9 @@ export async function getAttendanceReportsService(callerId: string, permScope: s
     if (rec.isOutOfArea) row.outOfAreaCount++;
   }
 
-  // Working days in month (Mon–Fri)
-  const daysInMonth = new Date(year, month, 0).getDate();
-  let workingDays = 0;
-  for (let d = 1; d <= daysInMonth; d++) {
-    const dow = new Date(year, month - 1, d).getDay();
-    if (dow !== 0 && dow !== 6) workingDays++;
-  }
+  // Working days in month (Mon–Fri minus company holidays)
+  const holidaySet = await getHolidaySet(startOfMonth, endOfMonth);
+  const workingDays = countWorkdays(startOfMonth, endOfMonth, holidaySet);
 
   const rows = Array.from(map.values()).map((row) => {
     const eligible = Math.max(1, workingDays - row.totalHoliday);
@@ -826,4 +868,274 @@ export async function getAttendanceReportsService(callerId: string, permScope: s
   return search
     ? rows.filter((r) => r.fullName.toLowerCase().includes(search) || r.username.toLowerCase().includes(search))
     : rows;
+}
+
+// ── Holidays (company calendar / tanggal merah) ────────────────
+
+export async function listHolidaysService(year: number) {
+  return prisma.holiday.findMany({
+    where: { date: { gte: parseDate(`${year}-01-01`), lte: parseDate(`${year}-12-31`) } },
+    orderBy: { date: 'asc' },
+  });
+}
+
+export async function createHolidayService(body: { date: string; name: string }) {
+  const date = parseDate(body.date);
+  const existing = await prisma.holiday.findUnique({ where: { date } });
+  if (existing) throw new AppError(`Tanggal tersebut sudah terdaftar sebagai "${existing.name}"`, 400);
+  return prisma.holiday.create({ data: { date, name: body.name } });
+}
+
+export async function deleteHolidayService(id: string) {
+  const holiday = await prisma.holiday.findUnique({ where: { id } });
+  if (!holiday) throw new AppError('Hari libur tidak ditemukan', 404);
+  return prisma.holiday.delete({ where: { id } });
+}
+
+// ── Shift Change Requests (timetable) ──────────────────────────
+
+export async function listShiftChangeRequestsService(
+  callerId: string, reviewScope: string, divisionId: string, query: ParsedQs,
+) {
+  const { page, limit, skip } = parsePagination(query);
+
+  const where: Prisma.ShiftChangeRequestWhereInput = {};
+  if (reviewScope === 'all') {
+    if (query.userId) where.userId = query.userId as string;
+  } else if (reviewScope === 'division') {
+    where.user = { divisionId };
+    if (query.userId) where.userId = query.userId as string;
+  } else {
+    where.userId = callerId;
+  }
+  if (query.status) where.status = query.status as RequestStatus;
+
+  const [items, total] = await prisma.$transaction([
+    prisma.shiftChangeRequest.findMany({
+      where, skip, take: limit,
+      include: {
+        user:           { select: USER_SELECT },
+        requestedShift: { select: { id: true, name: true, startTime: true, endTime: true, color: true } },
+        reviewedBy:     { select: USER_SELECT },
+      },
+      orderBy: { createdAt: 'desc' },
+    }),
+    prisma.shiftChangeRequest.count({ where }),
+  ]);
+
+  return { shiftChangeRequests: items, meta: buildMeta(total, page, limit) };
+}
+
+export async function createShiftChangeRequestService(userId: string, body: {
+  requestedShiftId: string; effectiveDate: string; reason: string;
+}) {
+  const shift = await prisma.shift.findUnique({ where: { id: body.requestedShiftId } });
+  if (!shift || !shift.isActive) throw new AppError('Shift tidak ditemukan', 404);
+
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { shiftId: true, fullName: true, divisionId: true },
+  });
+  if (user?.shiftId === body.requestedShiftId) {
+    throw new AppError('Kamu sudah berada di shift tersebut', 400);
+  }
+
+  const pending = await prisma.shiftChangeRequest.findFirst({
+    where: { userId, status: RequestStatus.PENDING },
+  });
+  if (pending) throw new AppError('Masih ada pengajuan perubahan shift yang menunggu review', 400);
+
+  const request = await prisma.shiftChangeRequest.create({
+    data: {
+      userId,
+      requestedShiftId: body.requestedShiftId,
+      effectiveDate:    parseDate(body.effectiveDate),
+      reason:           body.reason,
+    },
+    include: {
+      user:           { select: USER_SELECT },
+      requestedShift: { select: { id: true, name: true, startTime: true, endTime: true, color: true } },
+    },
+  });
+
+  if (user) {
+    const managers = await prisma.user.findMany({
+      where: { divisionId: user.divisionId, role: { level: { lte: 4 } }, id: { not: userId } },
+      select: { id: true },
+    });
+    await Promise.all(managers.map((m) =>
+      sendHRISNotif(
+        NotificationType.SYSTEM, userId, m.id,
+        'Pengajuan Perubahan Shift',
+        `${user.fullName} mengajukan pindah ke shift ${shift.name} mulai ${body.effectiveDate}.`,
+        '/hris/requests',
+      ),
+    ));
+  }
+
+  return request;
+}
+
+export async function reviewShiftChangeRequestService(
+  id: string, reviewerId: string, reviewScope: string, divisionId: string,
+  body: { status: 'APPROVED' | 'REJECTED'; reviewNote?: string | null },
+) {
+  const req = await prisma.shiftChangeRequest.findUnique({
+    where: { id },
+    include: { user: { select: { divisionId: true } }, requestedShift: { select: { name: true } } },
+  });
+  if (!req) throw new AppError('Pengajuan tidak ditemukan', 404);
+  if (req.status !== RequestStatus.PENDING) throw new AppError('Pengajuan ini sudah diproses', 400);
+  if (req.userId === reviewerId) throw new AppError('Tidak bisa mereview pengajuan sendiri', 403);
+  if (reviewScope === 'division' && req.user.divisionId !== divisionId) {
+    throw new AppError('Akses ditolak', 403);
+  }
+
+  // Approval applies the new shift to the user immediately — effectiveDate is
+  // informational for HR; late detection always uses the user's current shift.
+  const updated = await prisma.$transaction(async (tx) => {
+    const r = await tx.shiftChangeRequest.update({
+      where: { id },
+      data: { status: body.status as RequestStatus, reviewNote: body.reviewNote ?? null, reviewedById: reviewerId, reviewedAt: new Date() },
+      include: {
+        user:           { select: USER_SELECT },
+        requestedShift: { select: { id: true, name: true, startTime: true, endTime: true, color: true } },
+        reviewedBy:     { select: USER_SELECT },
+      },
+    });
+    if (body.status === 'APPROVED') {
+      await tx.user.update({ where: { id: req.userId }, data: { shiftId: req.requestedShiftId } });
+    }
+    return r;
+  });
+
+  const reviewer = await prisma.user.findUnique({ where: { id: reviewerId }, select: { fullName: true } });
+  await sendHRISNotif(
+    NotificationType.SYSTEM, reviewerId, req.userId,
+    body.status === 'APPROVED' ? 'Perubahan Shift Disetujui' : 'Perubahan Shift Ditolak',
+    body.status === 'APPROVED'
+      ? `${reviewer?.fullName ?? 'HRD'} menyetujui pindah shift kamu ke ${req.requestedShift.name}.`
+      : `${reviewer?.fullName ?? 'HRD'} menolak pengajuan pindah shift kamu${body.reviewNote ? ': ' + body.reviewNote : '.'}`,
+    '/hris/requests',
+  );
+
+  return updated;
+}
+
+export async function cancelShiftChangeRequestService(id: string, userId: string) {
+  const req = await prisma.shiftChangeRequest.findUnique({ where: { id } });
+  if (!req) throw new AppError('Pengajuan tidak ditemukan', 404);
+  if (req.userId !== userId) throw new AppError('Bukan pengajuan kamu', 403);
+  if (req.status !== RequestStatus.PENDING) throw new AppError('Hanya pengajuan PENDING yang bisa dibatalkan', 400);
+  return prisma.shiftChangeRequest.update({ where: { id }, data: { status: RequestStatus.CANCELLED } });
+}
+
+// ── Late Excuse Requests (izin telat di muka) ──────────────────
+
+export async function listLateExcuseRequestsService(
+  callerId: string, reviewScope: string, divisionId: string, query: ParsedQs,
+) {
+  const { page, limit, skip } = parsePagination(query);
+
+  const where: Prisma.LateExcuseRequestWhereInput = {};
+  if (reviewScope === 'all') {
+    if (query.userId) where.userId = query.userId as string;
+  } else if (reviewScope === 'division') {
+    where.user = { divisionId };
+    if (query.userId) where.userId = query.userId as string;
+  } else {
+    where.userId = callerId;
+  }
+  if (query.status) where.status = query.status as RequestStatus;
+
+  const [items, total] = await prisma.$transaction([
+    prisma.lateExcuseRequest.findMany({
+      where, skip, take: limit,
+      include: { user: { select: USER_SELECT }, reviewedBy: { select: USER_SELECT } },
+      orderBy: { date: 'desc' },
+    }),
+    prisma.lateExcuseRequest.count({ where }),
+  ]);
+
+  return { lateExcuseRequests: items, meta: buildMeta(total, page, limit) };
+}
+
+export async function createLateExcuseRequestService(userId: string, body: {
+  date: string; expectedTime?: string | null; reason: string;
+}) {
+  // Advance notice only — for a past date the lateness already happened.
+  if (body.date < todayJakarta()) {
+    throw new AppError('Tidak bisa mengajukan izin telat untuk tanggal yang sudah lewat', 400);
+  }
+
+  const dateVal = parseDate(body.date);
+  const existing = await prisma.lateExcuseRequest.findFirst({
+    where: { userId, date: dateVal, status: { in: [RequestStatus.PENDING, RequestStatus.APPROVED] } },
+  });
+  if (existing) throw new AppError('Sudah ada pengajuan izin telat untuk tanggal ini', 400);
+
+  const request = await prisma.lateExcuseRequest.create({
+    data: { userId, date: dateVal, expectedTime: body.expectedTime ?? null, reason: body.reason },
+    include: { user: { select: USER_SELECT } },
+  });
+
+  const requester = await prisma.user.findUnique({ where: { id: userId }, select: { divisionId: true, fullName: true } });
+  if (requester) {
+    const managers = await prisma.user.findMany({
+      where: { divisionId: requester.divisionId, role: { level: { lte: 4 } }, id: { not: userId } },
+      select: { id: true },
+    });
+    await Promise.all(managers.map((m) =>
+      sendHRISNotif(
+        NotificationType.SYSTEM, userId, m.id,
+        'Pengajuan Izin Telat',
+        `${requester.fullName} mengajukan izin telat pada ${body.date}${body.expectedTime ? ` (perkiraan tiba ${body.expectedTime})` : ''}.`,
+        '/hris/requests',
+      ),
+    ));
+  }
+
+  return request;
+}
+
+export async function reviewLateExcuseRequestService(
+  id: string, reviewerId: string, reviewScope: string, divisionId: string,
+  body: { status: 'APPROVED' | 'REJECTED'; reviewNote?: string | null },
+) {
+  const req = await prisma.lateExcuseRequest.findUnique({
+    where: { id },
+    include: { user: { select: { divisionId: true } } },
+  });
+  if (!req) throw new AppError('Pengajuan tidak ditemukan', 404);
+  if (req.status !== RequestStatus.PENDING) throw new AppError('Pengajuan ini sudah diproses', 400);
+  if (req.userId === reviewerId) throw new AppError('Tidak bisa mereview pengajuan sendiri', 403);
+  if (reviewScope === 'division' && req.user.divisionId !== divisionId) {
+    throw new AppError('Akses ditolak', 403);
+  }
+
+  const updated = await prisma.lateExcuseRequest.update({
+    where: { id },
+    data: { status: body.status as RequestStatus, reviewNote: body.reviewNote ?? null, reviewedById: reviewerId, reviewedAt: new Date() },
+    include: { user: { select: USER_SELECT }, reviewedBy: { select: USER_SELECT } },
+  });
+
+  const reviewer = await prisma.user.findUnique({ where: { id: reviewerId }, select: { fullName: true } });
+  await sendHRISNotif(
+    NotificationType.SYSTEM, reviewerId, req.userId,
+    body.status === 'APPROVED' ? 'Izin Telat Disetujui' : 'Izin Telat Ditolak',
+    body.status === 'APPROVED'
+      ? `${reviewer?.fullName ?? 'HRD'} menyetujui izin telat kamu pada ${req.date.toISOString().slice(0, 10)} — check-in tidak akan dihitung telat.`
+      : `${reviewer?.fullName ?? 'HRD'} menolak izin telat kamu${body.reviewNote ? ': ' + body.reviewNote : '.'}`,
+    '/hris/requests',
+  );
+
+  return updated;
+}
+
+export async function cancelLateExcuseRequestService(id: string, userId: string) {
+  const req = await prisma.lateExcuseRequest.findUnique({ where: { id } });
+  if (!req) throw new AppError('Pengajuan tidak ditemukan', 404);
+  if (req.userId !== userId) throw new AppError('Bukan pengajuan kamu', 403);
+  if (req.status !== RequestStatus.PENDING) throw new AppError('Hanya pengajuan PENDING yang bisa dibatalkan', 400);
+  return prisma.lateExcuseRequest.update({ where: { id }, data: { status: RequestStatus.CANCELLED } });
 }

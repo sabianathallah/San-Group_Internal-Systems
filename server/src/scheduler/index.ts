@@ -12,11 +12,13 @@
 import cron from 'node-cron';
 import { registerDueDateJob } from './due-date.job';
 import { registerWorkOrderOverdueJob } from './work-order-overdue.job';
+import { registerAttendanceAbsentJob } from './attendance-absent.job';
 import { fireScheduledAnnouncements } from '@/services/scheduled-announcement.service';
 
 export function startScheduler(): void {
   registerDueDateJob();
   registerWorkOrderOverdueJob();
+  registerAttendanceAbsentJob();
 
   // Fire scheduled announcements every minute
   cron.schedule('* * * * *', async () => {

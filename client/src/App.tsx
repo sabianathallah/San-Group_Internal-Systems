@@ -23,6 +23,8 @@ import HRISOverviewPage from '@/pages/hris/HRISOverviewPage';
 import AttendancePage from '@/pages/hris/AttendancePage';
 import LeavePage from '@/pages/hris/LeavePage';
 import OvertimePage from '@/pages/hris/OvertimePage';
+import RequestsPage from '@/pages/hris/RequestsPage';
+import HolidaysAdminPage from '@/pages/hris/admin/HolidaysAdminPage';
 import ReportsPage from '@/pages/hris/ReportsPage';
 import ShiftsAdminPage from '@/pages/hris/admin/ShiftsAdminPage';
 import LocationsAdminPage from '@/pages/hris/admin/LocationsAdminPage';
@@ -83,12 +85,14 @@ export default function App() {
           <Route path={ROUTES.HRIS_ATTENDANCE}      element={<AttendancePage />}      />
           <Route path={ROUTES.HRIS_LEAVE}           element={<LeavePage />}           />
           <Route path={ROUTES.HRIS_OVERTIME}        element={<OvertimePage />}        />
+          <Route path={ROUTES.HRIS_REQUESTS}        element={<RequestsPage />}        />
           <Route element={<HrisReportsRoute />}>
             <Route path={ROUTES.HRIS_REPORTS} element={<ReportsPage />} />
           </Route>
           <Route element={<HrisAdminRoute />}>
             <Route path={ROUTES.HRIS_ADMIN_SHIFTS}    element={<ShiftsAdminPage />}    />
             <Route path={ROUTES.HRIS_ADMIN_LOCATIONS} element={<LocationsAdminPage />} />
+            <Route path={ROUTES.HRIS_ADMIN_HOLIDAYS}  element={<HolidaysAdminPage />}  />
           </Route>
 
           {/* Admin-only routes */}

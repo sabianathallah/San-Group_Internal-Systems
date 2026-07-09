@@ -163,3 +163,48 @@ export const reportsFilterSchema = z.object({
     limit:      z.coerce.number().int().positive().max(200).optional(),
   }),
 });
+
+// ── Holidays ───────────────────────────────────────────────────
+
+export const createHolidaySchema = z.object({
+  body: z.object({
+    date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Format tanggal harus YYYY-MM-DD'),
+    name: z.string().min(1, 'Nama hari libur wajib diisi').max(200),
+  }),
+});
+
+// ── Shift Change Requests ──────────────────────────────────────
+
+export const createShiftChangeSchema = z.object({
+  body: z.object({
+    requestedShiftId: z.string().uuid(),
+    effectiveDate:    z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Format tanggal harus YYYY-MM-DD'),
+    reason:           z.string().min(5, 'Alasan minimal 5 karakter').max(1000),
+  }),
+});
+
+export const reviewRequestSchema = z.object({
+  body: z.object({
+    status:     z.enum(['APPROVED', 'REJECTED']),
+    reviewNote: z.string().max(1000).optional().nullable(),
+  }),
+});
+
+export const requestFilterSchema = z.object({
+  query: z.object({
+    userId: z.string().uuid().optional(),
+    status: z.enum(['PENDING', 'APPROVED', 'REJECTED', 'CANCELLED']).optional(),
+    page:   z.coerce.number().int().positive().optional(),
+    limit:  z.coerce.number().int().positive().max(100).optional(),
+  }),
+});
+
+// ── Late Excuse Requests ───────────────────────────────────────
+
+export const createLateExcuseSchema = z.object({
+  body: z.object({
+    date:         z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Format tanggal harus YYYY-MM-DD'),
+    expectedTime: z.string().regex(/^\d{2}:\d{2}$/, 'Format jam harus HH:MM').optional().nullable(),
+    reason:       z.string().min(5, 'Alasan minimal 5 karakter').max(1000),
+  }),
+});
