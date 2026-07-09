@@ -83,14 +83,12 @@ const WO_DETAIL_SELECT = {
   },
 } as const;
 
-// A brand-new WO with no assignee is invisible until someone opens the board —
-// notify everyone who has the authority to assign it (work_order.edit 'all',
-// or 'division' within the reporter's division) so it can't sit unnoticed.
-async function notifyAssignCapableUsers(creatorId: string, woId: string, title: string) {
-  const creator = await prisma.user.findUnique({ where: { id: creatorId }, select: { divisionId: true } });
-
+// Everyone with the authority to assign work orders: work_order.edit 'all',
+// or 'division' within the given division. Exported for the overdue
+// scheduler job, which escalates to the same audience.
+export async function getAssignCapableUserIds(divisionId: string | null, excludeUserId?: string): Promise<string[]> {
   const candidates = await prisma.user.findMany({
-    where: { isActive: true, id: { not: creatorId } },
+    where: { isActive: true, ...(excludeUserId && { id: { not: excludeUserId } }) },
     select: { id: true, divisionId: true, role: { select: { id: true, level: true } } },
   });
 
@@ -103,17 +101,26 @@ async function notifyAssignCapableUsers(creatorId: string, woId: string, title: 
     }
   }
 
-  const recipients = candidates.filter((u) => {
-    const edit = roleEdit.get(u.role.id);
-    if (edit === 'all') return true;
-    if (edit === 'division') return !!creator?.divisionId && u.divisionId === creator.divisionId;
-    return false;
-  });
+  return candidates
+    .filter((u) => {
+      const edit = roleEdit.get(u.role.id);
+      if (edit === 'all') return true;
+      if (edit === 'division') return !!divisionId && u.divisionId === divisionId;
+      return false;
+    })
+    .map((u) => u.id);
+}
 
-  if (recipients.length === 0) return;
+// A brand-new WO with no assignee is invisible until someone opens the board —
+// notify everyone who has the authority to assign it so it can't sit unnoticed.
+async function notifyAssignCapableUsers(creatorId: string, woId: string, title: string) {
+  const creator = await prisma.user.findUnique({ where: { id: creatorId }, select: { divisionId: true } });
+  const recipientIds = await getAssignCapableUserIds(creator?.divisionId ?? null, creatorId);
+
+  if (recipientIds.length === 0) return;
   await prisma.notification.createMany({
-    data: recipients.map((u) => ({
-      userId:  u.id,
+    data: recipientIds.map((userId) => ({
+      userId,
       actorId: creatorId,
       type:    NotificationType.WO_STATUS_CHANGED,
       title:   `New work order: ${title}`,
