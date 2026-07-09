@@ -21,7 +21,6 @@ export interface AuditLogPerms {
 }
 export interface HrisPerms {
   reviewLeave: Scope;
-  reviewOvertime: Scope;
   editAttendance: Scope;
   manageShifts: boolean;
   manageLocations: boolean;
@@ -73,7 +72,7 @@ export const DEFAULT_PERMS: PermissionConfig = {
   note:       { view: 'own', create: true, edit: 'own', delete: 'own' },
   analytics:  { view: 'none' },
   audit_log:  { view: 'none' },
-  hris:       { reviewLeave: 'none', reviewOvertime: 'none', editAttendance: 'none', manageShifts: false, manageLocations: false, viewReports: 'none' },
+  hris:       { reviewLeave: 'none', editAttendance: 'none', manageShifts: false, manageLocations: false, viewReports: 'none' },
   work_order: { view: 'own', create: true, edit: 'own', delete: 'own', canBeAssignee: true },
   user_mgmt:     { create: false, edit: 'none', delete: 'none', toggleStatus: 'none' },
   role_mgmt:     { create: false, edit: 'none', delete: 'none' },

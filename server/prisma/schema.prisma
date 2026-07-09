@@ -59,16 +59,11 @@ enum NotificationType {
   LEAVE_SUBMITTED
   LEAVE_APPROVED
   LEAVE_REJECTED
+  // Legacy — overtime module removed (client policy: no overtime); values kept
+  // because removing PG enum values requires a type rebuild.
   OVERTIME_SUBMITTED
   OVERTIME_APPROVED
   OVERTIME_REJECTED
-}
-
-enum OvertimeStatus {
-  PENDING
-  APPROVED
-  REJECTED
-  CANCELLED
 }
 
 enum AttendanceStatus {
@@ -248,8 +243,6 @@ model User {
   leaveRequests              LeaveRequest[]          @relation("LRRequester")
   reviewedLeaveRequests      LeaveRequest[]          @relation("LRReviewer")
   leaveBalances              LeaveBalance[]
-  overtimeRequests           OvertimeRequest[]       @relation("OTRequester")
-  reviewedOvertimes          OvertimeRequest[]       @relation("OTReviewer")
   shiftChangeRequests        ShiftChangeRequest[]    @relation("SCRRequester")
   reviewedShiftChanges       ShiftChangeRequest[]    @relation("SCRReviewer")
   lateExcuseRequests         LateExcuseRequest[]     @relation("LERRequester")
@@ -894,7 +887,6 @@ model Attendance {
   createdAt        DateTime         @default(now())
   updatedAt        DateTime         @updatedAt
 
-  overtimeRequests OvertimeRequest[]
 
   @@unique([userId, date])
   @@index([userId])
@@ -965,29 +957,6 @@ model LateExcuseRequest {
   @@map("late_excuse_requests")
 }
 
-model OvertimeRequest {
-  id              String         @id @default(uuid())
-  userId          String
-  user            User           @relation("OTRequester", fields: [userId], references: [id])
-  attendanceId    String?
-  attendance      Attendance?    @relation(fields: [attendanceId], references: [id], onDelete: SetNull)
-  date            DateTime       @db.Date
-  startTime       String
-  endTime         String
-  durationMinutes Int
-  reason          String
-  status          OvertimeStatus @default(PENDING)
-  reviewNote      String?
-  reviewedById    String?
-  reviewedBy      User?          @relation("OTReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
-  reviewedAt      DateTime?
-  createdAt       DateTime       @default(now())
-  updatedAt       DateTime       @updatedAt
-
-  @@index([userId])
-  @@index([status])
-  @@map("overtime_requests")
-}
 
 // ============================================================
 // PHASE 3 — COMMENTED OUT (uncomment saat Phase 3 dimulai)

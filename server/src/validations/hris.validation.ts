@@ -122,35 +122,6 @@ export const updateOfficeLocationSchema = z.object({
   }),
 });
 
-// ── Overtime ────────────────────────────────────────────────────
-
-export const createOvertimeSchema = z.object({
-  body: z.object({
-    date:         z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-    startTime:    z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),
-    endTime:      z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),
-    reason:       z.string().min(10).max(500),
-    attendanceId: z.string().uuid().optional().nullable(),
-  }),
-});
-
-export const reviewOvertimeSchema = z.object({
-  body: z.object({
-    status:     z.enum(['APPROVED', 'REJECTED']),
-    reviewNote: z.string().max(500).optional().nullable(),
-  }),
-});
-
-export const overtimeFilterSchema = z.object({
-  query: z.object({
-    userId: z.string().uuid().optional(),
-    status: z.enum(['PENDING', 'APPROVED', 'REJECTED', 'CANCELLED']).optional(),
-    month:  z.coerce.number().int().min(1).max(12).optional(),
-    year:   z.coerce.number().int().min(2020).optional(),
-    page:   z.coerce.number().int().positive().optional(),
-    limit:  z.coerce.number().int().positive().max(100).optional(),
-  }),
-});
 
 // ── Reports ─────────────────────────────────────────────────────
 

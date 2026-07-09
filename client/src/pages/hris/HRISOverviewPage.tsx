@@ -55,15 +55,6 @@ interface LeaveRequest {
   leaveType: { name: string; color: string };
 }
 
-interface OvertimeRequest {
-  id: string;
-  date: string;
-  startTime: string;
-  endTime: string;
-  durationMinutes: number;
-  status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED';
-}
-
 // ── Helpers ────────────────────────────────────────────────────
 async function reverseGeocode(lat: number, lng: number): Promise<string> {
   try {
@@ -384,7 +375,6 @@ export default function HRISOverviewPage() {
   const [attSummary, setAttSummary] = useState<AttSummary | null>(null);
   const [balances, setBalances] = useState<LeaveBalance[]>([]);
   const [recentLeaves, setRecentLeaves] = useState<LeaveRequest[]>([]);
-  const [pendingOT, setPendingOT] = useState<OvertimeRequest[]>([]);
   const [loading, setLoading]   = useState(true);
   const [checkinLoading, setCheckinLoading]   = useState(false);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
@@ -404,18 +394,16 @@ export default function HRISOverviewPage() {
     const thisMonth = now.getMonth() + 1;
     const thisYear  = now.getFullYear();
     try {
-      const [todayRes, balRes, leaveRes, summaryRes, otRes] = await Promise.all([
+      const [todayRes, balRes, leaveRes, summaryRes] = await Promise.all([
         api.get('/hris/attendance/today'),
         api.get('/hris/leave-balances'),
         api.get('/hris/leave-requests', { params: { limit: 5 } }),
         api.get('/hris/attendance/summary', { params: { month: thisMonth, year: thisYear } }),
-        api.get('/hris/overtime', { params: { status: 'PENDING', limit: 5 } }),
       ]);
       setToday(todayRes.data.data);
       setBalances(balRes.data.data);
       setRecentLeaves(leaveRes.data.data);
       setAttSummary(summaryRes.data.data.summary);
-      setPendingOT(otRes.data.data);
     } catch { /* silent */ }
     finally { setLoading(false); }
   }
@@ -811,42 +799,6 @@ export default function HRISOverviewPage() {
               </div>
             </div>
 
-            {/* Pending overtime */}
-            {pendingOT.length > 0 && (
-              <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-                <div className="px-5 py-3.5 border-b border-gray-100 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className="w-7 h-7 rounded-lg bg-gray-100 flex items-center justify-center">
-                      <Timer size={14} className="text-gray-500" />
-                    </div>
-                    <span className="text-sm font-semibold text-gray-800">Pending Overtime</span>
-                    <span className="text-xs font-medium text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded-full">
-                      {pendingOT.length}
-                    </span>
-                  </div>
-                  <Link to={ROUTES.HRIS_OVERTIME} className="text-xs text-navy hover:underline flex items-center gap-0.5 font-medium">
-                    Details <ChevronRight size={12} />
-                  </Link>
-                </div>
-                <div className="divide-y divide-gray-50">
-                  {pendingOT.slice(0, 3).map((ot) => (
-                    <div key={ot.id} className="flex items-center justify-between px-5 py-3">
-                      <div>
-                        <p className="text-sm font-medium text-gray-800">
-                          {new Date(ot.date).toLocaleDateString('en-US', { day: 'numeric', month: 'short' })}
-                        </p>
-                        <p className="text-xs text-gray-400">
-                          {ot.startTime} – {ot.endTime}
-                        </p>
-                      </div>
-                      <span className="text-xs font-medium text-gray-600 bg-gray-100 px-2 py-0.5 rounded-full">
-                        {Math.floor(ot.durationMinutes / 60)}h{ot.durationMinutes % 60 > 0 ? ` ${ot.durationMinutes % 60}m` : ''}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
           </div>
         </div>
       </div>

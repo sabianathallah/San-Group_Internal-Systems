@@ -17,7 +17,6 @@ import {
   UserCog,
   Clock,
   CalendarRange,
-  Timer,
   MapPin,
   CalendarClock,
   CalendarOff,
@@ -102,7 +101,6 @@ export default function Sidebar() {
     { label: 'Overview',    to: ROUTES.HRIS,              icon: HardHat       },
     { label: 'Attendance',  to: ROUTES.HRIS_ATTENDANCE,   icon: Clock         },
     { label: 'Leave',       to: ROUTES.HRIS_LEAVE,        icon: CalendarRange },
-    { label: 'Overtime',    to: ROUTES.HRIS_OVERTIME,     icon: Timer         },
     { label: 'Requests',    to: ROUTES.HRIS_REQUESTS,     icon: ClipboardEdit },
     ...(canReports ? [{ label: 'Reports', to: ROUTES.HRIS_REPORTS, icon: BarChart3 }] : []),
     ...(isHRAdmin ? [

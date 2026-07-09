@@ -2,7 +2,7 @@ import {
   PrismaClient, TaskStatus, TaskPriority, TaskVisibility,
   BulletinCategory, BulletinPriority, NotificationType, AssignmentStatus,
   WorkOrderStatus, WorkOrderPriority, WorkOrderCategory,
-  AttendanceStatus, LeaveStatus, OvertimeStatus,
+  AttendanceStatus, LeaveStatus,
 } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 
@@ -389,7 +389,6 @@ async function main() {
   console.log('✅ Database folders & links created');
 
   // ── HRIS ───────────────────────────────────────────────────
-  await prisma.overtimeRequest.deleteMany({});
   await prisma.attendance.deleteMany({});
   await prisma.leaveRequest.deleteMany({});
   await prisma.leaveBalance.deleteMany({});
@@ -529,33 +528,6 @@ async function main() {
     });
   }
   console.log('✅ HRIS attendance records created');
-
-  // Overtime requests
-  const todayForOT = new Date(new Date().toISOString().slice(0, 10) + 'T00:00:00.000Z');
-  const ot1Date    = new Date(new Date(Date.now() - 3 * 86400000).toISOString().slice(0, 10) + 'T00:00:00.000Z');
-  const ot2Date    = new Date(new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10) + 'T00:00:00.000Z');
-  await prisma.overtimeRequest.create({ data: {
-    userId: engineer.id, date: todayForOT,
-    startTime: '17:00', endTime: '20:00', durationMinutes: 180,
-    reason: 'Perbaikan AC lantai 3 harus selesai sebelum rapat direksi besok pagi.',
-    status: OvertimeStatus.PENDING,
-  }});
-  await prisma.overtimeRequest.create({ data: {
-    userId: pm.id, date: ot1Date,
-    startTime: '17:00', endTime: '19:30', durationMinutes: 150,
-    reason: 'Finalisasi laporan inspeksi bangunan untuk diserahkan ke klien.',
-    status: OvertimeStatus.APPROVED,
-    reviewedById: admin.id, reviewedAt: new Date(Date.now() - 2 * 86400000),
-    reviewNote: 'Disetujui. Pastikan laporan sudah lengkap.',
-  }});
-  await prisma.overtimeRequest.create({ data: {
-    userId: hr.id, date: ot2Date,
-    startTime: '17:00', endTime: '19:00', durationMinutes: 120,
-    reason: 'Persiapan dokumen onboarding 3 staff baru yang mulai Senin.',
-    status: OvertimeStatus.APPROVED,
-    reviewedById: admin.id, reviewedAt: new Date(Date.now() - 6 * 86400000),
-  }});
-  console.log('✅ Overtime requests created');
 
   // ── Work Orders ────────────────────────────────────────────
   // Clear previous WO seed data
@@ -849,10 +821,6 @@ async function main() {
     { type: NotificationType.WO_STATUS_CHANGED, title: 'Menunggu Review',        message: 'Reza Maulana mengirim WO "Kerusakan Panel Listrik Utama Gedung B" untuk direview.',              link: `/work-orders/${woPanel.id}`,     isRead: false, userId: admin.id,    actorId: engineer.id },
     { type: NotificationType.WO_COMPLETED,     title: 'Work Order Disetujui',    message: 'Super Admin menyetujui WO "Perbaikan Genset Cadangan Tower A" — sudah ditutup.',                  link: `/work-orders/${woGenset.id}`,    isRead: false, userId: engineer.id, actorId: admin.id    },
     { type: NotificationType.WO_STATUS_CHANGED, title: 'Work Order Ditolak',      message: 'Super Admin menolak hasil pengerjaan "Pendinginan AC Presisi Ruang Server Data Center": Suhu masih di atas standar.', link: `/work-orders/${woServerAC.id}`, isRead: false, userId: engineer.id, actorId: admin.id },
-    // Overtime notifications
-    { type: NotificationType.OVERTIME_SUBMITTED, title: 'Pengajuan Lembur Baru', message: 'Reza Maulana mengajukan lembur hari ini (3j 0m).', link: '/hris/overtime', isRead: false, userId: admin.id, actorId: engineer.id },
-    { type: NotificationType.OVERTIME_APPROVED,  title: 'Lembur Disetujui',      message: 'Super Admin menyetujui pengajuan lembur kamu.',  link: '/hris/overtime', isRead: false, userId: pm.id,      actorId: admin.id    },
-    { type: NotificationType.OVERTIME_APPROVED,  title: 'Lembur Disetujui',      message: 'Super Admin menyetujui pengajuan lembur kamu.',  link: '/hris/overtime', isRead: true,  userId: hr.id,      actorId: admin.id    },
   ]});
   console.log('✅ Notifications created');
 

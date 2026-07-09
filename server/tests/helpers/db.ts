@@ -26,14 +26,13 @@ export async function cleanDatabase() {
     testPrisma.databaseFolder.deleteMany(),
     // These User FKs have no onDelete (defaults to Restrict), so leftover rows
     // silently block user.deleteMany() below — must clean these first. Found
-    // the hard way: WorkOrder/LeaveRequest/OvertimeRequest rows accumulating
+    // the hard way: WorkOrder/LeaveRequest rows accumulating
     // across a long test session eventually broke every integration suite's
     // cleanDatabase() call, since the failed transaction just rolled back with
     // no visible error until the next login/lookup hit a now-stale user.
     testPrisma.workOrderHistory.deleteMany(),
     testPrisma.workOrderAttachment.deleteMany(),
     testPrisma.workOrder.deleteMany(),
-    testPrisma.overtimeRequest.deleteMany(),
     testPrisma.leaveRequest.deleteMany(),
     testPrisma.refreshToken.deleteMany(),
     testPrisma.user.deleteMany(),

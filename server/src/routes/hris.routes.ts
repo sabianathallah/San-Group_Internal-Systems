@@ -10,7 +10,6 @@ import {
   reviewLeaveRequestSchema, leaveFilterSchema,
   createShiftSchema, updateShiftSchema, assignShiftSchema,
   createOfficeLocationSchema, updateOfficeLocationSchema,
-  createOvertimeSchema, reviewOvertimeSchema, overtimeFilterSchema,
   reportsFilterSchema,
   createHolidaySchema,
   createShiftChangeSchema,
@@ -25,7 +24,6 @@ import {
   getTodayAttendance, checkIn, checkOut, listAttendance, getAttendanceSummary, updateAttendance,
   listShifts, createShift, updateShift, deleteShift, assignShift, listUsersForShift,
   listOfficeLocations, createOfficeLocation, updateOfficeLocation, deleteOfficeLocation,
-  listOvertimes, createOvertime, reviewOvertime, cancelOvertime,
   getAttendanceReports,
   listHolidays,
   createHoliday,
@@ -74,12 +72,6 @@ router.get   ('/office-locations',     listOfficeLocations);
 router.post  ('/office-locations',     checkPerm('hris', 'manageLocations'), validate(createOfficeLocationSchema), createOfficeLocation);
 router.put   ('/office-locations/:id', checkPerm('hris', 'manageLocations'), validate(uuidParamSchema, ['params']), validate(updateOfficeLocationSchema), updateOfficeLocation);
 router.delete('/office-locations/:id', checkPerm('hris', 'manageLocations'), validate(uuidParamSchema, ['params']), deleteOfficeLocation);
-
-// ── Overtime ───────────────────────────────────────────────────
-router.get   ('/overtime',            validate(overtimeFilterSchema, ['query']), listOvertimes);
-router.post  ('/overtime',            validate(createOvertimeSchema), createOvertime);
-router.patch ('/overtime/:id/review', checkPerm('hris', 'reviewOvertime'), validate(uuidParamSchema, ['params']), validate(reviewOvertimeSchema), reviewOvertime);
-router.patch ('/overtime/:id/cancel', validate(uuidParamSchema, ['params']), cancelOvertime);
 
 // ── Reports ────────────────────────────────────────────────────
 router.get('/reports/attendance', checkPerm('hris', 'viewReports'), validate(reportsFilterSchema, ['query']), getAttendanceReports);

@@ -27,10 +27,6 @@ import {
   createOfficeLocationService,
   updateOfficeLocationService,
   deleteOfficeLocationService,
-  listOvertimeRequestsService,
-  createOvertimeRequestService,
-  reviewOvertimeRequestService,
-  cancelOvertimeRequestService,
   getAttendanceReportsService,
   listHolidaysService,
   createHolidayService,
@@ -250,40 +246,6 @@ export async function deleteOfficeLocation(req: AuthRequest, res: Response, next
   try {
     await deleteOfficeLocationService(String(req.params.id));
     successResponse(res, null, 'Lokasi kantor berhasil dihapus');
-  } catch (err) { next(err); }
-}
-
-// ── Overtime ───────────────────────────────────────────────────
-
-export async function listOvertimes(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
-  try {
-    const { userId, roleId, roleLevel, divisionId } = req.user!;
-    const perms = await getPermissionsForRole(roleId, roleLevel);
-    const result = await listOvertimeRequestsService(userId, perms.hris.reviewOvertime, divisionId, req.query);
-    successResponse(res, result.overtimes, 'Daftar lembur berhasil diambil', 200, result.meta);
-  } catch (err) { next(err); }
-}
-
-export async function createOvertime(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
-  try {
-    const data = await createOvertimeRequestService(req.user!.userId, req.body);
-    successResponse(res, data, 'Pengajuan lembur berhasil dibuat', 201);
-  } catch (err) { next(err); }
-}
-
-export async function reviewOvertime(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
-  try {
-    const { userId, divisionId } = req.user!;
-    const reviewScope = req.permScope ?? 'all';
-    const data = await reviewOvertimeRequestService(String(req.params.id), userId, reviewScope, divisionId, req.body);
-    successResponse(res, data, 'Pengajuan lembur berhasil diproses');
-  } catch (err) { next(err); }
-}
-
-export async function cancelOvertime(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
-  try {
-    await cancelOvertimeRequestService(String(req.params.id), req.user!.userId);
-    successResponse(res, null, 'Pengajuan lembur dibatalkan');
   } catch (err) { next(err); }
 }
 

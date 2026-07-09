@@ -19,7 +19,6 @@ export const ROUTES = {
   HRIS:                  '/hris',
   HRIS_ATTENDANCE:       '/hris/attendance',
   HRIS_LEAVE:            '/hris/leave',
-  HRIS_OVERTIME:         '/hris/overtime',
   HRIS_REQUESTS:         '/hris/requests',
   HRIS_REPORTS:          '/hris/reports',
   HRIS_ADMIN_SHIFTS:     '/hris/admin/shifts',
