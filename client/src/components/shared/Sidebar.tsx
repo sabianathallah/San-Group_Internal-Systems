@@ -146,16 +146,25 @@ export default function Sidebar() {
     ...(hrisAdminItems.length > 0 ? [{ label: 'Administration', items: hrisAdminItems }] : []),
   ];
 
-  const adminNav: NavItem[] = [
-    { label: 'Manage Users',        to: ROUTES.ADMIN_USERS,       icon: Users         },
-    { label: 'Roles & Permissions', to: ROUTES.ADMIN_PERMISSIONS, icon: Shield        },
-    { label: 'Audit Log',           to: ROUTES.ADMIN_AUDIT_LOG,   icon: ClipboardList },
+  // Management (things you change) vs Monitoring (things you inspect).
+  const adminNav: NavSection[] = [
+    {
+      label: null,
+      items: [
+        { label: 'Manage Users',        to: ROUTES.ADMIN_USERS,       icon: Users  },
+        { label: 'Roles & Permissions', to: ROUTES.ADMIN_PERMISSIONS, icon: Shield },
+      ],
+    },
+    {
+      label: 'Monitoring',
+      items: [{ label: 'Audit Log', to: ROUTES.ADMIN_AUDIT_LOG, icon: ClipboardList }],
+    },
   ];
 
   const navSections: NavSection[] =
     activeModule === 'work-orders' ? workOrderNav :
     activeModule === 'hris'        ? hrisNav :
-    activeModule === 'admin'       ? [{ label: null, items: adminNav }] :
+    activeModule === 'admin'       ? adminNav :
     internalNav;
 
   const visibleModules = MODULES.filter((m) => !m.adminOnly || isAdmin);
