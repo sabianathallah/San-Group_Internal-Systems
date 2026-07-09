@@ -29,7 +29,7 @@ const USER_MINI = { id: true, fullName: true, avatar: true } as const;
 const TASK_SELECT = {
   id: true, title: true, description: true, status: true, priority: true,
   isImportant: true, myDayDate: true,
-  dueDate: true, completedAt: true, isPrivate: true, visibility: true,
+  dueDate: true, startedAt: true, completedAt: true, isPrivate: true, visibility: true,
   assignmentStatus: true, assignmentNote: true, position: true,
   createdAt: true, updatedAt: true,
   creator:  { select: USER_MINI },
@@ -383,7 +383,7 @@ export async function updateTaskService(id: string, userId: string, permScope: s
 }) {
   const task = await prisma.task.findUnique({
     where: { id },
-    select: { userId: true, assignedToId: true, title: true, visibility: true },
+    select: { userId: true, assignedToId: true, title: true, visibility: true, startedAt: true },
   });
   if (!task) throw new AppError('Task tidak ditemukan', 404);
 
@@ -451,6 +451,9 @@ export async function updateTaskService(id: string, userId: string, permScope: s
       ...(data.visibility       !== undefined && { visibility: data.visibility }),
       ...(newAssignmentStatus   !== undefined && { assignmentStatus: newAssignmentStatus }),
       ...(completedAt           !== undefined && { completedAt }),
+      // Stamp the first move into IN_PROGRESS; kept on later transitions so
+      // the work duration always measures from the original start.
+      ...(data.status === TaskStatus.IN_PROGRESS && !task.startedAt && { startedAt: new Date() }),
       ...(syncDivisions && data.divisionIds!.length > 0 && {
         divisionAccess: {
           deleteMany: {},

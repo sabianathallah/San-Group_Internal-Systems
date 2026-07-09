@@ -47,11 +47,21 @@ interface ListMembership {
   taskList: { id: string; name: string; color: string };
 }
 
+// Human duration for the task detail panel ("2d 4h", "35m").
+function fmtElapsed(ms: number): string {
+  const mins = Math.max(1, Math.round(ms / 60000));
+  const days = Math.floor(mins / 1440);
+  const hrs  = Math.floor((mins % 1440) / 60);
+  if (days > 0) return hrs > 0 ? `${days}d ${hrs}h` : `${days}d`;
+  if (hrs > 0)  return `${hrs}h`;
+  return `${mins}m`;
+}
+
 interface Task {
   id: string; title: string; description: string | null;
   status: TaskStatus; priority: TaskPriority;
   isImportant: boolean; myDayDate: string | null;
-  dueDate: string | null; completedAt: string | null;
+  dueDate: string | null; startedAt: string | null; completedAt: string | null;
   isPrivate?: boolean; visibility: TaskVisibility;
   assignmentStatus: AssignmentStatus | null; assignmentNote: string | null;
   position: number; createdAt: string; updatedAt: string;
@@ -1679,6 +1689,21 @@ function TaskDetailPanel({
                 <Avatar name={task.creator.fullName} avatar={task.creator.avatar} size={16} />
                 <span className="text-xs text-gray-500">{task.creator.fullName}</span>
               </div>
+            </div>
+
+            {/* Duration — same "how long is this taking" visibility as Work Orders */}
+            <div className="flex items-center gap-3 px-1 py-2 rounded hover:bg-gray-50">
+              <div className="flex items-center gap-2 w-24 flex-shrink-0">
+                <Clock size={13} className="text-gray-400" />
+                <span className="text-xs text-gray-400">Duration</span>
+              </div>
+              <span className="text-xs text-gray-500">
+                {task.status === 'DONE' && task.completedAt
+                  ? `Completed in ${fmtElapsed(new Date(task.completedAt).getTime() - new Date(task.startedAt ?? task.createdAt).getTime())}`
+                  : task.status === 'IN_PROGRESS' && task.startedAt
+                    ? `In progress for ${fmtElapsed(Date.now() - new Date(task.startedAt).getTime())}`
+                    : `Open for ${fmtElapsed(Date.now() - new Date(task.createdAt).getTime())}`}
+              </span>
             </div>
           </div>
 
