@@ -38,6 +38,14 @@ interface NavItem {
   disabled?: boolean;
 }
 
+// A titled group of nav items. Everyday items live in an untitled section;
+// admin/config items get their own labelled section so the two don't blend
+// into one long flat list (matters for HR admins who see both).
+interface NavSection {
+  label: string | null;
+  items: NavItem[];
+}
+
 type ModuleId = 'internal' | 'work-orders' | 'hris' | 'admin';
 
 interface Module {
@@ -97,17 +105,27 @@ export default function Sidebar() {
     ...(canWorkOrderReports ? [{ label: 'Reports', to: ROUTES.WORK_ORDERS_REPORTS, icon: BarChart3 }] : []),
   ];
 
-  const hrisNav: NavItem[] = [
-    { label: 'Overview',    to: ROUTES.HRIS,              icon: HardHat       },
-    { label: 'Attendance',  to: ROUTES.HRIS_ATTENDANCE,   icon: Clock         },
-    { label: 'Leave',       to: ROUTES.HRIS_LEAVE,        icon: CalendarRange },
-    { label: 'Requests',    to: ROUTES.HRIS_REQUESTS,     icon: ClipboardEdit },
+  // Everyday HRIS items for everyone; management tooling in its own
+  // labelled section so daily use and configuration don't blend together.
+  const hrisAdminItems: NavItem[] = [
     ...(canReports ? [{ label: 'Reports', to: ROUTES.HRIS_REPORTS, icon: BarChart3 }] : []),
     ...(isHRAdmin ? [
       { label: 'Shifts',    to: ROUTES.HRIS_ADMIN_SHIFTS,    icon: CalendarClock },
       { label: 'Locations', to: ROUTES.HRIS_ADMIN_LOCATIONS, icon: MapPin        },
       { label: 'Holidays',  to: ROUTES.HRIS_ADMIN_HOLIDAYS,  icon: CalendarOff   },
     ] : []),
+  ];
+  const hrisNav: NavSection[] = [
+    {
+      label: null,
+      items: [
+        { label: 'Overview',   to: ROUTES.HRIS,            icon: HardHat       },
+        { label: 'Attendance', to: ROUTES.HRIS_ATTENDANCE, icon: Clock         },
+        { label: 'Leave',      to: ROUTES.HRIS_LEAVE,      icon: CalendarRange },
+        { label: 'Requests',   to: ROUTES.HRIS_REQUESTS,   icon: ClipboardEdit },
+      ],
+    },
+    ...(hrisAdminItems.length > 0 ? [{ label: 'Administration', items: hrisAdminItems }] : []),
   ];
 
   const adminNav: NavItem[] = [
@@ -116,11 +134,11 @@ export default function Sidebar() {
     { label: 'Audit Log',           to: ROUTES.ADMIN_AUDIT_LOG,   icon: ClipboardList },
   ];
 
-  const navItems: NavItem[] =
-    activeModule === 'work-orders' ? workOrderNav :
+  const navSections: NavSection[] =
+    activeModule === 'work-orders' ? [{ label: null, items: workOrderNav }] :
     activeModule === 'hris'        ? hrisNav :
-    activeModule === 'admin'       ? adminNav :
-    internalNav;
+    activeModule === 'admin'       ? [{ label: null, items: adminNav }] :
+    [{ label: null, items: internalNav }];
 
   const visibleModules = MODULES.filter((m) => !m.adminOnly || isAdmin);
 
@@ -218,13 +236,28 @@ export default function Sidebar() {
           </p>
         )}
 
-        {navItems.map((item) => (
-          <SidebarLink
-            key={item.to}
-            item={item}
-            open={open}
-            badge={item.to === ROUTES.NOTIFICATIONS && unreadCount > 0 ? unreadCount : undefined}
-          />
+        {navSections.map((section, idx) => (
+          <div key={section.label ?? idx}>
+            {idx > 0 && (
+              open && section.label ? (
+                <p className="px-2 mt-4 mb-1 text-[10px] font-semibold text-white/30 uppercase tracking-wider">
+                  {section.label}
+                </p>
+              ) : (
+                <div className="my-3 mx-2 border-t border-white/10" />
+              )
+            )}
+            <div className="space-y-0.5">
+              {section.items.map((item) => (
+                <SidebarLink
+                  key={item.to}
+                  item={item}
+                  open={open}
+                  badge={item.to === ROUTES.NOTIFICATIONS && unreadCount > 0 ? unreadCount : undefined}
+                />
+              ))}
+            </div>
+          </div>
         ))}
       </nav>
 
