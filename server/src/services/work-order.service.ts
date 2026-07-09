@@ -83,6 +83,46 @@ const WO_DETAIL_SELECT = {
   },
 } as const;
 
+// A brand-new WO with no assignee is invisible until someone opens the board —
+// notify everyone who has the authority to assign it (work_order.edit 'all',
+// or 'division' within the reporter's division) so it can't sit unnoticed.
+async function notifyAssignCapableUsers(creatorId: string, woId: string, title: string) {
+  const creator = await prisma.user.findUnique({ where: { id: creatorId }, select: { divisionId: true } });
+
+  const candidates = await prisma.user.findMany({
+    where: { isActive: true, id: { not: creatorId } },
+    select: { id: true, divisionId: true, role: { select: { id: true, level: true } } },
+  });
+
+  // Resolve permissions once per distinct role — getPermissionsForRole caches.
+  const roleEdit = new Map<string, string>();
+  for (const u of candidates) {
+    if (!roleEdit.has(u.role.id)) {
+      const perms = await getPermissionsForRole(u.role.id, u.role.level);
+      roleEdit.set(u.role.id, perms.work_order.edit);
+    }
+  }
+
+  const recipients = candidates.filter((u) => {
+    const edit = roleEdit.get(u.role.id);
+    if (edit === 'all') return true;
+    if (edit === 'division') return !!creator?.divisionId && u.divisionId === creator.divisionId;
+    return false;
+  });
+
+  if (recipients.length === 0) return;
+  await prisma.notification.createMany({
+    data: recipients.map((u) => ({
+      userId:  u.id,
+      actorId: creatorId,
+      type:    NotificationType.WO_STATUS_CHANGED,
+      title:   `New work order: ${title}`,
+      message: 'A new work order was reported and needs to be assigned.',
+      link:    `/work-orders/${woId}`,
+    })),
+  });
+}
+
 async function sendWONotification(
   type: NotificationType,
   actorId: string,
@@ -256,6 +296,8 @@ export async function createWorkOrderService(userId: string, body: Record<string
       `You have been assigned to handle this work order.`,
       wo.id,
     );
+  } else {
+    await notifyAssignCapableUsers(userId, wo.id, title);
   }
 
   return wo;
@@ -325,7 +367,19 @@ export async function updateWorkOrderService(
         assignedById: assignedToId ? userId : null,
         assignedAt:   assignedToId ? new Date() : null,
       }),
-      ...(statusUpdate && { status: statusUpdate }),
+      // Assignment-driven status jumps must land in the audit log too, same as
+      // explicit status changes — the WO module's whole point is "who did what, when".
+      ...(statusUpdate && {
+        status: statusUpdate,
+        history: {
+          create: {
+            fromStatus:  existing.status,
+            toStatus:    statusUpdate,
+            note:        assignedToId ? 'Status changed by assignment' : 'Status changed by unassignment',
+            changedById: userId,
+          },
+        },
+      }),
     },
     select: WO_DETAIL_SELECT,
   });
@@ -586,9 +640,12 @@ export async function getWorkOrderReportsService(viewScope: string, divisionId: 
   const now   = new Date();
   const month = query.month ? Number(query.month) : now.getMonth() + 1;
   const year  = query.year  ? Number(query.year)  : now.getFullYear();
-  const startOfMonth = new Date(`${year}-${String(month).padStart(2, '0')}-01T00:00:00.000Z`);
-  const endOfMonth   = new Date(year, month, 0);
-  endOfMonth.setUTCHours(23, 59, 59, 999);
+  // Month boundaries in WIB (UTC+7) — the business operates in Jakarta time, so
+  // a WO created July 1st at 02:00 WIB must count as July, not June.
+  const nextY = month === 12 ? year + 1 : year;
+  const nextM = month === 12 ? 1 : month + 1;
+  const startOfMonth = new Date(`${year}-${String(month).padStart(2, '0')}-01T00:00:00.000+07:00`);
+  const endOfMonth   = new Date(new Date(`${nextY}-${String(nextM).padStart(2, '0')}-01T00:00:00.000+07:00`).getTime() - 1);
 
   let scopeWhere: Prisma.WorkOrderWhereInput = {};
   if (viewScope === 'division') scopeWhere = { OR: [{ reportedBy: { divisionId } }, { assignee: { divisionId } }] };

@@ -134,6 +134,37 @@ const STATUS_TRANSITIONS: Record<WOStatus, WOStatus[]> = {
 };
 
 // ── Helpers ────────────────────────────────────────────────
+// Close modals/drawers on Escape. Shared by every overlay in the WO module
+// (exported for WorkOrderHistoryPage's detail drawer).
+export function useEscapeClose(active: boolean, onClose: () => void) {
+  useEffect(() => {
+    if (!active) return;
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [active, onClose]);
+}
+
+// Debounce a fast-changing value (e.g. search input) so each keystroke doesn't
+// fire its own API request. Exported for WorkOrderHistoryPage.
+export function useDebounced<T>(value: T, delayMs = 400): T {
+  const [debounced, setDebounced] = useState(value);
+  useEffect(() => {
+    const t = setTimeout(() => setDebounced(value), delayMs);
+    return () => clearTimeout(t);
+  }, [value, delayMs]);
+  return debounced;
+}
+
+// datetime-local inputs work in local time; Date#toISOString is UTC. Feeding
+// the raw ISO slice into the input shifts the time by the UTC offset (7h in
+// WIB) — and silently re-saves the shifted value on every edit.
+function toDatetimeLocal(d: Date | string): string {
+  const dt = new Date(d);
+  dt.setMinutes(dt.getMinutes() - dt.getTimezoneOffset());
+  return dt.toISOString().slice(0, 16);
+}
+
 export function extractErr(err: unknown): string {
   if (err && typeof err === 'object') {
     const e = err as Record<string, unknown>;
@@ -304,8 +335,7 @@ const SLA_DAYS: Record<WOPriority, number> = { URGENT: 1, HIGH: 3, MEDIUM: 7, LO
 function slaDueDateInput(priority: WOPriority): string {
   const d = new Date();
   d.setDate(d.getDate() + SLA_DAYS[priority]);
-  d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); // datetime-local expects local time
-  return d.toISOString().slice(0, 16);
+  return toDatetimeLocal(d);
 }
 
 function WorkOrderModal({
@@ -329,13 +359,15 @@ function WorkOrderModal({
         priority:     editItem.priority,
         category:     editItem.category,
         location:     editItem.location ?? '',
-        dueDate:      editItem.dueDate ? new Date(editItem.dueDate).toISOString().slice(0, 16) : '',
+        dueDate:      editItem.dueDate ? toDatetimeLocal(editItem.dueDate) : '',
         assignedToId: editItem.assignee?.id ?? '',
         notes:        editItem.notes ?? '',
       } : { ...DEFAULT_FORM, dueDate: slaDueDateInput(DEFAULT_FORM.priority) });
       setDueTouched(!!editItem);
     }
   }, [open, editItem]);
+
+  useEscapeClose(open, onClose);
 
   if (!open) return null;
 
@@ -509,6 +541,7 @@ function StatusModal({
   const [saving, setSaving]     = useState(false);
 
   useEffect(() => { if (open) { setSelected(null); setNote(''); } }, [open]);
+  useEscapeClose(open, onClose);
   if (!open) return null;
 
   const transitions = STATUS_TRANSITIONS[wo.status];
@@ -602,6 +635,7 @@ function ReviewModal({
   const [saving, setSaving] = useState(false);
 
   useEffect(() => { if (open) { setDecision(null); setReviewNotes(''); } }, [open]);
+  useEscapeClose(open, onClose);
   if (!open) return null;
 
   const afterPhotos = (wo.attachments ?? []).filter((a) => a.type === 'AFTER');
@@ -710,6 +744,7 @@ function AssigneePickerModal({
 }) {
   const [search, setSearch] = useState('');
   useEffect(() => { if (wo) setSearch(''); }, [wo]);
+  useEscapeClose(!!wo, onClose);
 
   if (!wo) return null;
 
@@ -1370,7 +1405,9 @@ export default function WorkOrderPage() {
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo]     = useState('');
   const [search, setSearch]       = useState('');
+  const debouncedSearch = useDebounced(search);
   const [showFilters, setShowFilters] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editItem, setEditItem]   = useState<WorkOrder | null>(null);
@@ -1394,27 +1431,54 @@ export default function WorkOrderPage() {
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
 
+  // Escape closes the detail drawer — but not while a modal is stacked on top,
+  // otherwise one keypress would close both layers at once.
+  const anyModalOpen = modalOpen || statusModalOpen || reviewModalOpen || !!assignPickerWO;
+  useEscapeClose(!!selectedWO && !anyModalOpen, () => { setSelectedId(null); setSelectedWO(null); });
+
+  // scope=active — DONE/CANCELLED work orders live in WorkOrderHistoryPage instead.
+  const buildParams = useCallback((pageArg: number, limit: number): Record<string, string> => {
+    const params: Record<string, string> = { scope: 'active', limit: String(limit), page: String(pageArg) };
+    if (view === 'pendingReview') params.status = 'PENDING_REVIEW';
+    else params.view = view;
+    if (priorityFilter) params.priority = priorityFilter;
+    if (categoryFilter) params.category = categoryFilter;
+    if (assigneeFilter) params.assignedToId = assigneeFilter;
+    if (dateFrom) params.dateFrom = new Date(dateFrom).toISOString();
+    if (dateTo)   params.dateTo   = new Date(dateTo).toISOString();
+    if (debouncedSearch.trim()) params.search = debouncedSearch.trim();
+    return params;
+  }, [view, priorityFilter, categoryFilter, assigneeFilter, dateFrom, dateTo, debouncedSearch]);
+
   const fetchWOs = useCallback(async (pageArg = 1, append = false) => {
     (append ? setLoadingMore : setLoading)(true);
     try {
-      // scope=active — DONE/CANCELLED work orders live in WorkOrderHistoryPage instead.
-      const params: Record<string, string> = { scope: 'active', limit: String(pageSize), page: String(pageArg) };
-      if (view === 'pendingReview') params.status = 'PENDING_REVIEW';
-      else params.view = view;
-      if (priorityFilter) params.priority = priorityFilter;
-      if (categoryFilter) params.category = categoryFilter;
-      if (assigneeFilter) params.assignedToId = assigneeFilter;
-      if (dateFrom) params.dateFrom = new Date(dateFrom).toISOString();
-      if (dateTo)   params.dateTo   = new Date(dateTo).toISOString();
-      if (search.trim())  params.search   = search.trim();
-
-      const res = await api.get('/work-orders', { params });
+      const res = await api.get('/work-orders', { params: buildParams(pageArg, pageSize) });
       setWorkOrders((prev) => (append ? [...prev, ...res.data.data] : res.data.data));
       setTotalCount(res.data.meta?.total ?? res.data.data.length);
       setBoardPage(pageArg);
     } catch (err) { toast.error(extractErr(err)); }
     finally { (append ? setLoadingMore : setLoading)(false); }
-  }, [view, priorityFilter, categoryFilter, assigneeFilter, dateFrom, dateTo, search, pageSize]);
+  }, [buildParams, pageSize]);
+
+  // Export the FULL filtered result set, not just the rows loaded on screen —
+  // pages through the API (server caps limit at 100) with a sanity cap.
+  const handleExport = useCallback(async () => {
+    setExporting(true);
+    try {
+      const all: WorkOrder[] = [];
+      const PAGE = 100;
+      const MAX_PAGES = 50; // 5000 rows — far beyond any realistic export here
+      for (let p = 1; p <= MAX_PAGES; p++) {
+        const res = await api.get('/work-orders', { params: buildParams(p, PAGE) });
+        all.push(...res.data.data);
+        const total = res.data.meta?.total ?? all.length;
+        if (all.length >= total || res.data.data.length < PAGE) break;
+      }
+      exportWorkOrdersCSV(all);
+    } catch (err) { toast.error(extractErr(err)); }
+    finally { setExporting(false); }
+  }, [buildParams]);
 
   const fetchStats = useCallback(async () => {
     try {
@@ -1518,13 +1582,17 @@ export default function WorkOrderPage() {
     const targetStatus = over.id as WOStatus;
     if (targetStatus === wo.status) return;
 
-    if (!STATUS_TRANSITIONS[wo.status].includes(targetStatus)) {
-      toast.error('This status transition is not allowed');
+    // Dropping into ASSIGNED from OPEN/VALIDATED always goes through the
+    // assignee picker: the server treats the assignment PATCH itself as the
+    // transition (assigning an OPEN WO implies the admin vetted it), so a
+    // single drag replaces the old OPEN → VALIDATED → ASSIGNED double step.
+    if (targetStatus === 'ASSIGNED' && (wo.status === 'OPEN' || wo.status === 'VALIDATED')) {
+      setAssignPickerWO(wo);
       return;
     }
 
-    if (targetStatus === 'ASSIGNED' && !wo.assignee) {
-      setAssignPickerWO(wo);
+    if (!STATUS_TRANSITIONS[wo.status].includes(targetStatus)) {
+      toast.error('This status transition is not allowed');
       return;
     }
 
@@ -1643,12 +1711,12 @@ export default function WorkOrderPage() {
             <RefreshCw size={14} />
           </button>
           <button
-            onClick={() => exportWorkOrdersCSV(workOrders)}
-            disabled={workOrders.length === 0}
-            title="Export visible work orders to CSV"
+            onClick={handleExport}
+            disabled={workOrders.length === 0 || exporting}
+            title="Export all filtered work orders to CSV"
             className="p-1.5 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
           >
-            <Download size={14} />
+            {exporting ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
           </button>
           <PageSizeSelect value={pageSize} onChange={(n) => setPageSize(n)} options={[25, 50, 100]} />
 

@@ -8,6 +8,7 @@ import { usePermStore } from '@/stores/permStore';
 import { PageSizeSelect } from '@/components/shared/PageSizeSelect';
 import {
   extractErr, WOTable, WODetail, PRIORITY_CONFIG, CATEGORY_CONFIG,
+  useDebounced, useEscapeClose,
   type WorkOrder, type WOPriority, type WOCategory,
 } from '@/pages/WorkOrderPage';
 
@@ -32,6 +33,7 @@ export default function WorkOrderHistoryPage() {
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [search, setSearch] = useState('');
+  const debouncedSearch = useDebounced(search);
   const [showFilters, setShowFilters] = useState(false);
 
   const [page, setPage] = useState(1);
@@ -47,7 +49,7 @@ export default function WorkOrderHistoryPage() {
       if (categoryFilter) params.category = categoryFilter;
       if (dateFrom) params.dateFrom = new Date(dateFrom).toISOString();
       if (dateTo)   params.dateTo   = new Date(dateTo).toISOString();
-      if (search.trim()) params.search = search.trim();
+      if (debouncedSearch.trim()) params.search = debouncedSearch.trim();
 
       const res = await api.get('/work-orders', { params });
       setWorkOrders((prev) => (append ? [...prev, ...res.data.data] : res.data.data));
@@ -55,9 +57,11 @@ export default function WorkOrderHistoryPage() {
       setPage(pageArg);
     } catch (err) { toast.error(extractErr(err)); }
     finally { (append ? setLoadingMore : setLoading)(false); }
-  }, [outcomeFilter, priorityFilter, categoryFilter, dateFrom, dateTo, search, pageSize]);
+  }, [outcomeFilter, priorityFilter, categoryFilter, dateFrom, dateTo, debouncedSearch, pageSize]);
 
   useEffect(() => { fetchWOs(); }, [fetchWOs]);
+
+  useEscapeClose(!!selectedWO, () => { setSelectedId(null); setSelectedWO(null); });
 
   const fetchDetail = useCallback(async (id: string) => {
     setLoadingDetail(true);
