@@ -88,14 +88,22 @@ export default function Sidebar() {
   const isHRAdmin    = perms.hris?.manageShifts || perms.hris?.manageLocations;
   const activeModule = useActiveModule();
 
-  const internalNav: NavItem[] = [
-    { label: 'Dashboard',     to: ROUTES.DASHBOARD,     icon: LayoutDashboard },
-    { label: 'Tasks',         to: ROUTES.TASKS,         icon: CheckSquare2    },
-    { label: 'Bulletin',      to: ROUTES.BULLETIN,      icon: Bell            },
-    { label: 'Notifications', to: ROUTES.NOTIFICATIONS, icon: Inbox           },
-    { label: 'Notes',         to: ROUTES.NOTES,         icon: StickyNote      },
-    { label: 'DB Links',      to: ROUTES.DATABASE,      icon: Database        },
-    ...(canAnalytics ? [{ label: 'Analytics', to: ROUTES.ANALYTICS, icon: BarChart3 }] : []),
+  const internalNav: NavSection[] = [
+    {
+      label: null,
+      items: [
+        { label: 'Dashboard',     to: ROUTES.DASHBOARD,     icon: LayoutDashboard },
+        { label: 'Tasks',         to: ROUTES.TASKS,         icon: CheckSquare2    },
+        { label: 'Bulletin',      to: ROUTES.BULLETIN,      icon: Bell            },
+        { label: 'Notifications', to: ROUTES.NOTIFICATIONS, icon: Inbox           },
+        { label: 'Notes',         to: ROUTES.NOTES,         icon: StickyNote      },
+        { label: 'DB Links',      to: ROUTES.DATABASE,      icon: Database        },
+      ],
+    },
+    ...(canAnalytics ? [{
+      label: 'Administration',
+      items: [{ label: 'Analytics', to: ROUTES.ANALYTICS, icon: BarChart3 }],
+    }] : []),
   ];
 
   // Same everyday/Administration split as HRIS: one visual rule app-wide —
@@ -148,7 +156,7 @@ export default function Sidebar() {
     activeModule === 'work-orders' ? workOrderNav :
     activeModule === 'hris'        ? hrisNav :
     activeModule === 'admin'       ? [{ label: null, items: adminNav }] :
-    [{ label: null, items: internalNav }];
+    internalNav;
 
   const visibleModules = MODULES.filter((m) => !m.adminOnly || isAdmin);
 
