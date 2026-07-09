@@ -170,16 +170,58 @@ export function isOverdue(wo: WorkOrder) {
     && new Date(wo.dueDate) < new Date();
 }
 
+// ── Age (how long a WO has been open) ──────────────────────
+// Age runs from creation until the WO is closed (closedAt/completedAt) — or
+// until now while it's still in flight. This answers the owner's core
+// question: "how long has this problem been open?"
+export function woAgeMinutes(wo: Pick<WorkOrder, 'createdAt' | 'closedAt' | 'completedAt'>): number {
+  const end = wo.closedAt ?? wo.completedAt;
+  const endMs = end ? new Date(end).getTime() : Date.now();
+  return Math.max(0, Math.round((endMs - new Date(wo.createdAt).getTime()) / 60000));
+}
+
+export function formatAge(mins: number): string {
+  const days = Math.floor(mins / (60 * 24));
+  const hrs  = Math.floor((mins % (60 * 24)) / 60);
+  if (days > 0)  return hrs > 0 ? `${days}d ${hrs}h` : `${days}d`;
+  if (hrs > 0)   return `${hrs}h`;
+  return `${Math.max(1, mins)}m`;
+}
+
+// Green under 2 days, amber 2–7 days, red past 7 days. Closed WOs show a
+// neutral tone — their duration is a fact, not an alarm.
+function ageTone(wo: WorkOrder, mins: number): string {
+  if (wo.status === 'DONE' || wo.status === 'CANCELLED') return 'bg-gray-100 text-gray-500';
+  const days = mins / (60 * 24);
+  if (days < 2) return 'bg-green-50 text-green-600';
+  if (days < 7) return 'bg-amber-50 text-amber-700';
+  return 'bg-red-50 text-red-600';
+}
+
+export function AgeBadge({ wo }: { wo: WorkOrder }) {
+  const mins = woAgeMinutes(wo);
+  return (
+    <span
+      className={cn('inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-full whitespace-nowrap', ageTone(wo, mins))}
+      title={wo.status === 'DONE' || wo.status === 'CANCELLED' ? 'Total duration from open to closed' : 'Open for'}
+    >
+      <Clock size={10} />
+      {formatAge(mins)}
+    </span>
+  );
+}
+
 function csvCell(v: string) {
   return `"${v.replace(/"/g, '""')}"`;
 }
 
 function exportWorkOrdersCSV(workOrders: WorkOrder[]) {
-  const header = ['Code', 'Title', 'Status', 'Priority', 'Category', 'Location', 'Reported By', 'Assignee', 'Due Date', 'Created At'];
+  const header = ['Code', 'Title', 'Status', 'Priority', 'Category', 'Location', 'Reported By', 'Assignee', 'Due Date', 'Created At', 'Closed At', 'Age / Duration'];
   const rows = workOrders.map((wo) => [
     wo.code, wo.title, STATUS_CONFIG[wo.status].label, PRIORITY_CONFIG[wo.priority].label,
     CATEGORY_CONFIG[wo.category].label, wo.location ?? '', wo.reportedBy.fullName,
     wo.assignee?.fullName ?? '', formatDate(wo.dueDate) ?? '', formatDate(wo.createdAt) ?? '',
+    formatDate(wo.closedAt) ?? '', formatAge(woAgeMinutes(wo)),
   ]);
   const csv = [header, ...rows].map((r) => r.map((v) => csvCell(String(v))).join(',')).join('\n');
   const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
@@ -254,6 +296,18 @@ const DEFAULT_FORM: FormData = {
   location: '', dueDate: '', assignedToId: '', notes: '',
 };
 
+// Default SLA per priority (days) — mirrors SLA_DAYS in work-order.service.ts.
+// The server applies the same default when dueDate is omitted; prefilling here
+// just makes the deadline visible (and adjustable) before submitting.
+const SLA_DAYS: Record<WOPriority, number> = { URGENT: 1, HIGH: 3, MEDIUM: 7, LOW: 14 };
+
+function slaDueDateInput(priority: WOPriority): string {
+  const d = new Date();
+  d.setDate(d.getDate() + SLA_DAYS[priority]);
+  d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); // datetime-local expects local time
+  return d.toISOString().slice(0, 16);
+}
+
 function WorkOrderModal({
   open, onClose, editItem, onSaved, users,
 }: {
@@ -264,6 +318,8 @@ function WorkOrderModal({
 }) {
   const [form, setForm] = useState<FormData>(DEFAULT_FORM);
   const [saving, setSaving] = useState(false);
+  // Once the user touches the due date, stop auto-adjusting it on priority change.
+  const [dueTouched, setDueTouched] = useState(false);
 
   useEffect(() => {
     if (open) {
@@ -276,7 +332,8 @@ function WorkOrderModal({
         dueDate:      editItem.dueDate ? new Date(editItem.dueDate).toISOString().slice(0, 16) : '',
         assignedToId: editItem.assignee?.id ?? '',
         notes:        editItem.notes ?? '',
-      } : DEFAULT_FORM);
+      } : { ...DEFAULT_FORM, dueDate: slaDueDateInput(DEFAULT_FORM.priority) });
+      setDueTouched(!!editItem);
     }
   }, [open, editItem]);
 
@@ -284,6 +341,14 @@ function WorkOrderModal({
 
   function set<K extends keyof FormData>(k: K, v: FormData[K]) {
     setForm((f) => ({ ...f, [k]: v }));
+  }
+
+  function handlePriorityChange(priority: WOPriority) {
+    setForm((f) => ({
+      ...f,
+      priority,
+      ...(dueTouched ? {} : { dueDate: slaDueDateInput(priority) }),
+    }));
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -347,7 +412,7 @@ function WorkOrderModal({
             <div>
               <label className="block text-xs font-medium text-gray-700 mb-1">Priority</label>
               <select
-                value={form.priority} onChange={(e) => set('priority', e.target.value as WOPriority)}
+                value={form.priority} onChange={(e) => handlePriorityChange(e.target.value as WOPriority)}
                 className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-navy/30"
               >
                 {(Object.keys(PRIORITY_CONFIG) as WOPriority[]).map((k) => (
@@ -381,9 +446,12 @@ function WorkOrderModal({
               <label className="block text-xs font-medium text-gray-700 mb-1">Due Date (SLA)</label>
               <input
                 type="datetime-local" value={form.dueDate}
-                onChange={(e) => set('dueDate', e.target.value)}
+                onChange={(e) => { setDueTouched(true); set('dueDate', e.target.value); }}
                 className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-navy/30"
               />
+              {!editItem && !dueTouched && (
+                <p className="text-[10px] text-gray-400 mt-1">Auto-set by priority — adjust if needed</p>
+              )}
             </div>
           </div>
 
@@ -729,6 +797,7 @@ function WOCard({
         )}
       </div>
       <div className="flex items-center gap-2">
+        <AgeBadge wo={wo} />
         {wo.dueDate && (
           <span className={cn('flex items-center gap-0.5 text-[10px]', overdue ? 'text-red-500 font-medium' : 'text-gray-400')}>
             <Calendar size={10} /> {formatDate(wo.dueDate)}
@@ -779,9 +848,11 @@ function WOColumn({
 
 // ── Table / List view ───────────────────────────────────────
 export function WOTable({
-  workOrders, selectedId, onSelect,
+  workOrders, selectedId, onSelect, showClosed = false,
 }: {
   workOrders: WorkOrder[]; selectedId: string | null; onSelect: (id: string) => void;
+  // History page: swap the Due column for Closed date, and label age as Duration.
+  showClosed?: boolean;
 }) {
   return (
     <div className="flex-1 overflow-auto">
@@ -794,7 +865,8 @@ export function WOTable({
             <th className="px-4 py-2.5">Priority</th>
             <th className="px-4 py-2.5">Status</th>
             <th className="px-4 py-2.5">Technician</th>
-            <th className="px-4 py-2.5">Due</th>
+            <th className="px-4 py-2.5">{showClosed ? 'Closed' : 'Due'}</th>
+            <th className="px-4 py-2.5">{showClosed ? 'Duration' : 'Age'}</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-100">
@@ -819,14 +891,21 @@ export function WOTable({
                     </div>
                   ) : <span className="text-xs text-gray-400">—</span>}
                 </td>
-                <td className={cn('px-4 py-2.5 text-xs whitespace-nowrap', overdue ? 'text-red-500 font-medium' : 'text-gray-500')}>
-                  {wo.dueDate ? formatDate(wo.dueDate) : '—'}
-                </td>
+                {showClosed ? (
+                  <td className="px-4 py-2.5 text-xs whitespace-nowrap text-gray-500">
+                    {wo.closedAt ? formatDate(wo.closedAt) : '—'}
+                  </td>
+                ) : (
+                  <td className={cn('px-4 py-2.5 text-xs whitespace-nowrap', overdue ? 'text-red-500 font-medium' : 'text-gray-500')}>
+                    {wo.dueDate ? formatDate(wo.dueDate) : '—'}
+                  </td>
+                )}
+                <td className="px-4 py-2.5 whitespace-nowrap"><AgeBadge wo={wo} /></td>
               </tr>
             );
           })}
           {workOrders.length === 0 && (
-            <tr><td colSpan={7} className="text-center text-gray-400 text-sm py-12">No work orders</td></tr>
+            <tr><td colSpan={8} className="text-center text-gray-400 text-sm py-12">No work orders</td></tr>
           )}
         </tbody>
       </table>
@@ -918,6 +997,68 @@ function PhotoSection({
           ref={afterInputRef} type="file" accept="image/*" capture="environment" className="hidden"
           onChange={(e) => handleFile('AFTER', e.target.files?.[0])}
         />
+      </div>
+    </div>
+  );
+}
+
+// ── Duration timeline (Created → Assigned → Started → Closed) ──
+// Answers "when did each step happen and how long did it take" at a glance,
+// without expanding the raw history log. Built purely from timestamps that
+// already exist on the WO + its history entries.
+function formatDateTime(d: string) {
+  return new Date(d).toLocaleString('en-US', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false });
+}
+
+function DurationTimeline({ wo }: { wo: WorkOrder }) {
+  const chrono = [...(wo.history ?? [])].reverse(); // history arrives newest-first
+  const started = chrono.find((h) => h.toStatus === 'IN_PROGRESS');
+  const review  = chrono.find((h) => h.toStatus === 'PENDING_REVIEW');
+
+  const steps: { label: string; at: string }[] = [{ label: 'Created', at: wo.createdAt }];
+  if (wo.assignedAt) steps.push({ label: 'Assigned', at: wo.assignedAt });
+  if (started)       steps.push({ label: 'Work started', at: started.createdAt });
+  if (review)        steps.push({ label: 'Submitted for review', at: review.createdAt });
+  if (wo.status === 'CANCELLED')  steps.push({ label: 'Cancelled', at: wo.closedAt ?? wo.updatedAt });
+  else if (wo.closedAt)           steps.push({ label: 'Closed', at: wo.closedAt });
+
+  steps.sort((a, b) => new Date(a.at).getTime() - new Date(b.at).getTime());
+
+  const isFinal = wo.status === 'DONE' || wo.status === 'CANCELLED';
+  const totalMins = woAgeMinutes(wo);
+
+  return (
+    <div>
+      <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wide mb-2">Timeline</p>
+      <div className="space-y-0">
+        {steps.map((s, i) => {
+          const gapMins = i === 0 ? 0 : Math.round((new Date(s.at).getTime() - new Date(steps[i - 1].at).getTime()) / 60000);
+          const last = i === steps.length - 1;
+          return (
+            <div key={`${s.label}-${s.at}`} className="flex gap-2.5">
+              <div className="flex flex-col items-center">
+                <span className={cn('w-2 h-2 rounded-full flex-shrink-0 mt-1', last && isFinal ? 'bg-green-500' : 'bg-navy/40')} />
+                {!last && <span className="w-px flex-1 bg-gray-200 my-0.5" />}
+              </div>
+              <div className={cn('flex-1 min-w-0', !last && 'pb-2.5')}>
+                <div className="flex items-baseline justify-between gap-2">
+                  <span className="text-xs font-medium text-gray-700">{s.label}</span>
+                  {i > 0 && <span className="text-[10px] text-gray-400 whitespace-nowrap">+{formatAge(gapMins)}</span>}
+                </div>
+                <p className="text-[11px] text-gray-400">{formatDateTime(s.at)}</p>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      <div className={cn(
+        'mt-2 px-2.5 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5',
+        isFinal ? 'bg-gray-50 text-gray-600' : totalMins < 2 * 60 * 24 ? 'bg-green-50 text-green-700' : totalMins < 7 * 60 * 24 ? 'bg-amber-50 text-amber-700' : 'bg-red-50 text-red-600',
+      )}>
+        <Clock size={12} />
+        {isFinal
+          ? `Total time open → closed: ${formatAge(totalMins)}`
+          : `Open for ${formatAge(totalMins)}`}
       </div>
     </div>
   );
@@ -1032,6 +1173,9 @@ export function WODetail({
             </div>
           )}
         </div>
+
+        {/* Duration timeline */}
+        <DurationTimeline wo={wo} />
 
         {/* Description */}
         {wo.description && (

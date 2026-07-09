@@ -120,6 +120,22 @@ async function generateWorkOrderCode(): Promise<string> {
 
 const CLOSED_STATUSES = [WorkOrderStatus.DONE, WorkOrderStatus.CANCELLED] as const;
 
+// Default SLA per priority, in days — applied as the due date whenever a work
+// order is created without an explicit one, so the overdue indicator always
+// has something to bite on (a WO can never silently hang without a deadline).
+const SLA_DAYS: Record<WorkOrderPriority, number> = {
+  [WorkOrderPriority.URGENT]: 1,
+  [WorkOrderPriority.HIGH]:   3,
+  [WorkOrderPriority.MEDIUM]: 7,
+  [WorkOrderPriority.LOW]:    14,
+};
+
+export function defaultDueDate(priority: WorkOrderPriority, from = new Date()): Date {
+  const d = new Date(from);
+  d.setDate(d.getDate() + SLA_DAYS[priority]);
+  return d;
+}
+
 export async function listWorkOrdersService(userId: string, viewScope: string, divisionId: string, query: ParsedQs) {
   const { page, limit, skip } = parsePagination(query, { createdAt: 'desc' });
 
@@ -204,16 +220,17 @@ export async function createWorkOrderService(userId: string, body: Record<string
   // Creating with an assignee already implies the creator (an admin) has
   // vetted it — skip straight past OPEN/VALIDATED to ASSIGNED.
   const initialStatus = assignedToId ? WorkOrderStatus.ASSIGNED : WorkOrderStatus.OPEN;
+  const effectivePriority = priority ?? WorkOrderPriority.MEDIUM;
 
   const wo = await prisma.workOrder.create({
     data: {
       code,
       title,
       description: description ?? null,
-      priority:    priority   ?? WorkOrderPriority.MEDIUM,
+      priority:    effectivePriority,
       category:    category   ?? WorkOrderCategory.OTHER,
       location:    location   ?? null,
-      dueDate:     dueDate    ? new Date(dueDate) : null,
+      dueDate:     dueDate    ? new Date(dueDate) : defaultDueDate(effectivePriority),
       status:      initialStatus,
       reportedById: userId,
       assignedToId: assignedToId ?? null,
@@ -381,6 +398,9 @@ export async function changeWorkOrderStatusService(
     where: { id },
     data: {
       status,
+      // CANCELLED is terminal too — stamp closedAt so the WO's age/duration
+      // stops counting, same as an approved review does for DONE.
+      ...(status === WorkOrderStatus.CANCELLED && { closedAt: new Date() }),
       history: {
         create: {
           fromStatus:  existing.status,
@@ -616,11 +636,46 @@ export async function getWorkOrderReportsService(viewScope: string, divisionId: 
     byTechnician.set(w.assignee.id, entry);
   }
 
+  // Aging is a snapshot of what is open right now, deliberately NOT limited to
+  // the selected month — an owner checking July's report still wants to see a
+  // leak reported in May that nobody closed.
+  const activeWOs = await prisma.workOrder.findMany({
+    where: { ...scopeWhere, status: { notIn: [...CLOSED_STATUSES] } },
+    select: {
+      id: true, code: true, title: true, status: true, priority: true, createdAt: true,
+      assignee: { select: { id: true, fullName: true } },
+    },
+    orderBy: { createdAt: 'asc' },
+  });
+
+  const DAY_MINUTES = 60 * 24;
+  const openAging = { under1d: 0, d1to3: 0, d3to7: 0, over7d: 0, total: activeWOs.length };
+  for (const w of activeWOs) {
+    const openMinutes = (now.getTime() - w.createdAt.getTime()) / 60000;
+    if      (openMinutes < DAY_MINUTES)     openAging.under1d += 1;
+    else if (openMinutes < 3 * DAY_MINUTES) openAging.d1to3   += 1;
+    else if (openMinutes < 7 * DAY_MINUTES) openAging.d3to7   += 1;
+    else                                    openAging.over7d  += 1;
+  }
+
+  const oldestOpen = activeWOs.slice(0, 10).map((w) => ({
+    id: w.id,
+    code: w.code,
+    title: w.title,
+    status: w.status,
+    priority: w.priority,
+    createdAt: w.createdAt,
+    assigneeName: w.assignee?.fullName ?? null,
+    openMinutes: Math.round((now.getTime() - w.createdAt.getTime()) / 60000),
+  }));
+
   return {
     total,
     completed: completed.length,
     completionRate,
     avgResolutionByCategory,
     byTechnician: Array.from(byTechnician.values()),
+    openAging,
+    oldestOpen,
   };
 }

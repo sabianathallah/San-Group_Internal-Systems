@@ -176,7 +176,7 @@ export default function WorkOrderHistoryPage() {
             <Loader2 size={20} className="animate-spin text-gray-300" />
           </div>
         ) : (
-          <WOTable workOrders={workOrders} selectedId={selectedId} onSelect={handleSelect} />
+          <WOTable workOrders={workOrders} selectedId={selectedId} onSelect={handleSelect} showClosed />
         )}
       </div>
 
