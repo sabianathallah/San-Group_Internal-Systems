@@ -11,6 +11,31 @@ const prisma = new PrismaClient();
 const hash = (pw: string) => bcrypt.hash(pw, 12);
 const days = (n: number) => new Date(Date.now() + n * 86_400_000);
 
+// Deterministic PRNG so every seed run produces the same demo dataset.
+let rngState = 20260714;
+function rng(): number {
+  rngState |= 0; rngState = (rngState + 0x6D2B79F5) | 0;
+  let t = Math.imul(rngState ^ (rngState >>> 15), 1 | rngState);
+  t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+  return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+}
+const pick = <T,>(arr: T[]): T => arr[Math.floor(rng() * arr.length)];
+const randInt = (min: number, max: number) => min + Math.floor(rng() * (max - min + 1));
+
+/** Jakarta calendar date (YYYY-MM-DD) of a JS Date. */
+const jktDateStr = (d: Date) => new Date(d.getTime() + 7 * 3_600_000).toISOString().slice(0, 10);
+/** UTC-midnight Date for a YYYY-MM-DD string — the @db.Date representation. */
+const dateOnly = (s: string) => new Date(s + 'T00:00:00.000Z');
+/** Date at HH:MM WIB on the given calendar day (setUTCHours handles day rollover). */
+const atWIB = (day: string, h: number, m: number) => {
+  const t = new Date(day + 'T00:00:00.000Z');
+  t.setUTCHours(h - 7, m, 0, 0);
+  return t;
+};
+
+const FIRST_NAMES = ['Agus', 'Bella', 'Citra', 'Dewi', 'Eko', 'Fajar', 'Gita', 'Hendra', 'Indah', 'Joko', 'Kartika', 'Lukman', 'Maya', 'Niko', 'Oktavia', 'Putra', 'Qori', 'Rina', 'Surya', 'Tania', 'Umar', 'Vina', 'Wawan', 'Yanti', 'Zaki', 'Ayu', 'Bagus', 'Cahya', 'Dian', 'Erik', 'Fitri', 'Galih', 'Hesti', 'Irfan', 'Juni', 'Kevin', 'Lina', 'Mira', 'Nanda', 'Oscar', 'Prita', 'Rendi', 'Sinta', 'Tono', 'Ulfa', 'Vito', 'Winda', 'Yusuf', 'Zahra', 'Arif'];
+const LAST_NAMES  = ['Saputra', 'Wulandari', 'Hidayat', 'Lestari', 'Nugroho', 'Rahayu', 'Kurniawan', 'Anggraini', 'Firmansyah', 'Puspita', 'Ramadhan', 'Safitri', 'Gunawan', 'Handayani', 'Prasetyo', 'Melati', 'Setiawan', 'Utami', 'Wibowo', 'Maharani', 'Santoso', 'Pertiwi', 'Hakim', 'Novita', 'Pratama'];
+
 /** Tanggal Jakarta sebagai UTC-midnight Date — format yang dipakai kolom myDayDate (@db.Date). */
 const jakartaDate = (offsetDays = 0) => {
   const d = new Date(Date.now() + 7 * 3_600_000 + offsetDays * 86_400_000);
@@ -122,6 +147,44 @@ async function main() {
     },
   });
   console.log('✅ Users created');
+
+  // ── Role coverage: every role gets at least 2 active users ──
+  // Roles are dynamic (admin UI), so read them from the DB instead of
+  // hardcoding slugs. Names/emails are deterministic dummy data.
+  const allRoles = await prisma.role.findMany({ include: { division: true } });
+  const divisions = await prisma.division.findMany();
+  const usedNames = new Set<string>();
+  const extraUsers: typeof admin[] = [];
+
+  for (const role of allRoles) {
+    const have = await prisma.user.count({ where: { roleId: role.id, isActive: true } });
+    for (let i = have; i < 2; i++) {
+      let first = pick(FIRST_NAMES); let last = pick(LAST_NAMES);
+      while (usedNames.has(first + last)) { first = pick(FIRST_NAMES); last = pick(LAST_NAMES); }
+      usedNames.add(first + last);
+      const email = `${first.toLowerCase()}.${last.toLowerCase()}@sangroup.id`;
+      // joinDate spread: mostly 1–3 years tenure, ~20% under a year so the
+      // unpaid-leave tenure rule shows up naturally in the demo.
+      const monthsAgo = rng() < 0.2 ? randInt(2, 10) : randInt(13, 40);
+      const join = new Date(); join.setUTCMonth(join.getUTCMonth() - monthsAgo); join.setUTCDate(randInt(1, 28));
+      const user = await prisma.user.upsert({
+        where: { email },
+        update: {},
+        create: {
+          email, username: `${first.toLowerCase()}.${last.toLowerCase()}`,
+          password: await hash('password123'),
+          fullName: `${first} ${last}`,
+          phone: `08${randInt(11, 99)}${randInt(1000000, 9999999)}`,
+          roleId: role.id,
+          divisionId: role.divisionId ?? pick(divisions).id,
+          isActive: true,
+          joinDate: dateOnly(join.toISOString().slice(0, 10)),
+        },
+      });
+      extraUsers.push(user);
+    }
+  }
+  console.log(`✅ Role coverage: ${extraUsers.length} extra users created (>=2 per role)`);
 
   // ── Clear previous seed data ───────────────────────────────
   await prisma.notification.deleteMany({});
@@ -298,6 +361,50 @@ async function main() {
   await prisma.task.create({ data: { title: 'Finalisasi pilihan warna dengan manajemen', status: TaskStatus.DONE, priority: TaskPriority.MEDIUM, completedAt: days(-1), userId: engineer.id, parentTaskId: taskCat.id, position: 0 }});
   await prisma.task.create({ data: { title: 'Pembelian material cat dan alat', status: TaskStatus.IN_PROGRESS, priority: TaskPriority.HIGH, dueDate: days(1), userId: engineer.id, parentTaskId: taskCat.id, position: 1 }});
   await prisma.task.create({ data: { title: 'Pelaksanaan pengecatan', status: TaskStatus.TODO, priority: TaskPriority.MEDIUM, dueDate: days(5), userId: engineer.id, parentTaskId: taskCat.id, position: 2 }});
+  // Historical tasks: months of completed work so statistics, calendar, and
+  // the work-duration report have data. (Dates rely on helpers defined above;
+  // history window matches the HRIS attendance window further below.)
+  const TASK_TITLES = [
+    'Rekonsiliasi rekening operasional bulan lalu', 'Update database kontak vendor',
+    'Inspeksi rutin APAR seluruh lantai', 'Perpanjangan polis asuransi gedung',
+    'Review draft kontrak vendor cleaning', 'Input data meteran listrik & air bulanan',
+    'Follow up piutang tenant lantai 8', 'Persiapan dokumen audit internal',
+    'Pembaruan data karyawan di sistem BPJS', 'Evaluasi vendor keamanan triwulan',
+    'Penyusunan jadwal maintenance preventif', 'Rekap pengeluaran petty cash mingguan',
+    'Koordinasi perbaikan area parkir motor', 'Sosialisasi jalur evakuasi ke tenant baru',
+    'Pengecekan stok ATK dan pengadaan ulang', 'Update SOP penerimaan tamu lobby',
+    'Verifikasi tagihan vendor lift bulan lalu', 'Persiapan meeting bulanan dengan owner',
+    'Penataan arsip kontrak tenant 2025', 'Kalibrasi timbangan loading dock',
+    'Pelaporan pajak PPh 21 bulanan', 'Screening kandidat staff engineering',
+    'Perbaikan minor furniture ruang meeting', 'Pembuatan laporan okupansi bulanan',
+  ];
+  {
+    const now7t = new Date(Date.now() + 7 * 3_600_000);
+    const tStart = new Date(Date.UTC(now7t.getUTCFullYear(), now7t.getUTCMonth() - 3, 1));
+    const totalDays = Math.floor((Date.now() - tStart.getTime()) / 86_400_000);
+    const everyone = [admin, director, pm, hr, finance, engineer, ...extraUsers];
+    for (const [i, title] of TASK_TITLES.entries()) {
+      const owner = everyone[Math.floor(rng() * everyone.length)];
+      const createdOffset = randInt(3, totalDays - 1);
+      const created = new Date(Date.now() - createdOffset * 86_400_000);
+      const done = rng() < 0.8;
+      const started = new Date(created.getTime() + randInt(2, 24) * 3_600_000);
+      const completed = new Date(started.getTime() + randInt(4, 72) * 3_600_000);
+      await prisma.task.create({ data: {
+        title,
+        status: done ? TaskStatus.DONE : rng() < 0.5 ? TaskStatus.IN_PROGRESS : TaskStatus.TODO,
+        priority: [TaskPriority.LOW, TaskPriority.MEDIUM, TaskPriority.MEDIUM, TaskPriority.HIGH][randInt(0, 3)],
+        visibility: rng() < 0.3 ? TaskVisibility.DIVISION : TaskVisibility.PRIVATE,
+        userId: owner.id,
+        position: 10 + i,
+        createdAt: created,
+        startedAt: done || rng() < 0.5 ? started : null,
+        completedAt: done ? completed : null,
+        dueDate: done ? completed : days(randInt(1, 10)),
+      }});
+    }
+    console.log(`✅ Historical tasks created (${TASK_TITLES.length})`);
+  }
   console.log('✅ Tasks, subtasks, links & comments created');
 
   // ── Sticky Notes ───────────────────────────────────────────
@@ -343,6 +450,23 @@ async function main() {
     isPublished: true, publishedAt: days(-1), expiresAt: null,
     authorId: hr.id,
   }});
+  // Historical bulletins across previous months.
+  const OLD_BULLETINS: [string, string, BulletinCategory, BulletinPriority, number][] = [
+    ['Hasil Fogging Area Gedung — Terima Kasih atas Kerjasamanya', 'Fogging seluruh area gedung telah selesai dilaksanakan Sabtu kemarin. Terima kasih atas kerjasama seluruh tenant dan karyawan.', BulletinCategory.MAINTENANCE, BulletinPriority.NORMAL, -20],
+    ['Pemadaman Listrik PLN Terjadwal — Genset Standby', 'PLN akan melakukan pemeliharaan jaringan. Genset gedung akan otomatis mengambil alih. Simpan pekerjaan Anda secara berkala.', BulletinCategory.MAINTENANCE, BulletinPriority.URGENT, -35],
+    ['Pembagian THR dan Jadwal Cuti Bersama', 'THR akan dibayarkan H-10. Cuti bersama mengikuti keputusan pemerintah — cek kalender HRIS untuk detail tanggal.', BulletinCategory.ANNOUNCEMENT, BulletinPriority.IMPORTANT, -50],
+    ['Uji Coba Alarm Kebakaran Tahunan', 'Uji coba sistem alarm kebakaran akan dilakukan Jumat pukul 10.00. Tidak perlu evakuasi — ini hanya pengujian.', BulletinCategory.MAINTENANCE, BulletinPriority.IMPORTANT, -60],
+    ['Program Medical Check-Up Karyawan 2026', 'MCU tahunan bekerjasama dengan RS Premier. Jadwal per divisi menyusul dari HR. Fasilitas ditanggung perusahaan.', BulletinCategory.ANNOUNCEMENT, BulletinPriority.NORMAL, -75],
+    ['Renovasi Lobby Tower A Dimulai', 'Renovasi lobby dimulai bulan ini, akses masuk sementara dialihkan ke pintu samping. Mohon maaf atas ketidaknyamanannya.', BulletinCategory.ANNOUNCEMENT, BulletinPriority.IMPORTANT, -85],
+  ];
+  for (const [title, content, category, priority, offset] of OLD_BULLETINS) {
+    await prisma.bulletin.create({ data: {
+      title, content, category, priority,
+      isPublished: true, publishedAt: days(offset), expiresAt: days(offset + 14),
+      authorId: pick([admin, hr, pm]).id,
+      createdAt: days(offset),
+    }});
+  }
   console.log('✅ Bulletins created');
 
   // ── Read status ────────────────────────────────────────────
@@ -389,6 +513,9 @@ async function main() {
   console.log('✅ Database folders & links created');
 
   // ── HRIS ───────────────────────────────────────────────────
+  await prisma.compOffGrant.deleteMany({});
+  await prisma.shiftChangeRequest.deleteMany({});
+  await prisma.lateExcuseRequest.deleteMany({});
   await prisma.attendance.deleteMany({});
   await prisma.leaveRequest.deleteMany({});
   await prisma.leaveBalance.deleteMany({});
@@ -407,9 +534,20 @@ async function main() {
   const locHead = await prisma.officeLocation.create({ data: { name: 'Head Office - Jakarta', address: 'Jakarta Selatan', lat: -6.2297, lng: 106.8295, radiusMeters: 150 } });
   await prisma.officeLocation.create({ data: { name: 'Site - Properti A', address: 'Tangerang Selatan', lat: -6.3297, lng: 106.7295, radiusMeters: 200 } });
 
-  // Assign default shift to all users
-  for (const u of [admin, director, pm, hr, finance, engineer]) {
-    await prisma.user.update({ where: { id: u.id }, data: { shiftId: shiftOffice.id } });
+  // Everyone in the demo — the 6 named logins plus the role-coverage users.
+  // Read from the DB so re-runs (where upsert skips creation) still cover all.
+  const staff = await prisma.user.findMany({ where: { isActive: true } });
+
+  // Assign shifts: mostly office, a few on Security / Shift Siang for variety.
+  const shiftSecurity = await prisma.shift.findFirst({ where: { name: 'Security' } });
+  const shiftSiang    = await prisma.shift.findFirst({ where: { name: 'Shift Siang' } });
+  const shiftOf = new Map<string, { id: string; startH: number }>();
+  for (let i = 0; i < staff.length; i++) {
+    const shift = i >= staff.length - 2 && shiftSecurity ? shiftSecurity
+                : i >= staff.length - 4 && shiftSiang    ? shiftSiang
+                : shiftOffice;
+    shiftOf.set(staff[i].id, { id: shift.id, startH: Number(shift.startTime.split(':')[0]) });
+    await prisma.user.update({ where: { id: staff[i].id }, data: { shiftId: shift.id } });
   }
   console.log('✅ Shifts & office locations created');
 
@@ -442,110 +580,288 @@ async function main() {
   // Ganti off — saldo dari grant HRD (kerja weekend/tanggal merah), bukan kuota tahunan
   await prisma.leaveType.create({ data: { name: 'Comp Off',         slug: 'COMP_OFF',    color: '#10b981', maxDaysPerYear: 0,  isPaid: true, requiresDoc: false, earnedBalance: true, position: 5 } });
 
-  // Leave balances (year 2026) for all 6 users
-  const allUsers = [admin, director, pm, hr, finance, engineer];
-  for (const u of allUsers) {
-    await prisma.leaveBalance.create({ data: { userId: u.id, leaveTypeId: ltAnnual.id, year: 2026, totalDays: 12, usedDays: 3, pendingDays: 0 } });
-    await prisma.leaveBalance.create({ data: { userId: u.id, leaveTypeId: ltEmerg.id,  year: 2026, totalDays: 3,  usedDays: 0, pendingDays: 0 } });
-    await prisma.leaveBalance.create({ data: { userId: u.id, leaveTypeId: ltWFH.id,    year: 2026, totalDays: 6,  usedDays: 2, pendingDays: 0 } });
+  // ── Demo history window: first day of month, 3 months back → today ──
+  const todayStr  = jktDateStr(new Date());
+  const seedYr    = Number(todayStr.slice(0, 4));
+  const now7      = new Date(Date.now() + 7 * 3_600_000);
+  const histStart = new Date(Date.UTC(now7.getUTCFullYear(), now7.getUTCMonth() - 3, 1));
+  const holidaySet = new Set(
+    (await prisma.holiday.findMany()).map((h) => h.date.toISOString().slice(0, 10)),
+  );
+  const isWorkday = (s: string) => {
+    const d = dateOnly(s).getUTCDay();
+    return d !== 0 && d !== 6 && !holidaySet.has(s);
+  };
+  const addDays = (s: string, n: number) => {
+    const d = dateOnly(s); d.setUTCDate(d.getUTCDate() + n);
+    return d.toISOString().slice(0, 10);
+  };
+  /** n-th workday on/after s. */
+  const nextWorkday = (s: string) => { let d = s; while (!isWorkday(d)) d = addDays(d, 1); return d; };
+  const listWorkdays = (from: string, to: string) => {
+    const out: string[] = [];
+    for (let d = from; d <= to; d = addDays(d, 1)) if (isWorkday(d)) out.push(d);
+    return out;
+  };
+  const histWorkdays = listWorkdays(histStart.toISOString().slice(0, 10), todayStr);
+
+  // ── Leave requests: months of history, every status ────────
+  const reviewers = [admin, hr];
+  const leaveOnDate = new Map<string, string>(); // `${userId}|${date}` → leave type name
+  const used    = new Map<string, number>();     // `${userId}|${typeId}` → approved days
+  const pending = new Map<string, number>();
+  const bump = (m: Map<string, number>, k: string, n: number) => m.set(k, (m.get(k) ?? 0) + n);
+
+  const LEAVE_REASONS: Record<string, string[]> = {
+    ANNUAL:      ['Liburan keluarga ke Bali.', 'Acara pernikahan saudara di luar kota.', 'Keperluan keluarga.', 'Mengurus dokumen penting di kampung halaman.', 'Refreshing setelah project selesai.'],
+    SICK:        ['Demam dan flu, sudah periksa ke dokter.', 'Sakit maag kambuh, istirahat sesuai anjuran dokter.', 'Migrain berat.', 'Tipes, perlu rawat jalan.'],
+    EMERGENCY:   ['Orang tua masuk rumah sakit mendadak.', 'Banjir di rumah, perlu evakuasi barang.', 'Kecelakaan ringan, mengurus asuransi.'],
+    WFH_SPECIAL: ['Menunggu kedatangan teknisi internet di rumah.', 'Anak sakit, kerja dari rumah sambil menjaga.', 'Cuaca ekstrem, jalan banjir.'],
+    SPECIAL:     ['Menikah — sesuai kebijakan cuti resmi.', 'Istri melahirkan.', 'Keluarga inti meninggal dunia.'],
+  };
+  const typeBySlug = { ANNUAL: ltAnnual, SICK: ltSick, EMERGENCY: ltEmerg, WFH_SPECIAL: ltWFH } as const;
+  const ltSpecial = await prisma.leaveType.findUnique({ where: { slug: 'SPECIAL' } });
+  const ltCompOff = await prisma.leaveType.findUnique({ where: { slug: 'COMP_OFF' } });
+
+  const leaveRows: object[] = [];
+  const monthsSince = (d: Date | null, ref: Date) =>
+    d ? (ref.getUTCFullYear() - d.getUTCFullYear()) * 12 + (ref.getUTCMonth() - d.getUTCMonth()) : 999;
+
+  for (const u of staff) {
+    const howMany = rng() < 0.35 ? 2 : rng() < 0.85 ? 1 : 0;
+    for (let i = 0; i < howMany; i++) {
+      const roll = rng();
+      const slug = roll < 0.45 ? 'ANNUAL' : roll < 0.65 ? 'SICK' : roll < 0.75 ? 'EMERGENCY' : roll < 0.92 ? 'WFH_SPECIAL' : 'SPECIAL';
+      const lt   = slug === 'SPECIAL' ? ltSpecial! : typeBySlug[slug as keyof typeof typeBySlug];
+      const startIdx = randInt(0, Math.max(0, histWorkdays.length - 12));
+      const start = histWorkdays[startIdx];
+      const dur   = slug === 'EMERGENCY' || slug === 'WFH_SPECIAL' ? 1 : randInt(1, 3);
+      const wdays = listWorkdays(start, addDays(start, dur + 3)).slice(0, dur);
+      const end   = wdays[wdays.length - 1];
+      if (wdays.some((d) => leaveOnDate.has(`${u.id}|${d}`)) || end >= todayStr) continue;
+
+      const sRoll  = rng();
+      const status = sRoll < 0.72 ? LeaveStatus.APPROVED : sRoll < 0.86 ? LeaveStatus.REJECTED : LeaveStatus.CANCELLED;
+      const reviewer = pick(reviewers);
+      const isUnpaid = slug === 'ANNUAL' && monthsSince(u.joinDate, dateOnly(start)) < 12;
+      const needsDoc = slug === 'SPECIAL' || (slug === 'SICK' && dur > 1);
+
+      leaveRows.push({
+        userId: u.id, leaveTypeId: lt.id,
+        startDate: dateOnly(start), endDate: dateOnly(end), totalDays: dur,
+        reason: pick(LEAVE_REASONS[slug]),
+        status, isUnpaid,
+        attachmentUrl:  needsDoc ? `https://picsum.photos/seed/leave-${leaveRows.length}/800/1100` : null,
+        attachmentName: needsDoc ? (slug === 'SICK' ? 'surat-dokter.jpg' : 'dokumen-pendukung.jpg') : null,
+        reviewedById: status === LeaveStatus.CANCELLED ? null : reviewer.id,
+        reviewedAt:   status === LeaveStatus.CANCELLED ? null : atWIB(addDays(start, -randInt(1, 3)), randInt(9, 17), randInt(0, 59)),
+        reviewNote:   status === LeaveStatus.REJECTED ? pick(['Beban kerja tim sedang tinggi, mohon jadwalkan ulang.', 'Bentrok dengan deadline project, coba minggu berikutnya.', 'Kuota tim yang cuti minggu itu sudah penuh.']) : null,
+        createdAt: atWIB(addDays(start, -randInt(3, 10)), randInt(8, 17), randInt(0, 59)),
+      });
+      if (status === LeaveStatus.APPROVED) {
+        wdays.forEach((d) => leaveOnDate.set(`${u.id}|${d}`, lt.name));
+        if (!isUnpaid && (lt.maxDaysPerYear > 0)) bump(used, `${u.id}|${lt.id}`, dur);
+      }
+    }
   }
 
-  // Leave requests
-  // 1) APPROVED — hr ambil cuti tahunan bulan lalu
-  await prisma.leaveRequest.create({ data: {
-    userId: hr.id, leaveTypeId: ltAnnual.id,
-    startDate: days(-15), endDate: days(-13), totalDays: 3,
-    reason: 'Keperluan keluarga di luar kota.',
-    status: LeaveStatus.APPROVED,
-    reviewedById: admin.id, reviewedAt: days(-17),
-    reviewNote: 'Disetujui. Pastikan handover ke rekan sebelum cuti.',
-  }});
-  // 2) APPROVED — finance sakit
-  await prisma.leaveRequest.create({ data: {
-    userId: finance.id, leaveTypeId: ltSick.id,
-    startDate: days(-5), endDate: days(-4), totalDays: 2,
-    reason: 'Demam dan flu sejak 2 hari lalu. Sudah periksa ke dokter.',
-    status: LeaveStatus.APPROVED,
-    reviewedById: admin.id, reviewedAt: days(-6),
-  }});
-  // 3) PENDING — engineer minta cuti tahunan
-  const lrPending = await prisma.leaveRequest.create({ data: {
-    userId: engineer.id, leaveTypeId: ltAnnual.id,
-    startDate: days(3), endDate: days(5), totalDays: 3,
-    reason: 'Pernikahan adik di Yogyakarta.',
-    status: LeaveStatus.PENDING,
-  }});
-  // 4) PENDING — pm darurat
-  const lrPending2 = await prisma.leaveRequest.create({ data: {
-    userId: pm.id, leaveTypeId: ltEmerg.id,
-    startDate: days(1), endDate: days(1), totalDays: 1,
-    reason: 'Orang tua masuk rumah sakit mendadak.',
-    status: LeaveStatus.PENDING,
-  }});
-  // 5) REJECTED — director
-  await prisma.leaveRequest.create({ data: {
-    userId: director.id, leaveTypeId: ltAnnual.id,
-    startDate: days(-2), endDate: days(0), totalDays: 2,
-    reason: 'Perlu istirahat setelah closing Q2.',
-    status: LeaveStatus.REJECTED,
-    reviewedById: admin.id, reviewedAt: days(-3),
-    reviewNote: 'Tidak bisa disetujui minggu ini karena ada meeting direksi. Coba jadwalkan minggu depan.',
-  }});
-  console.log('✅ HRIS leave types, balances & requests created');
+  // A few PENDING requests in the near future so reviewers see a queue.
+  const pendingSeed: [typeof admin, typeof ltAnnual, number, string][] = [
+    [engineer,      ltAnnual, 3, 'Pernikahan adik di Yogyakarta.'],
+    [pm,            ltEmerg,  1, 'Orang tua masuk rumah sakit mendadak.'],
+    [extraUsers[2] ?? finance, ltAnnual, 2, 'Liburan keluarga akhir bulan.'],
+    [extraUsers[5] ?? hr,      ltWFH,    1, 'Menunggu renovasi rumah selesai.'],
+  ];
+  for (const [u, lt, dur, reason] of pendingSeed) {
+    const start = nextWorkday(addDays(todayStr, randInt(2, 8)));
+    const wdays = listWorkdays(start, addDays(start, dur + 3)).slice(0, dur);
+    leaveRows.push({
+      userId: u.id, leaveTypeId: lt.id,
+      startDate: dateOnly(start), endDate: dateOnly(wdays[wdays.length - 1]), totalDays: dur,
+      reason, status: LeaveStatus.PENDING,
+      createdAt: atWIB(todayStr, 8, randInt(0, 45)),
+    });
+    if (lt.maxDaysPerYear > 0) bump(pending, `${u.id}|${lt.id}`, dur);
+  }
+  await prisma.leaveRequest.createMany({ data: leaveRows as never });
 
-  // Attendance — 10 hari terakhir untuk semua user
-  const checkInHour  = (h: number, m: number) => new Date(Date.UTC(2026, 5, 26 - 10, h, m)); // base date
-  for (let d = 9; d >= 0; d--) {
-    const dateOffset = -d;
-    const dateVal = new Date(Date.now() + dateOffset * 86_400_000);
-    // Skip weekend
-    const dayOfWeek = dateVal.getUTCDay();
-    if (dayOfWeek === 0 || dayOfWeek === 6) continue;
+  // ── Comp-off: HR grants + one consumed request ──────────────
+  const compOffTargets = [engineer, extraUsers[0] ?? pm, extraUsers[7] ?? finance];
+  const compOffGranted = new Map<string, number>();
+  for (const [i, target] of compOffTargets.entries()) {
+    const daysGranted = randInt(1, 2);
+    await prisma.compOffGrant.create({ data: {
+      userId: target.id, days: daysGranted,
+      reason: pick(['Lembur persiapan acara 17 Agustus di gedung.', 'Kerja weekend saat maintenance listrik total.', 'Standby saat tanggal merah untuk kunjungan owner.']),
+      grantedById: hr.id,
+      createdAt: atWIB(histWorkdays[randInt(10, 30)] ?? todayStr, randInt(9, 17), 0),
+    }});
+    bump(compOffGranted, target.id, daysGranted);
+    // First grantee already used 1 day of it (APPROVED history).
+    if (i === 0 && ltCompOff) {
+      const start = histWorkdays[Math.floor(histWorkdays.length * 0.7)];
+      await prisma.leaveRequest.create({ data: {
+        userId: target.id, leaveTypeId: ltCompOff.id,
+        startDate: dateOnly(start), endDate: dateOnly(start), totalDays: 1,
+        reason: 'Pakai ganti off dari kerja weekend kemarin.',
+        status: LeaveStatus.APPROVED,
+        reviewedById: hr.id, reviewedAt: atWIB(addDays(start, -1), 14, 0),
+        createdAt: atWIB(addDays(start, -2), 10, 0),
+      }});
+      leaveOnDate.set(`${target.id}|${start}`, 'Comp Off');
+      bump(used, `${target.id}|${ltCompOff.id}`, 1);
+    }
+  }
 
-    for (const u of allUsers) {
-      // Randomize a bit
-      const lateChance = Math.random();
-      const isLate = lateChance > 0.8;
-      const checkInMin = isLate ? 90 + Math.floor(Math.random() * 30) : 60 + Math.floor(Math.random() * 25);
-      const checkInTime = new Date(dateVal);
-      checkInTime.setUTCHours(1, checkInMin, 0, 0); // ~08:00-09:30 WIB
-
-      const checkOutTime = new Date(dateVal);
-      checkOutTime.setUTCHours(10, 0 + Math.floor(Math.random() * 30), 0, 0); // ~17:00-17:30 WIB
-
-      const workMinutes = Math.floor((checkOutTime.getTime() - checkInTime.getTime()) / 60000);
-      const status = isLate ? AttendanceStatus.LATE : AttendanceStatus.PRESENT;
-      const lateMinutes = isLate ? checkInMin - 90 : 0;
-
-      const dateOnly = new Date(dateVal.toISOString().slice(0, 10) + 'T00:00:00.000Z');
-
-      await prisma.attendance.upsert({
-        where: { userId_date: { userId: u.id, date: dateOnly } },
-        update: {},
-        create: {
-          userId: u.id, date: dateOnly,
-          checkIn: checkInTime, checkOut: checkOutTime,
-          status, isLate, lateMinutes, workMinutes,
-          shiftId: shiftOffice.id,
-          lat: locHead.lat + (Math.random() - 0.5) * 0.001,
-          lng: locHead.lng + (Math.random() - 0.5) * 0.001,
-          locationName: 'Head Office - Jakarta',
-          officeLocationId: locHead.id,
-        },
+  // ── Balances for everyone, consistent with the requests above ──
+  const balanceRows: object[] = [];
+  for (const u of staff) {
+    for (const lt of [ltAnnual, ltEmerg, ltWFH]) {
+      balanceRows.push({
+        userId: u.id, leaveTypeId: lt.id, year: seedYr,
+        totalDays: lt.maxDaysPerYear,
+        usedDays:  used.get(`${u.id}|${lt.id}`) ?? 0,
+        pendingDays: pending.get(`${u.id}|${lt.id}`) ?? 0,
+      });
+    }
+    if (ltCompOff && compOffGranted.has(u.id)) {
+      balanceRows.push({
+        userId: u.id, leaveTypeId: ltCompOff.id, year: seedYr,
+        totalDays: compOffGranted.get(u.id)!,
+        usedDays:  used.get(`${u.id}|${ltCompOff.id}`) ?? 0,
+        pendingDays: 0,
       });
     }
   }
-  // WFH example for finance today
-  {
-    const todayDate = new Date(new Date().toISOString().slice(0, 10) + 'T00:00:00.000Z');
-    const ci = new Date(); ci.setUTCHours(1, 5, 0, 0);
-    await prisma.attendance.upsert({
-      where: { userId_date: { userId: finance.id, date: todayDate } },
-      update: { status: AttendanceStatus.WFH, checkIn: ci, note: 'WFH hari ini', shiftId: shiftOffice.id },
-      create: { userId: finance.id, date: todayDate, checkIn: ci, status: AttendanceStatus.WFH, isLate: false, lateMinutes: 0, note: 'WFH hari ini', shiftId: shiftOffice.id },
-    });
+  await prisma.leaveBalance.createMany({ data: balanceRows as never });
+  console.log(`✅ HRIS leave: ${leaveRows.length} requests, ${balanceRows.length} balances, ${compOffTargets.length} comp-off grants`);
+
+  // ── Shift change requests: all statuses ────────────────────
+  if (shiftSiang && shiftSecurity) {
+    const scSeed = [
+      { u: extraUsers[1] ?? engineer, shift: shiftSiang,    status: 'APPROVED',  note: 'Disetujui, efektif minggu depan.' },
+      { u: extraUsers[3] ?? pm,       shift: shiftSecurity, status: 'REJECTED',  note: 'Formasi security sudah penuh bulan ini.' },
+      { u: extraUsers[4] ?? finance,  shift: shiftSiang,    status: 'PENDING',   note: null },
+      { u: extraUsers[6] ?? hr,       shift: shiftSiang,    status: 'CANCELLED', note: null },
+    ] as const;
+    for (const [i, sc] of scSeed.entries()) {
+      const reviewed = sc.status === 'APPROVED' || sc.status === 'REJECTED';
+      await prisma.shiftChangeRequest.create({ data: {
+        userId: sc.u.id, requestedShiftId: sc.shift.id,
+        effectiveDate: dateOnly(sc.status === 'PENDING' ? nextWorkday(addDays(todayStr, 7)) : histWorkdays[20 + i * 5] ?? todayStr),
+        reason: pick(['Jadwal antar-jemput anak sekolah berubah.', 'Menyesuaikan jadwal kuliah malam.', 'Rotasi tugas tim.', 'Kondisi kesehatan, disarankan dokter kerja siang.']),
+        status: sc.status as never,
+        reviewNote: sc.note,
+        reviewedById: reviewed ? hr.id : null,
+        reviewedAt:   reviewed ? atWIB(histWorkdays[22 + i * 5] ?? todayStr, 15, 0) : null,
+      }});
+    }
   }
-  console.log('✅ HRIS attendance records created');
+
+  // ── Late excuses: approved (neutralised), pending, rejected ──
+  const lateExcuseDay = histWorkdays[histWorkdays.length - 4] ?? todayStr;
+  await prisma.lateExcuseRequest.create({ data: {
+    userId: engineer.id, date: dateOnly(lateExcuseDay), expectedTime: '10:30',
+    reason: 'Antar orang tua kontrol rutin ke rumah sakit pagi.',
+    status: 'APPROVED', reviewedById: hr.id, reviewedAt: atWIB(addDays(lateExcuseDay, -1), 16, 20),
+    createdAt: atWIB(addDays(lateExcuseDay, -1), 15, 45),
+  }});
+  await prisma.lateExcuseRequest.create({ data: {
+    userId: extraUsers[8]?.id ?? pm.id, date: dateOnly(histWorkdays[histWorkdays.length - 8] ?? todayStr), expectedTime: '09:45',
+    reason: 'Ban mobil bocor di tol.',
+    status: 'APPROVED', reviewedById: admin.id, reviewedAt: atWIB(histWorkdays[histWorkdays.length - 8] ?? todayStr, 7, 30),
+  }});
+  await prisma.lateExcuseRequest.create({ data: {
+    userId: extraUsers[9]?.id ?? finance.id, date: dateOnly(nextWorkday(addDays(todayStr, 1))), expectedTime: '10:00',
+    reason: 'Jadwal vaksin anak pagi hari.',
+    status: 'PENDING', createdAt: atWIB(todayStr, 9, 10),
+  }});
+  await prisma.lateExcuseRequest.create({ data: {
+    userId: extraUsers[10]?.id ?? director.id, date: dateOnly(histWorkdays[histWorkdays.length - 6] ?? todayStr), expectedTime: '11:00',
+    reason: 'Urusan pribadi.',
+    status: 'REJECTED', reviewNote: 'Alasan kurang jelas, mohon detailkan.',
+    reviewedById: hr.id, reviewedAt: atWIB(histWorkdays[histWorkdays.length - 7] ?? todayStr, 17, 0),
+  }});
+  console.log('✅ HRIS shift changes & late excuses created');
+
+  // ── Attendance: full history for every workday in the window ──
+  const OUT_OF_AREA_REASONS = ['Kunjungan tenant di site Properti A.', 'Meeting dengan vendor di kantor mereka.', 'Survey lokasi untuk project baru.', 'Ambil dokumen di notaris.'];
+  const attendanceRows: object[] = [];
+  let photoCounter = 0;
+  const recentCutoff = addDays(todayStr, -14);
+
+  for (const day of histWorkdays) {
+    const isToday = day === todayStr;
+    for (const u of staff) {
+      const shift = shiftOf.get(u.id)!;
+
+      // Approved leave that day → PERMISSION record, no check-in.
+      const leaveName = leaveOnDate.get(`${u.id}|${day}`);
+      if (leaveName) {
+        attendanceRows.push({
+          userId: u.id, date: dateOnly(day),
+          status: AttendanceStatus.PERMISSION, isLate: false, lateMinutes: 0,
+          note: leaveName, shiftId: shift.id,
+        });
+        continue;
+      }
+
+      // Today: ~15% haven't shown up yet (no record at all).
+      if (isToday && rng() < 0.15) continue;
+
+      const roll = rng();
+      if (!isToday && roll < 0.02) {
+        attendanceRows.push({
+          userId: u.id, date: dateOnly(day),
+          status: AttendanceStatus.ABSENT, isLate: false, lateMinutes: 0, shiftId: shift.id,
+        });
+        continue;
+      }
+
+      const isWFH  = roll >= 0.02 && roll < 0.07;
+      const isLate = !isWFH && rng() < 0.15;
+      const lateMinutes = isLate ? randInt(5, 75) : 0;
+      const inMin  = isLate ? lateMinutes : -randInt(2, 25); // minutes relative to shift start
+      const checkIn = atWIB(day, shift.startH, 0);
+      checkIn.setUTCMinutes(checkIn.getUTCMinutes() + inMin);
+
+      const hasCheckedOut = !isToday;
+      const checkOut = new Date(checkIn.getTime() + (9 * 60 + randInt(-20, 50)) * 60_000);
+      const workMinutes = hasCheckedOut ? Math.floor((checkOut.getTime() - checkIn.getTime()) / 60_000) : null;
+
+      const outOfArea = !isWFH && rng() < 0.03;
+      const includePhoto = !isWFH && day >= recentCutoff;
+
+      attendanceRows.push({
+        userId: u.id, date: dateOnly(day),
+        checkIn, checkOut: hasCheckedOut ? checkOut : null,
+        status: isWFH ? AttendanceStatus.WFH : isLate ? AttendanceStatus.LATE : AttendanceStatus.PRESENT,
+        isLate, lateMinutes, workMinutes,
+        note: isWFH ? 'WFH' : null,
+        lat: isWFH ? null : locHead.lat + (rng() - 0.5) * (outOfArea ? 0.05 : 0.001),
+        lng: isWFH ? null : locHead.lng + (rng() - 0.5) * (outOfArea ? 0.05 : 0.001),
+        locationName: isWFH ? null : outOfArea ? 'Jl. BSD Raya, Serpong, Tangerang Selatan' : 'Head Office - Jakarta',
+        isOutOfArea: outOfArea,
+        outOfAreaReason: outOfArea ? pick(OUT_OF_AREA_REASONS) : null,
+        officeLocationId: isWFH || outOfArea ? null : locHead.id,
+        photoUrl: includePhoto ? `https://i.pravatar.cc/300?u=${u.id.slice(0, 8)}-${photoCounter++}` : null,
+        shiftId: shift.id,
+      });
+    }
+  }
+  // The engineer's approved late excuse: that day he came at 10:20 but is NOT
+  // flagged late (excuse neutralises it) — matches the service behaviour.
+  const excuseIdx = attendanceRows.findIndex(
+    (r: any) => r.userId === engineer.id && r.date.toISOString().slice(0, 10) === lateExcuseDay && r.checkIn,
+  );
+  if (excuseIdx >= 0) {
+    const r = attendanceRows[excuseIdx] as any;
+    r.checkIn = atWIB(lateExcuseDay, 10, 20);
+    r.status = AttendanceStatus.PRESENT; r.isLate = false; r.lateMinutes = 0;
+    if (r.checkOut) r.workMinutes = Math.floor((r.checkOut.getTime() - r.checkIn.getTime()) / 60_000);
+  }
+  await prisma.attendance.createMany({ data: attendanceRows as never, skipDuplicates: true });
+  console.log(`✅ HRIS attendance: ${attendanceRows.length} records across ${histWorkdays.length} workdays`);
 
   // ── Work Orders ────────────────────────────────────────────
   // Clear previous WO seed data
@@ -810,7 +1126,81 @@ async function main() {
     ]},
   }});
 
-  console.log('✅ Work orders & histories created');
+  // ── Historical work orders: months of closed/active WOs ─────
+  const WO_TEMPLATES: [string, string, WorkOrderCategory][] = [
+    ['Perbaikan Exhaust Fan Toilet Lantai %F', 'Exhaust fan tidak berputar, sirkulasi udara buruk.', WorkOrderCategory.ELECTRICAL],
+    ['Servis Rutin Unit AC Lantai %F', 'Jadwal servis berkala unit AC split — pembersihan filter dan cek freon.', WorkOrderCategory.HVAC],
+    ['Keran Wastafel Bocor Pantry Lantai %F', 'Keran menetes terus meski sudah ditutup rapat.', WorkOrderCategory.PLUMBING],
+    ['Penggantian Lampu Koridor Lantai %F', 'Beberapa titik lampu koridor mati atau berkedip.', WorkOrderCategory.ELECTRICAL],
+    ['Perbaikan Pintu Akses Kartu Lantai %F', 'Card reader tidak merespons, pintu harus dibuka manual.', WorkOrderCategory.SECURITY],
+    ['Pembersihan Kaca Fasad Zona %F', 'Pembersihan berkala kaca fasad eksterior gedung.', WorkOrderCategory.CLEANING],
+    ['Perbaikan Plafon Bocor Lantai %F', 'Plafon gypsum bernoda air, dicurigai rembesan dari lantai atas.', WorkOrderCategory.CIVIL],
+    ['Kalibrasi Sensor Smoke Detector Lantai %F', 'Pemeriksaan tahunan sensor asap sesuai standar K3.', WorkOrderCategory.OTHER],
+    ['Perbaikan Pompa Booster Air Tower %T', 'Tekanan air lantai atas menurun, pompa booster perlu dicek.', WorkOrderCategory.PLUMBING],
+    ['Pengecekan Grounding Panel Lantai %F', 'Audit grounding berkala untuk keamanan instalasi listrik.', WorkOrderCategory.ELECTRICAL],
+  ];
+  const woAssignees = [engineer, extraUsers[1] ?? engineer, extraUsers[11] ?? engineer].filter(Boolean);
+  const woReporters = [admin, pm, hr, director, extraUsers[3] ?? pm];
+  let woCounter = 12;
+  const woMkHistory = (openDay: string, doneDay: string | null, reporter: typeof admin, assignee: typeof admin, finalStatus: WorkOrderStatus) => {
+    const h: object[] = [
+      { fromStatus: null, toStatus: WorkOrderStatus.OPEN, note: 'Work order dibuat', changedById: reporter.id, createdAt: atWIB(openDay, randInt(8, 11), randInt(0, 59)) },
+    ];
+    if (finalStatus === WorkOrderStatus.CANCELLED) {
+      h.push({ fromStatus: WorkOrderStatus.OPEN, toStatus: WorkOrderStatus.CANCELLED, note: 'Dibatalkan — duplikat / dijadwalkan ulang.', changedById: admin.id, createdAt: atWIB(addDays(openDay, 1), 10, 0) });
+      return h;
+    }
+    h.push({ fromStatus: WorkOrderStatus.OPEN, toStatus: WorkOrderStatus.ASSIGNED, note: 'Ditugaskan ke teknisi', changedById: admin.id, createdAt: atWIB(openDay, randInt(12, 15), 0) });
+    if (finalStatus === WorkOrderStatus.ASSIGNED) return h;
+    const workDay = addDays(openDay, 1);
+    h.push({ fromStatus: WorkOrderStatus.ASSIGNED, toStatus: WorkOrderStatus.IN_PROGRESS, note: 'Pengerjaan dimulai', changedById: assignee.id, createdAt: atWIB(workDay, randInt(8, 10), 0) });
+    if (finalStatus === WorkOrderStatus.IN_PROGRESS) return h;
+    if (doneDay) {
+      h.push({ fromStatus: WorkOrderStatus.IN_PROGRESS, toStatus: WorkOrderStatus.PENDING_REVIEW, note: 'Pengerjaan selesai, menunggu verifikasi.', changedById: assignee.id, createdAt: atWIB(doneDay, randInt(13, 16), 0) });
+      h.push({ fromStatus: WorkOrderStatus.PENDING_REVIEW, toStatus: WorkOrderStatus.DONE, note: 'Hasil diverifikasi, work order ditutup.', changedById: admin.id, createdAt: atWIB(doneDay, randInt(16, 18), 0) });
+    }
+    return h;
+  };
+
+  for (let i = 0; i < 28; i++) {
+    const [titleT, desc, category] = WO_TEMPLATES[i % WO_TEMPLATES.length];
+    const title = titleT.replace('%F', String(randInt(1, 12))).replace('%T', pick(['A', 'B']));
+    const openDay = histWorkdays[randInt(0, histWorkdays.length - 6)];
+    // Weighted: mostly DONE history; a handful still active.
+    const sRoll = rng();
+    const finalStatus = sRoll < 0.72 ? WorkOrderStatus.DONE
+      : sRoll < 0.80 ? WorkOrderStatus.CANCELLED
+      : sRoll < 0.88 ? WorkOrderStatus.IN_PROGRESS
+      : WorkOrderStatus.ASSIGNED;
+    const doneDay = finalStatus === WorkOrderStatus.DONE ? addDays(openDay, randInt(1, 5)) : null;
+    const reporter = pick(woReporters);
+    const assignee = finalStatus === WorkOrderStatus.CANCELLED ? null : pick(woAssignees);
+    woCounter++;
+    await prisma.workOrder.create({ data: {
+      code: `WO/${seedYr}/${String(woCounter).padStart(3, '0')}`,
+      title, description: desc,
+      status: finalStatus,
+      priority: pick([WorkOrderPriority.LOW, WorkOrderPriority.MEDIUM, WorkOrderPriority.MEDIUM, WorkOrderPriority.HIGH, WorkOrderPriority.URGENT]),
+      category,
+      location: `Tower ${pick(['A', 'B'])} — Lantai ${randInt(1, 12)}`,
+      dueDate: atWIB(addDays(openDay, randInt(2, 7)), 17, 0),
+      completedAt: doneDay ? atWIB(doneDay, 16, 0) : null,
+      closedAt:    doneDay ? atWIB(doneDay, 17, 0) : null,
+      notes: finalStatus === WorkOrderStatus.DONE ? 'Pekerjaan selesai dan sudah diuji.' : null,
+      reportedById: reporter.id,
+      assignedToId: assignee?.id ?? null,
+      reviewedById: doneDay ? admin.id : null,
+      reviewedAt:   doneDay ? atWIB(doneDay, 17, 0) : null,
+      createdAt: atWIB(openDay, randInt(8, 11), 0),
+      history: { create: woMkHistory(openDay, doneDay, reporter, assignee ?? admin, finalStatus) as never },
+    }});
+  }
+  // Keep the app's code generator ahead of everything we just seeded.
+  await prisma.$executeRaw`
+    INSERT INTO work_order_sequences (year, counter) VALUES (${seedYr}, ${woCounter})
+    ON CONFLICT (year) DO UPDATE SET counter = ${woCounter}
+  `;
+  console.log(`✅ Work orders & histories created (${woCounter} total, sequence synced)`);
 
   // ── Notifications ──────────────────────────────────────────
   await prisma.notification.createMany({ data: [
@@ -844,6 +1234,7 @@ async function main() {
 
   console.log('\n🎉 Seeding selesai!');
   console.log('─────────────────────────────────────────');
+  console.log(`Users total       : ${staff.length} aktif (>=2 per role, password123)`);
   console.log('Login credentials:');
   console.log('  Super Admin      : admin@sangroup.id / admin123');
   console.log('  Director Retail  : director.retail@sangroup.id / password123');
