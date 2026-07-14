@@ -12,6 +12,8 @@ import {
   createOfficeLocationSchema, updateOfficeLocationSchema,
   reportsFilterSchema,
   createHolidaySchema,
+  createLeaveTypeSchema,
+  updateLeaveTypeSchema,
   createShiftChangeSchema,
   reviewRequestSchema,
   requestFilterSchema,
@@ -19,7 +21,7 @@ import {
   grantCompOffSchema,
 } from '@/validations/hris.validation';
 import {
-  listLeaveTypes, getLeaveBalances,
+  listLeaveTypes, createLeaveType, updateLeaveType, getLeaveBalances,
   listLeaveRequests, createLeaveRequest, reviewLeaveRequest, cancelLeaveRequest,
   getTodayAttendance, checkIn, checkOut, listAttendance, getAttendanceSummary, updateAttendance,
   listShifts, createShift, updateShift, deleteShift, assignShift, listUsersForShift,
@@ -45,6 +47,8 @@ router.use(authenticate);
 
 // ── Leave ──────────────────────────────────────────────────────
 router.get('/leave-types',    listLeaveTypes);
+router.post('/leave-types',    checkPerm('hris', 'manageShifts'), validate(createLeaveTypeSchema), createLeaveType);
+router.put ('/leave-types/:id', checkPerm('hris', 'manageShifts'), validate(uuidParamSchema, ['params']), validate(updateLeaveTypeSchema), updateLeaveType);
 router.get('/leave-balances', getLeaveBalances);
 router.get('/leave-requests', validate(leaveFilterSchema, ['query']), listLeaveRequests);
 router.post('/leave-requests', validate(createLeaveRequestSchema), createLeaveRequest);

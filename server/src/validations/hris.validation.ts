@@ -137,6 +137,32 @@ export const reportsFilterSchema = z.object({
   }),
 });
 
+// ── Leave Types (HR policy admin) ──────────────────────────────
+
+const leaveTypeFields = {
+  name:                 z.string().min(2).max(100),
+  color:                z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
+  maxDaysPerYear:       z.number().int().min(0).max(365),
+  isPaid:               z.boolean().optional(),
+  requiresDoc:          z.boolean().optional(),
+  requiresDocAfterDays: z.number().int().min(0).max(365).optional(),
+  allowCarryOver:       z.boolean().optional(),
+  tenureMonthsRequired: z.number().int().min(0).max(120).optional(),
+};
+
+export const createLeaveTypeSchema = z.object({
+  body: z.object(leaveTypeFields),
+});
+
+export const updateLeaveTypeSchema = z.object({
+  body: z.object({
+    ...leaveTypeFields,
+    name:           leaveTypeFields.name.optional(),
+    maxDaysPerYear: leaveTypeFields.maxDaysPerYear.optional(),
+    isActive:       z.boolean().optional(),
+  }),
+});
+
 // ── Holidays ───────────────────────────────────────────────────
 
 export const createHolidaySchema = z.object({

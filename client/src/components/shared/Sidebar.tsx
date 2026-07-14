@@ -128,9 +128,10 @@ export default function Sidebar() {
   const hrisAdminItems: NavItem[] = [
     ...(canReports ? [{ label: 'Reports', to: ROUTES.HRIS_REPORTS, icon: BarChart3 }] : []),
     ...(isHRAdmin ? [
-      { label: 'Shifts',    to: ROUTES.HRIS_ADMIN_SHIFTS,    icon: CalendarClock },
-      { label: 'Locations', to: ROUTES.HRIS_ADMIN_LOCATIONS, icon: MapPin        },
-      { label: 'Holidays',  to: ROUTES.HRIS_ADMIN_HOLIDAYS,  icon: CalendarOff   },
+      { label: 'Shifts',      to: ROUTES.HRIS_ADMIN_SHIFTS,      icon: CalendarClock },
+      { label: 'Locations',   to: ROUTES.HRIS_ADMIN_LOCATIONS,   icon: MapPin        },
+      { label: 'Holidays',    to: ROUTES.HRIS_ADMIN_HOLIDAYS,    icon: CalendarOff   },
+      { label: 'Leave Types', to: ROUTES.HRIS_ADMIN_LEAVE_TYPES, icon: CalendarRange },
     ] : []),
   ];
   const hrisNav: NavSection[] = [

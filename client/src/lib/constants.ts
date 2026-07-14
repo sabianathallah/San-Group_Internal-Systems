@@ -24,4 +24,5 @@ export const ROUTES = {
   HRIS_ADMIN_SHIFTS:     '/hris/admin/shifts',
   HRIS_ADMIN_LOCATIONS:  '/hris/admin/locations',
   HRIS_ADMIN_HOLIDAYS:   '/hris/admin/holidays',
+  HRIS_ADMIN_LEAVE_TYPES: '/hris/admin/leave-types',
 } as const;

@@ -6,6 +6,8 @@ import { successResponse } from '@/helpers/response';
 import { getPermissionsForRole } from '@/services/permission.service';
 import {
   listLeaveTypesService,
+  createLeaveTypeService,
+  updateLeaveTypeService,
   getLeaveBalancesService,
   listLeaveRequestsService,
   createLeaveRequestService,
@@ -47,8 +49,22 @@ import {
 
 export async function listLeaveTypes(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
-    const types = await listLeaveTypesService();
+    const types = await listLeaveTypesService(req.query.all === 'true');
     successResponse(res, types, 'Jenis cuti berhasil diambil');
+  } catch (err) { next(err); }
+}
+
+export async function createLeaveType(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const type = await createLeaveTypeService(req.body);
+    successResponse(res, type, 'Leave type created', 201);
+  } catch (err) { next(err); }
+}
+
+export async function updateLeaveType(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const type = await updateLeaveTypeService(String(req.params.id), req.body);
+    successResponse(res, type, 'Leave type updated');
   } catch (err) { next(err); }
 }
 

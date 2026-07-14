@@ -204,10 +204,81 @@ async function reverseGeocode(lat: number, lng: number): Promise<string | null> 
 
 // ── Leave Types ────────────────────────────────────────────────
 
-export async function listLeaveTypesService() {
+export async function listLeaveTypesService(includeInactive = false) {
   return prisma.leaveType.findMany({
-    where: { isActive: true },
+    where: includeInactive ? {} : { isActive: true },
     orderBy: { position: 'asc' },
+  });
+}
+
+type LeaveTypeBody = {
+  name: string; color?: string; maxDaysPerYear: number;
+  isPaid?: boolean; requiresDoc?: boolean; requiresDocAfterDays?: number;
+  allowCarryOver?: boolean; tenureMonthsRequired?: number;
+};
+
+export async function createLeaveTypeService(body: LeaveTypeBody) {
+  const slug = body.name.trim().toUpperCase().replace(/[^A-Z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+  if (!slug) throw new AppError('Leave type name must contain letters or numbers', 400);
+  const existing = await prisma.leaveType.findFirst({ where: { OR: [{ name: body.name.trim() }, { slug }] } });
+  if (existing) throw new AppError('A leave type with that name already exists', 400);
+
+  const maxPos = await prisma.leaveType.aggregate({ _max: { position: true } });
+  return prisma.leaveType.create({
+    data: {
+      name:  body.name.trim(),
+      slug,
+      color: body.color ?? '#6366f1',
+      maxDaysPerYear:       body.maxDaysPerYear,
+      isPaid:               body.isPaid ?? true,
+      requiresDoc:          body.requiresDoc ?? false,
+      requiresDocAfterDays: body.requiresDocAfterDays ?? 0,
+      allowCarryOver:       body.allowCarryOver ?? false,
+      tenureMonthsRequired: body.tenureMonthsRequired ?? 0,
+      position: (maxPos._max.position ?? -1) + 1,
+    },
+  });
+}
+
+export async function updateLeaveTypeService(id: string, body: Partial<LeaveTypeBody> & { isActive?: boolean }) {
+  const existing = await prisma.leaveType.findUnique({ where: { id } });
+  if (!existing) throw new AppError('Leave type not found', 404);
+
+  return prisma.$transaction(async (tx) => {
+    const updated = await tx.leaveType.update({
+      where: { id },
+      data: {
+        name:  body.name?.trim(),
+        color: body.color,
+        maxDaysPerYear:       body.maxDaysPerYear,
+        isPaid:               body.isPaid,
+        requiresDoc:          body.requiresDoc,
+        requiresDocAfterDays: body.requiresDocAfterDays,
+        allowCarryOver:       body.allowCarryOver,
+        tenureMonthsRequired: body.tenureMonthsRequired,
+        isActive:             body.isActive,
+      },
+    });
+
+    // Quota change: re-align already-materialized current-year balances so the
+    // new quota applies immediately, preserving each user's carry-over. Earned
+    // types (comp-off) grow via grants and are never touched here.
+    if (
+      !existing.earnedBalance &&
+      body.maxDaysPerYear !== undefined &&
+      body.maxDaysPerYear !== existing.maxDaysPerYear
+    ) {
+      const year = Number(todayJakarta().slice(0, 4));
+      const balances = await tx.leaveBalance.findMany({ where: { leaveTypeId: id, year } });
+      for (const b of balances) {
+        await tx.leaveBalance.update({
+          where: { id: b.id },
+          data:  { totalDays: body.maxDaysPerYear + b.carriedOverDays },
+        });
+      }
+    }
+
+    return updated;
   });
 }
 
