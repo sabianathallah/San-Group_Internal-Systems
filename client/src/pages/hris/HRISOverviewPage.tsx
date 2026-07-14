@@ -4,11 +4,13 @@ import {
   Clock, CalendarCheck, ChevronRight,
   CheckCircle2, Timer, Home, AlertCircle, Loader2,
   MapPin, MapPinOff, AlertTriangle, X, Camera, CameraOff,
-  TrendingUp, CalendarDays, CalendarX2,
+  TrendingUp, CalendarDays, CalendarX2, RefreshCw,
 } from 'lucide-react';
 import api from '@/lib/api';
 import { cn } from '@/lib/cn';
 import { ROUTES } from '@/lib/constants';
+import { getHolidaySet } from '@/lib/holidays';
+import { useEscapeClose } from '@/hooks/useEscapeClose';
 import { useAuthStore } from '@/stores/authStore';
 import { toast } from '@/stores/toastStore';
 
@@ -57,18 +59,14 @@ interface LeaveRequest {
 }
 
 // ── Helpers ────────────────────────────────────────────────────
-async function reverseGeocode(lat: number, lng: number): Promise<string> {
-  try {
-    const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`, {
-      headers: { 'Accept-Language': 'id' },
-    });
-    const data = await res.json();
-    const addr = data.address;
-    const parts = [addr.road, addr.suburb || addr.neighbourhood, addr.city || addr.town].filter(Boolean);
-    return parts.join(', ') || data.display_name?.split(',').slice(0, 2).join(',') || 'Unknown location';
-  } catch {
-    return 'Unknown location';
-  }
+function getPosition(): Promise<GeolocationPosition> {
+  return new Promise((resolve, reject) => {
+    if (!navigator.geolocation) {
+      reject(new Error('unsupported'));
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 10000, enableHighAccuracy: true });
+  });
 }
 
 const STATUS_CONFIG: Record<AttendanceStatus, { label: string; color: string; bg: string; border: string; icon: React.ElementType }> = {
@@ -127,6 +125,7 @@ function OutOfAreaModal({ info, onCancel, onForce }: {
 }) {
   const [reason, setReason] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  useEscapeClose(onCancel);
 
   async function handleForce() {
     if (reason.trim().length < 10) return;
@@ -228,6 +227,7 @@ function CameraModal({ onCapture, onClose }: { onCapture: (photo: string | null)
   const [preview, setPreview] = useState<string | null>(null);
   const [error,   setError]   = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  useEscapeClose(onClose);
 
   useEffect(() => {
     let mounted = true;
@@ -376,36 +376,47 @@ export default function HRISOverviewPage() {
   const [attSummary, setAttSummary] = useState<AttSummary | null>(null);
   const [balances, setBalances] = useState<LeaveBalance[]>([]);
   const [recentLeaves, setRecentLeaves] = useState<LeaveRequest[]>([]);
+  const [holidays, setHolidays] = useState<Set<string>>(new Set());
   const [loading, setLoading]   = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [checkinLoading, setCheckinLoading]   = useState(false);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [outOfAreaInfo, setOutOfAreaInfo] = useState<OutOfAreaInfo | null>(null);
   const [showCamera, setShowCamera] = useState(false);
+  // Set when GPS failed after the selfie was taken — lets the user retry
+  // check-in with the same photo instead of starting over.
+  const [gpsRetry, setGpsRetry] = useState(false);
 
   const pendingCheckInStatus = useRef<'PRESENT' | 'WFH'>('PRESENT');
   const pendingPhotoDataUrl  = useRef<string | null>(null);
+  // Started as soon as the camera opens so GPS acquisition runs while the
+  // user is taking the selfie.
+  const positionPromise = useRef<Promise<GeolocationPosition> | null>(null);
 
   const now = new Date();
   const hour = now.getHours();
-  const greeting = hour < 10 ? 'Good morning' : hour < 15 ? 'Good afternoon' : hour < 18 ? 'Good afternoon' : 'Good evening';
+  const greeting = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
   const dateStr  = now.toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
 
   async function load() {
     setLoading(true);
+    setLoadError(false);
     const thisMonth = now.getMonth() + 1;
     const thisYear  = now.getFullYear();
     try {
-      const [todayRes, balRes, leaveRes, summaryRes] = await Promise.all([
+      const [todayRes, balRes, leaveRes, summaryRes, holidaySet] = await Promise.all([
         api.get('/hris/attendance/today'),
         api.get('/hris/leave-balances'),
         api.get('/hris/leave-requests', { params: { limit: 5 } }),
         api.get('/hris/attendance/summary', { params: { month: thisMonth, year: thisYear } }),
+        getHolidaySet(thisYear),
       ]);
       setToday(todayRes.data.data);
       setBalances(balRes.data.data);
       setRecentLeaves(leaveRes.data.data);
       setAttSummary(summaryRes.data.data.summary);
-    } catch { /* silent */ }
+      setHolidays(holidaySet);
+    } catch { setLoadError(true); }
     finally { setLoading(false); }
   }
 
@@ -415,7 +426,6 @@ export default function HRISOverviewPage() {
     status: 'PRESENT' | 'WFH';
     lat?: number | null;
     lng?: number | null;
-    locationName?: string | null;
     outOfAreaReason?: string | null;
     photoDataUrl?: string | null;
   }) {
@@ -425,11 +435,12 @@ export default function HRISOverviewPage() {
       if (opts.photoDataUrl) payload.photoBase64 = opts.photoDataUrl;
       if (opts.lat != null)        payload.lat = opts.lat;
       if (opts.lng != null)        payload.lng = opts.lng;
-      if (opts.locationName)       payload.locationName = opts.locationName;
       if (opts.outOfAreaReason)    payload.outOfAreaReason = opts.outOfAreaReason;
 
       const res = await api.post('/hris/attendance/check-in', payload);
       setToday(res.data.data);
+      setGpsRetry(false);
+      pendingPhotoDataUrl.current = null;
       toast.success('Checked in successfully!');
     } catch (err: any) {
       const data = err?.response?.data;
@@ -439,7 +450,7 @@ export default function HRISOverviewPage() {
           nearestLocation: data.data.nearestLocation,
           userLat: opts.lat!,
           userLng: opts.lng!,
-          locationName: opts.locationName ?? 'Lokasi kamu',
+          locationName: 'Your location',
           checkInStatus: opts.status,
         });
       } else {
@@ -456,30 +467,35 @@ export default function HRISOverviewPage() {
       doCheckIn({ status: 'WFH' });
       return;
     }
+    // Kick off GPS acquisition now — it resolves while the user takes the selfie.
+    positionPromise.current = getPosition();
+    positionPromise.current.catch(() => { /* handled after capture */ });
     setShowCamera(true);
+  }
+
+  async function submitWithLocation() {
+    const status = pendingCheckInStatus.current;
+    const photo  = pendingPhotoDataUrl.current;
+    try {
+      const pos = await (positionPromise.current ?? getPosition());
+      setGpsRetry(false);
+      await doCheckIn({ status, lat: pos.coords.latitude, lng: pos.coords.longitude, photoDataUrl: photo });
+    } catch {
+      setGpsRetry(true);
+      toast.error('Could not get your location. Allow location access, then retry — your photo is kept.');
+    }
   }
 
   async function handlePhotoCapture(photo: string | null) {
     setShowCamera(false);
     pendingPhotoDataUrl.current = photo;
-    const status = pendingCheckInStatus.current;
+    await submitWithLocation();
+  }
 
-    if (!navigator.geolocation) {
-      toast.error('Perangkat kamu tidak mendukung lokasi. Aktifkan GPS untuk check-in.');
-      return;
-    }
-
-    navigator.geolocation.getCurrentPosition(
-      async (pos) => {
-        const { latitude: lat, longitude: lng } = pos.coords;
-        const locationName = await reverseGeocode(lat, lng);
-        await doCheckIn({ status, lat, lng, locationName, photoDataUrl: photo });
-      },
-      () => {
-        toast.error('Gagal mendapatkan lokasi. Aktifkan izin lokasi lalu coba lagi.');
-      },
-      { timeout: 10000, enableHighAccuracy: true },
-    );
+  // GPS failed after the selfie — retry location only, keeping the photo.
+  async function handleGpsRetry() {
+    positionPromise.current = getPosition();
+    await submitWithLocation();
   }
 
   async function handleForceCheckIn(reason: string) {
@@ -489,7 +505,6 @@ export default function HRISOverviewPage() {
       status: info.checkInStatus,
       lat: info.userLat,
       lng: info.userLng,
-      locationName: info.locationName,
       outOfAreaReason: reason,
       photoDataUrl: pendingPhotoDataUrl.current,
     });
@@ -514,6 +529,21 @@ export default function HRISOverviewPage() {
     );
   }
 
+  if (loadError) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 gap-3">
+        <AlertCircle size={28} className="text-gray-300" />
+        <p className="text-sm text-gray-500">Failed to load data. Check your connection and try again.</p>
+        <button
+          onClick={load}
+          className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+        >
+          <RefreshCw size={14} /> Retry
+        </button>
+      </div>
+    );
+  }
+
   const statusCfg = today ? STATUS_CONFIG[today.status] : null;
   const StatusIcon = statusCfg?.icon ?? CheckCircle2;
 
@@ -523,8 +553,10 @@ export default function HRISOverviewPage() {
   const workdaysPassed = (() => {
     let count = 0;
     for (let d = 1; d <= now.getDate(); d++) {
-      const day = new Date(now.getFullYear(), now.getMonth(), d).getDay();
-      if (day !== 0 && day !== 6) count++;
+      const date = new Date(now.getFullYear(), now.getMonth(), d);
+      const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      const day = date.getDay();
+      if (day !== 0 && day !== 6 && !holidays.has(key)) count++;
     }
     return count;
   })();
@@ -612,12 +644,12 @@ export default function HRISOverviewPage() {
                 </div>
                 <div className="flex gap-2">
                   <button
-                    onClick={() => handleCheckIn('PRESENT')}
+                    onClick={() => (gpsRetry ? handleGpsRetry() : handleCheckIn('PRESENT'))}
                     disabled={checkinLoading}
                     className="flex items-center gap-2 px-5 py-2.5 bg-navy text-white rounded-xl text-sm font-semibold hover:bg-navy/90 transition-colors disabled:opacity-50 shadow-sm"
                   >
-                    {checkinLoading ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={15} />}
-                    Check In
+                    {checkinLoading ? <Loader2 size={14} className="animate-spin" /> : gpsRetry ? <RefreshCw size={15} /> : <CheckCircle2 size={15} />}
+                    {gpsRetry ? 'Retry Check In' : 'Check In'}
                   </button>
                   <button
                     onClick={() => handleCheckIn('WFH')}
@@ -791,7 +823,7 @@ export default function HRISOverviewPage() {
                       <div className="min-w-0">
                         <p className="text-sm font-medium text-gray-800 truncate">{r.leaveType.name}</p>
                         <p className="text-xs text-gray-400">
-                          {fmtDate(r.startDate)} – {fmtDate(r.endDate)} · {r.totalDays}h
+                          {fmtDate(r.startDate)} – {fmtDate(r.endDate)} · {r.totalDays} {r.totalDays > 1 ? 'days' : 'day'}
                         </p>
                       </div>
                     </div>

@@ -6,6 +6,8 @@ import {
 } from 'lucide-react';
 import api from '@/lib/api';
 import { cn } from '@/lib/cn';
+import { getHolidaySet, countWorkdays } from '@/lib/holidays';
+import { useEscapeClose } from '@/hooks/useEscapeClose';
 import { useAuthStore } from '@/stores/authStore';
 import { usePermStore } from '@/stores/permStore';
 import { toast } from '@/stores/toastStore';
@@ -52,19 +54,6 @@ function fmtDate(iso: string) {
   return new Date(iso).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
-function countWeekdays(start: string, end: string): number {
-  if (!start || !end) return 0;
-  let count = 0;
-  const cur = new Date(start + 'T00:00:00Z');
-  const endD = new Date(end + 'T00:00:00Z');
-  while (cur <= endD) {
-    const d = cur.getUTCDay();
-    if (d !== 0 && d !== 6) count++;
-    cur.setUTCDate(cur.getUTCDate() + 1);
-  }
-  return count;
-}
-
 // ── Create Modal ───────────────────────────────────────────────
 function CreateLeaveModal({
   open, onClose, leaveTypes, balances, onCreated,
@@ -76,8 +65,17 @@ function CreateLeaveModal({
   const [form, setForm] = useState({ leaveTypeId: '', startDate: '', endDate: '', reason: '' });
   const [attachment, setAttachment] = useState<{ base64: string; name: string } | null>(null);
   const [saving, setSaving] = useState(false);
+  const [holidays, setHolidays] = useState<Set<string>>(new Set());
+  useEscapeClose(onClose);
 
-  const totalDays = form.startDate && form.endDate ? countWeekdays(form.startDate, form.endDate) : 0;
+  // Holiday set for the year being requested, so the preview day count
+  // matches what the server will compute.
+  const startYear = form.startDate ? Number(form.startDate.slice(0, 4)) : new Date().getFullYear();
+  useEffect(() => {
+    if (open) getHolidaySet(startYear).then(setHolidays);
+  }, [open, startYear]);
+
+  const totalDays = form.startDate && form.endDate ? countWorkdays(form.startDate, form.endDate, holidays) : 0;
   const selType   = leaveTypes.find((t) => t.id === form.leaveTypeId);
   const selBal    = balances.find((b) => b.leaveType.id === form.leaveTypeId);
   // Document mandatory when the type requires one and the request exceeds the
@@ -241,6 +239,7 @@ function ReviewModal({
 }: { request: LeaveRequest; onClose: () => void; onDone: () => void }) {
   const [note, setNote]     = useState('');
   const [saving, setSaving] = useState(false);
+  useEscapeClose(onClose);
   // The approver should see the requester's balance while deciding — the
   // server already validated it at submission, this is decision context.
   const [reqBalance, setReqBalance] = useState<LeaveBalance | null | 'loading'>('loading');
@@ -351,6 +350,7 @@ function GrantCompOffModal({ onClose, onDone }: { onClose: () => void; onDone: (
   const [users, setUsers] = useState<{ id: string; fullName: string }[]>([]);
   const [form, setForm] = useState({ userId: '', days: 1, reason: '' });
   const [saving, setSaving] = useState(false);
+  useEscapeClose(onClose);
 
   useEffect(() => {
     api.get('/users', { params: { limit: 100, isActive: true } })
@@ -434,6 +434,7 @@ export default function LeavePage() {
   const [requests,     setRequests]     = useState<LeaveRequest[]>([]);
   const [meta,         setMeta]         = useState<Meta | null>(null);
   const [loading,      setLoading]      = useState(true);
+  const [loadError,    setLoadError]    = useState(false);
   const [createOpen,   setCreateOpen]   = useState(false);
   const [grantOpen,    setGrantOpen]    = useState(false);
   const [reviewTarget, setReviewTarget] = useState<LeaveRequest | null>(null);
@@ -445,6 +446,7 @@ export default function LeavePage() {
 
   const load = useCallback(async () => {
     setLoading(true);
+    setLoadError(false);
     try {
       const params: Record<string, unknown> = { limit: pageSize, year, page };
       if (statusFilter) params.status = statusFilter;
@@ -459,7 +461,7 @@ export default function LeavePage() {
       setBalances(balRes.data.data);
       setRequests(reqRes.data.data);
       setMeta(reqRes.data.meta);
-    } catch { /* silent */ }
+    } catch { setLoadError(true); }
     finally { setLoading(false); }
   }, [statusFilter, year, page, pageSize, viewMode, user?.id]);
 
@@ -467,8 +469,9 @@ export default function LeavePage() {
 
   useEffect(() => { load(); }, [load]);
 
+  // Next year is allowed so a December request for January stays visible.
   function prevYear() { setYear((y) => y - 1); setPage(1); }
-  function nextYear() { setYear((y) => Math.min(new Date().getFullYear(), y + 1)); setPage(1); }
+  function nextYear() { setYear((y) => Math.min(new Date().getFullYear() + 1, y + 1)); setPage(1); }
 
   async function handleCancel(id: string) {
     try {
@@ -565,7 +568,7 @@ export default function LeavePage() {
             <ChevronLeft size={16} className="text-gray-500" />
           </button>
           <span className="text-sm font-semibold text-gray-700 min-w-[48px] text-center">{year}</span>
-          <button onClick={nextYear} disabled={year >= new Date().getFullYear()} className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors disabled:opacity-30">
+          <button onClick={nextYear} disabled={year >= new Date().getFullYear() + 1} className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors disabled:opacity-30">
             <ChevronRight size={16} className="text-gray-500" />
           </button>
         </div>
@@ -592,6 +595,13 @@ export default function LeavePage() {
         {loading ? (
           <div className="flex items-center justify-center h-32">
             <Loader2 size={20} className="animate-spin text-gray-300" />
+          </div>
+        ) : loadError ? (
+          <div className="py-16 text-center">
+            <p className="text-sm text-gray-500 mb-3">Failed to load data. Check your connection and try again.</p>
+            <button onClick={load} className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
+              <RefreshCw size={14} /> Retry
+            </button>
           </div>
         ) : displayed.length === 0 ? (
           <div className="py-16 text-center">
@@ -639,7 +649,7 @@ export default function LeavePage() {
                       {r.reviewedBy && (
                         <p className="text-xs text-gray-400 mt-0.5">
                           {r.status === 'APPROVED' ? 'Approved' : 'Rejected'} by <span className="font-medium">{r.reviewedBy.fullName}</span>
-                          {r.reviewedAt && ` · ${new Date(r.reviewedAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })}`}
+                          {r.reviewedAt && ` · ${new Date(r.reviewedAt).toLocaleDateString('en-US', { day: 'numeric', month: 'short' })}`}
                         </p>
                       )}
                     </div>

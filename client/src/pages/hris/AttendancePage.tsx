@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import api from '@/lib/api';
 import { cn } from '@/lib/cn';
+import { getHolidaySet } from '@/lib/holidays';
 import { useAuthStore } from '@/stores/authStore';
 import { usePermStore } from '@/stores/permStore';
 
@@ -194,7 +195,7 @@ export default function AttendancePage() {
   const perms = usePermStore((s) => s.perms);
   const attendanceScope = perms.hris.editAttendance;
   const canSeeTeam = attendanceScope === 'division' || attendanceScope === 'all';
-  const teamLabel = attendanceScope === 'division' ? `Team — ${user?.division?.name ?? 'Divisi'}` : 'Team — Semua';
+  const teamLabel = attendanceScope === 'division' ? `Team — ${user?.division?.name ?? 'Division'}` : 'Team — All';
 
   const now = new Date();
   const [month, setMonth]           = useState(now.getMonth() + 1);
@@ -202,6 +203,8 @@ export default function AttendancePage() {
   const [records, setRecords]       = useState<AttendanceRecord[]>([]);
   const [summary, setSummary]       = useState<Summary | null>(null);
   const [loading, setLoading]       = useState(true);
+  const [loadError, setLoadError]   = useState(false);
+  const [holidays, setHolidays]     = useState<Set<string>>(new Set());
   const [viewMode, setViewMode]     = useState<'mine' | 'team'>('mine');
   const [teamRecords, setTeamRecords] = useState<AttendanceRecord[]>([]);
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
@@ -209,18 +212,21 @@ export default function AttendancePage() {
 
   const load = useCallback(async () => {
     setLoading(true);
+    setLoadError(false);
     try {
-      const [summaryRes] = await Promise.all([
+      const [summaryRes, holidaySet] = await Promise.all([
         api.get('/hris/attendance/summary', { params: { month, year } }),
+        getHolidaySet(year),
       ]);
       setSummary(summaryRes.data.data.summary);
       setRecords(summaryRes.data.data.records ?? []);
+      setHolidays(holidaySet);
 
       if (canSeeTeam && viewMode === 'team') {
         const teamRes = await api.get('/hris/attendance', { params: { month, year, limit: 300 } });
         setTeamRecords(teamRes.data.data ?? []);
       }
-    } catch { /* silent */ }
+    } catch { setLoadError(true); }
     finally { setLoading(false); }
   }, [month, year, viewMode, canSeeTeam]);
 
@@ -344,20 +350,23 @@ export default function AttendancePage() {
                   const isToday    = day === now.getDate() && month === now.getMonth() + 1 && year === now.getFullYear();
                   const isSelected = day === selectedDay;
                   const isWeekend  = (firstDay + day - 1) % 7 === 0 || (firstDay + day - 1) % 7 === 6;
+                  const dateKey    = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                  const isHoliday  = holidays.has(dateKey);
 
                   return (
-                    <div
+                    <button
+                      type="button"
                       key={day}
                       onClick={() => setSelectedDay(isSelected ? null : day)}
                       className={cn(
-                        'border-b border-r border-gray-50 min-h-[84px] p-2 cursor-pointer transition-colors',
+                        'border-b border-r border-gray-50 min-h-[84px] p-2 cursor-pointer transition-colors text-left align-top',
                         isSelected ? 'bg-navy/5 ring-1 ring-inset ring-navy/20' : 'hover:bg-gray-50',
-                        isWeekend && !rec ? 'bg-gray-50/60' : '',
+                        (isWeekend || isHoliday) && !rec ? 'bg-gray-50/60' : '',
                       )}
                     >
                       <div className={cn(
                         'w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold mb-1',
-                        isToday ? 'bg-navy text-white shadow-sm' : isSelected ? 'bg-navy/10 text-navy' : isWeekend ? 'text-gray-400' : 'text-gray-700',
+                        isToday ? 'bg-navy text-white shadow-sm' : isSelected ? 'bg-navy/10 text-navy' : isHoliday ? 'text-red-400' : isWeekend ? 'text-gray-400' : 'text-gray-700',
                       )}>
                         {day}
                       </div>
@@ -377,10 +386,12 @@ export default function AttendancePage() {
                             <Camera size={9} className="text-gray-300 mt-0.5" />
                           )}
                         </div>
+                      ) : isHoliday ? (
+                        <span className="text-[10px] font-medium text-red-400">Holiday</span>
                       ) : isWeekend ? (
                         <span className="text-[10px] text-gray-300">Off</span>
                       ) : null}
-                    </div>
+                    </button>
                   );
                 })}
               </div>
@@ -420,6 +431,13 @@ export default function AttendancePage() {
           {loading ? (
             <div className="flex items-center justify-center h-32">
               <Loader2 size={20} className="animate-spin text-gray-300" />
+            </div>
+          ) : loadError ? (
+            <div className="py-12 text-center">
+              <p className="text-sm text-gray-500 mb-3">Failed to load data. Check your connection and try again.</p>
+              <button onClick={load} className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
+                <RefreshCw size={14} /> Retry
+              </button>
             </div>
           ) : viewMode === 'mine' ? (
             <LogTable

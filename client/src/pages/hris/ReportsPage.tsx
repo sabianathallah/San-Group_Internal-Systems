@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import {
   BarChart3, ChevronLeft, ChevronRight, Download, Loader2,
-  Users, CheckCircle2, Clock, XCircle, MapPinOff, Filter, Search,
+  Users, CheckCircle2, Clock, XCircle, MapPinOff, Filter, Search, RefreshCw,
 } from 'lucide-react';
 import api from '@/lib/api';
 import { cn } from '@/lib/cn';
@@ -77,6 +77,7 @@ export default function ReportsPage() {
 
   const [rows, setRows]         = useState<ReportRow[]>([]);
   const [loading, setLoading]   = useState(false);
+  const [loadError, setLoadError] = useState(false);
   const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
@@ -85,13 +86,14 @@ export default function ReportsPage() {
 
   const fetch = useCallback(async () => {
     setLoading(true);
+    setLoadError(false);
     try {
       const params: Record<string, string | number> = { month, year };
       if (divisionId) params.divisionId = divisionId;
       if (search.trim()) params.search = search.trim();
       const res = await api.get('/hris/reports/attendance', { params });
       setRows(Array.isArray(res.data.data) ? res.data.data : []);
-    } catch { /* silent */ }
+    } catch { setLoadError(true); }
     finally { setLoading(false); }
   }, [month, year, divisionId, search]);
 
@@ -213,6 +215,13 @@ export default function ReportsPage() {
       {loading ? (
         <div className="flex items-center justify-center py-16">
           <Loader2 size={24} className="animate-spin text-gray-300" />
+        </div>
+      ) : loadError ? (
+        <div className="text-center py-16">
+          <p className="text-sm text-gray-500 mb-3">Failed to load data. Check your connection and try again.</p>
+          <button onClick={fetch} className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
+            <RefreshCw size={14} /> Retry
+          </button>
         </div>
       ) : rows.length === 0 ? (
         <div className="text-center py-16">

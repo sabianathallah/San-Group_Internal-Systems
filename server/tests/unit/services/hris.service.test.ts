@@ -35,7 +35,8 @@ beforeEach(() => {
   prismaMock.holiday.findMany.mockResolvedValue([] as never);
   prismaMock.leaveRequest.findFirst.mockResolvedValue(null);
   prismaMock.lateExcuseRequest.findFirst.mockResolvedValue(null);
-  prismaMock.user.findMany.mockResolvedValue([] as never); // no managers to notify
+  prismaMock.role.findMany.mockResolvedValue([] as never); // no reviewer roles
+  prismaMock.user.findMany.mockResolvedValue([] as never); // no reviewers to notify
 });
 
 // ── checkInService — geofencing ──────────────────────────────

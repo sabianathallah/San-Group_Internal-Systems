@@ -1,10 +1,11 @@
 import { useEffect, useState, useCallback } from 'react';
 import {
   ClipboardEdit, Plus, Loader2, X, CheckCircle2, XCircle, Clock,
-  AlertCircle, CalendarClock, AlarmClock, Users, User,
+  AlertCircle, CalendarClock, AlarmClock, Users, User, RefreshCw,
 } from 'lucide-react';
 import api from '@/lib/api';
 import { cn } from '@/lib/cn';
+import { useEscapeClose } from '@/hooks/useEscapeClose';
 import { useAuthStore } from '@/stores/authStore';
 import { usePermStore } from '@/stores/permStore';
 import { toast } from '@/stores/toastStore';
@@ -52,6 +53,7 @@ function CreateLateExcuseModal({ onClose, onCreated }: { onClose: () => void; on
   const today = new Date(Date.now() + 7 * 3600 * 1000).toISOString().slice(0, 10);
   const [form, setForm] = useState({ date: today, expectedTime: '', reason: '' });
   const [submitting, setSubmitting] = useState(false);
+  useEscapeClose(onClose);
 
   async function handleSubmit() {
     if (form.reason.trim().length < 5) return;
@@ -123,6 +125,7 @@ function CreateShiftChangeModal({ onClose, onCreated }: { onClose: () => void; o
   const [shifts, setShifts] = useState<ShiftOption[]>([]);
   const [form, setForm] = useState({ requestedShiftId: '', effectiveDate: today, reason: '' });
   const [submitting, setSubmitting] = useState(false);
+  useEscapeClose(onClose);
 
   useEffect(() => {
     api.get('/hris/shifts')
@@ -201,6 +204,7 @@ function ReviewModal({
 }) {
   const [note, setNote] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  useEscapeClose(onClose);
 
   async function handleReview(status: 'APPROVED' | 'REJECTED') {
     setSubmitting(true);
@@ -285,6 +289,7 @@ export default function RequestsPage() {
   const [items, setItems]         = useState<(LateExcuse | ShiftChange)[]>([]);
   const [meta, setMeta]           = useState<Meta | null>(null);
   const [loading, setLoading]     = useState(false);
+  const [loadError, setLoadError] = useState(false);
   const [page, setPage]           = useState(1);
   const [pageSize, setPageSize]   = useState(20);
   const [createOpen, setCreateOpen]       = useState(false);
@@ -292,6 +297,7 @@ export default function RequestsPage() {
 
   const fetch = useCallback(async () => {
     setLoading(true);
+    setLoadError(false);
     try {
       const params: Record<string, string | number> = { page, limit: pageSize };
       if (statusTab) params.status = statusTab;
@@ -299,7 +305,7 @@ export default function RequestsPage() {
       const res = await api.get(kind === 'late' ? '/hris/late-excuses' : '/hris/shift-changes', { params });
       setItems(res.data.data);
       setMeta(res.data.meta);
-    } catch { /* silent */ }
+    } catch { setLoadError(true); }
     finally { setLoading(false); }
   }, [kind, statusTab, viewMode, page, pageSize, user, canReview]);
 
@@ -379,6 +385,13 @@ export default function RequestsPage() {
         {loading ? (
           <div className="flex items-center justify-center py-12">
             <Loader2 size={24} className="animate-spin text-gray-300" />
+          </div>
+        ) : loadError ? (
+          <div className="text-center py-12">
+            <p className="text-sm text-gray-500 mb-3">Failed to load data. Check your connection and try again.</p>
+            <button onClick={fetch} className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
+              <RefreshCw size={14} /> Retry
+            </button>
           </div>
         ) : items.length === 0 ? (
           <div className="text-center py-12">
