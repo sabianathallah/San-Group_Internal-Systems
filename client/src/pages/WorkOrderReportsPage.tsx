@@ -4,7 +4,8 @@ import {
 } from 'lucide-react';
 import api from '@/lib/api';
 import { cn } from '@/lib/cn';
-import { STATUS_CONFIG, PRIORITY_CONFIG, type WOStatus, type WOPriority } from '@/pages/WorkOrderPage';
+import { toast } from '@/stores/toastStore';
+import { STATUS_CONFIG, PRIORITY_CONFIG, extractErr, type WOStatus, type WOPriority } from '@/pages/WorkOrderPage';
 
 // ── Types ──────────────────────────────────────────────────────
 const CATEGORY_LABELS: Record<string, string> = {
@@ -54,7 +55,13 @@ function exportCSV(report: Report, monthLabel: string) {
       'Longest Open', `${w.code} — ${w.title}`, w.assigneeName ?? 'Unassigned', '', fmtDuration(w.openMinutes),
     ]),
   ];
-  const csv = [header, ...rows].map((r) => r.map((v) => `"${v.replace(/"/g, '""')}"`).join(',')).join('\n');
+  // Neutralize leading =, +, -, @ so Excel/Sheets never executes a cell as a formula.
+  const csv = [header, ...rows]
+    .map((r) => r.map((v) => {
+      const safe = /^[=+\-@]/.test(v) ? `'${v}` : v;
+      return `"${safe.replace(/"/g, '""')}"`;
+    }).join(','))
+    .join('\n');
   const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -70,14 +77,22 @@ export default function WorkOrderReportsPage() {
   const [year, setYear]   = useState(now.getFullYear());
   const [report, setReport] = useState<Report | null>(null);
   const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
 
   const fetch = useCallback(async () => {
     setLoading(true);
+    setLoadError(null);
     try {
       const res = await api.get('/work-orders/reports', { params: { month, year } });
       setReport(res.data.data);
-    } catch { /* silent */ }
+    } catch (err) {
+      // Surface the failure — a silent catch here would render "No report
+      // data", which reads as "the month is empty" instead of "server error".
+      const msg = extractErr(err);
+      setLoadError(msg);
+      toast.error(msg);
+    }
     finally { setLoading(false); }
   }, [month, year]);
 
@@ -128,6 +143,17 @@ export default function WorkOrderReportsPage() {
       {loading ? (
         <div className="flex items-center justify-center py-16">
           <Loader2 size={24} className="animate-spin text-gray-300" />
+        </div>
+      ) : loadError ? (
+        <div className="text-center py-16">
+          <BarChart3 size={32} className="text-gray-200 mx-auto mb-3" />
+          <p className="text-gray-500 text-sm mb-3">Failed to load report: {loadError}</p>
+          <button
+            onClick={fetch}
+            className="text-sm font-medium px-4 py-2 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50"
+          >
+            Try again
+          </button>
         </div>
       ) : !report ? (
         <div className="text-center py-16">

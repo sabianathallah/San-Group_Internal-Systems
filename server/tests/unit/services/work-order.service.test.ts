@@ -355,7 +355,7 @@ describe('assignee eligibility (work_order.canBeAssignee)', () => {
   });
 
   it('rejects creating a WO pre-assigned to a role with canBeAssignee=false', async () => {
-    getPermissionsForRoleMock.mockResolvedValue({ work_order: { canBeAssignee: false } });
+    getPermissionsForRoleMock.mockResolvedValue({ work_order: { canBeAssignee: false, edit: 'all' } });
 
     await expect(
       createWorkOrderService(REQUESTER_ID, { title: 'AC rusak', assignedToId: ASSIGNEE_ID }),
@@ -363,7 +363,7 @@ describe('assignee eligibility (work_order.canBeAssignee)', () => {
   });
 
   it('allows creating a WO pre-assigned to a role with canBeAssignee=true', async () => {
-    getPermissionsForRoleMock.mockResolvedValue({ work_order: { canBeAssignee: true } });
+    getPermissionsForRoleMock.mockResolvedValue({ work_order: { canBeAssignee: true, edit: 'all' } });
     prismaMock.$queryRaw.mockResolvedValue([{ counter: 1 }] as never);
     prismaMock.workOrder.create.mockResolvedValue(mockWO({ assignedToId: ASSIGNEE_ID }) as never);
 
@@ -379,5 +379,100 @@ describe('assignee eligibility (work_order.canBeAssignee)', () => {
     await expect(
       updateWorkOrderService('wo-uuid-1', REQUESTER_ID, 'all', DIVISION_A, { assignedToId: ASSIGNEE_ID }),
     ).rejects.toMatchObject({ statusCode: 400 });
+  });
+});
+
+// ── assignment authority ──────────────────────────────────────
+describe('assignment authority (work_order.edit beyond own)', () => {
+  const ASSIGNEE_ID = 'user-uuid-assignee';
+
+  it("rejects creating a pre-assigned WO when the creator's edit scope is 'own'", async () => {
+    prismaMock.user.findUnique.mockResolvedValue({ role: { id: 'role-uuid-1', level: 5 } } as never);
+    getPermissionsForRoleMock.mockResolvedValue({ work_order: { canBeAssignee: true, edit: 'own' } });
+
+    await expect(
+      createWorkOrderService(REQUESTER_ID, { title: 'AC rusak', assignedToId: ASSIGNEE_ID }),
+    ).rejects.toMatchObject({ statusCode: 403 });
+    expect(prismaMock.workOrder.create).not.toHaveBeenCalled();
+  });
+
+  it("rejects changing the assignee via update when edit scope is 'own'", async () => {
+    prismaMock.workOrder.findUnique.mockResolvedValue(mockWO({ status: WorkOrderStatus.OPEN }) as never);
+
+    await expect(
+      updateWorkOrderService('wo-uuid-1', REQUESTER_ID, 'own', DIVISION_A, { assignedToId: ASSIGNEE_ID }),
+    ).rejects.toMatchObject({ statusCode: 403 });
+    expect(prismaMock.workOrder.update).not.toHaveBeenCalled();
+  });
+});
+
+// ── deleting closed work orders ───────────────────────────────
+describe('deleteWorkOrderService — closed work orders', () => {
+  it("rejects deleting a DONE work order without 'all' scope", async () => {
+    prismaMock.workOrder.findUnique.mockResolvedValue(
+      mockWO({ status: WorkOrderStatus.DONE, reportedBy: { divisionId: DIVISION_A } }) as never,
+    );
+
+    await expect(
+      deleteWorkOrderService('wo-uuid-1', REQUESTER_ID, 'own', DIVISION_A),
+    ).rejects.toMatchObject({ statusCode: 403 });
+    expect(prismaMock.workOrder.delete).not.toHaveBeenCalled();
+  });
+
+  it("rejects deleting a CANCELLED work order with 'division' scope", async () => {
+    prismaMock.workOrder.findUnique.mockResolvedValue(
+      mockWO({ status: WorkOrderStatus.CANCELLED, reportedBy: { divisionId: DIVISION_A } }) as never,
+    );
+
+    await expect(
+      deleteWorkOrderService('wo-uuid-1', REQUESTER_ID, 'division', DIVISION_A),
+    ).rejects.toMatchObject({ statusCode: 403 });
+  });
+
+  it("allows deleting a DONE work order with 'all' scope", async () => {
+    prismaMock.workOrder.findUnique.mockResolvedValue(mockWO({ status: WorkOrderStatus.DONE }) as never);
+
+    await expect(
+      deleteWorkOrderService('wo-uuid-1', REQUESTER_ID, 'all', DIVISION_A),
+    ).resolves.toBeUndefined();
+    expect(prismaMock.workOrder.delete).toHaveBeenCalledTimes(1);
+  });
+});
+
+// ── resubmission after rejection requires fresh proof ─────────
+describe('changeWorkOrderStatusService — resubmit after rejection', () => {
+  const REVIEWED_AT = new Date('2026-07-10T10:00:00Z');
+
+  it('rejects resubmitting with only pre-rejection "after" photos', async () => {
+    prismaMock.workOrder.findUnique.mockResolvedValue(
+      mockWO({
+        status: WorkOrderStatus.IN_PROGRESS, assignedToId: REQUESTER_ID, reviewedAt: REVIEWED_AT,
+        attachments: [{ type: 'AFTER', createdAt: new Date('2026-07-09T08:00:00Z') }],
+      }) as never,
+    );
+
+    await expect(
+      changeWorkOrderStatusService('wo-uuid-1', REQUESTER_ID, 'own', DIVISION_A, { status: WorkOrderStatus.PENDING_REVIEW }),
+    ).rejects.toMatchObject({ statusCode: 400 });
+    expect(prismaMock.workOrder.update).not.toHaveBeenCalled();
+  });
+
+  it('allows resubmitting once a new "after" photo was uploaded after the rejection', async () => {
+    prismaMock.workOrder.findUnique.mockResolvedValue(
+      mockWO({
+        status: WorkOrderStatus.IN_PROGRESS, assignedToId: REQUESTER_ID, reviewedAt: REVIEWED_AT,
+        attachments: [
+          { type: 'AFTER', createdAt: new Date('2026-07-09T08:00:00Z') },
+          { type: 'AFTER', createdAt: new Date('2026-07-11T09:00:00Z') },
+        ],
+      }) as never,
+    );
+    prismaMock.workOrder.update.mockResolvedValue(mockWO({ status: WorkOrderStatus.PENDING_REVIEW }) as never);
+
+    const result = await changeWorkOrderStatusService(
+      'wo-uuid-1', REQUESTER_ID, 'own', DIVISION_A, { status: WorkOrderStatus.PENDING_REVIEW },
+    );
+
+    expect(result.status).toBe(WorkOrderStatus.PENDING_REVIEW);
   });
 });

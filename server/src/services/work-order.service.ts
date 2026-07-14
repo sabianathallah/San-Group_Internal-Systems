@@ -25,6 +25,22 @@ async function assertCanBeAssignee(userId: string): Promise<void> {
   }
 }
 
+// Assigning a technician requires authority beyond one's own work orders —
+// mirrors the client hiding the assignee field for edit scope 'own'. Without
+// this, any user who can create a WO could pre-assign it and skip the
+// OPEN → VALIDATED vetting step entirely.
+async function assertCanAssign(userId: string): Promise<void> {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { role: { select: { id: true, level: true } } },
+  });
+  if (!user) throw new AppError('User not found', 404);
+  const perms = await getPermissionsForRole(user.role.id, user.role.level);
+  if (perms.work_order.edit !== 'all' && perms.work_order.edit !== 'division') {
+    throw new AppError('You do not have authority to assign work orders', 403);
+  }
+}
+
 // Mirrors client-side STATUS_TRANSITIONS in WorkOrderPage.tsx — kept in sync manually.
 // PENDING_REVIEW is only ever entered via submitForReviewService (photo-gated) and
 // only ever left via reviewWorkOrderService (approve -> DONE, reject -> IN_PROGRESS) —
@@ -125,7 +141,7 @@ async function notifyAssignCapableUsers(creatorId: string, woId: string, title: 
       type:    NotificationType.WO_STATUS_CHANGED,
       title:   `New work order: ${title}`,
       message: 'A new work order was reported and needs to be assigned.',
-      link:    `/work-orders/${woId}`,
+      link:    `/work-orders?id=${woId}`,
     })),
   });
 }
@@ -146,7 +162,7 @@ async function sendWONotification(
       type,
       title,
       message,
-      link: `/work-orders/${woId}`,
+      link: `/work-orders?id=${woId}`,
     },
   });
 }
@@ -261,7 +277,10 @@ export async function createWorkOrderService(userId: string, body: Record<string
     assignedToId?: string | null;
   };
 
-  if (assignedToId) await assertCanBeAssignee(assignedToId);
+  if (assignedToId) {
+    await assertCanAssign(userId);
+    await assertCanBeAssignee(assignedToId);
+  }
 
   const code = await generateWorkOrderCode();
   // Creating with an assignee already implies the creator (an admin) has
@@ -347,6 +366,11 @@ export async function updateWorkOrderService(
     assignedToId?: string | null; notes?: string | null;
   };
 
+  // Changing the assignee (assigning or unassigning) needs assignment
+  // authority, not just the right to edit one's own work order.
+  if (assignedToId !== undefined && editScope === 'own') {
+    throw new AppError('You do not have authority to assign work orders', 403);
+  }
   if (assignedToId) await assertCanBeAssignee(assignedToId);
 
   const prevAssignee = existing.assignedToId;
@@ -415,10 +439,10 @@ export async function changeWorkOrderStatusService(
   const existing = await prisma.workOrder.findUnique({
     where: { id },
     select: {
-      id: true, reportedById: true, assignedToId: true, status: true, title: true,
+      id: true, reportedById: true, assignedToId: true, status: true, title: true, reviewedAt: true,
       reportedBy: { select: { divisionId: true } },
       assignee:   { select: { divisionId: true } },
-      attachments: { select: { type: true } },
+      attachments: { select: { type: true, createdAt: true } },
     },
   });
   if (!existing) throw new AppError('Work order not found', 404);
@@ -447,9 +471,20 @@ export async function changeWorkOrderStatusService(
     if (!canSubmitForReview) {
       throw new AppError(`Cannot change status from ${existing.status} to ${status}`, 400);
     }
-    const hasAfterPhoto = existing.attachments.some((a) => a.type === WorkOrderAttachmentType.AFTER);
+    // After a rejection (reviewedAt set), the old proof photos don't count —
+    // resubmitting requires fresh evidence uploaded after the review, otherwise
+    // the reject → fix → resubmit cycle would enforce nothing.
+    const hasAfterPhoto = existing.attachments.some(
+      (a) => a.type === WorkOrderAttachmentType.AFTER
+        && (!existing.reviewedAt || a.createdAt > existing.reviewedAt),
+    );
     if (!hasAfterPhoto) {
-      throw new AppError('At least 1 "after" photo must be uploaded before submitting for review', 400);
+      throw new AppError(
+        existing.reviewedAt
+          ? 'At least 1 new "after" photo (uploaded after the rejection) is required before resubmitting for review'
+          : 'At least 1 "after" photo must be uploaded before submitting for review',
+        400,
+      );
     }
   } else if (!STATUS_TRANSITIONS[existing.status].includes(status)) {
     throw new AppError(`Cannot change status from ${existing.status} to ${status}`, 400);
@@ -602,12 +637,20 @@ export async function deleteWorkOrderService(id: string, userId: string, deleteS
   const existing = await prisma.workOrder.findUnique({
     where: { id },
     select: {
-      id: true, reportedById: true,
+      id: true, reportedById: true, status: true,
       reportedBy: { select: { divisionId: true } },
       assignee:   { select: { divisionId: true } },
     },
   });
   if (!existing) throw new AppError('Work order not found', 404);
+  // Closed WOs are the audit record of work done — only company-wide admins
+  // may remove them; everyone else's delete right stops at in-flight WOs.
+  if (
+    (existing.status === WorkOrderStatus.DONE || existing.status === WorkOrderStatus.CANCELLED)
+    && deleteScope !== 'all'
+  ) {
+    throw new AppError('Closed work orders can only be deleted by an administrator', 403);
+  }
   if (deleteScope === 'own' && existing.reportedById !== userId) {
     throw new AppError('Only the reporter can delete this work order', 403);
   }

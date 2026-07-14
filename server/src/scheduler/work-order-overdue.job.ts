@@ -77,7 +77,7 @@ export function registerWorkOrderOverdueJob(): void {
         await sendNotif(
           'Work order overdue',
           `${wo.code} "${wo.title}" has passed its due date`,
-          `/work-orders/${wo.id}`,
+          `/work-orders?id=${wo.id}`,
           [wo.assignedToId, ...(await adminsFor(divisionId))],
         );
       }
@@ -99,7 +99,7 @@ export function registerWorkOrderOverdueJob(): void {
         await sendNotif(
           'Work order still unassigned',
           `${wo.code} "${wo.title}" has been waiting for an assignee since yesterday or longer`,
-          `/work-orders/${wo.id}`,
+          `/work-orders?id=${wo.id}`,
           await adminsFor(wo.reportedBy.divisionId ?? null),
         );
       }

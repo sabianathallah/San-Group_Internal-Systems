@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   DndContext, DragOverlay, PointerSensor, useSensor, useSensors,
   useDraggable, useDroppable, type DragEndEvent, type DragStartEvent,
@@ -8,7 +9,7 @@ import {
   MapPin, User, Calendar, List, Filter, RefreshCw, Loader2,
   CheckCircle2, Circle, ArrowRight, Camera, History, ChevronUp,
   Zap, AlertCircle, Ban, LayoutGrid, Table2, ImageOff, ThumbsUp, ThumbsDown,
-  ShieldCheck, ClipboardCheck, Download,
+  ShieldCheck, ClipboardCheck, Download, Info,
 } from 'lucide-react';
 import api from '@/lib/api';
 import { cn } from '@/lib/cn';
@@ -243,7 +244,10 @@ export function AgeBadge({ wo }: { wo: WorkOrder }) {
 }
 
 function csvCell(v: string) {
-  return `"${v.replace(/"/g, '""')}"`;
+  // Leading =, +, -, @ would be executed as a formula by Excel/Sheets —
+  // neutralize with a leading apostrophe (standard CSV-injection guard).
+  const safe = /^[=+\-@]/.test(v) ? `'${v}` : v;
+  return `"${safe.replace(/"/g, '""')}"`;
 }
 
 function exportWorkOrdersCSV(workOrders: WorkOrder[]) {
@@ -305,12 +309,19 @@ export function CategoryBadge({ category }: { category: WOCategory }) {
   );
 }
 
+// Static class map — Tailwind's JIT can't see template-literal classes like
+// `w-${size}`, so dynamic strings would silently produce no styling.
+const AVATAR_SIZE_CLASS: Record<number, string> = {
+  5: 'w-5 h-5', 6: 'w-6 h-6', 7: 'w-7 h-7', 8: 'w-8 h-8',
+};
+
 export function Avatar({ user, size = 6 }: { user: WOUser | null; size?: number }) {
-  if (!user) return <div className={cn('rounded-full bg-gray-200', `w-${size} h-${size}`)} />;
+  const sizeClass = AVATAR_SIZE_CLASS[size] ?? AVATAR_SIZE_CLASS[6];
+  if (!user) return <div className={cn('rounded-full bg-gray-200', sizeClass)} />;
   return user.avatar
-    ? <img src={user.avatar} alt={user.fullName} className={cn('rounded-full object-cover flex-shrink-0', `w-${size} h-${size}`)} />
+    ? <img src={user.avatar} alt={user.fullName} className={cn('rounded-full object-cover flex-shrink-0', sizeClass)} />
     : (
-      <div className={cn('rounded-full bg-navy/10 flex items-center justify-center flex-shrink-0 text-navy font-semibold', `w-${size} h-${size}`, size <= 6 ? 'text-[10px]' : 'text-xs')}>
+      <div className={cn('rounded-full bg-navy/10 flex items-center justify-center flex-shrink-0 text-navy font-semibold', sizeClass, size <= 6 ? 'text-[10px]' : 'text-xs')}>
         {user.fullName.slice(0, 2).toUpperCase()}
       </div>
     );
@@ -339,12 +350,15 @@ function slaDueDateInput(priority: WOPriority): string {
 }
 
 function WorkOrderModal({
-  open, onClose, editItem, onSaved, users,
+  open, onClose, editItem, onSaved, users, canAssign,
 }: {
   open: boolean; onClose: () => void;
   editItem: WorkOrder | null;
   onSaved: (wo: WorkOrder) => void;
   users: WOUser[];
+  // edit scope 'all'/'division' only — assigning is an admin decision, so
+  // own-scope reporters never see the field (and the server rejects it anyway).
+  canAssign: boolean;
 }) {
   const [form, setForm] = useState<FormData>(DEFAULT_FORM);
   const [saving, setSaving] = useState(false);
@@ -388,16 +402,18 @@ function WorkOrderModal({
     if (!form.title.trim()) { toast.error('Title is required'); return; }
     setSaving(true);
     try {
-      const payload = {
+      const payload: Record<string, unknown> = {
         title:        form.title.trim(),
         description:  form.description.trim() || null,
         priority:     form.priority,
         category:     form.category,
         location:     form.location.trim() || null,
         dueDate:      form.dueDate ? new Date(form.dueDate).toISOString() : null,
-        assignedToId: form.assignedToId || null,
         notes:        form.notes.trim() || null,
       };
+      // Only include the assignee when the user has assignment authority —
+      // sending it without would be rejected server-side (403).
+      if (canAssign) payload.assignedToId = form.assignedToId || null;
       const res = editItem
         ? await api.patch(`/work-orders/${editItem.id}`, payload)
         : await api.post('/work-orders', payload);
@@ -410,6 +426,7 @@ function WorkOrderModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4" onClick={onClose}>
       <div
+        role="dialog" aria-modal="true" aria-label={editItem ? `Edit ${editItem.code}` : 'Create Work Order'}
         className="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
@@ -417,7 +434,7 @@ function WorkOrderModal({
           <h2 className="font-semibold text-gray-900">
             {editItem ? `Edit ${editItem.code}` : 'Create Work Order'}
           </h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
+          <button onClick={onClose} aria-label="Close" className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
         </div>
 
         <form onSubmit={handleSubmit} className="p-5 space-y-4">
@@ -487,18 +504,20 @@ function WorkOrderModal({
             </div>
           </div>
 
-          <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">Assign to Technician</label>
-            <select
-              value={form.assignedToId} onChange={(e) => set('assignedToId', e.target.value)}
-              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-navy/30"
-            >
-              <option value="">— Unassigned —</option>
-              {users.map((u) => (
-                <option key={u.id} value={u.id}>{u.fullName}</option>
-              ))}
-            </select>
-          </div>
+          {canAssign && (
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Assign to Technician</label>
+              <select
+                value={form.assignedToId} onChange={(e) => set('assignedToId', e.target.value)}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-navy/30"
+              >
+                <option value="">— Unassigned —</option>
+                {users.map((u) => (
+                  <option key={u.id} value={u.id}>{u.fullName}</option>
+                ))}
+              </select>
+            </div>
+          )}
 
           {editItem && (
             <div>
@@ -559,10 +578,10 @@ function StatusModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4" onClick={onClose}>
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-sm" onClick={(e) => e.stopPropagation()}>
+      <div role="dialog" aria-modal="true" aria-label="Change Status" className="bg-white rounded-xl shadow-xl w-full max-w-sm" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
           <h2 className="font-semibold text-gray-900">Change Status</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
+          <button onClick={onClose} aria-label="Close" className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
         </div>
         <div className="p-5 space-y-4">
           {transitions.length === 0 && (
@@ -587,7 +606,11 @@ function StatusModal({
                   <div>
                     <p className="text-sm font-medium text-gray-800">{cfg.label}</p>
                     {s === 'PENDING_REVIEW' && (
-                      <p className="text-[10px] text-gray-400">Requires at least 1 "after" photo</p>
+                      <p className="text-[10px] text-gray-400">
+                        {wo.reviewedAt
+                          ? 'Requires a new "after" photo uploaded after the rejection'
+                          : 'Requires at least 1 "after" photo'}
+                      </p>
                     )}
                   </div>
                   {selected === s && <Check size={14} className="ml-auto text-navy" />}
@@ -657,10 +680,10 @@ function ReviewModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4" onClick={onClose}>
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+      <div role="dialog" aria-modal="true" aria-label="Review Completed Work" className="bg-white rounded-xl shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
           <h2 className="font-semibold text-gray-900">Review Completed Work</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
+          <button onClick={onClose} aria-label="Close" className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
         </div>
         <div className="p-5 space-y-4">
           <p className="text-sm text-gray-600">{wo.code} — {wo.title}</p>
@@ -754,10 +777,10 @@ function AssigneePickerModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4" onClick={onClose}>
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-sm max-h-[80vh] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
+      <div role="dialog" aria-modal="true" aria-label="Assign Work Order" className="bg-white rounded-xl shadow-xl w-full max-w-sm max-h-[80vh] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 flex-shrink-0">
           <h2 className="font-semibold text-gray-900">Assign Work Order</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
+          <button onClick={onClose} aria-label="Close" className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
         </div>
         <p className="px-5 pt-3 text-xs text-gray-500">Pick a technician for &quot;{wo.title}&quot;</p>
         <div className="px-5 pt-3 flex-shrink-0">
@@ -1002,6 +1025,7 @@ function PhotoSection({
             <button
               onClick={() => beforeInputRef.current?.click()}
               disabled={uploading === 'BEFORE'}
+              aria-label="Upload before photo"
               className="text-navy hover:text-navy/70 disabled:opacity-50"
             >
               {uploading === 'BEFORE' ? <Loader2 size={14} className="animate-spin" /> : <Camera size={14} />}
@@ -1021,6 +1045,7 @@ function PhotoSection({
             <button
               onClick={() => afterInputRef.current?.click()}
               disabled={uploading === 'AFTER'}
+              aria-label="Upload after photo"
               className="text-navy hover:text-navy/70 disabled:opacity-50"
             >
               {uploading === 'AFTER' ? <Loader2 size={14} className="animate-spin" /> : <Camera size={14} />}
@@ -1116,8 +1141,11 @@ export function WODetail({
   const isAssignee    = wo.assignee?.id === currentUserId;
   const sameDivision  = wo.reportedBy.divisionId === currentDivisionId || wo.assignee?.divisionId === currentDivisionId;
 
+  const isClosedWO = wo.status === 'DONE' || wo.status === 'CANCELLED';
   const canEdit    = hasScope(editScope, isReporter, sameDivision);
-  const canDelete  = hasScope(deleteScope, isReporter, sameDivision);
+  // Closed WOs are the audit record — only company-wide admins may delete them
+  // (mirrors the server-side guard in deleteWorkOrderService).
+  const canDelete  = hasScope(deleteScope, isReporter, sameDivision) && (!isClosedWO || deleteScope === 'all');
   // Status changes go through the 'edit' permission on the backend (same route guard),
   // and 'own' scope there additionally allows the assignee, not just the reporter.
   const canStatus  = hasScope(editScope, isReporter || isAssignee, sameDivision);
@@ -1150,7 +1178,7 @@ export function WODetail({
             <CategoryBadge category={wo.category} />
           </div>
         </div>
-        <button onClick={onClose} className="text-gray-400 hover:text-gray-600 flex-shrink-0">
+        <button onClick={onClose} aria-label="Close" className="text-gray-400 hover:text-gray-600 flex-shrink-0">
           <X size={18} />
         </button>
       </div>
@@ -1405,7 +1433,11 @@ export default function WorkOrderPage() {
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo]     = useState('');
   const [search, setSearch]       = useState('');
+  // The committed search value actually sent to the API — follows typing with a
+  // debounce, but Enter commits immediately (no stale-debounce fetch).
+  const [searchQuery, setSearchQuery] = useState('');
   const debouncedSearch = useDebounced(search);
+  useEffect(() => { setSearchQuery(debouncedSearch); }, [debouncedSearch]);
   const [showFilters, setShowFilters] = useState(false);
   const [exporting, setExporting] = useState(false);
 
@@ -1447,10 +1479,11 @@ export default function WorkOrderPage() {
     if (categoryFilter) params.category = categoryFilter;
     if (assigneeFilter) params.assignedToId = assigneeFilter;
     if (dateFrom) params.dateFrom = new Date(dateFrom).toISOString();
-    if (dateTo)   params.dateTo   = new Date(dateTo).toISOString();
-    if (debouncedSearch.trim()) params.search = debouncedSearch.trim();
+    // End of day, not midnight — "to 14 Jul" must include WOs created on the 14th.
+    if (dateTo)   params.dateTo   = new Date(`${dateTo}T23:59:59.999`).toISOString();
+    if (searchQuery.trim()) params.search = searchQuery.trim();
     return params;
-  }, [view, priorityFilter, categoryFilter, assigneeFilter, dateFrom, dateTo, debouncedSearch]);
+  }, [view, priorityFilter, categoryFilter, assigneeFilter, dateFrom, dateTo, searchQuery]);
 
   const fetchWOs = useCallback(async (pageArg = 1, append = false) => {
     (append ? setLoadingMore : setLoading)(true);
@@ -1514,17 +1547,54 @@ export default function WorkOrderPage() {
     finally { setLoadingDetail(false); }
   }, []);
 
+  // Deep link from notifications: /work-orders?id=<uuid> opens the detail
+  // drawer directly (works for closed WOs too — the drawer hides actions).
+  const [searchParams, setSearchParams] = useSearchParams();
+  useEffect(() => {
+    const id = searchParams.get('id');
+    if (!id) return;
+    setSelectedId(id);
+    fetchDetail(id);
+    setSearchParams({}, { replace: true }); // consume the param so refresh/close behaves normally
+  }, [searchParams, setSearchParams, fetchDetail]);
+
   function handleSelect(id: string) {
     setSelectedId(id);
     fetchDetail(id);
   }
 
+  // Whether a WO still belongs on the board under the current view — closed
+  // WOs move to History, and e.g. assigning one away from the "Unassigned"
+  // view means its card must leave immediately, not linger until a refetch.
+  function matchesCurrentView(wo: WorkOrder): boolean {
+    if (wo.status === 'DONE' || wo.status === 'CANCELLED') return false;
+    if (view === 'mine')          return wo.assignee?.id === user?.id;
+    if (view === 'reported')      return wo.reportedBy.id === user?.id;
+    if (view === 'unassigned')    return !wo.assignee;
+    if (view === 'pendingReview') return wo.status === 'PENDING_REVIEW';
+    return true;
+  }
+
   function handleSaved(wo: WorkOrder) {
+    const keep = matchesCurrentView(wo);
     setWorkOrders((prev) => {
       const idx = prev.findIndex((w) => w.id === wo.id);
-      if (idx >= 0) { const next = [...prev]; next[idx] = { ...next[idx], ...wo }; return next; }
-      return [wo, ...prev];
+      if (idx >= 0) {
+        const next = [...prev];
+        if (keep) next[idx] = { ...next[idx], ...wo };
+        else next.splice(idx, 1);
+        return next;
+      }
+      return keep ? [wo, ...prev] : prev;
     });
+    setTotalCount((prev) => {
+      const wasListed = workOrders.some((w) => w.id === wo.id);
+      if (wasListed && !keep) return Math.max(0, prev - 1);
+      if (!wasListed && keep) return prev + 1;
+      return prev;
+    });
+    // The detail drawer stays open regardless — it shows the updated state
+    // (e.g. an approved WO now reads DONE) even after its card left the board.
     if (selectedId === wo.id) setSelectedWO(wo);
     fetchStats();
   }
@@ -1745,23 +1815,26 @@ export default function WorkOrderPage() {
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && fetchWOs()}
+            onKeyDown={(e) => { if (e.key === 'Enter') setSearchQuery(search); }}
             placeholder="Search code / title..."
+            aria-label="Search work orders"
             className="flex-1 min-w-[140px] max-w-xs text-sm border border-gray-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-navy/30"
           />
           <button
             onClick={() => setShowFilters((v) => !v)}
+            aria-label="Toggle filters"
             className={cn('p-1.5 rounded-lg border transition-colors', showFilters ? 'border-navy bg-navy/5 text-navy' : 'border-gray-200 text-gray-500 hover:bg-gray-50')}
           >
             <Filter size={14} />
           </button>
-          <button onClick={() => fetchWOs()} className="p-1.5 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50">
+          <button onClick={() => fetchWOs()} aria-label="Refresh" className="p-1.5 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50">
             <RefreshCw size={14} />
           </button>
           <button
             onClick={handleExport}
             disabled={workOrders.length === 0 || exporting}
             title="Export all filtered work orders to CSV"
+            aria-label="Export CSV"
             className="p-1.5 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
           >
             {exporting ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
@@ -1773,14 +1846,14 @@ export default function WorkOrderPage() {
             <button
               onClick={() => setBoardMode('kanban')}
               className={cn('p-1.5', boardMode === 'kanban' ? 'bg-navy text-white' : 'text-gray-500 hover:bg-gray-50')}
-              title="Kanban"
+              title="Kanban" aria-label="Kanban view"
             >
               <LayoutGrid size={14} />
             </button>
             <button
               onClick={() => setBoardMode('table')}
               className={cn('p-1.5', boardMode === 'table' ? 'bg-navy text-white' : 'text-gray-500 hover:bg-gray-50')}
-              title="Table"
+              title="Table" aria-label="Table view"
             >
               <Table2 size={14} />
             </button>
@@ -1832,13 +1905,13 @@ export default function WorkOrderPage() {
         </div>
 
         {totalCount > workOrders.length && (
-          <div className="flex items-center gap-2 px-4 py-1.5 text-[11px] text-amber-700 bg-amber-50 border-b border-amber-100 flex-shrink-0">
-            <AlertTriangle size={11} />
+          <div className="flex items-center gap-2 px-4 py-1.5 text-[11px] text-gray-500 bg-gray-50 border-b border-gray-100 flex-shrink-0">
+            <Info size={11} />
             <span>Showing {workOrders.length} of {totalCount} work orders.</span>
             <button
               onClick={() => fetchWOs(boardPage + 1, true)}
               disabled={loadingMore}
-              className="ml-auto flex items-center gap-1 font-medium text-amber-800 hover:underline disabled:opacity-60"
+              className="ml-auto flex items-center gap-1 font-medium text-navy hover:underline disabled:opacity-60"
             >
               {loadingMore ? <Loader2 size={11} className="animate-spin" /> : null}
               Load more
@@ -1935,6 +2008,7 @@ export default function WorkOrderPage() {
         editItem={editItem}
         onSaved={handleSaved}
         users={users}
+        canAssign={woPerms.edit === 'all' || woPerms.edit === 'division'}
       />
 
       {selectedWO && (

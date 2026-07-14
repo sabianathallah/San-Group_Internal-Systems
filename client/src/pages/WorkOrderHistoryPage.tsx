@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Archive, Filter, RefreshCw, Loader2, AlertTriangle, Search } from 'lucide-react';
+import { Archive, Filter, RefreshCw, Loader2, Info, Search } from 'lucide-react';
 import api from '@/lib/api';
 import { cn } from '@/lib/cn';
 import { toast } from '@/stores/toastStore';
@@ -33,7 +33,10 @@ export default function WorkOrderHistoryPage() {
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [search, setSearch] = useState('');
+  // Committed value sent to the API — debounced while typing, Enter commits immediately.
+  const [searchQuery, setSearchQuery] = useState('');
   const debouncedSearch = useDebounced(search);
+  useEffect(() => { setSearchQuery(debouncedSearch); }, [debouncedSearch]);
   const [showFilters, setShowFilters] = useState(false);
 
   const [page, setPage] = useState(1);
@@ -48,8 +51,9 @@ export default function WorkOrderHistoryPage() {
       if (priorityFilter) params.priority = priorityFilter;
       if (categoryFilter) params.category = categoryFilter;
       if (dateFrom) params.dateFrom = new Date(dateFrom).toISOString();
-      if (dateTo)   params.dateTo   = new Date(dateTo).toISOString();
-      if (debouncedSearch.trim()) params.search = debouncedSearch.trim();
+      // End of day, not midnight — "to 14 Jul" must include WOs created on the 14th.
+      if (dateTo)   params.dateTo   = new Date(`${dateTo}T23:59:59.999`).toISOString();
+      if (searchQuery.trim()) params.search = searchQuery.trim();
 
       const res = await api.get('/work-orders', { params });
       setWorkOrders((prev) => (append ? [...prev, ...res.data.data] : res.data.data));
@@ -57,7 +61,7 @@ export default function WorkOrderHistoryPage() {
       setPage(pageArg);
     } catch (err) { toast.error(extractErr(err)); }
     finally { (append ? setLoadingMore : setLoading)(false); }
-  }, [outcomeFilter, priorityFilter, categoryFilter, dateFrom, dateTo, debouncedSearch, pageSize]);
+  }, [outcomeFilter, priorityFilter, categoryFilter, dateFrom, dateTo, searchQuery, pageSize]);
 
   useEffect(() => { fetchWOs(); }, [fetchWOs]);
 
@@ -100,8 +104,9 @@ export default function WorkOrderHistoryPage() {
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && fetchWOs()}
+              onKeyDown={(e) => { if (e.key === 'Enter') setSearchQuery(search); }}
               placeholder="Search code / title..."
+              aria-label="Search work order history"
               className="w-full text-sm border border-gray-200 rounded-lg pl-8 pr-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-navy/30"
             />
           </div>
@@ -116,11 +121,12 @@ export default function WorkOrderHistoryPage() {
           </select>
           <button
             onClick={() => setShowFilters((v) => !v)}
+            aria-label="Toggle filters"
             className={cn('p-1.5 rounded-lg border transition-colors', showFilters ? 'border-navy bg-navy/5 text-navy' : 'border-gray-200 text-gray-500 hover:bg-gray-50')}
           >
             <Filter size={14} />
           </button>
-          <button onClick={() => fetchWOs()} className="p-1.5 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50">
+          <button onClick={() => fetchWOs()} aria-label="Refresh" className="p-1.5 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50">
             <RefreshCw size={14} />
           </button>
           <PageSizeSelect value={pageSize} onChange={(n) => setPageSize(n)} options={[25, 50, 100]} />
@@ -161,13 +167,13 @@ export default function WorkOrderHistoryPage() {
         </div>
 
         {totalCount > workOrders.length && (
-          <div className="flex items-center gap-2 px-4 py-1.5 text-[11px] text-amber-700 bg-amber-50 border-b border-amber-100 flex-shrink-0">
-            <AlertTriangle size={11} />
+          <div className="flex items-center gap-2 px-4 py-1.5 text-[11px] text-gray-500 bg-gray-50 border-b border-gray-100 flex-shrink-0">
+            <Info size={11} />
             <span>Showing {workOrders.length} of {totalCount} work orders.</span>
             <button
               onClick={() => fetchWOs(page + 1, true)}
               disabled={loadingMore}
-              className="ml-auto flex items-center gap-1 font-medium text-amber-800 hover:underline disabled:opacity-60"
+              className="ml-auto flex items-center gap-1 font-medium text-navy hover:underline disabled:opacity-60"
             >
               {loadingMore ? <Loader2 size={11} className="animate-spin" /> : null}
               Load more
