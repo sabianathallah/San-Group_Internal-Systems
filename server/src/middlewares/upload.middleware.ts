@@ -73,6 +73,18 @@ const attendancePhotoStorage = new CloudinaryStorage({
   } as object,
 });
 
+const wallpaperStorage = new CloudinaryStorage({
+  cloudinary,
+  params: {
+    folder:          'san-group/wallpapers',
+    allowed_formats: ['jpg', 'jpeg', 'png', 'webp'],
+    transformation:  [{ width: 1600, height: 400, crop: 'fill', gravity: 'auto', quality: 'auto' }],
+    public_id: (_req: Request, file: Express.Multer.File) => {
+      return `wallpaper_${Date.now()}_${Math.round(Math.random() * 1e6)}`;
+    },
+  } as object,
+});
+
 const leaveDocStorage = new CloudinaryStorage({
   cloudinary,
   params: {
@@ -100,6 +112,12 @@ export const uploadAttendancePhoto = multer({
 export const uploadLeaveDoc = multer({
   storage: leaveDocStorage,
   limits:  { fileSize: 5 * 1024 * 1024 },
+});
+
+export const uploadWallpaper = multer({
+  storage: wallpaperStorage,
+  limits:  { fileSize: 3 * 1024 * 1024 },
+  fileFilter: imageFilter,
 });
 
 // ── Magic-byte validation (for local disk uploads only) ──────────────────────

@@ -1,13 +1,13 @@
 import { Router } from 'express';
 import {
   listUsers, getUserById, createUser, updateUser,
-  updateMyProfile, updateMyAvatar,
+  updateMyProfile, updateMyAvatar, updateMyWallpaper,
   toggleUser, deleteUser, updateAvatar,
 } from '@/controllers/user.controller';
 import { authenticate } from '@/middlewares/auth.middleware';
 import { checkPerm } from '@/middlewares/permission.middleware';
 import { validate } from '@/middlewares/validate.middleware';
-import { uploadAvatar, validateImageMagicBytes } from '@/middlewares/upload.middleware';
+import { uploadAvatar, uploadWallpaper, validateImageMagicBytes } from '@/middlewares/upload.middleware';
 import { uuidParamSchema, userFilterSchema } from '@/validations/common.validation';
 import { createUserSchema, updateUserSchema, updateMyProfileSchema } from '@/validations/user.validation';
 
@@ -18,6 +18,7 @@ router.use(authenticate);
 // ── Self-service routes (must be before /:id) ──────────────
 router.patch('/me', validate(updateMyProfileSchema), updateMyProfile);
 router.patch('/me/avatar', uploadAvatar.single('avatar'), validateImageMagicBytes, updateMyAvatar);
+router.patch('/me/wallpaper', uploadWallpaper.single('wallpaper'), updateMyWallpaper);
 
 // ── Admin routes ───────────────────────────────────────────
 router.get('/', validate(userFilterSchema, ['query']), listUsers);

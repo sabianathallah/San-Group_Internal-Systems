@@ -24,6 +24,8 @@ export interface User {
   fullName:    string;
   phone:       string | null;
   avatar:      string | null;
+  wallpaperType:  string | null;
+  wallpaperValue: string | null;
   isActive:    boolean;
   lastLoginAt: string | null;
   createdAt:   string;

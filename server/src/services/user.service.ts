@@ -16,6 +16,8 @@ const USER_SAFE_SELECT = {
   phone: true,
   joinDate: true,
   avatar: true,
+  wallpaperType: true,
+  wallpaperValue: true,
   isActive: true,
   lastLoginAt: true,
   createdAt: true,
@@ -286,6 +288,29 @@ export async function updateAvatarService(
   return prisma.user.update({
     where: { id },
     data: { avatar: filePath },
+    select: USER_SAFE_SELECT,
+  });
+}
+
+// Keep in sync with WALLPAPER_PRESETS on the client (DashboardPage.tsx) —
+// server validates the key, client owns the actual gradient/label.
+export const WALLPAPER_PRESET_KEYS = ['default', 'ocean', 'golden', 'emerald', 'slate', 'midnight'];
+
+export async function updatePresetWallpaperService(id: string, presetKey: string) {
+  if (!WALLPAPER_PRESET_KEYS.includes(presetKey)) {
+    throw new AppError('Preset wallpaper tidak dikenal', 400);
+  }
+  return prisma.user.update({
+    where: { id },
+    data: { wallpaperType: 'preset', wallpaperValue: presetKey },
+    select: USER_SAFE_SELECT,
+  });
+}
+
+export async function updateCustomWallpaperService(id: string, imageUrl: string) {
+  return prisma.user.update({
+    where: { id },
+    data: { wallpaperType: 'custom', wallpaperValue: imageUrl },
     select: USER_SAFE_SELECT,
   });
 }

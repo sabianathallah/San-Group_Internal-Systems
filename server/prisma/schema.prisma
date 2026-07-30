@@ -201,6 +201,8 @@ model User {
   fullName    String
   phone       String?
   avatar      String?
+  wallpaperType  String?   // 'preset' | 'custom' — homepage header background
+  wallpaperValue String?   // preset key, or Cloudinary URL when wallpaperType = 'custom'
   isActive    Boolean   @default(true)
   joinDate    DateTime? @db.Date // tanggal mulai kerja — dasar aturan tenure cuti
   lastLoginAt DateTime?

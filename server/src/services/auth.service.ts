@@ -12,6 +12,8 @@ const USER_SAFE_SELECT = {
   fullName: true,
   phone: true,
   avatar: true,
+  wallpaperType: true,
+  wallpaperValue: true,
   isActive: true,
   lastLoginAt: true,
   createdAt: true,

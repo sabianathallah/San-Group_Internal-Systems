@@ -8,6 +8,8 @@ import {
   toggleUserService,
   deleteUserService,
   updateAvatarService,
+  updatePresetWallpaperService,
+  updateCustomWallpaperService,
 } from '@/services/user.service';
 import { successResponse } from '@/helpers/response';
 import { AuthRequest } from '@/types';
@@ -89,6 +91,21 @@ export async function updateMyAvatar(req: AuthRequest, res: Response, next: Next
     const filePath = req.file.path.replace(/\\/g, '/');
     const user = await updateAvatarService(req.user!.userId, filePath);
     successResponse(res, user, 'Avatar berhasil diperbarui');
+  } catch (err) { next(err); }
+}
+
+export async function updateMyWallpaper(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+  try {
+    if (req.file) {
+      const filePath = req.file.path.replace(/\\/g, '/');
+      const user = await updateCustomWallpaperService(req.user!.userId, filePath);
+      successResponse(res, user, 'Wallpaper berhasil diperbarui');
+      return;
+    }
+    const presetKey = String(req.body.presetKey ?? '');
+    if (!presetKey) { res.status(400).json({ success: false, message: 'File atau presetKey wajib diisi' }); return; }
+    const user = await updatePresetWallpaperService(req.user!.userId, presetKey);
+    successResponse(res, user, 'Wallpaper berhasil diperbarui');
   } catch (err) { next(err); }
 }
 

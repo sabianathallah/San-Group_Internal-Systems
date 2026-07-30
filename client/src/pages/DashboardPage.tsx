@@ -3,14 +3,17 @@ import {
   Star, AlertCircle, Megaphone, Users,
   ArrowRight, CheckCircle2, Circle,
   Loader2, Sun, ChevronDown, ChevronRight,
-  Plus, Pin,
-  TrendingUp,
-  BarChart3, UserCheck,
+  Plus, StickyNote as StickyNoteIcon,
+  TrendingUp, MapPin, Timer,
+  BarChart3, UserCheck, CheckSquare2, Database,
+  Wrench, HardHat, Shield, Bell, ImagePlus, Check, Upload,
 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/stores/authStore';
 import { useTaskStore, Task, isInMyDay } from '@/stores/taskStore';
 import { useNoteStore } from '@/stores/noteStore';
+import { usePermStore } from '@/stores/permStore';
+import { useClickOutside } from '@/hooks/useClickOutside';
 import { ROUTES } from '@/lib/constants';
 import api from '@/lib/api';
 import { cn } from '@/lib/cn';
@@ -52,9 +55,22 @@ function bulletinAge(iso: string): string {
   return new Date(iso).toLocaleDateString('en-US', { day: '2-digit', month: 'short' });
 }
 
+function fmtTime(iso: string | null): string {
+  return iso ? new Date(iso).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : '—';
+}
+
+function fmtMins(total: number): string {
+  const h = Math.floor(total / 60);
+  const m = total % 60;
+  if (h && m) return `${h}h ${m}m`;
+  if (h) return `${h}h`;
+  return `${m}m`;
+}
+
 // ── Types ──────────────────────────────────────────────────
 type TaskPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
 type BulletinPriority = 'NORMAL' | 'IMPORTANT' | 'URGENT';
+type AttendanceStatus = 'PRESENT' | 'LATE' | 'WFH' | 'PERMISSION' | 'ABSENT' | 'HOLIDAY';
 
 interface Bulletin {
   id:          string;
@@ -71,6 +87,17 @@ interface TaskStats {
   system:   { totalUsers: number; totalTasks: number; totalBulletins: number } | null;
 }
 
+interface TodayAttendance {
+  status:      AttendanceStatus;
+  checkIn:     string | null;
+  checkOut:    string | null;
+  isLate:      boolean;
+  lateMinutes: number;
+  workMinutes: number | null;
+  locationName: string | null;
+  shift: { name: string; startTime: string } | null;
+}
+
 // ── Config ─────────────────────────────────────────────────
 const PRIORITY_COLOR: Record<TaskPriority, string> = {
   URGENT: 'text-danger',
@@ -79,14 +106,27 @@ const PRIORITY_COLOR: Record<TaskPriority, string> = {
   LOW:    'text-gray-300',
 };
 
-const BULLETIN_BADGE: Record<BulletinPriority, { bg: string; dot: string }> = {
-  URGENT:    { bg: 'bg-danger/10 text-danger',   dot: 'bg-danger'  },
-  IMPORTANT: { bg: 'bg-warning/10 text-warning', dot: 'bg-warning' },
-  NORMAL:    { bg: 'bg-gray-100 text-gray-500',  dot: 'bg-gray-400'},
+const BULLETIN_BADGE: Record<BulletinPriority, { bg: string; dot: string; accent: string }> = {
+  URGENT:    { bg: 'bg-danger/10 text-danger',   dot: 'bg-danger',  accent: 'bg-danger'  },
+  IMPORTANT: { bg: 'bg-warning/10 text-warning', dot: 'bg-warning', accent: 'bg-warning' },
+  NORMAL:    { bg: 'bg-gray-100 text-gray-500',  dot: 'bg-gray-400', accent: 'bg-gray-200' },
 };
 
 const BULLETIN_LABEL: Record<BulletinPriority, string> = {
   URGENT: 'Urgent', IMPORTANT: 'Important', NORMAL: 'General',
+};
+
+const BULLETIN_RANK: Record<BulletinPriority, number> = { URGENT: 0, IMPORTANT: 1, NORMAL: 2 };
+
+// Keep keys in sync with WALLPAPER_PRESET_KEYS on the server (user.service.ts) —
+// server only validates the key, the gradient/label lives here.
+const WALLPAPER_PRESETS: Record<string, { label: string; gradient: string }> = {
+  default:  { label: 'Navy Classic',   gradient: '#0F2942' },
+  ocean:    { label: 'Ocean Depth',    gradient: 'linear-gradient(135deg, #0F2942 0%, #164e63 55%, #0891b2 130%)' },
+  golden:   { label: 'Golden Hour',    gradient: 'linear-gradient(135deg, #0F2942 0%, #4a3510 60%, #C9A84C 140%)' },
+  emerald:  { label: 'Emerald Dusk',   gradient: 'linear-gradient(135deg, #0F2942 0%, #064e3b 55%, #059669 130%)' },
+  slate:    { label: 'Slate Fade',     gradient: 'linear-gradient(135deg, #1F2937 0%, #0F2942 100%)' },
+  midnight: { label: 'Midnight Bloom', gradient: 'linear-gradient(135deg, #0F2942 0%, #312e81 60%, #4c1d95 130%)' },
 };
 
 const NOTE_COLOR: Record<string, { bg: string; border: string }> = {
@@ -247,28 +287,272 @@ function QuickAddTask({ onAdded }: { onAdded: (task: Task) => void }) {
   );
 }
 
-// ── Personal Stats Strip ───────────────────────────────────
-function PersonalStats({ stats, loading }: { stats: TaskStats | null; loading: boolean }) {
-  const items = [
-    { label: 'To Do',    value: stats?.personal.todo,       color: 'text-blue-600'   },
-    { label: 'Active',   value: stats?.personal.inProgress, color: 'text-amber-600'  },
-    { label: 'Done',     value: stats?.personal.done,       color: 'text-green-600'  },
-    { label: 'Awaiting', value: stats?.personal.assigned,   color: 'text-orange-600' },
-  ];
+// ── Header wallpaper picker ─────────────────────────────────
+function WallpaperPicker({
+  wallpaperType, wallpaperValue, onChange,
+}: {
+  wallpaperType: string | null; wallpaperValue: string | null;
+  onChange: (type: string, value: string) => void;
+}) {
+  const [open, setOpen]         = useState(false);
+  const [saving, setSaving]     = useState(false);
+  const [error, setError]       = useState('');
+  const popRef  = useRef<HTMLDivElement>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  useClickOutside(popRef, () => setOpen(false));
+
+  async function selectPreset(key: string) {
+    setSaving(true);
+    setError('');
+    try {
+      const res = await api.patch('/users/me/wallpaper', { presetKey: key });
+      onChange(res.data.data.wallpaperType, res.data.data.wallpaperValue);
+      setOpen(false);
+    } catch {
+      setError('Failed to apply wallpaper');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 3 * 1024 * 1024) { setError('Maximum file size is 3MB'); return; }
+    setSaving(true);
+    setError('');
+    const form = new FormData();
+    form.append('wallpaper', file);
+    try {
+      const res = await api.patch('/users/me/wallpaper', form, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      onChange(res.data.data.wallpaperType, res.data.data.wallpaperValue);
+      setOpen(false);
+    } catch {
+      setError('Failed to upload wallpaper');
+    } finally {
+      setSaving(false);
+      if (fileRef.current) fileRef.current.value = '';
+    }
+  }
 
   return (
-    <div className="px-4 pt-3 pb-3 bg-white border-b border-gray-100">
-      <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2">My Tasks</p>
-      <div className="grid grid-cols-4 gap-1.5">
-        {items.map(({ label, value, color }) => (
-          <div key={label} className="rounded-lg bg-gray-50 py-2.5 text-center">
-            {loading ? (
-              <div className="h-5 w-6 mx-auto rounded bg-gray-200 animate-pulse mb-1" />
-            ) : (
-              <p className={cn('text-lg font-bold leading-tight', color)}>{value ?? 0}</p>
-            )}
-            <p className="text-[10px] text-gray-400 mt-0.5 leading-tight">{label}</p>
+    <div ref={popRef} className="relative">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        title="Change header wallpaper"
+        className="w-7 h-7 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 text-white/70 hover:text-white transition-colors"
+      >
+        <ImagePlus size={14} />
+      </button>
+
+      {open && (
+        <div className="absolute right-0 top-9 w-64 bg-white border border-gray-200 rounded-lg shadow-lg z-50 p-3">
+          <p className="text-xs font-semibold text-gray-700 mb-2">Header wallpaper</p>
+          <div className="grid grid-cols-3 gap-2 mb-3">
+            {Object.entries(WALLPAPER_PRESETS).map(([key, { label, gradient }]) => {
+              const isActive = wallpaperType === 'preset' && wallpaperValue === key
+                || (wallpaperType == null && key === 'default');
+              return (
+                <button
+                  key={key}
+                  title={label}
+                  disabled={saving}
+                  onClick={() => selectPreset(key)}
+                  className="group relative h-11 rounded-lg overflow-hidden ring-1 ring-gray-200 hover:ring-navy/40 transition-shadow disabled:opacity-50"
+                  style={{ background: gradient }}
+                >
+                  {isActive && (
+                    <span className="absolute inset-0 flex items-center justify-center bg-black/20">
+                      <Check size={14} className="text-white" strokeWidth={3} />
+                    </span>
+                  )}
+                </button>
+              );
+            })}
           </div>
+          <button
+            onClick={() => fileRef.current?.click()}
+            disabled={saving}
+            className="flex items-center justify-center gap-1.5 w-full text-xs font-medium text-navy bg-navy/5 hover:bg-navy/10 rounded-lg py-2 transition-colors disabled:opacity-50"
+          >
+            {saving ? <Loader2 size={12} className="animate-spin" /> : <Upload size={12} />}
+            Upload custom image
+          </button>
+          <input ref={fileRef} type="file" accept="image/*" onChange={handleUpload} className="hidden" />
+          {error && <p className="text-[10px] text-danger mt-1.5">{error}</p>}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Bulletin Spotlight (prominent, above the fold, no click-in required) ───
+function BulletinSpotlight({ bulletins, loading }: { bulletins: Bulletin[]; loading: boolean }) {
+  const unreadCount = bulletins.filter((b) => !b.isRead).length;
+
+  const sorted = [...bulletins].sort((a, b) => {
+    if (a.isRead !== b.isRead) return a.isRead ? 1 : -1;
+    return BULLETIN_RANK[a.priority] - BULLETIN_RANK[b.priority];
+  }).slice(0, 8);
+
+  return (
+    <div className="bg-white border-b border-gray-100">
+      <div className="flex items-center justify-between px-6 sm:px-8 pt-4 pb-2.5">
+        <div className="flex items-center gap-2">
+          <Megaphone size={15} className="text-navy" />
+          <span className="text-sm font-semibold text-gray-800">Bulletin</span>
+          {unreadCount > 0 && (
+            <span className="text-[10px] font-semibold text-white bg-danger rounded-full px-1.5 py-0.5 leading-none">
+              {unreadCount} new
+            </span>
+          )}
+        </div>
+        <Link to={ROUTES.BULLETIN} className="flex items-center gap-1 text-xs text-gray-400 hover:text-navy transition-colors">
+          All announcements <ArrowRight size={11} />
+        </Link>
+      </div>
+
+      {loading ? (
+        <div className="flex gap-3 px-6 sm:px-8 pb-4">
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="w-64 h-20 flex-shrink-0 rounded-xl bg-gray-100 animate-pulse" />
+          ))}
+        </div>
+      ) : sorted.length === 0 ? (
+        <div className="flex items-center gap-2.5 px-6 sm:px-8 pb-5 text-gray-400">
+          <Megaphone size={16} className="text-gray-200" />
+          <p className="text-xs">No announcements yet</p>
+        </div>
+      ) : (
+        <div className="flex gap-3 px-6 sm:px-8 pb-5 overflow-x-auto scroll-smooth snap-x snap-mandatory">
+          {sorted.map((b) => (
+            <Link
+              key={b.id}
+              to={ROUTES.BULLETIN}
+              className="group relative flex-shrink-0 w-64 snap-start rounded-xl border border-gray-100 bg-white pl-4 pr-3.5 py-3 hover:shadow-md hover:-translate-y-0.5 transition-all duration-150 overflow-hidden"
+            >
+              <span className={cn('absolute left-0 top-0 bottom-0 w-1', BULLETIN_BADGE[b.priority].accent)} />
+              <div className="flex items-center gap-1.5 mb-1.5">
+                <span className={cn('text-[10px] font-semibold px-1.5 py-0.5 rounded-full', BULLETIN_BADGE[b.priority].bg)}>
+                  {BULLETIN_LABEL[b.priority]}
+                </span>
+                {!b.isRead && <span className="w-1.5 h-1.5 rounded-full bg-info flex-shrink-0" />}
+              </div>
+              <p className={cn('text-xs leading-snug line-clamp-2', !b.isRead ? 'font-semibold text-gray-800' : 'text-gray-500')}>
+                {b.title}
+              </p>
+              {b.publishedAt && (
+                <p className="text-[10px] text-gray-400 mt-1.5">{bulletinAge(b.publishedAt)}</p>
+              )}
+            </Link>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Attendance / Check-in widget ────────────────────────────
+// Deliberately status-only: the real check-in/out action (GPS + optional
+// selfie) stays on the HRIS Attendance page. Duplicating that flow here
+// would re-implement geofencing/photo logic twice for no benefit — this
+// widget just answers "am I checked in" and deep-links to the real page.
+const DEFAULT_MIN_WORK_MINUTES = 480;
+
+function CheckInWidget({ today, loading }: { today: TodayAttendance | null; loading: boolean }) {
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    if (!today?.checkIn || today?.checkOut) return;
+    const id = setInterval(() => setNow(Date.now()), 30_000);
+    return () => clearInterval(id);
+  }, [today?.checkIn, today?.checkOut]);
+
+  const worked = today?.checkIn && !today?.checkOut
+    ? Math.max(0, Math.floor((now - new Date(today.checkIn).getTime()) / 60_000))
+    : 0;
+  const pct = Math.min(100, Math.round((worked / DEFAULT_MIN_WORK_MINUTES) * 100));
+
+  return (
+    <Link
+      to={ROUTES.HRIS}
+      className="block rounded-xl border border-gray-100 bg-white px-4 py-3.5 hover:shadow-md hover:-translate-y-0.5 transition-all duration-150"
+    >
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 bg-info/10">
+            <MapPin size={17} className="text-info" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-gray-800">Attendance Today</p>
+            {loading ? (
+              <div className="h-3.5 w-28 bg-gray-100 rounded animate-pulse mt-1" />
+            ) : !today?.checkIn ? (
+              <p className="text-xs text-gray-400">Not checked in yet</p>
+            ) : !today?.checkOut ? (
+              <p className="text-xs text-gray-400 truncate">
+                Checked in {fmtTime(today.checkIn)}
+                {today.isLate && <span className="text-warning font-medium"> · Late {today.lateMinutes}m</span>}
+              </p>
+            ) : (
+              <p className="text-xs text-success font-medium">Done · {fmtTime(today.checkIn)}–{fmtTime(today.checkOut)}</p>
+            )}
+          </div>
+        </div>
+        <div className="flex items-center gap-1.5 flex-shrink-0">
+          {!today?.checkIn ? (
+            <span className="text-xs font-medium text-white bg-navy px-3 py-1.5 rounded-lg">Check In</span>
+          ) : !today?.checkOut ? (
+            <span className="text-xs font-medium text-navy bg-navy/10 px-3 py-1.5 rounded-lg">Check Out</span>
+          ) : (
+            <span className="text-[10px] font-bold text-success bg-success/10 px-2 py-1 rounded-full">Complete</span>
+          )}
+          <ChevronRight size={15} className="text-gray-300" />
+        </div>
+      </div>
+
+      {today?.checkIn && !today?.checkOut && (
+        <div className="mt-3 pt-3 border-t border-gray-100">
+          <div className="flex items-center justify-between text-[11px] mb-1.5">
+            <span className="flex items-center gap-1 font-medium text-gray-500">
+              <Timer size={11} /> {fmtMins(worked)} / {fmtMins(DEFAULT_MIN_WORK_MINUTES)}
+            </span>
+            {today.shift && <span className="text-gray-400">Shift {today.shift.name}</span>}
+          </div>
+          <div className="h-1.5 rounded-full bg-gray-100 overflow-hidden">
+            <div className="h-full rounded-full bg-info transition-all" style={{ width: `${pct}%` }} />
+          </div>
+        </div>
+      )}
+    </Link>
+  );
+}
+
+// ── Quick Access grid ───────────────────────────────────────
+interface QuickAccessItem { label: string; to: string; icon: React.ElementType; accent: string }
+
+function QuickAccessGrid({ items }: { items: QuickAccessItem[] }) {
+  return (
+    <div className="rounded-xl border border-gray-100 bg-white px-4 py-3.5">
+      <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2.5">Quick Access</p>
+      <div className="grid grid-cols-3 gap-2">
+        {items.map(({ label, to, icon: Icon, accent }) => (
+          <Link
+            key={to}
+            to={to}
+            className="group flex flex-col items-center gap-1.5 rounded-lg py-3 px-1 text-center hover:bg-gray-50 transition-colors"
+          >
+            <div
+              className="w-10 h-10 rounded-xl flex items-center justify-center transition-transform group-hover:scale-105"
+              style={{ backgroundColor: `${accent}18` }}
+            >
+              <Icon size={17} style={{ color: accent }} />
+            </div>
+            <span className="text-[11px] font-medium text-gray-600 leading-tight">{label}</span>
+          </Link>
         ))}
       </div>
     </div>
@@ -286,12 +570,12 @@ function TeamStats({ stats, loading, roleLevel }: { stats: TaskStats | null; loa
   const label = roleLevel <= 3 ? 'My Division' : 'My Team';
 
   return (
-    <div className="px-4 pt-3 pb-3 bg-white border-b border-gray-100">
+    <div className="rounded-xl border border-gray-100 bg-white px-4 py-3.5">
       <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2">{label}</p>
       {loading ? (
-        <div className="h-12 rounded-lg bg-gray-100 animate-pulse" />
+        <div className="h-12 rounded-lg bg-gray-50 animate-pulse" />
       ) : stats?.team ? (
-        <div className="rounded-lg border border-gray-100 bg-gray-50 px-3 py-2.5 grid grid-cols-3 gap-2 text-center">
+        <div className="rounded-lg bg-gray-50 px-3 py-2.5 grid grid-cols-3 gap-2 text-center">
           <div>
             <p className="text-base font-bold text-gray-800">{stats.team.total}</p>
             <p className="text-[10px] text-gray-400">Tasks</p>
@@ -317,7 +601,7 @@ function SystemStats({ stats, loading }: { stats: TaskStats | null; loading: boo
   if (!stats?.system) return null;
 
   return (
-    <div className="px-4 pt-3 pb-3 bg-white border-b border-gray-100">
+    <div className="rounded-xl border border-gray-100 bg-white px-4 py-3.5">
       <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2">System</p>
       <div className="grid grid-cols-3 gap-1.5 text-center">
         {[
@@ -341,10 +625,13 @@ function SystemStats({ stats, loading }: { stats: TaskStats | null; loading: boo
 
 // ── Main ───────────────────────────────────────────────────
 export default function DashboardPage() {
-  const user      = useAuthStore((s) => s.user);
+  const user       = useAuthStore((s) => s.user);
+  const updateUser = useAuthStore((s) => s.updateUser);
   const navigate  = useNavigate();
   const roleLevel = user?.role?.level ?? 99;
   const isAdmin   = roleLevel <= 2;
+  const perms     = usePermStore((s) => s.perms);
+  const canAnalytics = perms.analytics?.view !== 'none';
 
   const allTasks    = useTaskStore((s) => s.tasks);
   const taskLoading = useTaskStore((s) => s.loading);
@@ -361,6 +648,8 @@ export default function DashboardPage() {
   const [showDone,     setShowDone]     = useState(false);
   const [stats,        setStats]        = useState<TaskStats | null>(null);
   const [statsLoading, setStatsLoading] = useState(true);
+  const [attendance,        setAttendance]        = useState<TodayAttendance | null>(null);
+  const [attendanceLoading, setAttendanceLoading] = useState(true);
 
   useEffect(() => {
     useTaskStore.getState().fetchTasks();
@@ -374,6 +663,11 @@ export default function DashboardPage() {
       .then((r) => setStats(r.data.data ?? null))
       .catch(() => {})
       .finally(() => setStatsLoading(false));
+
+    api.get('/hris/attendance/today')
+      .then((r) => setAttendance(r.data.data ?? null))
+      .catch(() => {})
+      .finally(() => setAttendanceLoading(false));
 
     if (isAdmin) {
       api.get('/users', { params: { isActive: 'true', limit: 1 } })
@@ -405,11 +699,34 @@ export default function DashboardPage() {
   const dashNotes  = allNotes.filter((n) => n.isPinned).slice(0, 4);
   const firstName  = user?.fullName?.split(' ')[0] ?? 'User';
 
+  const isCustomWallpaper = user?.wallpaperType === 'custom' && !!user.wallpaperValue;
+  const headerStyle: React.CSSProperties = isCustomWallpaper
+    ? { backgroundImage: `linear-gradient(rgba(15,41,66,0.55), rgba(15,41,66,0.75)), url(${user!.wallpaperValue})`, backgroundSize: 'cover', backgroundPosition: 'center' }
+    : { background: WALLPAPER_PRESETS[user?.wallpaperValue ?? 'default']?.gradient ?? WALLPAPER_PRESETS.default.gradient };
+
+  const quickAccessItems: QuickAccessItem[] = [
+    { label: 'Tasks',       to: ROUTES.TASKS,       icon: CheckSquare2, accent: '#0F2942' },
+    { label: 'Bulletin',    to: ROUTES.BULLETIN,    icon: Bell,         accent: '#D97706' },
+    { label: 'Notes',       to: ROUTES.NOTES,       icon: StickyNoteIcon, accent: '#C9A84C' },
+    { label: 'DB Links',    to: ROUTES.DATABASE,    icon: Database,     accent: '#2563EB' },
+    { label: 'Work Orders', to: ROUTES.WORK_ORDERS, icon: Wrench,       accent: '#EA580C' },
+    { label: 'HRIS',        to: ROUTES.HRIS,        icon: HardHat,      accent: '#059669' },
+    ...(canAnalytics ? [{ label: 'Analytics', to: ROUTES.ANALYTICS, icon: BarChart3, accent: '#7C3AED' }] : []),
+    ...(isAdmin ? [{ label: 'Admin', to: ROUTES.ADMIN_USERS, icon: Shield, accent: '#4B5563' }] : []),
+  ];
+
   return (
     <div className="space-y-0 -m-6">
 
       {/* ── Header ──────────────────────────────────────── */}
-      <div className="bg-navy px-8 pt-8 pb-6">
+      <div className="relative px-8 pt-8 pb-6" style={headerStyle}>
+        <div className="absolute top-3 right-3">
+          <WallpaperPicker
+            wallpaperType={user?.wallpaperType ?? null}
+            wallpaperValue={user?.wallpaperValue ?? null}
+            onChange={(wallpaperType, wallpaperValue) => updateUser({ wallpaperType, wallpaperValue })}
+          />
+        </div>
         <div className="flex items-start justify-between">
           <div>
             <p className="text-white/40 text-xs font-medium tracking-widest uppercase mb-1">
@@ -464,139 +781,81 @@ export default function DashboardPage() {
         )}
       </div>
 
+      {/* ── Bulletin spotlight — important info surfaced immediately, ── */}
+      {/* no click-through required to see what's new                  */}
+      <BulletinSpotlight bulletins={bulletins} loading={false} />
+
       {/* ── Body ──────────────────────────────────────────── */}
-      <div className="grid grid-cols-3 bg-gray-50 min-h-[calc(100vh-220px)]">
+      <div className="grid grid-cols-3 bg-gray-50 min-h-[calc(100vh-320px)]">
 
-        {/* ── Left: My Day tasks (2/3) ── */}
-        <div className="col-span-2 bg-white border-r border-gray-100">
-          <div className="flex items-center justify-between px-5 py-3.5 border-b border-gray-100 sticky top-0 bg-white z-10">
-            <div className="flex items-center gap-2">
-              <Sun size={15} className="text-navy" />
-              <span className="text-sm font-semibold text-gray-800">My Day</span>
-              {active.length > 0 && (
-                <span className="text-[10px] font-semibold text-white bg-navy rounded-full px-1.5 py-0.5 leading-none">
-                  {active.length}
-                </span>
-              )}
-            </div>
-            <Link to={ROUTES.TASKS} className="flex items-center gap-1 text-xs text-gray-400 hover:text-navy transition-colors">
-              All tasks <ArrowRight size={11} />
-            </Link>
-          </div>
+        {/* ── Left: Check-in + My Day tasks + Sticky Notes (2/3) ── */}
+        <div className="col-span-2 border-r border-gray-100 p-5 space-y-4">
 
-          {taskLoading ? (
-            <div className="flex flex-col items-center justify-center py-16 gap-2">
-              <Loader2 size={22} className="animate-spin text-gray-300" />
-              <p className="text-xs text-gray-400">Loading tasks…</p>
-            </div>
-          ) : sortedActive.length === 0 && done.length === 0 ? (
-            <EmptyMyDay onNavigate={() => navigate(ROUTES.TASKS)} />
-          ) : (
-            <>
-              {sortedActive.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-10 gap-2">
-                  <CheckCircle2 size={28} className="text-success" />
-                  <p className="text-sm font-medium text-gray-700">All tasks done for today!</p>
-                </div>
-              ) : (
-                sortedActive.map((task) => (
-                  <TaskRow key={task.id} task={task} onNavigate={goToTask} />
-                ))
-              )}
+          <CheckInWidget today={attendance} loading={attendanceLoading} />
 
-              <QuickAddTask onAdded={(t) => addTask(t)} />
-
-              {done.length > 0 && (
-                <div className="border-t border-gray-100">
-                  <button
-                    onClick={() => setShowDone((v) => !v)}
-                    className="flex items-center gap-2 w-full px-5 py-3 text-xs text-gray-500 hover:bg-gray-50 transition-colors"
-                  >
-                    {showDone ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
-                    <span className="font-medium">Completed</span>
-                    <span className="ml-1 text-gray-400">{done.length}</span>
-                  </button>
-                  {showDone && done.map((task) => (
-                    <TaskRow key={task.id} task={task} onNavigate={goToTask} />
-                  ))}
-                </div>
-              )}
-            </>
-          )}
-        </div>
-
-        {/* ── Right panel (1/3) ── */}
-        <div className="col-span-1 flex flex-col overflow-y-auto">
-
-          {/* Personal task stats */}
-          <PersonalStats stats={stats} loading={statsLoading} />
-
-          {/* Team / Division stats */}
-          <TeamStats stats={stats} loading={statsLoading} roleLevel={roleLevel} />
-
-          {/* System stats (Admin+) */}
-          {isAdmin && <SystemStats stats={stats} loading={statsLoading} />}
-
-          {/* Bulletin */}
-          <div className="flex-shrink-0">
-            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 bg-white sticky top-0 z-10">
+          <div className="rounded-xl border border-gray-100 bg-white overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-3.5 border-b border-gray-100">
               <div className="flex items-center gap-2">
-                <Megaphone size={14} className="text-navy" />
-                <span className="text-sm font-semibold text-gray-800">Bulletin</span>
-                {unreadBulletins.length > 0 && (
-                  <span className="text-[10px] font-semibold text-white bg-danger rounded-full px-1.5 py-0.5 leading-none">
-                    {unreadBulletins.length}
+                <Sun size={15} className="text-navy" />
+                <span className="text-sm font-semibold text-gray-800">To Do Today</span>
+                {active.length > 0 && (
+                  <span className="text-[10px] font-semibold text-white bg-navy rounded-full px-1.5 py-0.5 leading-none">
+                    {active.length}
                   </span>
                 )}
               </div>
-              <Link to={ROUTES.BULLETIN} className="flex items-center gap-1 text-xs text-gray-400 hover:text-navy transition-colors">
-                All <ArrowRight size={11} />
+              <Link to={ROUTES.TASKS} className="flex items-center gap-1 text-xs text-gray-400 hover:text-navy transition-colors">
+                All tasks <ArrowRight size={11} />
               </Link>
             </div>
 
-            <div className="bg-white">
-              {bulletins.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-8 text-center px-4">
-                  <Megaphone size={22} className="text-gray-200 mb-2" />
-                  <p className="text-xs text-gray-400">No announcements yet</p>
-                </div>
-              ) : (
-                bulletins.slice(0, 5).map((b) => (
-                  <Link
-                    key={b.id}
-                    to={ROUTES.BULLETIN}
-                    className="flex items-start gap-3 px-4 py-3 border-b border-gray-50 last:border-0 hover:bg-gray-50/60 transition-colors"
-                  >
-                    <span className={cn(
-                      'flex-shrink-0 mt-1.5 w-1.5 h-1.5 rounded-full',
-                      BULLETIN_BADGE[b.priority].dot,
-                      b.isRead && 'opacity-30',
-                    )} />
-                    <div className="flex-1 min-w-0">
-                      <p className={cn('text-xs leading-snug', !b.isRead ? 'font-semibold text-gray-800' : 'text-gray-500')}>
-                        {b.title}
-                      </p>
-                      <div className="flex items-center gap-1.5 mt-1">
-                        <span className={cn('text-[10px] font-medium px-1.5 py-0.5 rounded-full', BULLETIN_BADGE[b.priority].bg)}>
-                          {BULLETIN_LABEL[b.priority]}
-                        </span>
-                        {b.publishedAt && (
-                          <span className="text-[10px] text-gray-400">{bulletinAge(b.publishedAt)}</span>
-                        )}
-                      </div>
-                    </div>
-                  </Link>
-                ))
-              )}
-            </div>
+            {taskLoading ? (
+              <div className="flex flex-col items-center justify-center py-16 gap-2">
+                <Loader2 size={22} className="animate-spin text-gray-300" />
+                <p className="text-xs text-gray-400">Loading tasks…</p>
+              </div>
+            ) : sortedActive.length === 0 && done.length === 0 ? (
+              <EmptyMyDay onNavigate={() => navigate(ROUTES.TASKS)} />
+            ) : (
+              <>
+                {sortedActive.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-10 gap-2">
+                    <CheckCircle2 size={28} className="text-success" />
+                    <p className="text-sm font-medium text-gray-700">All tasks done for today!</p>
+                  </div>
+                ) : (
+                  sortedActive.map((task) => (
+                    <TaskRow key={task.id} task={task} onNavigate={goToTask} />
+                  ))
+                )}
+
+                <QuickAddTask onAdded={(t) => addTask(t)} />
+
+                {done.length > 0 && (
+                  <div className="border-t border-gray-100">
+                    <button
+                      onClick={() => setShowDone((v) => !v)}
+                      className="flex items-center gap-2 w-full px-5 py-3 text-xs text-gray-500 hover:bg-gray-50 transition-colors"
+                    >
+                      {showDone ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+                      <span className="font-medium">Completed</span>
+                      <span className="ml-1 text-gray-400">{done.length}</span>
+                    </button>
+                    {showDone && done.map((task) => (
+                      <TaskRow key={task.id} task={task} onNavigate={goToTask} />
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
           </div>
 
-          {/* Pinned Notes */}
-          <div className="flex-shrink-0 border-t border-gray-100 bg-white">
-            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+          {/* Sticky Notes — directly under Tasks, per feedback */}
+          <div className="rounded-xl border border-gray-100 bg-white overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-3.5 border-b border-gray-100">
               <div className="flex items-center gap-2">
-                <Pin size={14} className="text-navy" />
-                <span className="text-sm font-semibold text-gray-800">Pinned Notes</span>
+                <StickyNoteIcon size={15} className="text-navy" />
+                <span className="text-sm font-semibold text-gray-800">Sticky Notes</span>
               </div>
               <Link to={ROUTES.NOTES} className="flex items-center gap-1 text-xs text-gray-400 hover:text-navy transition-colors">
                 All <ArrowRight size={11} />
@@ -605,11 +864,11 @@ export default function DashboardPage() {
 
             {dashNotes.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-6 text-center px-4">
-                <Pin size={18} className="text-gray-200 mb-1.5" />
+                <StickyNoteIcon size={18} className="text-gray-200 mb-1.5" />
                 <p className="text-xs text-gray-400">No pinned notes</p>
               </div>
             ) : (
-              <div className="p-3 space-y-1.5">
+              <div className="p-3 grid grid-cols-2 gap-2">
                 {dashNotes.map((note) => {
                   const { bg, border } = NOTE_COLOR[note.color] ?? NOTE_COLOR.yellow;
                   return (
@@ -626,27 +885,23 @@ export default function DashboardPage() {
                   );
                 })}
                 {allNotes.filter((n) => n.isPinned).length > 4 && (
-                  <Link to={ROUTES.NOTES} className="block text-center text-xs text-gray-400 hover:text-navy py-1 transition-colors">
+                  <Link to={ROUTES.NOTES} className="col-span-2 block text-center text-xs text-gray-400 hover:text-navy py-1 transition-colors">
                     +{allNotes.filter((n) => n.isPinned).length - 4} more
                   </Link>
                 )}
               </div>
             )}
           </div>
+        </div>
 
-          {/* Analytics shortcut — for roles with analytics access */}
-          {roleLevel <= 5 && (
-            <Link
-              to={ROUTES.ANALYTICS}
-              className="flex items-center justify-between px-4 py-3 bg-white border-t border-gray-100 text-xs text-gray-500 hover:text-navy hover:bg-gray-50 transition-colors group"
-            >
-              <span className="flex items-center gap-2">
-                <BarChart3 size={13} className="text-gray-400 group-hover:text-navy" />
-                View full analytics
-              </span>
-              <ArrowRight size={11} className="text-gray-300 group-hover:text-navy" />
-            </Link>
-          )}
+        {/* ── Right: Quick access + stats (1/3) ── */}
+        <div className="col-span-1 p-5 space-y-4">
+
+          <QuickAccessGrid items={quickAccessItems} />
+
+          <TeamStats stats={stats} loading={statsLoading} roleLevel={roleLevel} />
+
+          {isAdmin && <SystemStats stats={stats} loading={statsLoading} />}
 
         </div>
       </div>
