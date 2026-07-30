@@ -79,6 +79,12 @@ interface TaskList {
   _count?: { tasks: number; memberships: number };
 }
 
+interface TeamList {
+  id: string; name: string; color: string; icon: string | null;
+  user: { id: string; fullName: string; avatar: string | null };
+  _count?: { tasks: number };
+}
+
 interface UserOption { id: string; fullName: string; avatar: string | null }
 
 interface DivisionAccess { divisionId: string; division: { id: string; name: string; color: string } }
@@ -1648,6 +1654,24 @@ function TaskDetailPanel({
               </div>
             </div>
 
+            <div className="flex items-center gap-3 px-1 py-2 rounded hover:bg-gray-50">
+              <div className="flex items-center gap-2 w-24 flex-shrink-0">
+                {task.isPrivate ? <EyeOff size={13} className="text-gray-400" /> : <Eye size={13} className="text-gray-400" />}
+                <span className="text-xs text-gray-400">Ke atasan</span>
+              </div>
+              <button
+                onClick={() => patch({ isPrivate: !task.isPrivate })}
+                className={cn(
+                  'flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-medium border transition-colors',
+                  task.isPrivate
+                    ? 'bg-gray-100 text-gray-500 border-gray-300'
+                    : 'bg-emerald-50 text-emerald-600 border-emerald-200',
+                )}
+              >
+                {task.isPrivate ? <><EyeOff size={11} /> Disembunyikan dari atasan</> : <><Eye size={11} /> Terlihat oleh atasan</>}
+              </button>
+            </div>
+
             {task.visibility === 'DIVISION_SELECT' && (
               <div className="flex items-start gap-3 px-1 py-2">
                 <div className="flex items-center gap-2 w-24 flex-shrink-0 pt-1">
@@ -2342,6 +2366,8 @@ export default function TasksPage() {
   const [suggestOpen,  setSuggestOpen]  = useState(true);
   const [completedTasks, setCompletedTasks] = useState<Task[]>([]);
   const [loadingCompleted, setLoadingCompleted] = useState(false);
+  const [teamLists,    setTeamLists]    = useState<TeamList[]>([]);
+  const [teamListId,   setTeamListId]   = useState<string | null>(null);
 
   // Debounce search
   useEffect(() => {
@@ -2357,6 +2383,18 @@ export default function TasksPage() {
       setTaskLists(res.data.data ?? []);
     } catch { /* silent */ } finally { setLoadingLists(false); }
   }, []);
+
+  // Load subordinates' lists for Team view (list-sharing: manager browses by list)
+  const loadTeamLists = useCallback(async () => {
+    if (!canSeeTeam || sidebarView !== 'team') return;
+    try {
+      const res = await api.get('/task-lists/team');
+      setTeamLists(res.data.data ?? []);
+    } catch { /* silent */ }
+  }, [canSeeTeam, sidebarView]);
+
+  useEffect(() => { loadTeamLists(); }, [loadTeamLists]);
+  useEffect(() => { if (sidebarView !== 'team') setTeamListId(null); }, [sidebarView]);
 
   // Load pending count
   const loadPendingCount = useCallback(async () => {
@@ -2409,6 +2447,7 @@ export default function TasksPage() {
       let endpoint = '/tasks';
       if (sidebarView === 'team') {
         endpoint = '/tasks/team';
+        if (teamListId) params.listId = teamListId;
       } else if (sidebarView.startsWith('list:')) {
         params.view   = 'list';
         params.listId = sidebarView.slice(5);
@@ -2427,7 +2466,7 @@ export default function TasksPage() {
       setTasks((prev) => page === 1 ? fetched : [...prev, ...fetched]);
     } catch (err) { toast.error(extractErr(err)); }
     finally { setLoading(false); setLoadingMore(false); }
-  }, [sidebarView, debSearch, selectedDivision, pageSize]);
+  }, [sidebarView, debSearch, selectedDivision, pageSize, teamListId]);
 
   useEffect(() => { loadTasks(); }, [loadTasks]);
 
@@ -2921,6 +2960,39 @@ export default function TasksPage() {
                 })}
               </div>
             )}
+          </div>
+        )}
+
+        {/* Team view: browse by subordinate's list */}
+        {sidebarView === 'team' && teamLists.length > 0 && (
+          <div className="border-b border-gray-100 bg-gray-50/50 flex-shrink-0 px-4 py-2 flex items-center gap-1.5 overflow-x-auto">
+            <button
+              onClick={() => setTeamListId(null)}
+              className={cn(
+                'flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-medium border transition-colors flex-shrink-0',
+                !teamListId ? 'bg-navy text-white border-navy' : 'text-gray-500 border-gray-200 hover:border-navy/40',
+              )}
+            >
+              All lists
+            </button>
+            {teamLists.map((l) => (
+              <button
+                key={l.id}
+                onClick={() => setTeamListId(l.id)}
+                title={l.user.fullName}
+                className={cn(
+                  'flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium border transition-colors flex-shrink-0',
+                  teamListId === l.id ? 'bg-navy text-white border-navy' : 'text-gray-600 border-gray-200 hover:border-navy/40',
+                )}
+              >
+                <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: l.color }} />
+                {l.icon ? `${l.icon} ` : ''}{l.name}
+                <span className={cn('opacity-70', teamListId === l.id ? 'text-white' : 'text-gray-400')}>· {l.user.fullName}</span>
+                {typeof l._count?.tasks === 'number' && (
+                  <span className={cn('opacity-70', teamListId === l.id ? 'text-white' : 'text-gray-400')}>({l._count.tasks})</span>
+                )}
+              </button>
+            ))}
           </div>
         )}
 

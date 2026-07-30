@@ -1,5 +1,6 @@
 import { prisma } from '@/config/database';
 import { AppError } from '@/middlewares/errorHandler.middleware';
+import { resolveTeamUserIds } from '@/services/task.service';
 
 const LIST_SELECT = {
   id:       true,
@@ -16,6 +17,25 @@ export async function listTaskListsService(userId: string) {
     select: LIST_SELECT,
     orderBy: { position: 'asc' },
   });
+}
+
+// Subordinates' lists, for a manager's Team view — grouped by owner. Task counts only
+// include non-private tasks, mirroring what the manager can actually see in Team tasks.
+export async function listTeamTaskListsService(userId: string, roleLevel: number, divisionId: string) {
+  const userIds = await resolveTeamUserIds(userId, roleLevel, divisionId);
+  if (!userIds.length) return [];
+
+  const lists = await prisma.taskList.findMany({
+    where: { userId: { in: userIds } },
+    select: {
+      id: true, name: true, color: true, icon: true,
+      user: { select: { id: true, fullName: true, avatar: true } },
+      _count: { select: { tasks: { where: { parentTaskId: null, isPrivate: false } } } },
+    },
+    orderBy: [{ userId: 'asc' }, { position: 'asc' }],
+  });
+
+  return lists;
 }
 
 export async function createTaskListService(userId: string, data: {

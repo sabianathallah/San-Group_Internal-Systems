@@ -174,43 +174,48 @@ export async function listTasksService(
   return { tasks, meta: buildMeta(total, page, limit) };
 }
 
+// ── Team hierarchy resolution (shared with task-list.service.ts) ──
+/** Returns the ids of users whose data `userId` (at `roleLevel`) may see in Team view:
+ *  admins (level ≤ 2) see everyone; staff (level ≥ 6) see no one; managers/supervisors
+ *  (3-5) see subordinates (higher level number = lower rank) in the same division. */
+export async function resolveTeamUserIds(userId: string, roleLevel: number, divisionId: string): Promise<string[]> {
+  if (canManage(roleLevel)) {
+    const users = await prisma.user.findMany({ where: { id: { not: userId } }, select: { id: true } });
+    return users.map((u) => u.id);
+  }
+  if (roleLevel >= 6) return [];
+  const users = await prisma.user.findMany({
+    where: {
+      divisionId,
+      id: { not: userId },
+      role: { level: { gt: roleLevel } },
+    },
+    select: { id: true },
+  });
+  return users.map((u) => u.id);
+}
+
 // ── Team tasks ─────────────────────────────────────────────
 export async function listTeamTasksService(
   userId: string, roleLevel: number, divisionId: string, query: ParsedQs,
 ) {
   const { page, limit, skip } = parsePagination(query, { createdAt: 'desc' });
 
-  let userIds: string[];
-
-  if (canManage(roleLevel)) {
-    // Admins see all users except themselves
-    const users = await prisma.user.findMany({ where: { id: { not: userId } }, select: { id: true } });
-    userIds = users.map((u) => u.id);
-  } else if (roleLevel >= 6) {
-    // Staff level — no team view
-    return { tasks: [], meta: buildMeta(0, 1, limit) };
-  } else {
-    // Managers/supervisors (level 3-5): see same division, lower-level (higher number) roles
-    const users = await prisma.user.findMany({
-      where: {
-        divisionId,
-        id: { not: userId },
-        role: { level: { gt: roleLevel } },
-      },
-      select: { id: true },
-    });
-    userIds = users.map((u) => u.id);
-  }
+  const userIds = await resolveTeamUserIds(userId, roleLevel, divisionId);
 
   if (!userIds.length) return { tasks: [], meta: buildMeta(0, 1, limit) };
 
   const where: Prisma.TaskWhereInput = {
     userId: { in: userIds },
     parentTaskId: null,
-    visibility: { not: TaskVisibility.PRIVATE },
+    // isPrivate (not visibility) gates manager visibility — visibility only controls
+    // sharing with division peers, a separate axis. A staff task is visible to their
+    // manager by default; isPrivate:true is an explicit opt-out staff can set.
+    isPrivate: false,
   };
   if (query.status)   where.status   = query.status as TaskStatus;
   if (query.priority) where.priority = query.priority as TaskPriority;
+  if (typeof query.listId === 'string') where.listId = query.listId;
   if (query.search && typeof query.search === 'string') {
     const s = { contains: query.search, mode: 'insensitive' as const };
     where.OR = [{ title: s }, { description: s }];
@@ -275,7 +280,7 @@ export async function createTaskService(userId: string, data: {
   priority?: TaskPriority; isImportant?: boolean; myDay?: boolean;
   dueDate?: string | null; assignedToId?: string | null;
   listId?: string | null; parentTaskId?: string | null;
-  visibility?: TaskVisibility; divisionIds?: string[];
+  visibility?: TaskVisibility; divisionIds?: string[]; isPrivate?: boolean;
 }) {
   const isAssigned = !!data.assignedToId;
 
@@ -312,7 +317,7 @@ export async function createTaskService(userId: string, data: {
       assignedToId:     data.assignedToId ?? null,
       listId:           data.listId       ?? null,
       parentTaskId:     data.parentTaskId ?? null,
-      isPrivate:        false,
+      isPrivate:        data.isPrivate    ?? false,
       visibility:       data.visibility   ?? TaskVisibility.PRIVATE,
       assignmentStatus: isAssigned ? AssignmentStatus.PENDING : null,
       userId,
@@ -379,7 +384,7 @@ export async function updateTaskService(id: string, userId: string, permScope: s
   priority?: TaskPriority; isImportant?: boolean; myDay?: boolean;
   dueDate?: string | null; assignedToId?: string | null;
   listId?: string | null; parentTaskId?: string | null;
-  visibility?: TaskVisibility; divisionIds?: string[];
+  visibility?: TaskVisibility; divisionIds?: string[]; isPrivate?: boolean;
 }) {
   const task = await prisma.task.findUnique({
     where: { id },
@@ -449,6 +454,7 @@ export async function updateTaskService(id: string, userId: string, permScope: s
       ...(data.listId           !== undefined && { listId: data.listId }),
       ...(data.parentTaskId     !== undefined && { parentTaskId: data.parentTaskId }),
       ...(data.visibility       !== undefined && { visibility: data.visibility }),
+      ...(data.isPrivate        !== undefined && { isPrivate: data.isPrivate }),
       ...(newAssignmentStatus   !== undefined && { assignmentStatus: newAssignmentStatus }),
       ...(completedAt           !== undefined && { completedAt }),
       // Stamp the first move into IN_PROGRESS; kept on later transitions so

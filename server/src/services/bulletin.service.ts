@@ -4,6 +4,17 @@ import { prisma } from '@/config/database';
 import { parsePagination, buildMeta } from '@/helpers/pagination';
 import { AppError } from '@/middlewares/errorHandler.middleware';
 
+// ── Business timezone helpers (Asia/Jakarta, UTC+7) ────────
+/** Normalizes an expiresAt input to a real Date. Date-only strings (from a plain
+ *  <input type="date">) are pinned to end-of-day Jakarta time instead of UTC midnight,
+ *  so a bulletin set to "expire today" doesn't read as already-expired the moment it's saved. */
+function normalizeExpiresAt(dateStr: string): Date {
+  if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+    return new Date(`${dateStr}T23:59:59+07:00`);
+  }
+  return new Date(dateStr);
+}
+
 const BULLETIN_SELECT = {
   id: true,
   title: true,
@@ -30,7 +41,11 @@ async function notifyBulletinPublished(authorId: string, title: string, priority
 
   let userWhere: Prisma.UserWhereInput = { isActive: true, id: { not: authorId } };
   if (audienceType === AudienceType.DIVISION) {
-    userWhere = { ...userWhere, divisionId: authorDivisionId ?? undefined };
+    // Matches listBulletinsService's audienceFilter, which requires author.divisionId ===
+    // userDivisionId — an author with no division can't have a DIVISION-scoped bulletin
+    // visible to anyone, so notifying "everyone" here would be misleading.
+    if (!authorDivisionId) return;
+    userWhere = { ...userWhere, divisionId: authorDivisionId };
   } else if (audienceType === AudienceType.CUSTOM && divisionIds.length > 0) {
     userWhere = { ...userWhere, divisionId: { in: divisionIds } };
   }
@@ -175,6 +190,11 @@ export async function createBulletinService(
 ) {
   const publishedAt = data.isPublished ? new Date() : null;
   const audienceType = data.audienceType ?? AudienceType.ALL;
+  const expiresAt = data.expiresAt ? normalizeExpiresAt(data.expiresAt) : null;
+
+  if (data.isPublished && expiresAt && expiresAt <= new Date()) {
+    throw new AppError('Tanggal "Valid until" harus di masa depan', 400);
+  }
 
   const bulletin = await prisma.bulletin.create({
     data: {
@@ -185,7 +205,7 @@ export async function createBulletinService(
       isPublished: data.isPublished ?? false,
       audienceType,
       publishedAt,
-      expiresAt:   data.expiresAt ? new Date(data.expiresAt) : null,
+      expiresAt,
       authorId,
       audiences:
         audienceType === AudienceType.CUSTOM && data.audienceDivisionIds?.length
@@ -222,7 +242,7 @@ export async function updateBulletinService(
 ) {
   const exists = await prisma.bulletin.findUnique({
     where: { id },
-    select: { id: true, isPublished: true, authorId: true },
+    select: { id: true, isPublished: true, authorId: true, expiresAt: true },
   });
   if (!exists) throw new AppError('Bulletin tidak ditemukan', 404);
   if (roleLevel > 2 && exists.authorId !== userId) throw new AppError('Hanya penulis atau admin yang dapat mengedit bulletin ini', 403);
@@ -231,6 +251,14 @@ export async function updateBulletinService(
   let publishedAt: Date | null | undefined;
   if (data.isPublished === true && !exists.isPublished)  publishedAt = new Date();
   if (data.isPublished === false && exists.isPublished)  publishedAt = null;
+
+  const willBePublished = data.isPublished ?? exists.isPublished;
+  const nextExpiresAt = data.expiresAt !== undefined
+    ? (data.expiresAt ? normalizeExpiresAt(data.expiresAt) : null)
+    : exists.expiresAt;
+  if (willBePublished && nextExpiresAt && nextExpiresAt <= new Date()) {
+    throw new AppError('Tanggal "Valid until" harus di masa depan', 400);
+  }
 
   const updated = await prisma.$transaction(async (tx) => {
     const result = await tx.bulletin.update({
@@ -242,7 +270,7 @@ export async function updateBulletinService(
         ...(data.priority     !== undefined && { priority: data.priority }),
         ...(data.isPublished  !== undefined && { isPublished: data.isPublished }),
         ...(publishedAt       !== undefined && { publishedAt }),
-        ...(data.expiresAt    !== undefined && { expiresAt: data.expiresAt ? new Date(data.expiresAt) : null }),
+        ...(data.expiresAt    !== undefined && { expiresAt: nextExpiresAt }),
         ...(data.audienceType !== undefined && { audienceType: data.audienceType }),
       },
       select: BULLETIN_SELECT,

@@ -3,13 +3,21 @@ import { AuthRequest } from '@/types';
 import { successResponse } from '@/helpers/response';
 import {
   listTaskListsService, createTaskListService,
-  updateTaskListService, deleteTaskListService,
+  updateTaskListService, deleteTaskListService, listTeamTaskListsService,
 } from '@/services/task-list.service';
 
 export async function listTaskLists(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
     const lists = await listTaskListsService(req.user!.userId);
     successResponse(res, lists, 'Daftar list berhasil diambil');
+  } catch (err) { next(err); }
+}
+
+export async function listTeamTaskLists(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { userId, roleLevel, divisionId } = req.user!;
+    const lists = await listTeamTaskListsService(userId, roleLevel, divisionId);
+    successResponse(res, lists, 'Daftar list tim berhasil diambil');
   } catch (err) { next(err); }
 }
 

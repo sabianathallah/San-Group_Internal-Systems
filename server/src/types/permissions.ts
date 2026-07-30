@@ -130,7 +130,7 @@ export const DEFAULT_PERMISSIONS: Record<number, PermissionConfig> = {
   3: {
     task:       { view: 'division', create: true,  edit: 'division', delete: 'division', viewPrivate: true },
     bulletin:   { view: true,       create: true,  audienceScope: 'all',      edit: 'own',  delete: 'own' },
-    db_link:    { view: 'all',      addLink: true, manageFolder: true, shareFolder: true },
+    db_link:    { view: 'division', addLink: true, manageFolder: true, shareFolder: true },
     note:       { view: 'division', create: true,  edit: 'own',      delete: 'own' },
     analytics:  { view: 'division' },
     audit_log:  { view: 'division' },
