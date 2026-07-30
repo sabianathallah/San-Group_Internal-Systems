@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState, FormEvent } from 'react';
 import {
   Megaphone, Plus, Search, X,
   AlertTriangle, Info, Calendar, Eye, EyeOff,
-  Loader2, Trash2, Edit2, CheckCircle2, Clock, ToggleLeft, ToggleRight,
+  Loader2, Trash2, Edit2, Clock, ToggleLeft, ToggleRight,
   ChevronLeft, ChevronRight,
 } from 'lucide-react';
 import api from '@/lib/api';
@@ -132,7 +132,6 @@ export default function BulletinPage() {
   const [page,         setPage]         = useState(1);
   const [pageSize,     setPageSize]     = useState(20);
 
-  const [selected, setSelected] = useState<Bulletin | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [editItem, setEditItem] = useState<Bulletin | null>(null);
 
@@ -162,6 +161,31 @@ export default function BulletinPage() {
   }, [category, search, isAdmin, showDrafts, page, pageSize]);
 
   useEffect(() => { fetchBulletins(); }, [fetchBulletins]);
+
+  // Full content now renders directly in the feed (no click-to-open pane),
+  // so being on this page already counts as "read" — mark each unread,
+  // published item as read as soon as it's fetched instead of waiting for
+  // a click that no longer exists.
+  useEffect(() => {
+    const unread = bulletins.filter((b) => b.isPublished && !b.isRead);
+    if (unread.length === 0) return;
+    unread.forEach((b) => {
+      api.get(`/bulletins/${b.id}`)
+        .then(() => setBulletins((prev) => prev.map((x) => x.id === b.id ? { ...x, isRead: true } : x)))
+        .catch(() => {});
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bulletins.map((b) => b.id).join(',')]);
+
+  // Notification arrives on its own poll cycle (see Header.tsx) — if this
+  // page is already mounted when a new bulletin is published, the list
+  // above was fetched before that write and won't include it until we
+  // refetch. Without this, the notification fires correctly but the
+  // bulletin looks "missing" to whoever is already looking at this page.
+  useEffect(() => {
+    window.addEventListener('bulletin:new', fetchBulletins);
+    return () => window.removeEventListener('bulletin:new', fetchBulletins);
+  }, [fetchBulletins]);
 
   function handlePageSizeChange(n: number) { setPageSize(n); setPage(1); }
 
@@ -204,7 +228,6 @@ export default function BulletinPage() {
     if (!confirm('Delete this bulletin?')) return;
     try {
       await api.delete(`/bulletins/${id}`);
-      if (selected?.id === id) setSelected(null);
       fetchBulletins();
     } catch {
       pushToast('error', 'Gagal menghapus bulletin');
@@ -220,77 +243,65 @@ export default function BulletinPage() {
     }
   };
 
-  const openDetail = async (b: Bulletin) => {
-    setSelected(b);
-    try {
-      const res = await api.get(`/bulletins/${b.id}`);
-      setSelected(res.data.data);
-      setBulletins((prev) => prev.map((x) => x.id === b.id ? { ...x, isRead: true } : x));
-    } catch { /* ignore */ }
-  };
-
   return (
-    <div className="flex gap-4 h-[calc(100vh-56px-48px)]">
-      {/* ── Left: list ── */}
-      <div className="flex flex-col w-96 flex-shrink-0">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-3">
-          <div>
-            <h1 className="text-xl font-semibold text-gray-800">Bulletin</h1>
-            <p className="text-sm text-gray-400 mt-0.5">
-              {activeTab === 'bulletins'
-                ? (meta ? `${meta.total} bulletins` : 'Announcements board')
-                : `${scheduled.length} scheduled`}
-            </p>
-          </div>
-          {activeTab === 'bulletins' && perms.bulletin.create && (
-            <button
-              onClick={() => { setEditItem(null); setShowForm(true); }}
-              className="flex items-center gap-1.5 h-9 px-3 bg-navy text-white text-sm font-medium rounded hover:bg-navy-light transition-colors"
-            >
-              <Plus size={15} /> Create
+    <div className="max-w-2xl mx-auto">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <h1 className="text-xl font-semibold text-gray-800">Bulletin</h1>
+          <p className="text-sm text-gray-400 mt-0.5">
+            {activeTab === 'bulletins'
+              ? (meta ? `${meta.total} bulletins` : 'Announcements board')
+              : `${scheduled.length} scheduled`}
+          </p>
+        </div>
+        {activeTab === 'bulletins' && perms.bulletin.create && (
+          <button
+            onClick={() => { setEditItem(null); setShowForm(true); }}
+            className="flex items-center gap-1.5 h-9 px-3 bg-navy text-white text-sm font-medium rounded hover:bg-navy-light transition-colors"
+          >
+            <Plus size={15} /> Create
+          </button>
+        )}
+        {activeTab === 'scheduled' && canManageScheduled && (
+          <button
+            onClick={() => { setEditScheduled(null); setShowScheduledForm(true); }}
+            className="flex items-center gap-1.5 h-9 px-3 bg-navy text-white text-sm font-medium rounded hover:bg-navy-light transition-colors"
+          >
+            <Plus size={15} /> Add
+          </button>
+        )}
+      </div>
+
+      {/* Tabs */}
+      {canManageScheduled && (
+        <div className="flex gap-1 mb-4 border-b border-gray-100">
+          {(['bulletins', 'scheduled'] as const).map((t) => (
+            <button key={t} onClick={() => setActiveTab(t)}
+              className={cn('px-3 py-2 text-xs font-medium border-b-2 -mb-px transition-colors capitalize',
+                activeTab === t ? 'border-navy text-navy' : 'border-transparent text-gray-500 hover:text-gray-700'
+              )}>
+              {t === 'scheduled' ? <span className="flex items-center gap-1"><Clock size={11} /> Scheduled</span> : 'Bulletins'}
             </button>
-          )}
-          {activeTab === 'scheduled' && canManageScheduled && (
-            <button
-              onClick={() => { setEditScheduled(null); setShowScheduledForm(true); }}
-              className="flex items-center gap-1.5 h-9 px-3 bg-navy text-white text-sm font-medium rounded hover:bg-navy-light transition-colors"
-            >
-              <Plus size={15} /> Add
-            </button>
-          )}
+          ))}
+        </div>
+      )}
+
+      {activeTab === 'bulletins' && <>
+        {/* Search */}
+        <div className="relative mb-3">
+          <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+          <input
+            type="text"
+            placeholder="Search bulletins..."
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            className="w-full h-9 pl-8 pr-3 text-sm border border-gray-300 rounded bg-white placeholder:text-gray-400 focus:border-navy focus:outline-none focus:ring-2 focus:ring-navy-50"
+          />
         </div>
 
-        {/* Tabs */}
-        {canManageScheduled && (
-          <div className="flex gap-1 mb-3 border-b border-gray-100">
-            {(['bulletins', 'scheduled'] as const).map((t) => (
-              <button key={t} onClick={() => setActiveTab(t)}
-                className={cn('px-3 py-2 text-xs font-medium border-b-2 -mb-px transition-colors capitalize',
-                  activeTab === t ? 'border-navy text-navy' : 'border-transparent text-gray-500 hover:text-gray-700'
-                )}>
-                {t === 'scheduled' ? <span className="flex items-center gap-1"><Clock size={11} /> Scheduled</span> : 'Bulletins'}
-              </button>
-            ))}
-          </div>
-        )}
-
-        {/* Search (bulletins only) */}
-        {activeTab === 'bulletins' && (
-          <div className="relative mb-3">
-            <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Search bulletins..."
-              value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
-              className="w-full h-8 pl-8 pr-3 text-sm border border-gray-300 rounded bg-white placeholder:text-gray-400 focus:border-navy focus:outline-none focus:ring-2 focus:ring-navy-50"
-            />
-          </div>
-        )}
-
-        {/* Category tabs (bulletins only) */}
-        {activeTab === 'bulletins' && <div className="flex gap-1 flex-wrap mb-3">
+        {/* Category tabs */}
+        <div className="flex items-center gap-1 flex-wrap mb-4">
           {CATEGORY_TABS.map((tab) => (
             <button
               key={tab.value}
@@ -305,15 +316,11 @@ export default function BulletinPage() {
               {tab.label}
             </button>
           ))}
-        </div>}
-
-        {activeTab === 'bulletins' && <>
-          {/* Admin: draft toggle */}
           {isAdmin && (
             <button
               onClick={() => { setShowDrafts((p) => !p); setPage(1); }}
               className={cn(
-                'flex items-center gap-1.5 text-xs mb-3 self-start px-2.5 py-1 rounded transition-colors',
+                'flex items-center gap-1.5 h-6 px-2.5 text-xs rounded transition-colors ml-auto',
                 showDrafts ? 'bg-warning-light text-warning' : 'text-gray-400 hover:text-gray-600',
               )}
             >
@@ -321,117 +328,96 @@ export default function BulletinPage() {
               {showDrafts ? 'Hide drafts' : 'Show drafts'}
             </button>
           )}
+        </div>
 
-          {/* List */}
-          <div className="flex-1 overflow-y-auto space-y-2 pr-1">
-            {loading ? (
-              <SkeletonList />
-            ) : error ? (
-              <ErrorState message={error} onRetry={fetchBulletins} />
-            ) : bulletins.length === 0 ? (
-              <EmptyState isAdmin={isAdmin} canCreate={perms.bulletin.create} onAdd={() => { setEditItem(null); setShowForm(true); }} />
-            ) : (
-              bulletins.map((b) => (
-                <BulletinCard
-                  key={b.id}
-                  bulletin={b}
-                  isSelected={selected?.id === b.id}
-                  canEdit={canEditBulletin(b)}
-                  canDelete={canDeleteBulletin(b)}
-                  onClick={() => openDetail(b)}
-                  onEdit={() => { setEditItem(b); setShowForm(true); }}
-                  onDelete={() => handleDelete(b.id)}
-                  onTogglePublish={() => handleTogglePublish(b)}
-                />
-              ))
+        {/* Feed — full content shown directly, just scroll, no click-to-open */}
+        <div className="space-y-3">
+          {loading ? (
+            <SkeletonList />
+          ) : error ? (
+            <ErrorState message={error} onRetry={fetchBulletins} />
+          ) : bulletins.length === 0 ? (
+            <EmptyState isAdmin={isAdmin} canCreate={perms.bulletin.create} onAdd={() => { setEditItem(null); setShowForm(true); }} />
+          ) : (
+            bulletins.map((b) => (
+              <BulletinFeedCard
+                key={b.id}
+                bulletin={b}
+                canEdit={canEditBulletin(b)}
+                canDelete={canDeleteBulletin(b)}
+                onEdit={() => { setEditItem(b); setShowForm(true); }}
+                onDelete={() => handleDelete(b.id)}
+                onTogglePublish={() => handleTogglePublish(b)}
+              />
+            ))
+          )}
+        </div>
+
+        {/* Pagination */}
+        {!loading && !error && meta && (
+          <div className="flex items-center justify-between gap-2 py-4">
+            <PageSizeSelect value={pageSize} onChange={handlePageSizeChange} />
+            {meta.totalPages > 1 && (
+              <div className="flex items-center gap-2">
+                <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1}
+                  className="p-2 text-gray-400 hover:text-gray-700 disabled:opacity-30 transition-colors">
+                  <ChevronLeft size={16} />
+                </button>
+                <span className="text-sm text-gray-500">{page} / {meta.totalPages}</span>
+                <button onClick={() => setPage((p) => Math.min(meta.totalPages, p + 1))} disabled={page === meta.totalPages}
+                  className="p-2 text-gray-400 hover:text-gray-700 disabled:opacity-30 transition-colors">
+                  <ChevronRight size={16} />
+                </button>
+              </div>
             )}
           </div>
+        )}
+      </>}
 
-          {/* Pagination */}
-          {!loading && !error && meta && (
-            <div className="flex items-center justify-between gap-2 pt-2 flex-shrink-0">
-              <PageSizeSelect value={pageSize} onChange={handlePageSizeChange} />
-              {meta.totalPages > 1 && (
-                <div className="flex items-center gap-2">
-                  <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1}
-                    className="p-2 text-gray-400 hover:text-gray-700 disabled:opacity-30 transition-colors">
-                    <ChevronLeft size={16} />
+      {activeTab === 'scheduled' && (
+        <div className="space-y-2">
+          {loadingScheduled ? (
+            <div className="flex justify-center py-8"><Loader2 size={18} className="animate-spin text-gray-300" /></div>
+          ) : scheduled.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 text-center">
+              <Clock size={32} className="text-gray-300 mb-3" />
+              <p className="text-sm font-medium text-gray-600">No scheduled announcements</p>
+              <p className="text-xs text-gray-400 mt-1">Add recurring notifications for your team.</p>
+            </div>
+          ) : scheduled.map((sa) => (
+            <div key={sa.id} className={cn(
+              'border rounded-lg p-3 space-y-1.5 transition-colors',
+              sa.isActive ? 'border-gray-200 bg-white' : 'border-gray-100 bg-gray-50 opacity-60',
+            )}>
+              <div className="flex items-start justify-between gap-2">
+                <p className="text-sm font-semibold text-gray-800 leading-snug">{sa.title}</p>
+                <div className="flex items-center gap-1 flex-shrink-0">
+                  <button onClick={() => handleToggleActive(sa)} title={sa.isActive ? 'Deactivate' : 'Activate'}
+                    className="text-gray-400 hover:text-navy transition-colors">
+                    {sa.isActive ? <ToggleRight size={18} className="text-navy" /> : <ToggleLeft size={18} />}
                   </button>
-                  <span className="text-sm text-gray-500">{page} / {meta.totalPages}</span>
-                  <button onClick={() => setPage((p) => Math.min(meta.totalPages, p + 1))} disabled={page === meta.totalPages}
-                    className="p-2 text-gray-400 hover:text-gray-700 disabled:opacity-30 transition-colors">
-                    <ChevronRight size={16} />
-                  </button>
+                  <button onClick={() => { setEditScheduled(sa); setShowScheduledForm(true); }}
+                    className="p-1 text-gray-400 hover:text-navy rounded"><Edit2 size={13} /></button>
+                  <button onClick={() => handleDeleteScheduled(sa.id)}
+                    className="p-1 text-gray-400 hover:text-danger rounded"><Trash2 size={13} /></button>
                 </div>
+              </div>
+              <p className="text-xs text-gray-500 line-clamp-2">{sa.content}</p>
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="inline-flex items-center gap-1 text-[10px] bg-navy/10 text-navy px-2 py-0.5 rounded-full font-medium">
+                  <Clock size={9} /> {scheduleLabel(sa)}
+                </span>
+                <span className="text-[10px] text-gray-400">
+                  {sa.audienceType === 'ALL' ? 'All staff' : sa.audienceType === 'DIVISION' ? "Creator's division" : sa.audiences.map(a => a.division.name).join(', ')}
+                </span>
+              </div>
+              {sa.lastSentAt && (
+                <p className="text-[10px] text-gray-400">Last sent: {new Date(sa.lastSentAt).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' })}</p>
               )}
             </div>
-          )}
-        </>}
-
-        {activeTab === 'scheduled' && (
-          <div className="flex-1 overflow-y-auto space-y-2 pr-1">
-            {loadingScheduled ? (
-              <div className="flex justify-center py-8"><Loader2 size={18} className="animate-spin text-gray-300" /></div>
-            ) : scheduled.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-16 text-center">
-                <Clock size={32} className="text-gray-300 mb-3" />
-                <p className="text-sm font-medium text-gray-600">No scheduled announcements</p>
-                <p className="text-xs text-gray-400 mt-1">Add recurring notifications for your team.</p>
-              </div>
-            ) : scheduled.map((sa) => (
-              <div key={sa.id} className={cn(
-                'border rounded-lg p-3 space-y-1.5 transition-colors',
-                sa.isActive ? 'border-gray-200 bg-white' : 'border-gray-100 bg-gray-50 opacity-60',
-              )}>
-                <div className="flex items-start justify-between gap-2">
-                  <p className="text-sm font-semibold text-gray-800 leading-snug">{sa.title}</p>
-                  <div className="flex items-center gap-1 flex-shrink-0">
-                    <button onClick={() => handleToggleActive(sa)} title={sa.isActive ? 'Deactivate' : 'Activate'}
-                      className="text-gray-400 hover:text-navy transition-colors">
-                      {sa.isActive ? <ToggleRight size={18} className="text-navy" /> : <ToggleLeft size={18} />}
-                    </button>
-                    <button onClick={() => { setEditScheduled(sa); setShowScheduledForm(true); }}
-                      className="p-1 text-gray-400 hover:text-navy rounded"><Edit2 size={13} /></button>
-                    <button onClick={() => handleDeleteScheduled(sa.id)}
-                      className="p-1 text-gray-400 hover:text-danger rounded"><Trash2 size={13} /></button>
-                  </div>
-                </div>
-                <p className="text-xs text-gray-500 line-clamp-2">{sa.content}</p>
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="inline-flex items-center gap-1 text-[10px] bg-navy/10 text-navy px-2 py-0.5 rounded-full font-medium">
-                    <Clock size={9} /> {scheduleLabel(sa)}
-                  </span>
-                  <span className="text-[10px] text-gray-400">
-                    {sa.audienceType === 'ALL' ? 'All staff' : sa.audienceType === 'DIVISION' ? "Creator's division" : sa.audiences.map(a => a.division.name).join(', ')}
-                  </span>
-                </div>
-                {sa.lastSentAt && (
-                  <p className="text-[10px] text-gray-400">Last sent: {new Date(sa.lastSentAt).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' })}</p>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* ── Right: detail pane ── */}
-      <div className="flex-1 bg-white border border-gray-200 rounded-lg overflow-hidden flex flex-col">
-        {selected ? (
-          <DetailPane bulletin={selected}
-            canEdit={canEditBulletin(selected)}
-            canDelete={canDeleteBulletin(selected)}
-            onEdit={() => { setEditItem(selected); setShowForm(true); }}
-            onDelete={() => handleDelete(selected.id)}
-            onTogglePublish={() => handleTogglePublish(selected)}
-          />
-        ) : (
-          <div className="flex flex-col items-center justify-center h-full text-center p-8">
-            <Megaphone size={40} className="text-gray-300 mb-3" />
-            <p className="text-sm font-medium text-gray-600">Select a bulletin to read</p>
-            <p className="text-xs text-gray-400 mt-1">Click on any bulletin on the left</p>
-          </div>
-        )}
-      </div>
+          ))}
+        </div>
+      )}
 
       {/* ── Form Modal ── */}
       {showForm && (
@@ -441,8 +427,6 @@ export default function BulletinPage() {
           onSaved={() => {
             setShowForm(false);
             fetchBulletins();
-            // Refresh detail pane if we just edited the open bulletin
-            if (editItem && selected?.id === editItem.id) openDetail(editItem);
           }}
         />
       )}
@@ -459,86 +443,10 @@ export default function BulletinPage() {
   );
 }
 
-// ── BulletinCard ───────────────────────────────────────────
-function BulletinCard({ bulletin: b, isSelected, canEdit, canDelete, onClick, onEdit, onDelete, onTogglePublish }: {
-  bulletin: Bulletin; isSelected: boolean; canEdit: boolean; canDelete: boolean;
-  onClick: () => void; onEdit: () => void;
-  onDelete: () => void; onTogglePublish: () => void;
-}) {
-  const cfg = priorityConfig(b.priority);
-
-  return (
-    <div
-      onClick={onClick}
-      className={cn(
-        'group relative border-l-2 rounded-lg p-3 cursor-pointer transition-colors',
-        cfg.cls,
-        isSelected ? 'ring-1 ring-navy' : 'border border-gray-200 bg-white hover:bg-gray-50',
-        !b.isRead && !isSelected && 'border-l-4',
-      )}
-    >
-      <div className="flex items-start gap-2">
-        {/* Unread dot */}
-        {!b.isRead && (
-          <span className="mt-1.5 flex-shrink-0 w-1.5 h-1.5 rounded-full bg-info" />
-        )}
-        <div className="flex-1 min-w-0">
-          <p className={cn('text-sm font-medium text-gray-800 leading-snug truncate', !b.isRead && 'font-semibold')}>
-            {b.title}
-          </p>
-          <div className="flex items-center gap-2 mt-1 flex-wrap">
-            <span className="text-xs text-gray-400">{categoryLabel(b.category)}</span>
-            {b.publishedAt && (
-              <span className="text-xs text-gray-400">{formatDate(b.publishedAt)}</span>
-            )}
-            {!b.isPublished && (
-              <span className="text-xs font-medium text-warning bg-warning-light px-1.5 py-0.5 rounded">
-                Draft
-              </span>
-            )}
-            {b.audienceType === 'DIVISION' && (
-              <span className="text-xs text-blue-500 bg-blue-50 px-1.5 py-0.5 rounded">Division</span>
-            )}
-            {b.audienceType === 'CUSTOM' && (
-              <span className="text-xs text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded">Limited</span>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Author / admin actions */}
-      {(canEdit || canDelete) && (
-        <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 flex items-center gap-1 transition-opacity">
-          {canEdit && (
-            <button onClick={(e) => { e.stopPropagation(); onTogglePublish(); }}
-              className="p-1 rounded hover:bg-white/80 text-gray-400 hover:text-gray-700 transition-colors"
-              title={b.isPublished ? 'Unpublish' : 'Publish'}
-            >
-              {b.isPublished ? <EyeOff size={13} /> : <Eye size={13} />}
-            </button>
-          )}
-          {canEdit && (
-            <button onClick={(e) => { e.stopPropagation(); onEdit(); }}
-              className="p-1 rounded hover:bg-white/80 text-gray-400 hover:text-gray-700 transition-colors"
-            >
-              <Edit2 size={13} />
-            </button>
-          )}
-          {canDelete && (
-            <button onClick={(e) => { e.stopPropagation(); onDelete(); }}
-              className="p-1 rounded hover:bg-white/80 text-gray-400 hover:text-danger transition-colors"
-            >
-              <Trash2 size={13} />
-            </button>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ── DetailPane ─────────────────────────────────────────────
-function DetailPane({ bulletin: b, canEdit, canDelete, onEdit, onDelete, onTogglePublish }: {
+// ── BulletinFeedCard ─────────────────────────────────────────
+// Full content shown directly — no separate detail pane to click into,
+// per feedback that the two-pane layout hid content behind an extra click.
+function BulletinFeedCard({ bulletin: b, canEdit, canDelete, onEdit, onDelete, onTogglePublish }: {
   bulletin: Bulletin; canEdit: boolean; canDelete: boolean;
   onEdit: () => void; onDelete: () => void; onTogglePublish: () => void;
 }) {
@@ -546,12 +454,15 @@ function DetailPane({ bulletin: b, canEdit, canDelete, onEdit, onDelete, onToggl
   const Icon = cfg.icon;
 
   return (
-    <>
-      {/* Detail header */}
-      <div className="px-6 py-4 border-b border-gray-100">
+    <div className={cn(
+      'group relative border-l-4 rounded-xl bg-white overflow-hidden transition-colors',
+      cfg.cls,
+      !b.isRead ? 'border border-gray-200 shadow-sm' : 'border border-gray-100',
+    )}>
+      <div className="px-5 py-4">
         <div className="flex items-start justify-between gap-3">
           <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-1.5">
+            <div className="flex items-center gap-2 mb-1.5 flex-wrap">
               <span className={cn('inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded', cfg.cls)}>
                 <Icon size={11} /> {cfg.label}
               </span>
@@ -559,69 +470,63 @@ function DetailPane({ bulletin: b, canEdit, canDelete, onEdit, onDelete, onToggl
                 {categoryLabel(b.category)}
               </span>
               {!b.isPublished && (
-                <span className="text-xs font-medium text-warning bg-warning-light px-2 py-0.5 rounded">
-                  Draft
-                </span>
+                <span className="text-xs font-medium text-warning bg-warning-light px-2 py-0.5 rounded">Draft</span>
               )}
+              {b.audienceType === 'DIVISION' && (
+                <span className="text-xs text-blue-500 bg-blue-50 px-1.5 py-0.5 rounded">Division</span>
+              )}
+              {b.audienceType === 'CUSTOM' && (
+                <span className="text-xs text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded">Limited</span>
+              )}
+              {!b.isRead && <span className="w-1.5 h-1.5 rounded-full bg-info flex-shrink-0" />}
             </div>
-            <h2 className="text-lg font-semibold text-gray-800 leading-snug">{b.title}</h2>
-            <div className="flex items-center gap-3 mt-1.5 text-xs text-gray-400">
+            <h2 className={cn('text-base leading-snug text-gray-800', !b.isRead ? 'font-semibold' : 'font-medium')}>
+              {b.title}
+            </h2>
+            <div className="flex items-center gap-3 mt-1 text-xs text-gray-400 flex-wrap">
               <span>By {b.author.fullName}</span>
               {b.publishedAt && (
-                <span className="flex items-center gap-1">
-                  <Calendar size={11} /> {formatDate(b.publishedAt)}
-                </span>
-              )}
-              {b.isRead && (
-                <span className="flex items-center gap-1 text-success">
-                  <CheckCircle2 size={11} /> Read
-                </span>
+                <span className="flex items-center gap-1"><Calendar size={11} /> {formatDate(b.publishedAt)}</span>
               )}
               <span>{b._count.readStatus} readers</span>
             </div>
           </div>
 
           {(canEdit || canDelete) && (
-            <div className="flex items-center gap-1 flex-shrink-0">
+            <div className="flex items-center gap-1 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
               {canEdit && (
                 <button onClick={onTogglePublish}
-                  className="flex items-center gap-1.5 h-8 px-3 text-xs border border-gray-300 rounded hover:bg-gray-50 transition-colors text-gray-600"
+                  className="p-1.5 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-700 transition-colors"
+                  title={b.isPublished ? 'Unpublish' : 'Publish'}
                 >
-                  {b.isPublished ? <><EyeOff size={12} /> Unpublish</> : <><Eye size={12} /> Publish</>}
+                  {b.isPublished ? <EyeOff size={13} /> : <Eye size={13} />}
                 </button>
               )}
               {canEdit && (
-                <button onClick={onEdit}
-                  className="h-8 px-3 text-xs border border-gray-300 rounded hover:bg-gray-50 transition-colors text-gray-600"
-                >
-                  <Edit2 size={12} />
+                <button onClick={onEdit} className="p-1.5 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-700 transition-colors">
+                  <Edit2 size={13} />
                 </button>
               )}
               {canDelete && (
-                <button onClick={onDelete}
-                  className="h-8 px-3 text-xs border border-danger/30 rounded hover:bg-danger-light transition-colors text-danger"
-                >
-                  <Trash2 size={12} />
+                <button onClick={onDelete} className="p-1.5 rounded hover:bg-gray-100 text-gray-400 hover:text-danger transition-colors">
+                  <Trash2 size={13} />
                 </button>
               )}
             </div>
           )}
         </div>
-      </div>
 
-      {/* Content */}
-      <div className="flex-1 overflow-y-auto px-6 py-5">
-        <div className="prose prose-sm max-w-none text-gray-700 leading-relaxed whitespace-pre-wrap">
+        <div className="prose prose-sm max-w-none text-gray-600 leading-relaxed whitespace-pre-wrap mt-3">
           {b.content}
         </div>
 
         {b.expiresAt && (
-          <p className="mt-6 text-xs text-gray-400 border-t border-gray-100 pt-3">
+          <p className="mt-3 text-xs text-gray-400 border-t border-gray-100 pt-2.5">
             Valid until: {formatDate(b.expiresAt)}
           </p>
         )}
       </div>
-    </>
+    </div>
   );
 }
 

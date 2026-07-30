@@ -114,6 +114,12 @@ export default function Header({ onSearchClick }: { onSearchClick?: () => void }
     if (newNotifs.length > 3) {
       toast.info(`+${newNotifs.length - 3} notifikasi lainnya`);
     }
+    // BulletinPage fetches once on mount and won't otherwise notice a bulletin
+    // published while it's already open — nudge it to refetch so "new
+    // notification" and "bulletin actually shows up" stay in sync.
+    if (newNotifs.some((n) => n.type === 'BULLETIN_NEW' || n.type === 'BULLETIN_URGENT')) {
+      window.dispatchEvent(new Event('bulletin:new'));
+    }
   }, [pollNotifs, markRead, navigate]);
 
   useEffect(() => {
