@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, FormEvent } from 'react';
 import {
-  Folder, FolderOpen, Plus, ChevronRight, Loader2,
+  Folder, FolderOpen, Plus, ChevronLeft, Loader2,
   X, Edit2, Trash2, ExternalLink, Search, FileText,
   AlertCircle, Share2, ShieldCheck,
 } from 'lucide-react';
@@ -436,7 +436,10 @@ export default function DatabasePage() {
                   </div>
                   <div className="w-full text-center space-y-0.5">
                     <p className="text-sm font-medium text-gray-800 truncate">{folder.name}</p>
-                    <p className="text-[11px] text-gray-400">{folder._count.links} item</p>
+                    {folder.description && (
+                      <p className="text-[11px] text-gray-400 truncate">{folder.description}</p>
+                    )}
+                    <p className="text-[11px] text-gray-300">{folder._count.links} item</p>
                   </div>
                 </button>
                 {(perms.db_link.manageFolder || perms.db_link.shareFolder) && (
@@ -496,20 +499,20 @@ export default function DatabasePage() {
   // ── Folder contents view ──────────────────────────────────
   return (
     <div className="space-y-5">
-      {/* Breadcrumb */}
-      <div className="flex items-center justify-between gap-4 flex-wrap">
-        <div className="flex items-center gap-2 min-w-0 flex-wrap">
+      {/* Back + breadcrumb */}
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div className="min-w-0">
           <button onClick={() => { setActiveFolder(null); setSearch(''); setLinks([]); }}
-            className="text-sm text-gray-500 hover:text-navy transition-colors">
-            Database Links
+            className="flex items-center gap-1 text-xs text-gray-500 hover:text-navy transition-colors mb-1.5">
+            <ChevronLeft size={13} />
+            Back to Database Links
           </button>
-          <ChevronRight size={13} className="text-gray-300 flex-shrink-0" />
           <div className="flex items-center gap-2">
             <FolderOpen size={16} style={{ color: activeFolder.color }} />
             <span className="text-sm font-semibold text-gray-900">{activeFolder.name}</span>
           </div>
           {activeFolder.description && (
-            <span className="text-xs text-gray-400 hidden sm:block">— {activeFolder.description}</span>
+            <p className="text-xs text-gray-400 mt-0.5">{activeFolder.description}</p>
           )}
         </div>
 

@@ -186,17 +186,14 @@ export default function Sidebar() {
         )}
       </div>
 
-      {/* Module switcher */}
+      {/* Module switcher — a horizontal tab bar (open) so it reads as a
+          distinct "level" from the vertical nav list below it, instead of
+          just another stack of rows in the same direction. */}
       <div className={cn(
-        'flex-shrink-0 border-b border-white/10',
+        'flex-shrink-0 border-b border-white/10 bg-black/15',
         open ? 'px-2 py-2' : 'px-1 py-2',
       )}>
-        {open && (
-          <p className="px-2 mb-1.5 text-[10px] font-semibold text-white/30 uppercase tracking-wider">
-            Module
-          </p>
-        )}
-        <div className={cn('flex gap-1', open ? 'flex-col' : 'flex-col items-center')}>
+        <div className={cn('flex gap-1', open ? 'items-stretch' : 'flex-col items-center')}>
           {visibleModules.map((mod) => {
             const Icon = mod.icon;
             const isActive = activeModule === mod.id;
@@ -205,21 +202,14 @@ export default function Sidebar() {
               return (
                 <div
                   key={mod.id}
-                  title={open ? undefined : `${mod.label} (${mod.disabledLabel})`}
+                  title={`${mod.label} (${mod.disabledLabel})`}
                   className={cn(
-                    'flex items-center gap-2.5 px-2 py-1.5 rounded text-sm cursor-not-allowed opacity-40',
-                    !open && 'justify-center px-0 w-10',
+                    'flex items-center justify-center cursor-not-allowed opacity-40',
+                    open ? 'flex-1 flex-col gap-1 py-2 rounded-lg' : 'px-0 w-10 py-1.5 rounded',
                   )}
                 >
-                  <Icon size={17} className="text-white/40 flex-shrink-0" />
-                  {open && (
-                    <span className="flex-1 text-white/40 truncate">{mod.label}</span>
-                  )}
-                  {open && mod.disabledLabel && (
-                    <span className="text-[9px] px-1 py-0.5 rounded bg-white/10 text-white/40 font-medium">
-                      {mod.disabledLabel}
-                    </span>
-                  )}
+                  <Icon size={16} className="text-white/40 flex-shrink-0" />
+                  {open && <span className="text-[9px] text-white/40 truncate">{mod.label}</span>}
                 </div>
               );
             }
@@ -234,20 +224,17 @@ export default function Sidebar() {
                   mod.id === 'admin'       ? ROUTES.ADMIN_USERS :
                   ROUTES.DASHBOARD
                 }
-                title={!open ? mod.label : undefined}
+                title={mod.label}
                 className={cn(
-                  'flex items-center gap-2.5 px-2 py-1.5 rounded text-sm transition-colors duration-150',
+                  'flex items-center justify-center transition-colors duration-150',
                   isActive
                     ? 'bg-white/10 text-white'
                     : 'text-white/50 hover:text-white hover:bg-white/5',
-                  !open && 'justify-center px-0 w-10',
+                  open ? 'flex-1 flex-col gap-1 py-2 rounded-lg' : 'px-0 w-10 py-1.5 rounded',
                 )}
               >
-                <Icon size={17} className={cn('flex-shrink-0', isActive ? mod.color : '')} />
-                {open && <span className="flex-1 truncate">{mod.label}</span>}
-                {open && isActive && (
-                  <span className={cn('w-1.5 h-1.5 rounded-full flex-shrink-0', mod.color.replace('text-', 'bg-'))} />
-                )}
+                <Icon size={16} className={cn('flex-shrink-0', isActive ? mod.color : '')} />
+                {open && <span className="text-[9px] font-medium truncate">{mod.label}</span>}
               </NavLink>
             );
           })}

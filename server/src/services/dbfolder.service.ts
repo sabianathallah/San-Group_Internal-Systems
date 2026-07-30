@@ -41,6 +41,26 @@ export async function listFoldersService(
         ...(sharedIds.length > 0 ? [{ id: { in: sharedIds } }] : []),
       ],
     };
+  } else if (viewScope === 'own' && userId) {
+    // Folders: public, created by this user, or shared with their division —
+    // was previously unhandled and silently fell through to "no filter" (i.e.
+    // behaved like 'all'), the same gap that let 'division' scope over-expose
+    // before it had its own branch.
+    const sharedFolderIds = userDivisionId
+      ? await prisma.resourceShare.findMany({
+          where: { resourceType: 'db_folder', targetType: 'division', targetId: userDivisionId },
+          select: { resourceId: true },
+        })
+      : [];
+    const sharedIds = sharedFolderIds.map((s) => s.resourceId);
+
+    where = {
+      OR: [
+        { divisionId: null },
+        { createdById: userId },
+        ...(sharedIds.length > 0 ? [{ id: { in: sharedIds } }] : []),
+      ],
+    };
   }
   // viewScope === 'all' or no scope: no filter
 
@@ -111,6 +131,7 @@ export async function listFolderLinksService(
   userId: string,
   userDivisionId: string | undefined,
   roleLevel: number,
+  viewScope?: Scope,
 ) {
   const folder = await prisma.databaseFolder.findUnique({
     where: { id: folderId },
@@ -119,13 +140,20 @@ export async function listFolderLinksService(
   if (!folder) throw new AppError('Folder tidak ditemukan', 404);
 
   if (roleLevel > 2) {
-    const isPublic     = folder.divisionId === null;
-    const isOwnDiv     = !!userDivisionId && folder.divisionId === userDivisionId;
-    const isOwner      = folder.createdById === userId;
-    const isShared     = !isPublic && !isOwnDiv && await prisma.resourceShare.findFirst({
+    const isPublic = folder.divisionId === null;
+    const isOwnDiv = !!userDivisionId && folder.divisionId === userDivisionId;
+    const isOwner  = folder.createdById === userId;
+    const isShared = !isPublic && !isOwnDiv && await prisma.resourceShare.findFirst({
       where: { resourceType: 'db_folder', resourceId: folderId, targetType: 'division', targetId: userDivisionId ?? '' },
     }).then(Boolean);
-    if (!isPublic && !isOwnDiv && !isOwner && !isShared) throw new AppError('Akses ditolak', 403);
+
+    // 'own' scope is stricter than 'division': being in the same division no
+    // longer grants access on its own — only folders you created, public
+    // ones, or ones explicitly shared with your division.
+    const allowed = viewScope === 'own'
+      ? (isPublic || isOwner || isShared)
+      : (isPublic || isOwnDiv || isOwner || isShared);
+    if (!allowed) throw new AppError('Akses ditolak', 403);
   }
 
   return prisma.databaseLink.findMany({

@@ -2922,44 +2922,47 @@ export default function TasksPage() {
           <FilterPanel filters={filters} onChange={setFilters} users={filterUsers} />
         )}
 
-        {/* My Day suggestions */}
+        {/* My Day suggestions — a floating bottom pop-up instead of an inline
+            banner, so it doesn't push the task list down / add to page clutter */}
         {sidebarView === 'my_day' && suggestions.length > 0 && (
-          <div className="border-b border-amber-100 bg-amber-50/50 flex-shrink-0">
-            <button
-              onClick={() => setSuggestOpen((v) => !v)}
-              className="flex items-center gap-2 w-full px-4 py-2.5 text-left"
-            >
-              <Lightbulb size={14} className="text-amber-500" />
-              <span className="text-xs font-semibold text-amber-700">
-                Suggestions ({suggestions.length})
-              </span>
-              <span className="text-[10px] text-amber-600/60">overdue · due today · not done yesterday</span>
-              {suggestOpen ? <ChevronDown size={13} className="text-amber-400 ml-auto" /> : <ChevronRight size={13} className="text-amber-400 ml-auto" />}
-            </button>
-            {suggestOpen && (
-              <div className="px-4 pb-3 flex gap-2 overflow-x-auto">
-                {suggestions.map((s) => {
-                  const due = fmtDue(s.dueDate);
-                  return (
-                    <div key={s.id} className="flex items-center gap-2 bg-white border border-amber-200 rounded-lg px-3 py-2 flex-shrink-0 max-w-[260px]">
-                      <div className="min-w-0">
-                        <p className="text-xs font-medium text-gray-700 truncate">{s.title}</p>
-                        {due.text && (
-                          <p className={cn('text-[10px]', due.overdue ? 'text-red-500' : 'text-gray-400')}>{due.text}</p>
-                        )}
+          <div className="fixed bottom-5 right-6 z-30 w-80 max-w-[calc(100vw-2.5rem)]">
+            <div className="rounded-xl border border-amber-200 bg-amber-50 shadow-lg overflow-hidden">
+              <button
+                onClick={() => setSuggestOpen((v) => !v)}
+                className="flex items-center gap-2 w-full px-4 py-2.5 text-left"
+              >
+                <Lightbulb size={14} className="text-amber-500 flex-shrink-0" />
+                <span className="text-xs font-semibold text-amber-700">
+                  Suggestions ({suggestions.length})
+                </span>
+                {suggestOpen ? <ChevronDown size={13} className="text-amber-400 ml-auto flex-shrink-0" /> : <ChevronRight size={13} className="text-amber-400 ml-auto flex-shrink-0" />}
+              </button>
+              {suggestOpen && (
+                <div className="px-3 pb-3 space-y-1.5 max-h-64 overflow-y-auto">
+                  <p className="text-[10px] text-amber-600/70 px-1 mb-1">overdue · due today · not done yesterday</p>
+                  {suggestions.map((s) => {
+                    const due = fmtDue(s.dueDate);
+                    return (
+                      <div key={s.id} className="flex items-center gap-2 bg-white border border-amber-200 rounded-lg px-3 py-2">
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs font-medium text-gray-700 truncate">{s.title}</p>
+                          {due.text && (
+                            <p className={cn('text-[10px]', due.overdue ? 'text-red-500' : 'text-gray-400')}>{due.text}</p>
+                          )}
+                        </div>
+                        <button
+                          onClick={() => addSuggestionToMyDay(s)}
+                          title="Add to My Day"
+                          className="flex items-center gap-1 text-[10px] font-semibold text-amber-600 hover:text-white hover:bg-amber-500 border border-amber-300 rounded-full px-2 py-1 transition-colors flex-shrink-0"
+                        >
+                          <Plus size={10} /> My Day
+                        </button>
                       </div>
-                      <button
-                        onClick={() => addSuggestionToMyDay(s)}
-                        title="Add to My Day"
-                        className="flex items-center gap-1 text-[10px] font-semibold text-amber-600 hover:text-white hover:bg-amber-500 border border-amber-300 rounded-full px-2 py-1 transition-colors flex-shrink-0"
-                      >
-                        <Plus size={10} /> My Day
-                      </button>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           </div>
         )}
 

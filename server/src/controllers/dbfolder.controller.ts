@@ -39,7 +39,8 @@ export async function deleteFolder(req: AuthRequest, res: Response, next: NextFu
 export async function listFolderLinks(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
     const { userId, divisionId, roleLevel } = req.user!;
-    const links = await listFolderLinksService(String(req.params.id), userId, divisionId, roleLevel);
+    const viewScope = (req.permScope ?? 'all') as import('@/types/permissions').Scope;
+    const links = await listFolderLinksService(String(req.params.id), userId, divisionId, roleLevel, viewScope);
     successResponse(res, links, 'Link berhasil diambil');
   } catch (err) { next(err); }
 }
