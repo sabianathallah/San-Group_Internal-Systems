@@ -28,7 +28,7 @@ const USER_MINI = { id: true, fullName: true, avatar: true } as const;
 
 const TASK_SELECT = {
   id: true, title: true, description: true, status: true, priority: true,
-  isImportant: true, myDayDate: true,
+  isImportant: true, myDayDate: true, parentTaskId: true,
   dueDate: true, startedAt: true, completedAt: true, isPrivate: true, visibility: true,
   assignmentStatus: true, assignmentNote: true, position: true,
   createdAt: true, updatedAt: true,

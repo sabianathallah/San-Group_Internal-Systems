@@ -62,7 +62,7 @@ interface Task {
   status: TaskStatus; priority: TaskPriority;
   isImportant: boolean; myDayDate: string | null;
   dueDate: string | null; startedAt: string | null; completedAt: string | null;
-  isPrivate?: boolean; visibility: TaskVisibility;
+  isPrivate?: boolean; visibility: TaskVisibility; parentTaskId?: string | null;
   assignmentStatus: AssignmentStatus | null; assignmentNote: string | null;
   position: number; createdAt: string; updatedAt: string;
   creator: TaskUser; assignee: TaskUser | null;
@@ -1248,11 +1248,11 @@ function DescriptionEditor({
 
 // ── Task Detail Panel ──────────────────────────────────────
 function TaskDetailPanel({
-  taskId, initialTask, onClose, onUpdated, onRequestDelete, currentUserId, taskLists,
+  taskId, initialTask, onClose, onUpdated, onRequestDelete, currentUserId, taskLists, onNavigate,
 }: {
   taskId: string; initialTask?: Task | null; onClose: () => void;
   onUpdated: (t: Task) => void; onRequestDelete: (t: Task) => void; currentUserId: string;
-  taskLists: TaskList[];
+  taskLists: TaskList[]; onNavigate: (id: string) => void;
 }) {
   // Render instantly from the list's copy; hydrate subtasks/links in the background
   const [task,    setTask]    = useState<Task | null>(initialTask ?? null);
@@ -1452,6 +1452,12 @@ function TaskDetailPanel({
         <button onClick={onClose} className="p-1 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-600">
           <ChevronsRight size={16} />
         </button>
+        {task.parentTaskId && (
+          <button onClick={() => onNavigate(task.parentTaskId!)}
+            className="flex items-center gap-1 text-[11px] text-gray-400 hover:text-navy px-1.5 py-1 rounded hover:bg-gray-100">
+            <ChevronLeft size={12} /> Back to parent
+          </button>
+        )}
         {saving && <Loader2 size={13} className="animate-spin text-gray-400 ml-1" />}
         <div className="flex-1" />
         <button onClick={handleDelete} className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-red-500 px-2 py-1 rounded hover:bg-red-50">
@@ -1786,8 +1792,9 @@ function TaskDetailPanel({
                 </div>
                 <div className="space-y-0.5">
                   {(task.subTasks ?? []).map((sub) => (
-                    <div key={sub.id} className="group flex items-center gap-2 px-1 py-1.5 rounded hover:bg-gray-50">
-                      <button onClick={() => toggleSubTask(sub)}
+                    <div key={sub.id} onClick={() => onNavigate(sub.id)}
+                      className="group flex items-center gap-2 px-1 py-1.5 rounded hover:bg-gray-50 cursor-pointer">
+                      <button onClick={(e) => { e.stopPropagation(); toggleSubTask(sub); }}
                         className={cn('w-4 h-4 rounded-full border-2 flex items-center justify-center flex-shrink-0',
                           sub.status === 'DONE' ? 'border-green-500 bg-green-500' : 'border-gray-300 hover:border-navy')}>
                         {sub.status === 'DONE' && <CheckCircle2 size={9} className="text-white" strokeWidth={3} />}
@@ -1795,7 +1802,12 @@ function TaskDetailPanel({
                       <span className={cn('flex-1 text-sm min-w-0 truncate', sub.status === 'DONE' && 'line-through text-gray-400')}>
                         {sub.title}
                       </span>
-                      <button onClick={() => deleteSubTask(sub.id)} className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-400 transition-all">
+                      {!!sub._count?.subTasks && (
+                        <span className="flex items-center gap-0.5 text-[10px] text-gray-300 flex-shrink-0">
+                          <GripVertical size={10} />{sub._count.subTasks}
+                        </span>
+                      )}
+                      <button onClick={(e) => { e.stopPropagation(); deleteSubTask(sub.id); }} className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-400 transition-all">
                         <X size={11} />
                       </button>
                     </div>
@@ -3124,6 +3136,7 @@ export default function TasksPage() {
                 onRequestDelete={handleDeleteTask}
                 currentUserId={user?.id ?? ''}
                 taskLists={taskLists}
+                onNavigate={setSelectedId}
               />
             </div>
           )}
