@@ -4,11 +4,17 @@ import {
   CalendarCheck, CalendarX2, Clock, Loader2, RefreshCw, Users,
   MapPin, MapPinOff, Camera, X,
 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import api from '@/lib/api';
 import { cn } from '@/lib/cn';
 import { getHolidaySet } from '@/lib/holidays';
 import { useAuthStore } from '@/stores/authStore';
 import { usePermStore } from '@/stores/permStore';
+
+/** Locale for date formatting — mirrors i18next's active language. */
+function dateLocale(language: string): string {
+  return language === 'id' ? 'id-ID' : 'en-US';
+}
 
 type AttendanceStatus = 'PRESENT' | 'LATE' | 'WFH' | 'PERMISSION' | 'ABSENT' | 'HOLIDAY';
 
@@ -35,22 +41,22 @@ interface Summary {
   totalWorkMinutes: number;
 }
 
-const STATUS_CONFIG: Record<AttendanceStatus, { label: string; color: string; bg: string; dot: string; icon: React.ElementType }> = {
-  PRESENT:    { label: 'Present',    color: 'text-green-700',  bg: 'bg-green-50',   dot: 'bg-green-500',  icon: CheckCircle2 },
-  LATE:       { label: 'Late',color: 'text-orange-700', bg: 'bg-orange-50',  dot: 'bg-orange-500', icon: Timer        },
-  WFH:        { label: 'WFH',      color: 'text-blue-700',   bg: 'bg-blue-50',    dot: 'bg-blue-500',   icon: Home         },
-  PERMISSION: { label: 'On Leave',     color: 'text-purple-700', bg: 'bg-purple-50',  dot: 'bg-purple-500', icon: CalendarCheck },
-  ABSENT:     { label: 'Absent',    color: 'text-red-700',    bg: 'bg-red-50',     dot: 'bg-red-500',    icon: CalendarX2   },
-  HOLIDAY:    { label: 'Holiday',    color: 'text-gray-500',   bg: 'bg-gray-100',   dot: 'bg-gray-400',   icon: CalendarCheck },
+const STATUS_CONFIG: Record<AttendanceStatus, { labelKey: string; color: string; bg: string; dot: string; icon: React.ElementType }> = {
+  PRESENT:    { labelKey: 'hris.attendance.status.present',    color: 'text-green-700',  bg: 'bg-green-50',   dot: 'bg-green-500',  icon: CheckCircle2 },
+  LATE:       { labelKey: 'hris.attendance.status.late', color: 'text-orange-700', bg: 'bg-orange-50',  dot: 'bg-orange-500', icon: Timer        },
+  WFH:        { labelKey: 'hris.attendance.status.wfh',      color: 'text-blue-700',   bg: 'bg-blue-50',    dot: 'bg-blue-500',   icon: Home         },
+  PERMISSION: { labelKey: 'hris.attendance.status.permission',     color: 'text-purple-700', bg: 'bg-purple-50',  dot: 'bg-purple-500', icon: CalendarCheck },
+  ABSENT:     { labelKey: 'hris.attendance.status.absent',    color: 'text-red-700',    bg: 'bg-red-50',     dot: 'bg-red-500',    icon: CalendarX2   },
+  HOLIDAY:    { labelKey: 'hris.attendance.status.holiday',    color: 'text-gray-500',   bg: 'bg-gray-100',   dot: 'bg-gray-400',   icon: CalendarCheck },
 };
 
-function fmt(iso: string | null) {
+function fmt(iso: string | null, language: string) {
   if (!iso) return '—';
-  return new Date(iso).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
+  return new Date(iso).toLocaleTimeString(dateLocale(language), { hour: '2-digit', minute: '2-digit', hour12: false });
 }
 
-function fmtDate(iso: string) {
-  return new Date(iso).toLocaleDateString('en-US', { day: 'numeric', month: 'short' });
+function fmtDate(iso: string, language: string) {
+  return new Date(iso).toLocaleDateString(dateLocale(language), { day: 'numeric', month: 'short' });
 }
 
 function fmtMins(mins: number) {
@@ -69,6 +75,7 @@ function getFirstDayOfMonth(year: number, month: number) {
 
 // ── Photo Lightbox ─────────────────────────────────────────────
 function PhotoLightbox({ url, onClose }: { url: string; onClose: () => void }) {
+  const { t } = useTranslation();
   return (
     <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4" onClick={onClose}>
       <button onClick={onClose} className="absolute top-4 right-4 w-9 h-9 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 text-white">
@@ -76,7 +83,7 @@ function PhotoLightbox({ url, onClose }: { url: string; onClose: () => void }) {
       </button>
       <img
         src={url}
-        alt="Check-in photo"
+        alt={t('hris.attendance.photoAlt')}
         className="max-h-[80vh] max-w-full rounded-xl shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       />
@@ -94,9 +101,11 @@ function LogTable({
   showUser: boolean;
   onPhotoClick: (url: string | null) => void;
 }) {
+  const { t, i18n } = useTranslation();
+
   if (records.length === 0) {
     return (
-      <div className="py-10 text-center text-sm text-gray-400">No attendance records for this period.</div>
+      <div className="py-10 text-center text-sm text-gray-400">{t('hris.attendance.log.empty')}</div>
     );
   }
 
@@ -105,14 +114,14 @@ function LogTable({
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-gray-100">
-            {showUser && <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500">Employee</th>}
-            <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500">Date</th>
-            <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500">Status</th>
-            <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500">Check In</th>
-            <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500">Check Out</th>
-            <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500">Duration</th>
-            <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500">Location</th>
-            <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500">Photo</th>
+            {showUser && <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500">{t('hris.attendance.log.table.employee')}</th>}
+            <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500">{t('hris.attendance.log.table.date')}</th>
+            <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500">{t('hris.attendance.log.table.status')}</th>
+            <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500">{t('hris.attendance.log.table.checkIn')}</th>
+            <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500">{t('hris.attendance.log.table.checkOut')}</th>
+            <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500">{t('hris.attendance.log.table.duration')}</th>
+            <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500">{t('hris.attendance.log.table.location')}</th>
+            <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500">{t('hris.attendance.log.table.photo')}</th>
           </tr>
         </thead>
         <tbody>
@@ -134,19 +143,19 @@ function LogTable({
                     </div>
                   </td>
                 )}
-                <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{fmtDate(r.date)}</td>
+                <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{fmtDate(r.date, i18n.language)}</td>
                 <td className="px-4 py-3">
                   <div className="flex flex-col gap-1">
                     <span className={cn('inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full w-fit', cfg.color, cfg.bg)}>
-                      <cfg.icon size={10} />{cfg.label}
+                      <cfg.icon size={10} />{t(cfg.labelKey)}
                     </span>
                     {r.isLate && r.lateMinutes > 0 && (
-                      <span className="text-[10px] text-gray-400">+{r.lateMinutes}m late</span>
+                      <span className="text-[10px] text-gray-400">+{r.lateMinutes}m {t('hris.attendance.log.lateSuffix')}</span>
                     )}
                   </div>
                 </td>
-                <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{fmt(r.checkIn)}</td>
-                <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{fmt(r.checkOut)}</td>
+                <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{fmt(r.checkIn, i18n.language)}</td>
+                <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{fmt(r.checkOut, i18n.language)}</td>
                 <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{r.workMinutes ? fmtMins(r.workMinutes) : '—'}</td>
                 <td className="px-4 py-3">
                   {r.locationName ? (
@@ -157,7 +166,7 @@ function LogTable({
                       </span>
                       {r.isOutOfArea && (
                         <span className="inline-flex items-center gap-0.5 text-[10px] font-medium text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded-full w-fit">
-                          <MapPinOff size={9} /> Out of area
+                          <MapPinOff size={9} /> {t('hris.attendance.log.table.outOfArea')}
                         </span>
                       )}
                     </div>
@@ -170,7 +179,7 @@ function LogTable({
                     <button onClick={() => onPhotoClick(r.photoUrl)}>
                       <img
                         src={r.photoUrl}
-                        alt="selfie"
+                        alt={t('hris.attendance.selfieAlt')}
                         className="w-9 h-9 rounded-lg object-cover border border-gray-100 hover:border-navy/40 hover:scale-105 transition-all"
                       />
                     </button>
@@ -191,11 +200,14 @@ function LogTable({
 
 // ── Main Page ──────────────────────────────────────────────────
 export default function AttendancePage() {
+  const { t, i18n } = useTranslation();
   const user = useAuthStore((s) => s.user);
   const perms = usePermStore((s) => s.perms);
   const attendanceScope = perms.hris.editAttendance;
   const canSeeTeam = attendanceScope === 'division' || attendanceScope === 'all';
-  const teamLabel = attendanceScope === 'division' ? `Team — ${user?.division?.name ?? 'Division'}` : 'Team — All';
+  const teamLabel = attendanceScope === 'division'
+    ? t('hris.attendance.viewMode.team', { name: user?.division?.name ?? t('hris.attendance.viewMode.teamDivision') })
+    : t('hris.attendance.viewMode.teamAll');
 
   const now = new Date();
   const [month, setMonth]           = useState(now.getMonth() + 1);
@@ -243,7 +255,7 @@ export default function AttendancePage() {
     else setMonth((m) => m + 1);
   }
 
-  const monthLabel  = new Date(year, month - 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  const monthLabel  = new Date(year, month - 1).toLocaleDateString(dateLocale(i18n.language), { month: 'long', year: 'numeric' });
   const daysInMonth = getDaysInMonth(year, month);
   const firstDay    = getFirstDayOfMonth(year, month);
 
@@ -273,8 +285,8 @@ export default function AttendancePage() {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-xl font-bold text-gray-900">Attendance</h1>
-            <p className="text-sm text-gray-500 mt-0.5">Monthly attendance summary</p>
+            <h1 className="text-xl font-bold text-gray-900">{t('hris.attendance.header.title')}</h1>
+            <p className="text-sm text-gray-500 mt-0.5">{t('hris.attendance.header.subtitle')}</p>
           </div>
           <div className="flex items-center gap-2">
             {canSeeTeam && (
@@ -283,7 +295,7 @@ export default function AttendancePage() {
                   onClick={() => setViewMode('mine')}
                   className={cn('px-3 py-1.5 flex items-center gap-1.5 transition-colors', viewMode === 'mine' ? 'bg-navy text-white' : 'text-gray-600 hover:bg-gray-50')}
                 >
-                  <Clock size={13} /> Me
+                  <Clock size={13} /> {t('hris.attendance.viewMode.me')}
                 </button>
                 <button
                   onClick={() => setViewMode('team')}
@@ -314,12 +326,12 @@ export default function AttendancePage() {
         {summary && (
           <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
             {[
-              { label: 'Present',  val: summary.present   },
-              { label: 'Late',     val: summary.late      },
-              { label: 'WFH',      val: summary.wfh       },
-              { label: 'On Leave', val: summary.permission },
-              { label: 'Absent',   val: summary.absent    },
-              { label: 'Work Hrs', val: summary.totalWorkMinutes > 0 ? fmtMins(summary.totalWorkMinutes) : '—' },
+              { label: t('hris.attendance.status.present'),  val: summary.present   },
+              { label: t('hris.attendance.status.late'),     val: summary.late      },
+              { label: t('hris.attendance.status.wfh'),      val: summary.wfh       },
+              { label: t('hris.attendance.status.permission'), val: summary.permission },
+              { label: t('hris.attendance.status.absent'),   val: summary.absent    },
+              { label: t('hris.attendance.summary.workHrs'), val: summary.totalWorkMinutes > 0 ? fmtMins(summary.totalWorkMinutes) : '—' },
             ].map((s) => (
               <div key={s.label} className="rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-center">
                 <p className="text-lg font-bold tabular-nums text-gray-800">{s.val}</p>
@@ -333,8 +345,10 @@ export default function AttendancePage() {
         {viewMode === 'mine' && (
           <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
             <div className="grid grid-cols-7 border-b border-gray-100">
-              {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((d) => (
-                <div key={d} className="py-2.5 text-center text-xs font-semibold text-gray-400">{d}</div>
+              {Array.from({ length: 7 }, (_, i) =>
+                new Date(Date.UTC(2023, 0, 1 + i)).toLocaleDateString(dateLocale(i18n.language), { weekday: 'short', timeZone: 'UTC' }),
+              ).map((d, i) => (
+                <div key={i} className="py-2.5 text-center text-xs font-semibold text-gray-400">{d}</div>
               ))}
             </div>
             {loading ? (
@@ -374,10 +388,10 @@ export default function AttendancePage() {
                         <div className="space-y-0.5">
                           <span className={cn('inline-flex items-center gap-0.5 text-[10px] font-semibold px-1.5 py-0.5 rounded-full', cfg.color, cfg.bg)}>
                             <cfg.icon size={9} />
-                            {cfg.label}
+                            {t(cfg.labelKey)}
                           </span>
                           {rec.checkIn && (
-                            <p className="text-[10px] text-gray-400 leading-tight">{fmt(rec.checkIn)}{rec.checkOut ? ` – ${fmt(rec.checkOut)}` : ''}</p>
+                            <p className="text-[10px] text-gray-400 leading-tight">{fmt(rec.checkIn, i18n.language)}{rec.checkOut ? ` – ${fmt(rec.checkOut, i18n.language)}` : ''}</p>
                           )}
                           {rec.isLate && rec.lateMinutes > 0 && (
                             <p className="text-[9px] text-gray-400">+{rec.lateMinutes}m</p>
@@ -387,9 +401,9 @@ export default function AttendancePage() {
                           )}
                         </div>
                       ) : isHoliday ? (
-                        <span className="text-[10px] font-medium text-red-400">Holiday</span>
+                        <span className="text-[10px] font-medium text-red-400">{t('hris.attendance.status.holiday')}</span>
                       ) : isWeekend ? (
-                        <span className="text-[10px] text-gray-300">Off</span>
+                        <span className="text-[10px] text-gray-300">{t('hris.attendance.calendar.off')}</span>
                       ) : null}
                     </button>
                   );
@@ -404,9 +418,9 @@ export default function AttendancePage() {
           <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
             <div>
               <p className="text-sm font-semibold text-gray-700">
-                {viewMode === 'mine' ? 'Attendance Log' : 'Team Attendance'} —{' '}
+                {viewMode === 'mine' ? t('hris.attendance.log.title') : t('hris.attendance.log.teamTitle')} —{' '}
                 {selectedDay
-                  ? new Date(year, month - 1, selectedDay).toLocaleDateString('en-US', { day: 'numeric', month: 'long', year: 'numeric' })
+                  ? new Date(year, month - 1, selectedDay).toLocaleDateString(dateLocale(i18n.language), { day: 'numeric', month: 'long', year: 'numeric' })
                   : monthLabel}
               </p>
               {selectedDay && (
@@ -414,7 +428,7 @@ export default function AttendancePage() {
                   onClick={() => setSelectedDay(null)}
                   className="text-xs text-navy hover:underline mt-0.5"
                 >
-                  ← Show all month
+                  {t('hris.attendance.log.showAllMonth')}
                 </button>
               )}
             </div>
@@ -434,9 +448,9 @@ export default function AttendancePage() {
             </div>
           ) : loadError ? (
             <div className="py-12 text-center">
-              <p className="text-sm text-gray-500 mb-3">Failed to load data. Check your connection and try again.</p>
+              <p className="text-sm text-gray-500 mb-3">{t('hris.attendance.log.loadError')}</p>
               <button onClick={load} className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
-                <RefreshCw size={14} /> Retry
+                <RefreshCw size={14} /> {t('hris.attendance.log.retry')}
               </button>
             </div>
           ) : viewMode === 'mine' ? (

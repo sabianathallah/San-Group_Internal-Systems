@@ -4,9 +4,16 @@ import {
   AlertCircle, ChevronLeft, ChevronRight, PowerOff, Power,
   ShieldCheck, Layers, Shield,
 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import api from '@/lib/api';
 import { useAuthStore } from '@/stores/authStore';
+import { useLanguageStore } from '@/stores/languageStore';
 import { cn } from '@/lib/cn';
+
+/** Locale for date formatting — mirrors i18next's active language. */
+function dateLocale(language: string): string {
+  return language === 'id' ? 'id-ID' : 'en-US';
+}
 
 // ── Types ──────────────────────────────────────────────────
 type Tab = 'users' | 'divisions' | 'roles';
@@ -60,9 +67,9 @@ const LEVEL_COLORS: Record<number, string> = {
 function initials(name: string) {
   return name.split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase();
 }
-function formatDate(iso: string | null) {
+function formatDate(iso: string | null, language: string) {
   if (!iso) return '—';
-  return new Date(iso).toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric' });
+  return new Date(iso).toLocaleDateString(dateLocale(language), { day: '2-digit', month: 'short', year: 'numeric' });
 }
 function hexToRgba(hex: string, alpha: number) {
   const safe = hex?.startsWith('#') ? hex : '#64748b';
@@ -77,6 +84,7 @@ function slugify(str: string) {
 
 // ── Shared UI ──────────────────────────────────────────────
 function ColorPicker({ value, onChange }: { value: string; onChange: (c: string) => void }) {
+  const { t } = useTranslation();
   return (
     <div className="space-y-2">
       <div className="flex flex-wrap gap-2">
@@ -90,7 +98,7 @@ function ColorPicker({ value, onChange }: { value: string; onChange: (c: string)
         <span className="w-6 h-6 rounded-full border border-gray-200 flex-shrink-0" style={{ backgroundColor: value }} />
         <input type="text" value={value}
           onChange={(e) => { const v = e.target.value; if (/^#[0-9a-fA-F]{0,6}$/.test(v)) onChange(v); }}
-          placeholder="#000000"
+          placeholder={t('admin.users.colorPicker.hexPlaceholder')}
           className="flex-1 text-xs border border-gray-200 rounded px-2 py-1 outline-none focus:border-navy font-mono" maxLength={7} />
       </div>
     </div>
@@ -115,17 +123,20 @@ function Field({ label, required, children }: { label: string; required?: boolea
 function DeleteConfirm({ title, name, onCancel, onConfirm, loading }: {
   title: string; name: string; onCancel: () => void; onConfirm: () => void; loading: boolean;
 }) {
+  const { t } = useTranslation();
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/40" onClick={onCancel} />
       <div className="relative bg-white rounded-xl shadow-xl w-full max-w-sm p-5 space-y-3">
         <h3 className="text-sm font-semibold text-gray-800">{title}</h3>
-        <p className="text-sm text-gray-600">Delete <strong>{name}</strong>? This action cannot be undone.</p>
+        <p className="text-sm text-gray-600">
+          {t('admin.users.deleteConfirmModal.deletePrefix')} <strong>{name}</strong>{t('admin.users.deleteConfirmModal.deleteSuffix')}
+        </p>
         <div className="flex justify-end gap-2 pt-1">
-          <button onClick={onCancel} className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded hover:bg-gray-50">Cancel</button>
+          <button onClick={onCancel} className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded hover:bg-gray-50">{t('admin.users.deleteConfirmModal.cancel')}</button>
           <button onClick={onConfirm} disabled={loading}
             className="flex items-center gap-1.5 px-4 py-2 text-sm text-white bg-red-500 hover:bg-red-600 rounded disabled:opacity-50">
-            {loading && <Loader2 size={13} className="animate-spin" />} Delete
+            {loading && <Loader2 size={13} className="animate-spin" />} {t('admin.users.deleteConfirmModal.delete')}
           </button>
         </div>
       </div>
@@ -140,6 +151,7 @@ const EMPTY_DIV: DivForm = { name: '', slug: '', color: '#1e3a5f', description: 
 function DivisionModal({ open, division, onClose, onSaved }: {
   open: boolean; division: DivisionOption | null; onClose: () => void; onSaved: (d: DivisionOption) => void;
 }) {
+  const { t } = useTranslation();
   const [form, setForm]     = useState<DivForm>(EMPTY_DIV);
   const [saving, setSaving] = useState(false);
   const [error, setError]   = useState('');
@@ -154,14 +166,14 @@ function DivisionModal({ open, division, onClose, onSaved }: {
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    if (!form.name.trim()) { setError('Name is required'); return; }
+    if (!form.name.trim()) { setError(t('admin.users.divisionModal.errors.nameRequired')); return; }
     setSaving(true); setError('');
     try {
       const payload = { name: form.name.trim(), slug: form.slug.trim() || slugify(form.name), color: form.color, description: form.description.trim() || undefined };
       const res = division ? await api.patch(`/divisions/${division.id}`, payload) : await api.post('/divisions', payload);
       onSaved(res.data.data); onClose();
     } catch (err: unknown) {
-      setError((err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'An error occurred');
+      setError((err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? t('admin.users.divisionModal.errors.generic'));
     } finally { setSaving(false); }
   }
 
@@ -171,35 +183,35 @@ function DivisionModal({ open, division, onClose, onSaved }: {
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
       <div className="relative bg-white rounded-xl shadow-xl w-full max-w-md">
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
-          <h2 className="text-sm font-semibold text-gray-800">{division ? 'Edit Division' : 'Add Division'}</h2>
+          <h2 className="text-sm font-semibold text-gray-800">{division ? t('admin.users.divisionModal.editTitle') : t('admin.users.divisionModal.createTitle')}</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={16} /></button>
         </div>
         <form onSubmit={handleSubmit} className="p-5 space-y-4">
-          <Field label="Name" required>
-            <input autoFocus type="text" value={form.name} placeholder="Finance"
+          <Field label={t('admin.users.divisionModal.nameLabel')} required>
+            <input autoFocus type="text" value={form.name} placeholder={t('admin.users.divisionModal.namePlaceholder')}
               onChange={(e) => setForm((f) => ({ ...f, name: e.target.value, slug: division ? f.slug : slugify(e.target.value) }))}
               className={inputCls} />
           </Field>
-          <Field label="Slug">
-            <input type="text" value={form.slug} placeholder="finance"
+          <Field label={t('admin.users.divisionModal.slugLabel')}>
+            <input type="text" value={form.slug} placeholder={t('admin.users.divisionModal.slugPlaceholder')}
               onChange={(e) => setForm((f) => ({ ...f, slug: e.target.value }))}
               className={cn(inputCls, 'font-mono text-xs')} />
           </Field>
-          <Field label="Color">
+          <Field label={t('admin.users.divisionModal.colorLabel')}>
             <ColorPicker value={form.color} onChange={(c) => setForm((f) => ({ ...f, color: c }))} />
           </Field>
-          <Field label="Description">
-            <textarea rows={2} value={form.description} placeholder="Brief description…"
+          <Field label={t('admin.users.divisionModal.descriptionLabel')}>
+            <textarea rows={2} value={form.description} placeholder={t('admin.users.divisionModal.descriptionPlaceholder')}
               onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
               className={cn(inputCls, 'resize-none')} />
           </Field>
           {error && <p className="flex items-center gap-1.5 text-xs text-red-500"><AlertCircle size={12} /> {error}</p>}
           <div className="flex justify-end gap-2 pt-1">
-            <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded hover:bg-gray-50">Cancel</button>
+            <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded hover:bg-gray-50">{t('admin.users.divisionModal.cancel')}</button>
             <button type="submit" disabled={saving}
               className="flex items-center gap-1.5 px-4 py-2 text-sm text-white bg-navy hover:bg-navy-light rounded disabled:opacity-50">
               {saving && <Loader2 size={13} className="animate-spin" />}
-              {division ? 'Save' : 'Create Division'}
+              {division ? t('admin.users.divisionModal.save') : t('admin.users.divisionModal.create')}
             </button>
           </div>
         </form>
@@ -215,6 +227,7 @@ function RoleModal({ open, role, onClose, onSaved }: {
   open: boolean; role: RoleOption | null;
   onClose: () => void; onSaved: (r: RoleOption) => void;
 }) {
+  const { t } = useTranslation();
   const [form, setForm]     = useState<RoleForm>({ name: '', color: '#334155' });
   const [saving, setSaving] = useState(false);
   const [error, setError]   = useState('');
@@ -227,13 +240,13 @@ function RoleModal({ open, role, onClose, onSaved }: {
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    if (!form.name.trim()) { setError('Name is required'); return; }
+    if (!form.name.trim()) { setError(t('admin.users.roleModal.errors.nameRequired')); return; }
     setSaving(true); setError('');
     try {
       const res = await api.patch(`/roles/${role!.id}`, { name: form.name.trim(), color: form.color });
       onSaved(res.data.data); onClose();
     } catch (err: unknown) {
-      setError((err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'An error occurred');
+      setError((err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? t('admin.users.roleModal.errors.generic'));
     } finally { setSaving(false); }
   }
 
@@ -243,24 +256,24 @@ function RoleModal({ open, role, onClose, onSaved }: {
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
       <div className="relative bg-white rounded-xl shadow-xl w-full max-w-sm">
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
-          <h2 className="text-sm font-semibold text-gray-800">Edit Role · L{role.level}</h2>
+          <h2 className="text-sm font-semibold text-gray-800">{t('admin.users.roleModal.title', { level: role.level })}</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={16} /></button>
         </div>
         <form onSubmit={handleSubmit} className="p-5 space-y-4">
-          <Field label="Name" required>
+          <Field label={t('admin.users.roleModal.nameLabel')} required>
             <input autoFocus type="text" value={form.name}
               onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
               className={inputCls} />
           </Field>
-          <Field label="Color">
+          <Field label={t('admin.users.roleModal.colorLabel')}>
             <ColorPicker value={form.color} onChange={(c) => setForm((f) => ({ ...f, color: c }))} />
           </Field>
           {error && <p className="flex items-center gap-1.5 text-xs text-red-500"><AlertCircle size={12} /> {error}</p>}
           <div className="flex justify-end gap-2 pt-1">
-            <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded hover:bg-gray-50">Cancel</button>
+            <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded hover:bg-gray-50">{t('admin.users.roleModal.cancel')}</button>
             <button type="submit" disabled={saving}
               className="flex items-center gap-1.5 px-4 py-2 text-sm text-white bg-navy hover:bg-navy-light rounded disabled:opacity-50">
-              {saving && <Loader2 size={13} className="animate-spin" />} Save
+              {saving && <Loader2 size={13} className="animate-spin" />} {t('admin.users.roleModal.save')}
             </button>
           </div>
         </form>
@@ -291,6 +304,7 @@ function UserFormModal({ open, mode, user, roles, divisions, onClose, onSaved }:
   roles: RoleOption[]; divisions: DivisionOption[];
   onClose: () => void; onSaved: (u: UserRow) => void;
 }) {
+  const { t } = useTranslation();
   const [createForm, setCreate] = useState<CreateForm>(EMPTY_CREATE);
   const [editForm,   setEdit]   = useState<EditForm>({ fullName: '', phone: '', joinDate: '', roleId: '', divisionId: '' });
   const [saving, setSaving]     = useState(false);
@@ -311,8 +325,8 @@ function UserFormModal({ open, mode, user, roles, divisions, onClose, onSaved }:
     setSaving(true); setError('');
     try {
       if (mode === 'create') {
-        if (!createForm.roleId)     { setError('Please select a role'); setSaving(false); return; }
-        if (!createForm.divisionId) { setError('Please select a division'); setSaving(false); return; }
+        if (!createForm.roleId)     { setError(t('admin.users.userFormModal.errors.roleRequired')); setSaving(false); return; }
+        if (!createForm.divisionId) { setError(t('admin.users.userFormModal.errors.divisionRequired')); setSaving(false); return; }
         const res = await api.post('/users', {
           fullName: createForm.fullName.trim(), email: createForm.email.trim(),
           username: createForm.username.trim(), password: createForm.password,
@@ -329,7 +343,7 @@ function UserFormModal({ open, mode, user, roles, divisions, onClose, onSaved }:
       }
       onClose();
     } catch (err: unknown) {
-      setError((err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'An error occurred');
+      setError((err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? t('admin.users.userFormModal.errors.generic'));
     } finally { setSaving(false); }
   }
 
@@ -358,52 +372,52 @@ function UserFormModal({ open, mode, user, roles, divisions, onClose, onSaved }:
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
       <div className="relative bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto flex flex-col">
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 sticky top-0 bg-white">
-          <h2 className="text-sm font-semibold text-gray-800">{mode === 'create' ? 'Add New User' : 'Edit User'}</h2>
+          <h2 className="text-sm font-semibold text-gray-800">{mode === 'create' ? t('admin.users.userFormModal.createTitle') : t('admin.users.userFormModal.editTitle')}</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={16} /></button>
         </div>
         <form onSubmit={handleSubmit} className="flex flex-col gap-4 px-5 py-4">
           {mode === 'create' ? (
             <>
-              <Field label="Full Name" required>
-                <input type="text" maxLength={100} placeholder="Budi Santoso" value={createForm.fullName}
+              <Field label={t('admin.users.userFormModal.fullNameLabel')} required>
+                <input type="text" maxLength={100} placeholder={t('admin.users.userFormModal.fullNamePlaceholder')} value={createForm.fullName}
                   onChange={(e) => setCreate((f) => ({ ...f, fullName: e.target.value }))} className={inputCls} />
               </Field>
               <div className="grid grid-cols-2 gap-4">
-                <Field label="Email" required>
-                  <input type="email" placeholder="budi@sangroup.id" value={createForm.email}
+                <Field label={t('admin.users.userFormModal.emailLabel')} required>
+                  <input type="email" placeholder={t('admin.users.userFormModal.emailPlaceholder')} value={createForm.email}
                     onChange={(e) => setCreate((f) => ({ ...f, email: e.target.value }))} className={inputCls} />
                 </Field>
-                <Field label="Username" required>
-                  <input type="text" maxLength={30} placeholder="budi.s" value={createForm.username}
+                <Field label={t('admin.users.userFormModal.usernameLabel')} required>
+                  <input type="text" maxLength={30} placeholder={t('admin.users.userFormModal.usernamePlaceholder')} value={createForm.username}
                     onChange={(e) => setCreate((f) => ({ ...f, username: e.target.value }))} className={inputCls} />
                 </Field>
               </div>
               <div className="grid grid-cols-2 gap-4">
-                <Field label="Password" required>
-                  <input type="password" placeholder="Min. 8 characters" value={createForm.password}
+                <Field label={t('admin.users.userFormModal.passwordLabel')} required>
+                  <input type="password" placeholder={t('admin.users.userFormModal.passwordPlaceholder')} value={createForm.password}
                     onChange={(e) => setCreate((f) => ({ ...f, password: e.target.value }))} className={inputCls} />
                 </Field>
-                <Field label="Phone Number">
-                  <input type="text" placeholder="08xxxxxxxx" value={createForm.phone}
+                <Field label={t('admin.users.userFormModal.phoneLabel')}>
+                  <input type="text" placeholder={t('admin.users.userFormModal.phonePlaceholder')} value={createForm.phone}
                     onChange={(e) => setCreate((f) => ({ ...f, phone: e.target.value }))} className={inputCls} />
                 </Field>
               </div>
-              <Field label="Join Date">
+              <Field label={t('admin.users.userFormModal.joinDateLabel')}>
                 <input type="date" value={createForm.joinDate}
                   onChange={(e) => setCreate((f) => ({ ...f, joinDate: e.target.value }))} className={inputCls} />
-                <p className="text-[11px] text-gray-400 mt-1">Basis of the leave tenure rule — annual quota applies after 1 year of employment</p>
+                <p className="text-[11px] text-gray-400 mt-1">{t('admin.users.userFormModal.joinDateHint')}</p>
               </Field>
               <div className="grid grid-cols-2 gap-4">
-                <Field label="Role" required>
+                <Field label={t('admin.users.userFormModal.roleLabel')} required>
                   <select value={createForm.roleId} onChange={(e) => setCreate((f) => ({ ...f, roleId: e.target.value }))} className={selectCls}>
-                    <option value="">-- Select role --</option>
+                    <option value="">{t('admin.users.userFormModal.selectRolePlaceholder')}</option>
                     {roles.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
                   </select>
                   {createForm.roleId && <RolePill roleId={createForm.roleId} />}
                 </Field>
-                <Field label="Division" required>
+                <Field label={t('admin.users.userFormModal.divisionLabel')} required>
                   <select value={createForm.divisionId} onChange={(e) => setCreate((f) => ({ ...f, divisionId: e.target.value }))} className={selectCls}>
-                    <option value="">-- Select division --</option>
+                    <option value="">{t('admin.users.userFormModal.selectDivisionPlaceholder')}</option>
                     {divisions.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
                   </select>
                   {createForm.divisionId && <DivPill divisionId={createForm.divisionId} />}
@@ -412,29 +426,29 @@ function UserFormModal({ open, mode, user, roles, divisions, onClose, onSaved }:
             </>
           ) : (
             <>
-              <Field label="Full Name" required>
+              <Field label={t('admin.users.userFormModal.fullNameLabel')} required>
                 <input type="text" maxLength={100} value={editForm.fullName}
                   onChange={(e) => setEdit((f) => ({ ...f, fullName: e.target.value }))} className={inputCls} />
               </Field>
-              <Field label="No. Telepon">
-                <input type="text" placeholder="08xxxxxxxx" value={editForm.phone}
+              <Field label={t('admin.users.userFormModal.phoneLabel')}>
+                <input type="text" placeholder={t('admin.users.userFormModal.phonePlaceholder')} value={editForm.phone}
                   onChange={(e) => setEdit((f) => ({ ...f, phone: e.target.value }))} className={inputCls} />
               </Field>
-              <Field label="Join Date">
+              <Field label={t('admin.users.userFormModal.joinDateLabel')}>
                 <input type="date" value={editForm.joinDate}
                   onChange={(e) => setEdit((f) => ({ ...f, joinDate: e.target.value }))} className={inputCls} />
               </Field>
               <div className="grid grid-cols-2 gap-4">
-                <Field label="Role" required>
+                <Field label={t('admin.users.userFormModal.roleLabel')} required>
                   <select value={editForm.roleId} onChange={(e) => setEdit((f) => ({ ...f, roleId: e.target.value }))} className={selectCls}>
-                    <option value="">-- Select role --</option>
+                    <option value="">{t('admin.users.userFormModal.selectRolePlaceholder')}</option>
                     {roles.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
                   </select>
                   {editForm.roleId && <RolePill roleId={editForm.roleId} />}
                 </Field>
-                <Field label="Division" required>
+                <Field label={t('admin.users.userFormModal.divisionLabel')} required>
                   <select value={editForm.divisionId} onChange={(e) => setEdit((f) => ({ ...f, divisionId: e.target.value }))} className={selectCls}>
-                    <option value="">-- Select division --</option>
+                    <option value="">{t('admin.users.userFormModal.selectDivisionPlaceholder')}</option>
                     {divisions.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
                   </select>
                   {editForm.divisionId && <DivPill divisionId={editForm.divisionId} />}
@@ -444,11 +458,11 @@ function UserFormModal({ open, mode, user, roles, divisions, onClose, onSaved }:
           )}
           {error && <p className="flex items-center gap-1.5 text-xs text-danger"><AlertCircle size={12} /> {error}</p>}
           <div className="flex justify-end gap-2 pt-1 border-t border-gray-100">
-            <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded hover:bg-gray-50">Cancel</button>
+            <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded hover:bg-gray-50">{t('admin.users.userFormModal.cancel')}</button>
             <button type="submit" disabled={saving}
               className="flex items-center gap-1.5 px-4 py-2 text-sm text-white bg-navy hover:bg-navy-light rounded disabled:opacity-50">
               {saving && <Loader2 size={13} className="animate-spin" />}
-              {mode === 'create' ? 'Create User' : 'Save'}
+              {mode === 'create' ? t('admin.users.userFormModal.createUser') : t('admin.users.userFormModal.save')}
             </button>
           </div>
         </form>
@@ -461,6 +475,8 @@ function UserFormModal({ open, mode, user, roles, divisions, onClose, onSaved }:
 const PAGE_SIZE = 15;
 
 export default function UsersPage() {
+  const { t } = useTranslation();
+  const language = useLanguageStore((s) => s.language);
   const currentUser  = useAuthStore((s) => s.user);
   const isSuperAdmin = (currentUser?.role?.level ?? 99) <= 1;
 
@@ -506,8 +522,8 @@ export default function UsersPage() {
 
   // users fetch
   useEffect(() => {
-    const t = setTimeout(() => { setDebSearch(search); setPage(1); }, 400);
-    return () => clearTimeout(t);
+    const timer = setTimeout(() => { setDebSearch(search); setPage(1); }, 400);
+    return () => clearTimeout(timer);
   }, [search]);
 
   const fetchUsers = useCallback(async () => {
@@ -520,9 +536,9 @@ export default function UsersPage() {
       if (statusFilter) params.isActive = statusFilter;
       const res = await api.get('/users', { params });
       setUsers(res.data.data); setMeta(res.data.meta);
-    } catch { setUsersError('Failed to load data. Try again.'); }
+    } catch { setUsersError(t('admin.users.usersTab.loadError')); }
     finally  { setUsersLoading(false); }
-  }, [debSearch, roleFilter, divFilter, statusFilter, page]);
+  }, [debSearch, roleFilter, divFilter, statusFilter, page, t]);
 
   useEffect(() => { fetchUsers(); }, [fetchUsers]);
 
@@ -534,17 +550,20 @@ export default function UsersPage() {
     setMeta((m) => ({ ...m, total: m.total + (users.find((u) => u.id === saved.id) ? 0 : 1) }));
   }
   async function handleToggle(u: UserRow) {
-    if (!confirm(`${u.isActive ? 'Deactivate' : 'Activate'} user "${u.fullName}"?`)) return;
+    const confirmMsg = u.isActive
+      ? t('admin.users.usersTab.confirmDeactivate', { name: u.fullName })
+      : t('admin.users.usersTab.confirmActivate', { name: u.fullName });
+    if (!confirm(confirmMsg)) return;
     setToggling(u.id);
     try { const res = await api.patch(`/users/${u.id}/toggle`); setUsers((p) => p.map((x) => x.id === u.id ? res.data.data : x)); }
-    catch (err: unknown) { alert((err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'Failed'); }
+    catch (err: unknown) { alert((err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? t('admin.users.usersTab.actionFailed')); }
     finally { setToggling(null); }
   }
   async function handleDeleteUser(u: UserRow) {
-    if (!confirm(`Permanently deactivate user "${u.fullName}"?`)) return;
+    if (!confirm(t('admin.users.usersTab.confirmDelete', { name: u.fullName }))) return;
     setDeletingUsr(u.id);
     try { const res = await api.delete(`/users/${u.id}`); setUsers((p) => p.map((x) => x.id === u.id ? res.data.data : x)); }
-    catch (err: unknown) { alert((err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'Failed'); }
+    catch (err: unknown) { alert((err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? t('admin.users.usersTab.actionFailed')); }
     finally { setDeletingUsr(null); }
   }
   function resetFilters() { setSearch(''); setRoleFilter(''); setDivFilter(''); setStatusFilter(''); setPage(1); }
@@ -558,7 +577,7 @@ export default function UsersPage() {
     if (!divDelTarget) return;
     setDeletingDiv(true); setDivDelError('');
     try { await api.delete(`/divisions/${divDelTarget.id}`); setDivisions((p) => p.filter((d) => d.id !== divDelTarget.id)); setDivDelTarget(null); }
-    catch (err: unknown) { setDivDelError((err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'Failed'); }
+    catch (err: unknown) { setDivDelError((err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? t('admin.users.usersTab.actionFailed')); }
     finally { setDeletingDiv(false); }
   }
 
@@ -569,9 +588,9 @@ export default function UsersPage() {
   const sortedRoles = [...roles].sort((a, b) => a.level - b.level || a.name.localeCompare(b.name));
 
   const TABS = [
-    { key: 'users' as Tab,     label: 'Users',     Icon: Users,  count: meta.total },
-    { key: 'divisions' as Tab, label: 'Divisions', Icon: Layers, count: divisions.length },
-    { key: 'roles' as Tab,     label: 'Roles',     Icon: Shield, count: roles.length },
+    { key: 'users' as Tab,     label: t('admin.users.tabs.users'),     Icon: Users,  count: meta.total },
+    { key: 'divisions' as Tab, label: t('admin.users.tabs.divisions'), Icon: Layers, count: divisions.length },
+    { key: 'roles' as Tab,     label: t('admin.users.tabs.roles'),     Icon: Shield, count: roles.length },
   ];
 
   return (
@@ -579,21 +598,21 @@ export default function UsersPage() {
       {/* Header */}
       <div className="flex items-center justify-between mb-5">
         <div>
-          <h1 className="text-xl font-semibold text-gray-800">User Management</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Manage users, divisions, and roles for SAN Group</p>
+          <h1 className="text-xl font-semibold text-gray-800">{t('admin.users.pageTitle')}</h1>
+          <p className="text-sm text-gray-500 mt-0.5">{t('admin.users.pageSubtitle')}</p>
         </div>
         {activeTab === 'users' && (
           <button onClick={openCreateUser} className="flex items-center gap-1.5 px-3 py-2 text-sm text-white bg-navy hover:bg-navy-light rounded transition-colors">
-            <Plus size={15} /> Add User
+            <Plus size={15} /> {t('admin.users.addUser')}
           </button>
         )}
         {activeTab === 'divisions' && (
           <button onClick={() => { setEditingDiv(null); setDivModal(true); }} className="flex items-center gap-1.5 px-3 py-2 text-sm text-white bg-navy hover:bg-navy-light rounded transition-colors">
-            <Plus size={15} /> Add Division
+            <Plus size={15} /> {t('admin.users.addDivision')}
           </button>
         )}
         {activeTab === 'roles' && (
-          <span className="text-xs text-gray-400 italic">6 system roles · edit name & color via the pencil icon</span>
+          <span className="text-xs text-gray-400 italic">{t('admin.users.rolesTabHint')}</span>
         )}
       </div>
 
@@ -620,7 +639,7 @@ export default function UsersPage() {
           <div className="bg-white border border-gray-200 rounded-lg p-4 mb-4 flex flex-wrap items-center gap-3">
             <div className="relative flex-1 min-w-48">
               <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-              <input type="text" placeholder="Search name, email, username..." value={search}
+              <input type="text" placeholder={t('admin.users.usersTab.searchPlaceholder')} value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="pl-8 pr-8 py-2 text-sm border border-gray-200 rounded w-full focus:outline-none focus:border-navy focus:ring-1 focus:ring-navy" />
               {search && (
@@ -629,26 +648,26 @@ export default function UsersPage() {
             </div>
             <select value={roleFilter} onChange={(e) => { setRoleFilter(e.target.value); setPage(1); }}
               className="py-2 px-3 text-sm border border-gray-200 rounded focus:outline-none focus:border-navy">
-              <option value="">All Roles</option>
+              <option value="">{t('admin.users.usersTab.allRoles')}</option>
               {roles.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
             </select>
             <select value={divFilter} onChange={(e) => { setDivFilter(e.target.value); setPage(1); }}
               className="py-2 px-3 text-sm border border-gray-200 rounded focus:outline-none focus:border-navy">
-              <option value="">All Divisions</option>
+              <option value="">{t('admin.users.usersTab.allDivisions')}</option>
               {divisions.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
             </select>
             <select value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
               className="py-2 px-3 text-sm border border-gray-200 rounded focus:outline-none focus:border-navy">
-              <option value="">All Status</option>
-              <option value="true">Active</option>
-              <option value="false">Inactive</option>
+              <option value="">{t('admin.users.usersTab.allStatus')}</option>
+              <option value="true">{t('admin.users.usersTab.active')}</option>
+              <option value="false">{t('admin.users.usersTab.inactive')}</option>
             </select>
             {hasFilter && (
               <button onClick={resetFilters} className="flex items-center gap-1 text-xs text-gray-500 hover:text-danger px-2 py-1">
-                <X size={12} /> Reset
+                <X size={12} /> {t('admin.users.usersTab.reset')}
               </button>
             )}
-            <span className="ml-auto text-xs text-gray-400">{meta.total} user</span>
+            <span className="ml-auto text-xs text-gray-400">{t('admin.users.usersTab.totalCount', { count: meta.total })}</span>
           </div>
 
           <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
@@ -658,25 +677,25 @@ export default function UsersPage() {
               <div className="flex flex-col items-center justify-center py-16 text-center">
                 <AlertCircle size={32} className="text-danger mb-3" />
                 <p className="text-sm text-gray-600">{usersError}</p>
-                <button onClick={fetchUsers} className="mt-3 px-4 py-1.5 text-sm text-navy border border-navy rounded hover:bg-navy-50">Try again</button>
+                <button onClick={fetchUsers} className="mt-3 px-4 py-1.5 text-sm text-navy border border-navy rounded hover:bg-navy-50">{t('admin.users.usersTab.tryAgain')}</button>
               </div>
             ) : users.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-16 text-center">
                 <Users size={40} className="text-gray-300 mb-3" />
-                <p className="text-sm font-medium text-gray-600">{hasFilter ? 'No matching users' : 'No users yet'}</p>
-                {hasFilter && <button onClick={resetFilters} className="mt-2 text-xs text-navy hover:underline">Reset filters</button>}
+                <p className="text-sm font-medium text-gray-600">{hasFilter ? t('admin.users.usersTab.noMatchingUsers') : t('admin.users.usersTab.noUsersYet')}</p>
+                {hasFilter && <button onClick={resetFilters} className="mt-2 text-xs text-navy hover:underline">{t('admin.users.usersTab.resetFilters')}</button>}
               </div>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-gray-100 bg-gray-50">
-                      <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">User</th>
-                      <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Username</th>
-                      <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
-                      <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Division</th>
-                      <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                      <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Last Login</th>
+                      <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">{t('admin.users.usersTab.table.user')}</th>
+                      <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">{t('admin.users.usersTab.table.username')}</th>
+                      <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">{t('admin.users.usersTab.table.role')}</th>
+                      <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">{t('admin.users.usersTab.table.division')}</th>
+                      <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">{t('admin.users.usersTab.table.status')}</th>
+                      <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">{t('admin.users.usersTab.table.lastLogin')}</th>
                       <th className="px-4 py-3" />
                     </tr>
                   </thead>
@@ -692,7 +711,7 @@ export default function UsersPage() {
                               <div className="min-w-0">
                                 <div className="flex items-center gap-1.5">
                                   <p className="text-sm font-medium text-gray-800 truncate">{u.fullName}</p>
-                                  {isMe && <span className="text-xs bg-navy-50 text-navy px-1.5 py-0.5 rounded">You</span>}
+                                  {isMe && <span className="text-xs bg-navy-50 text-navy px-1.5 py-0.5 rounded">{t('admin.users.usersTab.youBadge')}</span>}
                                 </div>
                                 <p className="text-xs text-gray-400 truncate">{u.email}</p>
                               </div>
@@ -722,26 +741,26 @@ export default function UsersPage() {
                           <td className="px-4 py-3">
                             <span className={cn('inline-block text-xs px-2 py-0.5 rounded-full font-medium',
                               u.isActive ? 'bg-success/10 text-success' : 'bg-gray-100 text-gray-500')}>
-                              {u.isActive ? 'Active' : 'Inactive'}
+                              {u.isActive ? t('admin.users.usersTab.active') : t('admin.users.usersTab.inactive')}
                             </span>
                           </td>
-                          <td className="px-4 py-3 text-xs text-gray-400">{formatDate(u.lastLoginAt)}</td>
+                          <td className="px-4 py-3 text-xs text-gray-400">{formatDate(u.lastLoginAt, language)}</td>
                           <td className="px-4 py-3">
                             <div className="flex items-center justify-end gap-1">
-                              <button onClick={() => openEditUser(u)} title="Edit"
+                              <button onClick={() => openEditUser(u)} title={t('admin.users.usersTab.editTitle')}
                                 className="w-7 h-7 flex items-center justify-center rounded text-gray-400 hover:text-navy hover:bg-navy-50 transition-colors">
                                 <Edit2 size={13} />
                               </button>
                               {isSuperAdmin && !isMe && !isTopRole && (
                                 <button onClick={() => handleToggle(u)} disabled={toggling === u.id}
-                                  title={u.isActive ? 'Deactivate' : 'Activate'}
+                                  title={u.isActive ? t('admin.users.usersTab.deactivateTitle') : t('admin.users.usersTab.activateTitle')}
                                   className={cn('w-7 h-7 flex items-center justify-center rounded transition-colors',
                                     u.isActive ? 'text-gray-400 hover:text-warning hover:bg-warning/10' : 'text-gray-400 hover:text-success hover:bg-success/10')}>
                                   {toggling === u.id ? <Loader2 size={13} className="animate-spin" /> : u.isActive ? <PowerOff size={13} /> : <Power size={13} />}
                                 </button>
                               )}
                               {isSuperAdmin && !isMe && !isTopRole && (
-                                <button onClick={() => handleDeleteUser(u)} disabled={deletingUsr === u.id} title="Delete"
+                                <button onClick={() => handleDeleteUser(u)} disabled={deletingUsr === u.id} title={t('admin.users.usersTab.deleteTitle')}
                                   className="w-7 h-7 flex items-center justify-center rounded text-gray-400 hover:text-danger hover:bg-danger/10 transition-colors">
                                   {deletingUsr === u.id ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}
                                 </button>
@@ -758,7 +777,7 @@ export default function UsersPage() {
             {!usersLoading && !usersError && meta.totalPages > 1 && (
               <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100 bg-gray-50/50">
                 <p className="text-xs text-gray-500">
-                  {(meta.page - 1) * meta.limit + 1}–{Math.min(meta.page * meta.limit, meta.total)} of {meta.total} users
+                  {t('admin.users.usersTab.paginationRange', { from: (meta.page - 1) * meta.limit + 1, to: Math.min(meta.page * meta.limit, meta.total), total: meta.total })}
                 </p>
                 <div className="flex items-center gap-1">
                   <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={meta.page <= 1}
@@ -797,10 +816,10 @@ export default function UsersPage() {
           {divisions.length === 0 ? (
             <div className="bg-white border border-gray-200 rounded-xl flex flex-col items-center justify-center py-20 text-center">
               <Layers size={40} className="text-gray-200 mb-3" />
-              <p className="text-sm text-gray-500 mb-3">No divisions yet</p>
+              <p className="text-sm text-gray-500 mb-3">{t('admin.users.divisionsTab.noDivisions')}</p>
               <button onClick={() => { setEditingDiv(null); setDivModal(true); }}
                 className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-navy border border-navy rounded hover:bg-navy-50">
-                <Plus size={14} /> Add your first division
+                <Plus size={14} /> {t('admin.users.divisionsTab.addFirst')}
               </button>
             </div>
           ) : (
@@ -829,7 +848,7 @@ export default function UsersPage() {
                             <Edit2 size={13} />
                           </button>
                           <button onClick={() => { setDivDelError(''); setDivDelTarget(d); }} disabled={userCount > 0}
-                            title={userCount > 0 ? 'Cannot delete — division still has users' : 'Delete'}
+                            title={userCount > 0 ? t('admin.users.divisionsTab.cannotDeleteTitle') : t('admin.users.divisionsTab.deleteTitle')}
                             className={cn('w-7 h-7 flex items-center justify-center rounded transition-colors',
                               userCount > 0 ? 'text-gray-200 cursor-not-allowed' : 'text-gray-400 hover:text-red-500 hover:bg-red-50')}>
                             <Trash2 size={13} />
@@ -838,9 +857,9 @@ export default function UsersPage() {
                       </div>
                       {d.description && <p className="text-xs text-gray-500 mt-2.5 line-clamp-2">{d.description}</p>}
                       <div className="flex items-center gap-3 mt-3 pt-3 border-t border-gray-100">
-                        <span className="text-xs text-gray-500 flex items-center gap-1"><Users size={11} className="text-gray-400" /> {userCount} user</span>
+                        <span className="text-xs text-gray-500 flex items-center gap-1"><Users size={11} className="text-gray-400" /> {t('admin.users.divisionsTab.userCount', { count: userCount })}</span>
                         <span className="text-gray-300">·</span>
-                        <span className="text-xs text-gray-500 flex items-center gap-1"><Shield size={11} className="text-gray-400" /> {roleCount} role</span>
+                        <span className="text-xs text-gray-500 flex items-center gap-1"><Shield size={11} className="text-gray-400" /> {t('admin.users.divisionsTab.roleCount', { count: roleCount })}</span>
                       </div>
                     </div>
                   </div>
@@ -892,7 +911,7 @@ export default function UsersPage() {
       <RoleModal open={roleModal} role={editingRole}
         onClose={() => setRoleModal(false)} onSaved={handleRoleSaved} />
       {divDelTarget && (
-        <DeleteConfirm title="Delete Division" name={divDelTarget.name}
+        <DeleteConfirm title={t('admin.users.deleteConfirmModal.deleteDivisionTitle')} name={divDelTarget.name}
           onCancel={() => setDivDelTarget(null)} onConfirm={handleDeleteDiv} loading={deletingDiv} />
       )}
     </div>

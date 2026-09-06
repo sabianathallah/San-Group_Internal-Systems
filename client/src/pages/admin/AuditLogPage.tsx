@@ -3,6 +3,8 @@ import {
   ClipboardList, Loader2, AlertCircle, ChevronLeft, ChevronRight,
   CheckSquare, User, Shield, Lock,
 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import api from '@/lib/api';
 import { usePermStore } from '@/stores/permStore';
 import { cn } from '@/lib/cn';
@@ -41,24 +43,40 @@ function EntityIcon({ entity }: { entity: string }) {
   return <Icon size={13} className="text-gray-400" />;
 }
 
-function fmtDatetime(iso: string) {
-  return new Date(iso).toLocaleString('en-US', {
+/** Locale for date formatting — mirrors i18next's active language. */
+function dateLocale(language: string): string {
+  return language === 'id' ? 'id-ID' : 'en-US';
+}
+
+function fmtDatetime(iso: string, language: string) {
+  return new Date(iso).toLocaleString(dateLocale(language), {
     day: '2-digit', month: 'short', year: 'numeric',
     hour: '2-digit', minute: '2-digit',
   });
 }
 
-const ENTITY_LABELS: Record<string, string> = {
-  task: 'Task', user: 'User', permission: 'Permission',
-};
-const ACTION_LABELS: Record<string, string> = {
-  CREATE: 'Created', UPDATE: 'Updated', DELETE: 'Deleted',
-};
+function entityLabels(t: TFunction): Record<string, string> {
+  return {
+    task: t('admin.auditLog.entities.task'),
+    user: t('admin.auditLog.entities.user'),
+    permission: t('admin.auditLog.entities.permission'),
+  };
+}
+function actionLabels(t: TFunction): Record<string, string> {
+  return {
+    CREATE: t('admin.auditLog.actions.CREATE'),
+    UPDATE: t('admin.auditLog.actions.UPDATE'),
+    DELETE: t('admin.auditLog.actions.DELETE'),
+  };
+}
 
 // ── Main Page ─────────────────────────────────────────────────
 const PAGE_SIZE = 20;
 
 export default function AuditLogPage() {
+  const { t, i18n } = useTranslation();
+  const ENTITY_LABELS = entityLabels(t);
+  const ACTION_LABELS = actionLabels(t);
   const perms   = usePermStore((s) => s.perms);
   const loaded  = usePermStore((s) => s.loaded);
   const canView = perms.audit_log?.view !== 'none';
@@ -80,7 +98,7 @@ export default function AuditLogPage() {
       setLogs(res.data.data.logs ?? []);
       setMeta(res.data.data);
     } catch {
-      setError('Failed to load audit log');
+      setError(t('admin.auditLog.loadError'));
     } finally {
       setLoading(false);
     }
@@ -98,8 +116,8 @@ export default function AuditLogPage() {
         <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mb-4">
           <Lock size={28} className="text-gray-400" />
         </div>
-        <h2 className="text-base font-semibold text-gray-700 mb-1">Access Restricted</h2>
-        <p className="text-sm text-gray-400">You don't have permission to view the audit log.</p>
+        <h2 className="text-base font-semibold text-gray-700 mb-1">{t('admin.auditLog.accessRestricted.title')}</h2>
+        <p className="text-sm text-gray-400">{t('admin.auditLog.accessRestricted.message')}</p>
       </div>
     );
   }
@@ -109,8 +127,8 @@ export default function AuditLogPage() {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-xl font-semibold text-gray-800">Audit Log</h1>
-          <p className="text-sm text-gray-500 mt-0.5">System activity history</p>
+          <h1 className="text-xl font-semibold text-gray-800">{t('admin.auditLog.pageTitle')}</h1>
+          <p className="text-sm text-gray-500 mt-0.5">{t('admin.auditLog.pageSubtitle')}</p>
         </div>
         <div className="flex items-center gap-2">
           <select
@@ -118,10 +136,10 @@ export default function AuditLogPage() {
             onChange={(e) => { setEntity(e.target.value); setPage(1); }}
             className="py-1.5 px-3 text-sm border border-gray-200 rounded focus:outline-none focus:border-navy"
           >
-            <option value="">All types</option>
-            <option value="task">Task</option>
-            <option value="user">User</option>
-            <option value="permission">Permission</option>
+            <option value="">{t('admin.auditLog.allTypes')}</option>
+            <option value="task">{t('admin.auditLog.entities.task')}</option>
+            <option value="user">{t('admin.auditLog.entities.user')}</option>
+            <option value="permission">{t('admin.auditLog.entities.permission')}</option>
           </select>
         </div>
       </div>
@@ -137,30 +155,30 @@ export default function AuditLogPage() {
             <AlertCircle size={28} className="text-red-400 mb-2" />
             <p className="text-sm text-gray-600">{error}</p>
             <button onClick={fetchLogs} className="mt-3 px-3 py-1.5 text-sm text-navy border border-navy rounded">
-              Try again
+              {t('admin.auditLog.tryAgain')}
             </button>
           </div>
         ) : logs.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16">
             <ClipboardList size={36} className="text-gray-200 mb-2" />
-            <p className="text-sm text-gray-400">No activity recorded yet</p>
+            <p className="text-sm text-gray-400">{t('admin.auditLog.noActivity')}</p>
           </div>
         ) : (
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-gray-100 bg-gray-50">
-                <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Time</th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">User</th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Action</th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Entity</th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Detail</th>
+                <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">{t('admin.auditLog.table.time')}</th>
+                <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">{t('admin.auditLog.table.user')}</th>
+                <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">{t('admin.auditLog.table.action')}</th>
+                <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">{t('admin.auditLog.table.entity')}</th>
+                <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">{t('admin.auditLog.table.detail')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
               {logs.map((log) => (
                 <tr key={log.id} className="hover:bg-gray-50/50 transition-colors">
                   <td className="px-4 py-3 text-xs text-gray-400 whitespace-nowrap">
-                    {fmtDatetime(log.createdAt)}
+                    {fmtDatetime(log.createdAt, i18n.language)}
                   </td>
                   <td className="px-4 py-3">
                     <p className="text-sm font-medium text-gray-800">{log.user.fullName}</p>
@@ -194,7 +212,7 @@ export default function AuditLogPage() {
         {!loading && !error && meta.totalPages > 1 && (
           <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100 bg-gray-50/50">
             <p className="text-xs text-gray-500">
-              {(meta.page - 1) * meta.limit + 1}–{Math.min(meta.page * meta.limit, meta.total)} of {meta.total} entries
+              {t('admin.auditLog.paginationRange', { from: (meta.page - 1) * meta.limit + 1, to: Math.min(meta.page * meta.limit, meta.total), total: meta.total })}
             </p>
             <div className="flex items-center gap-1">
               <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={meta.page <= 1}

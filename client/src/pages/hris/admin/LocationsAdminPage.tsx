@@ -3,6 +3,7 @@ import {
   MapPin, Plus, Pencil, Trash2, Loader2, X, CheckCircle2,
   Navigation, Building2, AlertCircle,
 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import api from '@/lib/api';
 import { cn } from '@/lib/cn';
 import { toast } from '@/stores/toastStore';
@@ -26,6 +27,7 @@ interface LocationFormProps {
 }
 
 function LocationFormModal({ initial, onClose, onSaved }: LocationFormProps) {
+  const { t } = useTranslation();
   const isEdit = !!initial;
   const [form, setForm] = useState({
     name: initial?.name ?? '',
@@ -41,16 +43,16 @@ function LocationFormModal({ initial, onClose, onSaved }: LocationFormProps) {
   function set(k: string, v: unknown) { setForm((f) => ({ ...f, [k]: v })); }
 
   function useMyLocation() {
-    if (!navigator.geolocation) { toast.error('Browser does not support GPS'); return; }
+    if (!navigator.geolocation) { toast.error(t('hris.admin.locations.toast.gpsUnsupported')); return; }
     setGettingLocation(true);
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         set('lat', pos.coords.latitude.toFixed(6));
         set('lng', pos.coords.longitude.toFixed(6));
         setGettingLocation(false);
-        toast.success('Location obtained');
+        toast.success(t('hris.admin.locations.toast.locationObtained'));
       },
-      () => { toast.error('Failed to get location'); setGettingLocation(false); },
+      () => { toast.error(t('hris.admin.locations.toast.getLocationFailed')); setGettingLocation(false); },
       { timeout: 10000, enableHighAccuracy: true },
     );
   }
@@ -70,15 +72,15 @@ function LocationFormModal({ initial, onClose, onSaved }: LocationFormProps) {
       };
       if (isEdit) {
         await api.put(`/hris/office-locations/${initial!.id}`, payload);
-        toast.success('Location updated');
+        toast.success(t('hris.admin.locations.toast.updated'));
       } else {
         await api.post('/hris/office-locations', payload);
-        toast.success('Location added');
+        toast.success(t('hris.admin.locations.toast.added'));
       }
       onSaved();
       onClose();
     } catch (err: any) {
-      toast.error(err?.response?.data?.message ?? 'Failed to save');
+      toast.error(err?.response?.data?.message ?? t('hris.admin.locations.toast.saveFailed'));
     } finally { setSaving(false); }
   }
 
@@ -92,40 +94,40 @@ function LocationFormModal({ initial, onClose, onSaved }: LocationFormProps) {
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
           <div className="flex items-center gap-2">
             <MapPin size={18} className="text-blue-500" />
-            <h3 className="font-semibold text-gray-900">{isEdit ? 'Edit Office Location' : 'Add Office Location'}</h3>
+            <h3 className="font-semibold text-gray-900">{isEdit ? t('hris.admin.locations.modal.editTitle') : t('hris.admin.locations.modal.addTitle')}</h3>
           </div>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
         </div>
         <div className="px-5 py-4 space-y-4">
           <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1.5">Location Name <span className="text-red-500">*</span></label>
-            <input value={form.name} onChange={(e) => set('name', e.target.value)} placeholder="e.g. Head Office Jakarta, Property Site A"
+            <label className="block text-xs font-medium text-gray-500 mb-1.5">{t('hris.admin.locations.modal.name')} <span className="text-red-500">*</span></label>
+            <input value={form.name} onChange={(e) => set('name', e.target.value)} placeholder={t('hris.admin.locations.modal.namePlaceholder')}
               className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-400" />
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1.5">Address</label>
-            <textarea value={form.address} onChange={(e) => set('address', e.target.value)} rows={2} placeholder="Full address (optional)"
+            <label className="block text-xs font-medium text-gray-500 mb-1.5">{t('hris.admin.locations.modal.address')}</label>
+            <textarea value={form.address} onChange={(e) => set('address', e.target.value)} rows={2} placeholder={t('hris.admin.locations.modal.addressPlaceholder')}
               className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-400 resize-none" />
           </div>
 
           {/* Coordinates */}
           <div>
             <div className="flex items-center justify-between mb-1.5">
-              <label className="text-xs font-medium text-gray-500">GPS Coordinates <span className="text-red-500">*</span></label>
+              <label className="text-xs font-medium text-gray-500">{t('hris.admin.locations.modal.gpsCoordinates')} <span className="text-red-500">*</span></label>
               <button onClick={useMyLocation} disabled={gettingLocation}
                 className="flex items-center gap-1.5 text-xs font-medium text-blue-600 hover:text-blue-700 disabled:opacity-40 bg-blue-50 hover:bg-blue-100 px-2.5 py-1 rounded-lg transition-colors">
                 {gettingLocation ? <Loader2 size={12} className="animate-spin" /> : <Navigation size={12} />}
-                Use My Location
+                {t('hris.admin.locations.modal.useMyLocation')}
               </button>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-[11px] text-gray-400 mb-1">Latitude</label>
+                <label className="block text-[11px] text-gray-400 mb-1">{t('hris.admin.locations.modal.latitude')}</label>
                 <input value={form.lat} onChange={(e) => set('lat', e.target.value)} placeholder="-6.2297"
                   className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-400 font-mono" />
               </div>
               <div>
-                <label className="block text-[11px] text-gray-400 mb-1">Longitude</label>
+                <label className="block text-[11px] text-gray-400 mb-1">{t('hris.admin.locations.modal.longitude')}</label>
                 <input value={form.lng} onChange={(e) => set('lng', e.target.value)} placeholder="106.8295"
                   className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-400 font-mono" />
               </div>
@@ -133,7 +135,7 @@ function LocationFormModal({ initial, onClose, onSaved }: LocationFormProps) {
             {hasCoords && (
               <a href={`https://www.google.com/maps?q=${latVal},${lngVal}`} target="_blank" rel="noopener noreferrer"
                 className="inline-flex items-center gap-1 text-xs text-blue-500 hover:underline mt-1.5">
-                <MapPin size={10} /> View on Google Maps
+                <MapPin size={10} /> {t('hris.admin.locations.modal.viewOnGoogleMaps')}
               </a>
             )}
           </div>
@@ -141,7 +143,7 @@ function LocationFormModal({ initial, onClose, onSaved }: LocationFormProps) {
           {/* Radius slider */}
           <div>
             <label className="block text-xs font-medium text-gray-500 mb-1.5">
-              Geofencing Radius: <span className="font-semibold text-gray-700">{form.radiusMeters} meters</span>
+              {t('hris.admin.locations.modal.geofencingRadius', { radius: form.radiusMeters })}
             </label>
             <input type="range" min={50} max={500} step={25} value={form.radiusMeters}
               onChange={(e) => set('radiusMeters', parseInt(e.target.value))}
@@ -151,10 +153,10 @@ function LocationFormModal({ initial, onClose, onSaved }: LocationFormProps) {
             </div>
             <div className={cn('text-xs mt-2 px-3 py-2 rounded-lg', form.radiusMeters <= 100 ? 'bg-orange-50 text-orange-600' : 'bg-blue-50 text-blue-600')}>
               {form.radiusMeters <= 100
-                ? 'Tight radius — suitable for small buildings or specific points'
+                ? t('hris.admin.locations.modal.radiusTight')
                 : form.radiusMeters <= 200
-                ? 'Standard radius — suitable for office areas'
-                : 'Wide radius — suitable for property sites or outdoor areas'}
+                ? t('hris.admin.locations.modal.radiusStandard')
+                : t('hris.admin.locations.modal.radiusWide')}
             </div>
           </div>
 
@@ -165,19 +167,19 @@ function LocationFormModal({ initial, onClose, onSaved }: LocationFormProps) {
               <div className={cn('absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform', form.isActive ? 'left-4' : 'left-0.5')} />
             </div>
             <div>
-              <p className="text-sm font-medium text-gray-700">Active Location</p>
-              <p className="text-xs text-gray-400">Only active locations are used for geofencing</p>
+              <p className="text-sm font-medium text-gray-700">{t('hris.admin.locations.modal.activeLocation')}</p>
+              <p className="text-xs text-gray-400">{t('hris.admin.locations.modal.activeLocationHint')}</p>
             </div>
           </label>
         </div>
         <div className="px-5 pb-5 flex gap-3">
           <button onClick={onClose} className="flex-1 py-2.5 text-sm font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors">
-            Cancel
+            {t('hris.admin.locations.modal.cancel')}
           </button>
           <button onClick={handleSave} disabled={saving || !form.name.trim() || !hasCoords}
             className="flex-1 py-2.5 text-sm font-medium text-white bg-blue-500 hover:bg-blue-600 disabled:opacity-40 rounded-lg transition-colors flex items-center justify-center gap-2">
             {saving ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
-            {isEdit ? 'Save Changes' : 'Add Location'}
+            {isEdit ? t('hris.admin.locations.modal.saveChanges') : t('hris.admin.locations.modal.addLocation')}
           </button>
         </div>
       </div>
@@ -195,6 +197,7 @@ function LocationCard({
   onEdit: () => void;
   onDelete: () => void;
 }) {
+  const { t } = useTranslation();
   const mapsUrl = `https://www.google.com/maps?q=${loc.lat},${loc.lng}`;
 
   return (
@@ -225,7 +228,7 @@ function LocationCard({
         </div>
         {!loc.isActive && (
           <div className="absolute top-2 left-2 bg-gray-500/80 text-white text-[10px] font-medium px-2 py-0.5 rounded-full">
-            Inactive
+            {t('hris.admin.locations.card.inactive')}
           </div>
         )}
       </div>
@@ -239,13 +242,13 @@ function LocationCard({
         )}
         <div className="space-y-1.5">
           <div className="flex items-center justify-between text-xs">
-            <span className="text-gray-500">Radius</span>
+            <span className="text-gray-500">{t('hris.admin.locations.card.radius')}</span>
             <span className={cn('font-medium', loc.radiusMeters <= 100 ? 'text-orange-600' : 'text-blue-600')}>
               {loc.radiusMeters} m
             </span>
           </div>
           <div className="flex items-center justify-between text-xs">
-            <span className="text-gray-500">Coordinates</span>
+            <span className="text-gray-500">{t('hris.admin.locations.card.coordinates')}</span>
             <a href={mapsUrl} target="_blank" rel="noopener noreferrer"
               className="font-mono text-blue-500 hover:underline flex items-center gap-0.5">
               {loc.lat.toFixed(4)}, {loc.lng.toFixed(4)}
@@ -259,6 +262,7 @@ function LocationCard({
 
 // ── Main Page ──────────────────────────────────────────────────
 export default function LocationsAdminPage() {
+  const { t } = useTranslation();
   const [locations, setLocations] = useState<OfficeLocation[]>([]);
   const [loading, setLoading]     = useState(false);
   const [formOpen, setFormOpen]   = useState(false);
@@ -276,13 +280,13 @@ export default function LocationsAdminPage() {
   useEffect(() => { loadLocations(); }, [loadLocations]);
 
   async function handleDelete(loc: OfficeLocation) {
-    if (!confirm(`Delete location "${loc.name}"? Existing check-in records will not be affected.`)) return;
+    if (!confirm(t('hris.admin.locations.deleteConfirm', { name: loc.name }))) return;
     try {
       await api.delete(`/hris/office-locations/${loc.id}`);
-      toast.success('Location deleted');
+      toast.success(t('hris.admin.locations.toast.deleted'));
       loadLocations();
     } catch (err: any) {
-      toast.error(err?.response?.data?.message ?? 'Failed to delete');
+      toast.error(err?.response?.data?.message ?? t('hris.admin.locations.toast.deleteFailed'));
     }
   }
 
@@ -303,13 +307,13 @@ export default function LocationsAdminPage() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-              <MapPin size={20} className="text-blue-500" /> Office Locations
+              <MapPin size={20} className="text-blue-500" /> {t('hris.admin.locations.header.title')}
             </h1>
-            <p className="text-sm text-gray-500 mt-0.5">Manage geofencing areas for employee attendance</p>
+            <p className="text-sm text-gray-500 mt-0.5">{t('hris.admin.locations.header.subtitle')}</p>
           </div>
           <button onClick={() => setFormOpen(true)}
             className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg text-sm font-medium hover:bg-blue-600 transition-colors">
-            <Plus size={15} /> Add Location
+            <Plus size={15} /> {t('hris.admin.locations.addLocation')}
           </button>
         </div>
 
@@ -318,9 +322,9 @@ export default function LocationsAdminPage() {
           <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 flex items-start gap-3">
             <AlertCircle size={16} className="text-blue-500 flex-shrink-0 mt-0.5" />
             <div>
-              <p className="text-sm font-medium text-blue-800">{activeCount} active location{activeCount !== 1 ? 's' : ''}</p>
+              <p className="text-sm font-medium text-blue-800">{t('hris.admin.locations.banner.activeCount', { count: activeCount })}</p>
               <p className="text-xs text-blue-600 mt-0.5">
-                Employees can check in from any active location. If outside all radii, a warning with a force check-in option will appear.
+                {t('hris.admin.locations.banner.detail')}
               </p>
             </div>
           </div>
@@ -334,11 +338,11 @@ export default function LocationsAdminPage() {
         ) : locations.length === 0 ? (
           <div className="text-center py-20 bg-white border-2 border-dashed border-gray-200 rounded-xl">
             <Building2 size={36} className="text-gray-200 mx-auto mb-3" />
-            <p className="text-gray-500 font-medium">No office locations yet</p>
-            <p className="text-gray-400 text-sm mt-1 mb-4">Add a location to enable attendance geofencing</p>
+            <p className="text-gray-500 font-medium">{t('hris.admin.locations.empty.title')}</p>
+            <p className="text-gray-400 text-sm mt-1 mb-4">{t('hris.admin.locations.empty.subtitle')}</p>
             <button onClick={() => setFormOpen(true)}
               className="inline-flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg text-sm font-medium hover:bg-blue-600 transition-colors">
-              <Plus size={14} /> Add First Location
+              <Plus size={14} /> {t('hris.admin.locations.addFirstLocation')}
             </button>
           </div>
         ) : (
@@ -356,7 +360,7 @@ export default function LocationsAdminPage() {
 
         {locations.length > 0 && (
           <p className="text-xs text-gray-400">
-            Click coordinates on a location card to open Google Maps. Radius is shown in the bottom-right corner of the circle.
+            {t('hris.admin.locations.footerNote')}
           </p>
         )}
       </div>

@@ -1,0 +1,2085 @@
+{
+  "dashboard": {
+    "greeting": {
+      "morning": "Good morning",
+      "afternoon": "Good afternoon",
+      "evening": "Good evening"
+    },
+    "subtitle": {
+      "empty": "No tasks in My Day — add one below",
+      "allDone": "All My Day tasks completed!",
+      "remaining": "{{count}} task remaining today",
+      "remaining_plural": "{{count}} tasks remaining today"
+    },
+    "done": "done",
+    "alerts": {
+      "overdue": "{{count}} overdue",
+      "awaiting": "{{count}} awaiting",
+      "users": "{{count}} users"
+    },
+    "checkIn": {
+      "title": "Attendance Today",
+      "notCheckedIn": "Not checked in yet",
+      "checkedIn": "Checked in {{time}}",
+      "late": "Late {{minutes}}m",
+      "done": "Done · {{checkIn}}–{{checkOut}}",
+      "checkInBtn": "Check In",
+      "checkOutBtn": "Check Out",
+      "complete": "Complete",
+      "shift": "Shift {{name}}"
+    },
+    "toDoToday": {
+      "title": "To Do Today",
+      "allTasks": "All tasks",
+      "loading": "Loading tasks…",
+      "allDone": "All tasks done for today!",
+      "addTask": "Add task to My Day",
+      "titlePlaceholder": "Enter task title...",
+      "add": "Add",
+      "cancel": "Cancel",
+      "completed": "Completed",
+      "waiting": "Waiting",
+      "inProgress": "In progress"
+    },
+    "emptyMyDay": {
+      "title": "My Day is empty",
+      "subtitle": "Add a task below, or create one now.",
+      "cta": "Create Task"
+    },
+    "stickyNotes": {
+      "title": "Sticky Notes",
+      "all": "All",
+      "empty": "No pinned notes",
+      "more": "+{{count}} more"
+    },
+    "quickAccess": {
+      "title": "Quick Access",
+      "tasks": "Tasks",
+      "bulletin": "Bulletin",
+      "notes": "Notes",
+      "dbLinks": "DB Links",
+      "workOrders": "Work Orders",
+      "hris": "HRIS",
+      "analytics": "Analytics",
+      "admin": "Admin"
+    },
+    "team": {
+      "myDivision": "My Division",
+      "myTeam": "My Team",
+      "tasks": "Tasks",
+      "done": "Done",
+      "members": "Members",
+      "noData": "No team data"
+    },
+    "system": {
+      "title": "System",
+      "users": "Users",
+      "tasks": "Tasks"
+    },
+    "wallpaper": {
+      "changeTitle": "Change header wallpaper",
+      "header": "Header wallpaper",
+      "upload": "Upload custom image",
+      "applyError": "Failed to apply wallpaper",
+      "uploadError": "Failed to upload wallpaper",
+      "maxSize": "Maximum file size is 3MB"
+    }
+  },
+  "tasks": {
+    "sidebar": {
+      "personal": "Personal",
+      "workspace": "Workspace",
+      "lists": "Lists",
+      "myDay": "My Day",
+      "important": "Important",
+      "planned": "Planned",
+      "assigned": "Assigned to Me",
+      "myTasks": "My Tasks",
+      "completed": "Completed",
+      "allTasks": "All Tasks",
+      "teamTasks": "Team Tasks",
+      "newList": "New List"
+    },
+    "filterPanel": {
+      "status": "Status",
+      "priority": "Priority",
+      "assignee": "Assignee",
+      "other": "Other",
+      "all": "All",
+      "hasDueDate": "Has due date",
+      "overdueOnly": "Overdue only",
+      "clearAll": "Clear all"
+    },
+    "status": {
+      "todo": "To Do",
+      "inProgress": "In Progress",
+      "done": "Done",
+      "waitingConfirmation": "Waiting for Confirmation"
+    },
+    "priority": {
+      "urgent": "Urgent",
+      "high": "High",
+      "medium": "Medium",
+      "low": "Low"
+    },
+    "visibility": {
+      "onlyMe": "Only Me",
+      "myDivision": "My Division",
+      "selectDivisions": "Select Divisions",
+      "allStaff": "All Staff"
+    },
+    "assignBadge": {
+      "accepted": "Accepted",
+      "rejected": "Rejected"
+    },
+    "due": {
+      "overdue": "{{count}}d overdue",
+      "overdue_plural": "{{count}}d overdue",
+      "today": "Today",
+      "tomorrow": "Tomorrow",
+      "ago": "{{count}}d ago",
+      "ago_plural": "{{count}}d ago"
+    },
+    "listView": {
+      "colTitle": "Title",
+      "colStatus": "Status",
+      "colPriority": "Priority",
+      "colDue": "Due",
+      "doneOf": "{{done}}/{{total}} done",
+      "newTaskPlaceholder": "New task title...",
+      "addTask": "Add task",
+      "ok": "OK",
+      "clickToggle": "Click: To Do → Done",
+      "removeFromMyDay": "Remove from My Day",
+      "addToMyDay": "Add to My Day",
+      "removeFromImportant": "Remove from Important",
+      "markImportant": "Mark as important",
+      "unassigned": "Unassigned"
+    },
+    "boardView": {
+      "taskTitlePlaceholder": "Task title...",
+      "addTask": "Add task",
+      "ok": "OK",
+      "cancel": "Cancel"
+    },
+    "tableView": {
+      "colTitle": "Title",
+      "colStatus": "Status",
+      "colPriority": "Priority",
+      "colAssignee": "Assignee",
+      "colDueDate": "Due Date",
+      "colList": "List",
+      "noTasksFound": "No tasks found"
+    },
+    "calendarView": {
+      "weekdays": {
+        "mon": "Mon", "tue": "Tue", "wed": "Wed", "thu": "Thu", "fri": "Fri", "sat": "Sat", "sun": "Sun"
+      },
+      "noDueDate": "No due date",
+      "dragHint": "{{count}} task · drag to date",
+      "dragHint_plural": "{{count}} tasks · drag to date",
+      "taskPlaceholder": "Task…",
+      "add": "Add",
+      "rangeMore": "+{{count}} range",
+      "chipMore": "+{{count}} more",
+      "rangeTitle": "{{title}} (start → due)"
+    },
+    "plannedView": {
+      "overdue": "Overdue",
+      "today": "Today",
+      "tomorrow": "Tomorrow",
+      "thisWeek": "This Week",
+      "thisMonth": "This Month",
+      "later": "Later",
+      "noScheduledTasks": "No scheduled tasks"
+    },
+    "descriptionEditor": {
+      "write": "Write",
+      "preview": "Preview",
+      "placeholder": "Add description... (Markdown supported)",
+      "previewEmpty": "Preview will appear here"
+    },
+    "detailPanel": {
+      "backToParent": "Back to parent",
+      "taskNotFound": "Task not found",
+      "delete": "Delete",
+      "assignedBy": "This task was assigned to you by {{name}}",
+      "accept": "Accept",
+      "reject": "Reject",
+      "rejectPlaceholder": "Write rejection reason...",
+      "submit": "Submit",
+      "cancel": "Cancel",
+      "taskRejected": "Task rejected",
+      "status": "Status",
+      "priority": "Priority",
+      "startDate": "Start date",
+      "dueDate": "Due date",
+      "assignTo": "Assign to",
+      "list": "List",
+      "myLists": "My Lists",
+      "flags": "Flags",
+      "shareWith": "Share with",
+      "toSupervisor": "To supervisor",
+      "division": "Division",
+      "createdBy": "Created by",
+      "duration": "Duration",
+      "noListOption": "— No list —",
+      "searchPeoplePlaceholder": "Search people…",
+      "unassigned": "— Unassigned —",
+      "myDayFlag": "My Day",
+      "importantFlag": "Important",
+      "hiddenFromSupervisor": "Hidden from supervisor",
+      "visibleToSupervisor": "Visible to supervisor",
+      "startDateError": "Start date must be on or before the due date",
+      "dueDateError": "Due date must be on or after the start date",
+      "completedIn": "Completed in {{duration}}",
+      "inProgressFor": "In progress for {{duration}}",
+      "openFor": "Open for {{duration}}",
+      "description": "Description",
+      "subtasksTab": "Subtasks",
+      "linksTab": "Links",
+      "notesTab": "Notes",
+      "add": "Add",
+      "subtaskPlaceholder": "Subtask name...",
+      "linkUrlPlaceholder": "https://…",
+      "linkTitlePlaceholder": "Link name (optional)",
+      "addLink": "Add link",
+      "noNotesYet": "No notes yet",
+      "notePlaceholder": "Write a note... (Enter to submit, Shift+Enter for new line)",
+      "send": "Send"
+    },
+    "newListModal": {
+      "title": "New List",
+      "namePlaceholder": "List name…",
+      "iconPlaceholder": "Emoji icon (optional)",
+      "color": "Color",
+      "cancel": "Cancel",
+      "create": "Create List"
+    },
+    "divisionGrid": {
+      "loading": "Loading divisions…",
+      "empty": "No divisions available",
+      "selectDivision": "Select Division",
+      "subtitle": "Click a division to view its tasks",
+      "myDivision": "My Division",
+      "open": "Open"
+    },
+    "completedView": {
+      "empty": "No completed tasks yet",
+      "taskCount": "{{count}} task",
+      "taskCount_plural": "{{count}} tasks",
+      "noneThisMonth": "No completed tasks this month"
+    },
+    "toolbar": {
+      "allStaff": "All Staff",
+      "byDivision": "By Division",
+      "viewList": "List",
+      "viewBoard": "Board",
+      "viewCal": "Cal",
+      "viewTable": "Table",
+      "groupStatus": "Group: Status",
+      "groupPriority": "Group: Priority",
+      "groupAssignee": "Group: Assignee",
+      "sortLatest": "Sort: Latest",
+      "sortDueDate": "Sort: Due Date",
+      "sortPriority": "Sort: Priority",
+      "sortAlpha": "Sort: A–Z",
+      "searchPlaceholder": "Search…",
+      "filter": "Filter",
+      "exportCsv": "CSV",
+      "exportCsvTitle": "Export to CSV",
+      "hideDone": "Hide done",
+      "showDone": "Show done ({{count}})",
+      "doneOf": "{{done}}/{{total}} done",
+      "newTask": "New Task",
+      "allTasksBreadcrumb": "All Tasks",
+      "loadMore": "Load more"
+    },
+    "myDay": {
+      "title": "My Day",
+      "greeting": {
+        "morning": "Good morning",
+        "afternoon": "Good afternoon",
+        "evening": "Good evening",
+        "night": "Good night"
+      },
+      "importantTitle": "Important",
+      "importantSubtitle": "Tasks you have marked as important",
+      "suggestions": "Suggestions ({{count}})",
+      "suggestionsHint": "overdue · due today · not done yesterday",
+      "addToMyDay": "My Day"
+    },
+    "team": {
+      "allLists": "All lists"
+    },
+    "emptyState": {
+      "noTasksHere": "No tasks here",
+      "createFirstTask": "Create first task",
+      "loadingTasks": "Loading tasks…",
+      "loading": "Loading…"
+    },
+    "errors": {
+      "generic": "An error occurred"
+    },
+    "toast": {
+      "markedDone": "\"{{title}}\" marked done",
+      "deleted": "\"{{title}}\" deleted"
+    },
+    "csv": {
+      "title": "Title",
+      "status": "Status",
+      "priority": "Priority",
+      "dueDate": "Due Date",
+      "creator": "Creator",
+      "assignee": "Assignee",
+      "list": "List",
+      "createdAt": "Created At"
+    }
+  },
+  "workOrder": {
+    "title": "Work Orders",
+    "createBtn": "Create WO",
+    "createBtnShort": "Create",
+    "sections": {
+      "myWork": "My Work",
+      "management": "Management"
+    },
+    "views": {
+      "mine": "My Tasks",
+      "reported": "Reported by Me",
+      "all": "All Work Orders",
+      "unassigned": "Unassigned",
+      "pendingReview": "Pending Review"
+    },
+    "stats": {
+      "active": "Active",
+      "pendingReview": "Pending Review",
+      "overdue": "Overdue",
+      "urgent": "Urgent"
+    },
+    "toolbar": {
+      "searchPlaceholder": "Search code / title...",
+      "searchAriaLabel": "Search work orders",
+      "toggleFiltersAriaLabel": "Toggle filters",
+      "refreshAriaLabel": "Refresh",
+      "exportCsvTitle": "Export all filtered work orders to CSV",
+      "exportCsvAriaLabel": "Export CSV",
+      "kanbanView": "Kanban",
+      "tableView": "Table",
+      "allPriorities": "All Priorities",
+      "allCategories": "All Categories",
+      "allTechnicians": "All Technicians",
+      "dateTo": "to"
+    },
+    "loadMore": {
+      "showing": "Showing {{shown}} of {{total}} work orders.",
+      "button": "Load more"
+    },
+    "noWorkOrders": "No work orders",
+    "empty": "Empty",
+    "noMatchingEmployee": "No matching employee",
+    "card": {
+      "reportedByPrefix": "by {{name}}"
+    },
+    "table": {
+      "code": "Code",
+      "title": "Title",
+      "category": "Category",
+      "priority": "Priority",
+      "status": "Status",
+      "technician": "Technician",
+      "due": "Due",
+      "closed": "Closed",
+      "age": "Age",
+      "duration": "Duration"
+    },
+    "common": {
+      "close": "Close",
+      "cancel": "Cancel",
+      "save": "Save"
+    },
+    "modal": {
+      "createTitle": "Create Work Order",
+      "editTitle": "Edit {{code}}",
+      "titleLabel": "Title *",
+      "titlePlaceholder": "Short description of the issue...",
+      "descriptionLabel": "Description",
+      "descriptionPlaceholder": "More detail about the issue...",
+      "priorityLabel": "Priority",
+      "categoryLabel": "Category",
+      "locationLabel": "Location",
+      "locationPlaceholder": "Building / floor / room",
+      "dueDateLabel": "Due Date (SLA)",
+      "dueDateAutoHint": "Auto-set by priority — adjust if needed",
+      "assignLabel": "Assign to Technician",
+      "unassignedOption": "— Unassigned —",
+      "technicianNotesLabel": "Technician Notes",
+      "technicianNotesPlaceholder": "Internal notes for the technician...",
+      "titleRequired": "Title is required",
+      "created": "Work order created",
+      "updated": "Work order updated"
+    },
+    "statusModal": {
+      "title": "Change Status",
+      "finalStatus": "This status is final.",
+      "noteLabel": "Note (optional)",
+      "notePlaceholder": "Reason for the status change...",
+      "updated": "Status updated",
+      "afterPhotoRequiredAgain": "Requires a new \"after\" photo uploaded after the rejection",
+      "afterPhotoRequired": "Requires at least 1 \"after\" photo"
+    },
+    "reviewModal": {
+      "title": "Review Completed Work",
+      "afterPhotosLabel": "After-work Photos",
+      "noPhotos": "No photos",
+      "approve": "Approve",
+      "reject": "Reject",
+      "rejectionReasonLabel": "Rejection reason *",
+      "noteLabel": "Note (optional)",
+      "rejectionPlaceholder": "Explain what needs to be fixed...",
+      "notePlaceholder": "Additional notes...",
+      "sendRejection": "Send Rejection",
+      "approveAndClose": "Approve & Close WO",
+      "rejectionRequired": "A rejection reason is required",
+      "approved": "Work order approved and closed",
+      "rejected": "Work order sent back for revision"
+    },
+    "assignModal": {
+      "title": "Assign Work Order",
+      "pickTechnicianFor": "Pick a technician for \"{{title}}\"",
+      "searchPlaceholder": "Search name...",
+      "assigned": "Work order assigned"
+    },
+    "detail": {
+      "reportedBy": "Reported by",
+      "assignedTo": "Assigned to",
+      "assignedBy": "Assigned by",
+      "unassigned": "Unassigned",
+      "location": "Location",
+      "created": "Created",
+      "dueDate": "Due Date",
+      "closed": "Closed",
+      "description": "Description",
+      "technicianNotes": "Technician Notes",
+      "reviewNote": "Review Note",
+      "reviewNoteBy": "Review Note — {{name}}",
+      "photoEvidence": "Photo Evidence",
+      "history": "History ({{count}})",
+      "changedFrom": "changed from",
+      "reviewWorkBtn": "Review Work",
+      "changeStatusBtn": "Change Status",
+      "editBtn": "Edit",
+      "deleteBtn": "Delete",
+      "confirmDelete": "Click again to delete",
+      "deleted": "Work order deleted"
+    },
+    "timeline": {
+      "title": "Timeline",
+      "created": "Created",
+      "assigned": "Assigned",
+      "workStarted": "Work started",
+      "submittedForReview": "Submitted for review",
+      "cancelled": "Cancelled",
+      "closed": "Closed",
+      "totalDuration": "Total time open → closed: {{duration}}",
+      "openFor": "Open for {{duration}}"
+    },
+    "photos": {
+      "before": "Before",
+      "after": "After",
+      "noPhotoYet": "No photo yet",
+      "afterRequiredHint": "Required before submitting for review",
+      "uploadBeforeAriaLabel": "Upload before photo",
+      "uploadAfterAriaLabel": "Upload after photo",
+      "photoUploaded": "Photo uploaded",
+      "videoUploaded": "Video uploaded"
+    },
+    "errors": {
+      "generic": "Something went wrong",
+      "transitionNotAllowed": "This status transition is not allowed"
+    },
+    "relative": {
+      "justNow": "just now",
+      "minsAgo": "{{count}}m ago",
+      "hrsAgo": "{{count}}h ago",
+      "daysAgo": "{{count}}d ago"
+    },
+    "age": {
+      "totalDurationTitle": "Total duration from open to closed",
+      "openForTitle": "Open for"
+    },
+    "units": {
+      "day": "d",
+      "hour": "h",
+      "minute": "m"
+    },
+    "csv": {
+      "code": "Code",
+      "title": "Title",
+      "status": "Status",
+      "priority": "Priority",
+      "category": "Category",
+      "location": "Location",
+      "reportedBy": "Reported By",
+      "assignee": "Assignee",
+      "dueDate": "Due Date",
+      "createdAt": "Created At",
+      "closedAt": "Closed At",
+      "ageDuration": "Age / Duration"
+    }
+  },
+  "language": {
+    "label": "Language",
+    "en": "EN",
+    "id": "ID"
+  },
+  "bulletin": {
+    "header": {
+      "title": "Bulletin",
+      "subtitleCount": "{{count}} bulletin",
+      "subtitleCount_plural": "{{count}} bulletins",
+      "subtitleDefault": "Announcements board",
+      "subtitleScheduledCount": "{{count}} scheduled",
+      "create": "Create",
+      "add": "Add"
+    },
+    "tabs": {
+      "bulletins": "Bulletins",
+      "scheduled": "Scheduled"
+    },
+    "category": {
+      "all": "All",
+      "announcement": "Announcement",
+      "holiday": "Holiday",
+      "maintenance": "Maintenance",
+      "event": "Event",
+      "general": "General"
+    },
+    "priority": {
+      "urgent": "Urgent",
+      "important": "Important",
+      "normal": "Normal"
+    },
+    "search": {
+      "placeholder": "Search bulletins..."
+    },
+    "drafts": {
+      "hide": "Hide drafts",
+      "show": "Show drafts"
+    },
+    "feed": {
+      "draft": "Draft",
+      "division": "Division",
+      "limited": "Limited",
+      "by": "By {{name}}",
+      "readers": "{{count}} reader",
+      "readers_plural": "{{count}} readers",
+      "validUntil": "Valid until: {{date}}",
+      "unpublish": "Unpublish",
+      "publish": "Publish"
+    },
+    "pagination": {
+      "pageOf": "{{page}} / {{totalPages}}"
+    },
+    "scheduledTab": {
+      "emptyTitle": "No scheduled announcements",
+      "emptySubtitle": "Add recurring notifications for your team.",
+      "deactivate": "Deactivate",
+      "activate": "Activate",
+      "lastSent": "Last sent: {{date}}",
+      "audienceAll": "All staff",
+      "audienceDivision": "Creator's division"
+    },
+    "recurrence": {
+      "daily": "Every day",
+      "weekdays": "Weekdays (Mon–Fri)",
+      "weekly": "Every week on…",
+      "weeklySpecific": "Every week on a specific day"
+    },
+    "days": {
+      "sunday": "Sunday",
+      "monday": "Monday",
+      "tuesday": "Tuesday",
+      "wednesday": "Wednesday",
+      "thursday": "Thursday",
+      "friday": "Friday",
+      "saturday": "Saturday"
+    },
+    "confirm": {
+      "deleteScheduled": "Delete this scheduled announcement?",
+      "deleteBulletin": "Delete this bulletin?"
+    },
+    "toast": {
+      "toggleScheduledError": "Failed to change the scheduled announcement status",
+      "deleteScheduledError": "Failed to delete the scheduled announcement",
+      "deleteBulletinError": "Failed to delete the bulletin",
+      "togglePublishError": "Failed to change the bulletin's publish status"
+    },
+    "emptyState": {
+      "title": "No bulletins yet",
+      "subtitle": "Announcements from management will appear here.",
+      "cta": "Create Bulletin"
+    },
+    "errorState": {
+      "loadFailed": "Failed to load bulletins.",
+      "tryAgain": "Try again"
+    },
+    "loadingDivisions": "Loading divisions...",
+    "form": {
+      "editTitle": "Edit Bulletin",
+      "createTitle": "Create Bulletin",
+      "titleLabel": "Title *",
+      "titlePlaceholder": "Bulletin title...",
+      "contentLabel": "Content *",
+      "contentPlaceholder": "Announcement content...",
+      "categoryLabel": "Category",
+      "priorityLabel": "Priority",
+      "audienceLabel": "Audience",
+      "audienceEveryone": "Everyone",
+      "audienceMyDivision": "My Division",
+      "audienceSelectDivisions": "Select Divisions",
+      "selectDivisionsLabel": "Select Divisions",
+      "validUntilLabel": "Valid until",
+      "publishNow": "Publish now",
+      "cancel": "Cancel",
+      "save": "Save",
+      "create": "Create Bulletin",
+      "errors": {
+        "titleRequired": "Title is required",
+        "contentRequired": "Content is required",
+        "divisionRequired": "Select at least one division for custom audience",
+        "generic": "An error occurred"
+      }
+    },
+    "scheduledForm": {
+      "editTitle": "Edit Scheduled Announcement",
+      "createTitle": "New Scheduled Announcement",
+      "titleLabel": "Title",
+      "titlePlaceholder": "e.g. Daily Attendance Reminder",
+      "messageLabel": "Message",
+      "messagePlaceholder": "e.g. Don't forget to submit your attendance today!",
+      "recurrenceLabel": "Recurrence",
+      "dayOfWeekLabel": "Day of week",
+      "hourLabel": "Hour (WIB)",
+      "minuteLabel": "Minute",
+      "audienceLabel": "Audience",
+      "audienceAll": "All staff",
+      "audienceDivision": "Creator's division only",
+      "audienceCustom": "Specific divisions",
+      "divisionsLabel": "Divisions",
+      "cancel": "Cancel",
+      "save": "Save changes",
+      "create": "Create",
+      "errors": {
+        "required": "Title and content are required.",
+        "divisionRequired": "Select at least one division.",
+        "saveFailed": "Failed to save. Please try again."
+      }
+    }
+  },
+  "analytics": {
+    "title": "Analytics",
+    "subtitle": "Productivity summary · {{scope}}",
+    "scope": {
+      "all": "All Divisions",
+      "division": "My Division",
+      "personal": "My Tasks"
+    },
+    "last30Days": "Last 30 days",
+    "accessRestricted": {
+      "title": "Access Restricted",
+      "message": "You don't have permission to view the analytics page."
+    },
+    "error": {
+      "loadFailed": "Failed to load analytics data",
+      "loadFailedGeneric": "Failed to load data",
+      "tryAgain": "Try again"
+    },
+    "stats": {
+      "totalTasks": "Total Tasks",
+      "completedPct": "{{pct}}% completed",
+      "completed": "Completed",
+      "inProgress": "In Progress",
+      "overdue": "Overdue",
+      "newThisWeek": "New this week",
+      "todo": "Todo",
+      "activeUsers": "Active users",
+      "ofTotal": "of {{total}} total",
+      "completionRate": "Completion rate"
+    },
+    "charts": {
+      "completionTrend": "Tasks Completed — Last 7 Days",
+      "priorityDistribution": "Priority Distribution",
+      "noData": "No data yet",
+      "perDivision": "Productivity per Division",
+      "doneOfTotal": "{{done}}/{{total}} done ({{rate}}%)"
+    },
+    "priority": {
+      "urgent": "Urgent",
+      "high": "High",
+      "medium": "Medium",
+      "low": "Low"
+    }
+  },
+  "notifications": {
+    "title": "Notifications",
+    "unread": "{{count}} unread",
+    "unread_plural": "{{count}} unread",
+    "allCaughtUp": "All caught up",
+    "markAllRead": "Mark all as read",
+    "emptyState": {
+      "title": "No notifications yet",
+      "subtitle": "You're all caught up! Check back later."
+    },
+    "loadMore": "Load more",
+    "groups": {
+      "today": "Today",
+      "yesterday": "Yesterday"
+    },
+    "time": {
+      "justNow": "Just now",
+      "minsAgo": "{{count}}m ago",
+      "hrsAgo": "{{count}}h ago"
+    }
+  },
+  "admin": {
+    "permissions": {
+      "levels": {
+        "l1": "Full system access",
+        "l2": "Organization leadership",
+        "l3": "Operational management",
+        "l4": "Division / department head",
+        "l5": "Unit / sub-division head",
+        "l6": "Team member / staff"
+      },
+      "loadError": "Failed to load roles and permissions",
+      "unsavedChangesConfirm": "You have unsaved changes. Continue?",
+      "toast": {
+        "saved": "Permissions saved",
+        "saveFailed": "Failed to save permissions"
+      },
+      "addRoleModal": {
+        "title": "Add Custom Role",
+        "roleNameLabel": "Role name",
+        "namePlaceholder": "e.g. Senior Engineer",
+        "slugPrefix": "slug: {{slug}}",
+        "hierarchyLevelLabel": "Hierarchy level",
+        "descriptionLabel": "Description",
+        "optional": "(optional)",
+        "descriptionPlaceholder": "Brief description of this role…",
+        "cancel": "Cancel",
+        "create": "Create Role",
+        "errors": {
+          "nameRequired": "Role name is required",
+          "invalidName": "Name must contain at least one letter or number"
+        }
+      },
+      "roleList": {
+        "title": "Roles",
+        "subtitle": "Select to view permissions",
+        "addTitle": "Add custom role",
+        "footerNote": "L1–L2 roles cannot be deleted. Custom roles can be deleted if no users are assigned.",
+        "customPermissionsBadge": "Custom permissions",
+        "editTitle": "Edit name & color",
+        "deleteTitle": "Delete role",
+        "cannotDeleteTitle": "Cannot delete — {{count}} user(s) assigned",
+        "cannotDeleteAlert": "Cannot delete — {{count}} user(s) are assigned to this role.",
+        "confirmDelete": "Delete role \"{{name}}\"? This cannot be undone.",
+        "nameEmptyError": "Name cannot be empty",
+        "save": "Save",
+        "cancel": "Cancel"
+      },
+      "editor": {
+        "fullAccessNote": "Full access — cannot be configured",
+        "customPermissions": "Custom permissions",
+        "defaultPermissions": "Default permissions",
+        "save": "Save",
+        "readOnlyTitle": "Only SuperAdmin can edit permissions",
+        "superAdminBanner": "SuperAdmin always has full permissions and cannot be configured.",
+        "readOnlyBanner": "Only SuperAdmin can modify permissions. You have view-only access.",
+        "selectRolePrompt": "Select a role to configure permissions"
+      },
+      "scope": {
+        "none": "None",
+        "own": "Own",
+        "division": "Division",
+        "all": "All",
+        "ownDivision": "Own Division"
+      },
+      "sections": {
+        "task": {
+          "title": "Task",
+          "view": "View tasks",
+          "create": "Create tasks",
+          "edit": "Edit tasks",
+          "delete": "Delete tasks",
+          "viewPrivate": "View others' private tasks"
+        },
+        "bulletin": {
+          "title": "Bulletin",
+          "view": "View bulletins",
+          "create": "Create & publish bulletins",
+          "audienceScope": "Target audience",
+          "edit": "Edit bulletins",
+          "delete": "Delete bulletins"
+        },
+        "dbLinks": {
+          "title": "DB Links",
+          "view": "View folders",
+          "addLink": "Add links to folders",
+          "manageFolder": "Manage folders (create/edit/delete)",
+          "shareFolder": "Share folders with other divisions"
+        },
+        "notes": {
+          "title": "Notes",
+          "view": "View notes",
+          "create": "Create notes",
+          "edit": "Edit notes",
+          "delete": "Delete notes"
+        },
+        "analytics": {
+          "title": "Analytics",
+          "view": "View analytics"
+        },
+        "auditLog": {
+          "title": "Audit Log",
+          "view": "View audit log"
+        },
+        "hris": {
+          "title": "HRIS",
+          "reviewLeave": "Review leave requests",
+          "editAttendance": "Edit attendance records",
+          "manageShifts": "Manage shifts",
+          "manageLocations": "Manage office locations",
+          "viewReports": "View attendance reports"
+        },
+        "workOrder": {
+          "title": "Work Orders",
+          "view": "View work orders",
+          "create": "Create work orders",
+          "edit": "Edit work orders",
+          "delete": "Delete work orders",
+          "canBeAssignee": "Can be assigned as technician/executor"
+        },
+        "userMgmt": {
+          "title": "User Management",
+          "create": "Create users",
+          "edit": "Edit users",
+          "toggleStatus": "Activate / deactivate users",
+          "delete": "Delete users"
+        },
+        "roleMgmt": {
+          "title": "Role Management",
+          "create": "Create roles",
+          "edit": "Edit roles",
+          "delete": "Delete roles"
+        },
+        "divisionMgmt": {
+          "title": "Division Management",
+          "create": "Create divisions",
+          "edit": "Edit divisions",
+          "delete": "Delete divisions"
+        }
+      },
+      "errors": {
+        "generic": "An error occurred"
+      }
+    },
+    "users": {
+      "pageTitle": "User Management",
+      "pageSubtitle": "Manage users, divisions, and roles for SAN Group",
+      "addUser": "Add User",
+      "addDivision": "Add Division",
+      "rolesTabHint": "6 system roles · edit name & color via the pencil icon",
+      "tabs": {
+        "users": "Users",
+        "divisions": "Divisions",
+        "roles": "Roles"
+      },
+      "usersTab": {
+        "searchPlaceholder": "Search name, email, username...",
+        "allRoles": "All Roles",
+        "allDivisions": "All Divisions",
+        "allStatus": "All Status",
+        "active": "Active",
+        "inactive": "Inactive",
+        "reset": "Reset",
+        "totalCount": "{{count}} user",
+        "totalCount_plural": "{{count}} users",
+        "loadError": "Failed to load data. Try again.",
+        "tryAgain": "Try again",
+        "noMatchingUsers": "No matching users",
+        "noUsersYet": "No users yet",
+        "resetFilters": "Reset filters",
+        "table": {
+          "user": "User",
+          "username": "Username",
+          "role": "Role",
+          "division": "Division",
+          "status": "Status",
+          "lastLogin": "Last Login"
+        },
+        "youBadge": "You",
+        "editTitle": "Edit",
+        "deactivateTitle": "Deactivate",
+        "activateTitle": "Activate",
+        "deleteTitle": "Delete",
+        "paginationRange": "{{from}}–{{to}} of {{total}} users",
+        "confirmDeactivate": "Deactivate user \"{{name}}\"?",
+        "confirmActivate": "Activate user \"{{name}}\"?",
+        "confirmDelete": "Permanently deactivate user \"{{name}}\"?",
+        "actionFailed": "Failed"
+      },
+      "divisionsTab": {
+        "noDivisions": "No divisions yet",
+        "addFirst": "Add your first division",
+        "userCount": "{{count}} user",
+        "roleCount": "{{count}} role",
+        "cannotDeleteTitle": "Cannot delete — division still has users",
+        "deleteTitle": "Delete"
+      },
+      "deleteConfirmModal": {
+        "deleteDivisionTitle": "Delete Division",
+        "deletePrefix": "Delete",
+        "deleteSuffix": "? This action cannot be undone.",
+        "cancel": "Cancel",
+        "delete": "Delete"
+      },
+      "divisionModal": {
+        "editTitle": "Edit Division",
+        "createTitle": "Add Division",
+        "nameLabel": "Name",
+        "namePlaceholder": "Finance",
+        "slugLabel": "Slug",
+        "slugPlaceholder": "finance",
+        "colorLabel": "Color",
+        "descriptionLabel": "Description",
+        "descriptionPlaceholder": "Brief description…",
+        "cancel": "Cancel",
+        "save": "Save",
+        "create": "Create Division",
+        "errors": {
+          "nameRequired": "Name is required",
+          "generic": "An error occurred"
+        }
+      },
+      "roleModal": {
+        "title": "Edit Role · L{{level}}",
+        "nameLabel": "Name",
+        "colorLabel": "Color",
+        "cancel": "Cancel",
+        "save": "Save",
+        "errors": {
+          "nameRequired": "Name is required",
+          "generic": "An error occurred"
+        }
+      },
+      "userFormModal": {
+        "createTitle": "Add New User",
+        "editTitle": "Edit User",
+        "fullNameLabel": "Full Name",
+        "fullNamePlaceholder": "Budi Santoso",
+        "emailLabel": "Email",
+        "emailPlaceholder": "budi@sangroup.id",
+        "usernameLabel": "Username",
+        "usernamePlaceholder": "budi.s",
+        "passwordLabel": "Password",
+        "passwordPlaceholder": "Min. 8 characters",
+        "phoneLabel": "Phone Number",
+        "phonePlaceholder": "08xxxxxxxx",
+        "joinDateLabel": "Join Date",
+        "joinDateHint": "Basis of the leave tenure rule — annual quota applies after 1 year of employment",
+        "roleLabel": "Role",
+        "selectRolePlaceholder": "-- Select role --",
+        "divisionLabel": "Division",
+        "selectDivisionPlaceholder": "-- Select division --",
+        "cancel": "Cancel",
+        "save": "Save",
+        "createUser": "Create User",
+        "errors": {
+          "roleRequired": "Please select a role",
+          "divisionRequired": "Please select a division",
+          "generic": "An error occurred"
+        }
+      },
+      "colorPicker": {
+        "hexPlaceholder": "#000000"
+      }
+    },
+    "divisions": {
+      "pageTitle": "Division Management",
+      "pageSubtitle": "Manage divisions for SAN Group",
+      "addDivision": "Add Division",
+      "loadError": "Failed to load divisions.",
+      "tryAgain": "Try again",
+      "noDivisionsYet": "No divisions yet",
+      "table": {
+        "color": "Color",
+        "name": "Name",
+        "slug": "Slug",
+        "users": "Users",
+        "roles": "Roles"
+      },
+      "userCount": "{{count}} user",
+      "userCount_plural": "{{count}} users",
+      "roleCount": "{{count}} role",
+      "roleCount_plural": "{{count}} roles",
+      "editTitle": "Edit division",
+      "deleteTitle": "Delete division",
+      "cannotDeleteTitle": "Cannot delete — division still has users",
+      "modal": {
+        "editTitle": "Edit Division",
+        "addTitle": "Add Division",
+        "nameLabel": "Name",
+        "namePlaceholder": "Finance",
+        "slugLabel": "Slug",
+        "slugPlaceholder": "finance",
+        "colorLabel": "Color",
+        "descriptionLabel": "Description",
+        "descriptionPlaceholder": "Brief description of the division…",
+        "cancel": "Cancel",
+        "save": "Save",
+        "create": "Create Division",
+        "errors": {
+          "nameRequired": "Name is required",
+          "generic": "An error occurred"
+        }
+      },
+      "deleteConfirm": {
+        "title": "Delete Division",
+        "deletePrefix": "Delete division",
+        "deleteSuffix": "? This action cannot be undone.",
+        "cancel": "Cancel",
+        "delete": "Delete",
+        "genericError": "Failed to delete division"
+      }
+    },
+    "roles": {
+      "pageTitle": "Role Management",
+      "pageSubtitle": "Manage hierarchy roles — edit name/color, or add custom roles",
+      "addRole": "Add Role",
+      "loadError": "Failed to load roles.",
+      "tryAgain": "Try again",
+      "noRolesYet": "No roles yet",
+      "hierarchyTitle": "Hierarchy",
+      "userCount": "{{count}} user",
+      "userCount_plural": "{{count}} users",
+      "editTitle": "Edit name & color",
+      "deleteTitle": "Delete role",
+      "cannotDeleteTitle": "Cannot delete — {{count}} user(s) assigned",
+      "confirmDelete": "Delete role \"{{name}}\"? This cannot be undone.",
+      "save": "Save",
+      "cancel": "Cancel",
+      "nameEmptyError": "Name cannot be empty",
+      "footerNote": "System roles (L1–L2) can only have their name and color changed. Custom roles can be deleted as long as no users are assigned to them.",
+      "levels": {
+        "l1": { "label": "L1", "desc": "Full system access" },
+        "l2": { "label": "L2", "desc": "Organization leadership" },
+        "l3": { "label": "L3", "desc": "Operational management" },
+        "l4": { "label": "L4", "desc": "Division / department head" },
+        "l5": { "label": "L5", "desc": "Unit / sub-division head" },
+        "l6": { "label": "L6", "desc": "Team member / staff" }
+      },
+      "addModal": {
+        "title": "Add Custom Role",
+        "roleNameLabel": "Role name",
+        "namePlaceholder": "e.g. Senior Engineer",
+        "slugPrefix": "slug: {{slug}}",
+        "hierarchyLevelLabel": "Hierarchy level",
+        "descriptionLabel": "Description",
+        "optional": "(optional)",
+        "descriptionPlaceholder": "Brief description of this role…",
+        "cancel": "Cancel",
+        "create": "Create Role",
+        "errors": {
+          "nameRequired": "Role name is required",
+          "invalidName": "Name must contain at least one letter or number",
+          "generic": "An error occurred"
+        }
+      }
+    },
+    "auditLog": {
+      "pageTitle": "Audit Log",
+      "pageSubtitle": "System activity history",
+      "allTypes": "All types",
+      "entities": {
+        "task": "Task",
+        "user": "User",
+        "permission": "Permission"
+      },
+      "actions": {
+        "CREATE": "Created",
+        "UPDATE": "Updated",
+        "DELETE": "Deleted"
+      },
+      "loadError": "Failed to load audit log",
+      "tryAgain": "Try again",
+      "noActivity": "No activity recorded yet",
+      "accessRestricted": {
+        "title": "Access Restricted",
+        "message": "You don't have permission to view the audit log."
+      },
+      "table": {
+        "time": "Time",
+        "user": "User",
+        "action": "Action",
+        "entity": "Entity",
+        "detail": "Detail"
+      },
+      "paginationRange": "{{from}}–{{to}} of {{total}} entries"
+    }
+  },
+  "hris": {
+    "overview": {
+      "loadError": "Failed to load data. Check your connection and try again.",
+      "retry": "Retry",
+      "attendanceThisMonth": "Attendance this month",
+      "status": {
+        "present": "Present",
+        "late": "Late",
+        "wfh": "WFH",
+        "onLeave": "On Leave",
+        "absent": "Absent",
+        "holiday": "Holiday"
+      },
+      "today": {
+        "title": "Today's Attendance",
+        "shiftInfo": "Shift {{name}} · Starts {{time}}",
+        "notCheckedIn": "Not checked in",
+        "outOfArea": "Out of Area",
+        "notCheckedInYet": "You haven't checked in today.",
+        "gpsHint": "GPS will be detected automatically on check-in.",
+        "retryCheckIn": "Retry Check In",
+        "checkIn": "Check In",
+        "wfh": "WFH",
+        "checkInLabel": "Check In",
+        "checkOutLabel": "Check Out",
+        "late": "Late {{minutes}} min",
+        "workDuration": "{{mins}} work",
+        "selfieAlt": "Check-in selfie",
+        "checkOut": "Check Out",
+        "locationDefault": "Your location"
+      },
+      "summary": {
+        "workedThisMonth": "{{mins}} this month"
+      },
+      "leaveBalance": {
+        "title": "Leave Balance {{year}}",
+        "detail": "Detail",
+        "empty": "No leave balance data.",
+        "asNeeded": "As needed",
+        "asNeededTooltip": "No fixed quota — every request still needs approval",
+        "ofDays": "/ {{total}} days",
+        "carriedOver": "incl. {{days}} carried over — expires Mar 31",
+        "pendingApproval": "{{days}} days pending approval"
+      },
+      "leaveRequests": {
+        "title": "Leave Requests",
+        "all": "All",
+        "empty": "No leave requests.",
+        "dateRange": "{{start}} – {{end}} · {{count}} day",
+        "dateRange_plural": "{{start}} – {{end}} · {{count}} days"
+      },
+      "leaveStatus": {
+        "pending": "Pending",
+        "approved": "Approved",
+        "rejected": "Rejected",
+        "cancelled": "Cancelled"
+      },
+      "outOfAreaModal": {
+        "title": "Out of Office Area",
+        "subtitle": "You are outside the check-in radius",
+        "nearestLocation": "Nearest location",
+        "yourDistance": "Your distance",
+        "allowedRadius": "Allowed radius",
+        "reasonLabel": "Reason for being out of area",
+        "reasonPlaceholder": "e.g. Client visit, off-site meeting, etc. (min. 10 characters)",
+        "charCountMin": "{{count}}/10 characters minimum",
+        "warning": "Check-in outside the area will be recorded and visible to your manager.",
+        "cancel": "Cancel",
+        "checkInAnyway": "Check In Anyway"
+      },
+      "cameraModal": {
+        "title": "Selfie Photo",
+        "cameraError": "Cannot access camera. Please allow camera permissions.",
+        "continueWithoutPhotoHint": "You can still check-in without a photo",
+        "close": "Close",
+        "continueWithoutPhoto": "Continue without photo",
+        "positionFace": "Position your face inside the oval",
+        "takePhoto": "Take Photo",
+        "retake": "Retake",
+        "usePhoto": "Use Photo"
+      },
+      "toast": {
+        "checkInSuccess": "Checked in successfully!",
+        "checkInFailed": "Check-in failed",
+        "checkOutSuccess": "Checked out successfully!",
+        "checkOutFailed": "Check-out failed",
+        "locationError": "Could not get your location. Allow location access, then retry — your photo is kept."
+      }
+    },
+    "leave": {
+      "header": {
+        "title": "Leave",
+        "subtitle": "Leave requests and balance"
+      },
+      "viewMode": {
+        "mine": "Me",
+        "team": "Team"
+      },
+      "grantCompOffBtn": "Comp Off",
+      "requestLeaveBtn": "Request Leave",
+      "loadError": "Failed to load data. Check your connection and try again.",
+      "retry": "Retry",
+      "empty": "No leave requests yet.",
+      "status": {
+        "pending": "Pending",
+        "approved": "Approved",
+        "rejected": "Rejected",
+        "cancelled": "Cancelled"
+      },
+      "filterAll": "All",
+      "balanceCard": {
+        "ofDaysUsed": "of {{total}} days · {{used}} used",
+        "carriedOver": "incl. {{days}} carried over — expires Mar 31",
+        "asNeeded": "As needed",
+        "asNeededHint": "No fixed quota — every request still needs approval",
+        "asNeededHintDoc": "No fixed quota — every request still needs approval + document"
+      },
+      "list": {
+        "dateRange": "{{start}} — {{end}} · {{count}} working day",
+        "dateRange_plural": "{{start}} — {{end}} · {{count}} working days",
+        "unpaidBadge": "Unpaid",
+        "attachmentDefault": "Attachment",
+        "approvedBy": "Approved by",
+        "rejectedBy": "Rejected by",
+        "reviewBtn": "Review",
+        "cancelBtn": "Cancel"
+      },
+      "toast": {
+        "cancelSuccess": "Leave request cancelled",
+        "cancelFailed": "Failed to cancel request"
+      },
+      "pagination": "{{page}} / {{totalPages}}",
+      "createModal": {
+        "title": "Request Leave",
+        "leaveTypeLabel": "Leave Type",
+        "remainingBalance": "Remaining balance: {{days}} days",
+        "requiresDoc": "⚠ Requires supporting document",
+        "requiresDocAfterDays": "⚠ Requires supporting document when longer than {{days}} day(s)",
+        "startDateLabel": "Start Date",
+        "endDateLabel": "End Date",
+        "totalWorkingDays": "Total: {{count}} working days",
+        "documentLabel": "Supporting Document",
+        "optional": "(optional)",
+        "reasonLabel": "Reason",
+        "reasonPlaceholder": "Enter leave reason...",
+        "attachmentName": "📎 {{name}}",
+        "cancel": "Cancel",
+        "submit": "Submit Request",
+        "toast": {
+          "maxFileSize": "Maximum file size is 5 MB",
+          "docRequired": "A supporting document is required for this leave",
+          "unpaidSubmitted": "Request submitted as UNPAID leave (tenure below 1 year — salary deduction applies)",
+          "submitted": "Leave request submitted",
+          "submitFailed": "Failed to submit leave request"
+        }
+      },
+      "reviewModal": {
+        "title": "Review Leave Request",
+        "remainingBalance": "Remaining balance:",
+        "noFixedQuota": "no fixed quota",
+        "remainingOfTotal": "{{remaining}} of {{total}} days",
+        "pendingIncluded": "(incl. {{count}} pending for this request)",
+        "unpaidNote": "UNPAID — tenure below requirement, salary deduction applies",
+        "viewAttachment": "View attachment",
+        "noteLabel": "Note (optional)",
+        "notePlaceholder": "Add a note for the employee...",
+        "reject": "Reject",
+        "approve": "Approve",
+        "toast": {
+          "approved": "Leave approved",
+          "rejected": "Leave rejected",
+          "failed": "Failed to process request"
+        }
+      },
+      "grantModal": {
+        "title": "Grant Comp Off",
+        "descriptionPrefix": "Give extra off days for working weekends or public holidays. The days land on the employee's",
+        "descriptionSuffix": "balance.",
+        "employeeLabel": "Employee",
+        "selectEmployee": "— Select employee —",
+        "daysLabel": "Days",
+        "reasonLabel": "Reason",
+        "reasonPlaceholder": "e.g. worked Saturday July 5 (building event)",
+        "cancel": "Cancel",
+        "grant": "Grant",
+        "toast": {
+          "granted": "Comp-off granted",
+          "grantFailed": "Failed to grant comp-off"
+        }
+      }
+    },
+    "attendance": {
+      "header": { "title": "Attendance", "subtitle": "Monthly attendance summary" },
+      "viewMode": { "me": "Me", "team": "Team — {{name}}", "teamAll": "Team — All", "teamDivision": "Division" },
+      "status": {
+        "present": "Present",
+        "late": "Late",
+        "wfh": "WFH",
+        "permission": "On Leave",
+        "absent": "Absent",
+        "holiday": "Holiday"
+      },
+      "summary": { "workHrs": "Work Hrs" },
+      "calendar": { "off": "Off" },
+      "log": {
+        "title": "Attendance Log",
+        "teamTitle": "Team Attendance",
+        "showAllMonth": "← Show all month",
+        "loadError": "Failed to load data. Check your connection and try again.",
+        "retry": "Retry",
+        "empty": "No attendance records for this period.",
+        "lateSuffix": "late",
+        "table": {
+          "employee": "Employee",
+          "date": "Date",
+          "status": "Status",
+          "checkIn": "Check In",
+          "checkOut": "Check Out",
+          "duration": "Duration",
+          "location": "Location",
+          "photo": "Photo",
+          "outOfArea": "Out of area"
+        }
+      },
+      "photoAlt": "Check-in photo",
+      "selfieAlt": "selfie"
+    },
+    "reports": {
+      "header": { "title": "Attendance Report", "subtitle": "Monthly employee attendance summary" },
+      "exportCsv": "Export CSV",
+      "exportSuccess": "CSV file downloaded",
+      "filters": { "allDivisions": "All Divisions", "searchPlaceholder": "Search employee..." },
+      "summaryCards": {
+        "totalPresent": "Total Present",
+        "late": "Late",
+        "absent": "Absent",
+        "wfh": "WFH",
+        "outOfArea": "Out of Area"
+      },
+      "avgRate": "Average Attendance Rate",
+      "employeeCount": "{{count}} employees · {{month}}",
+      "table": {
+        "employee": "Employee",
+        "shift": "Shift",
+        "present": "P",
+        "late": "L",
+        "wfh": "WFH",
+        "absent": "A",
+        "outOfArea": "Out of Area",
+        "workHours": "Work Hours",
+        "attendance": "Attendance",
+        "total": "Total ({{count}} employees)"
+      },
+      "loadError": "Failed to load data. Check your connection and try again.",
+      "retry": "Retry",
+      "empty": "No attendance data for this period",
+      "legend": "P = Present · L = Late · A = Absent · Out of Area = Check-in outside office radius",
+      "csv": {
+        "name": "Name",
+        "username": "Username",
+        "division": "Division",
+        "shift": "Shift",
+        "present": "Present",
+        "late": "Late",
+        "absent": "Absent",
+        "wfh": "WFH",
+        "permission": "Permission",
+        "holiday": "Holiday",
+        "totalWorkHours": "Total Work Hours",
+        "totalLateMin": "Total Late (min)",
+        "outOfArea": "Out of Area",
+        "attendancePct": "Attendance (%)"
+      }
+    },
+    "requests": {
+      "header": { "title": "Requests", "subtitle": "Late excuses and shift change requests" },
+      "kind": { "late": "Late Excuse", "shift": "Shift Change", "lateTabs": "Late Excuses", "shiftTabs": "Shift Changes" },
+      "viewMode": { "me": "Me", "team": "Team" },
+      "statusTabs": { "all": "All", "pending": "Pending", "approved": "Approved", "rejected": "Rejected", "cancelled": "Cancelled" },
+      "status": { "pending": "Pending", "approved": "Approved", "rejected": "Rejected", "cancelled": "Cancelled" },
+      "createLateModal": {
+        "title": "Late Excuse (Advance Notice)",
+        "description": "Submit before you check in. If approved, that day's check-in won't count as late.",
+        "dateLabel": "Date",
+        "expectedArrivalLabel": "Expected Arrival",
+        "reasonLabel": "Reason",
+        "reasonPlaceholder": "e.g. morning doctor's appointment (min. 5 characters)",
+        "cancel": "Cancel",
+        "submit": "Submit",
+        "toast": { "submitted": "Late excuse submitted", "failed": "Failed to submit" }
+      },
+      "createShiftModal": {
+        "title": "Request Shift Change",
+        "newShiftLabel": "New Shift",
+        "selectShiftPlaceholder": "— Select shift —",
+        "effectiveFromLabel": "Effective From",
+        "reasonLabel": "Reason",
+        "reasonPlaceholder": "Why do you need to change shifts? (min. 5 characters)",
+        "cancel": "Cancel",
+        "submit": "Submit",
+        "toast": { "submitted": "Shift change request submitted", "failed": "Failed to submit" }
+      },
+      "reviewModal": {
+        "titleLate": "Review Late Excuse",
+        "titleShift": "Review Shift Change",
+        "employee": "Employee",
+        "date": "Date",
+        "expectedArrival": "Expected arrival",
+        "newShift": "New shift",
+        "effectiveFrom": "Effective from",
+        "reason": "Reason",
+        "noteLabel": "Note (optional)",
+        "notePlaceholder": "Note for employee...",
+        "reject": "Reject",
+        "approve": "Approve",
+        "toast": { "approved": "Request approved", "rejected": "Request rejected", "failed": "Failed to process" }
+      },
+      "list": {
+        "expectedArrival": "Expected arrival {{time}}",
+        "effective": "Effective {{date}}",
+        "cancel": "Cancel",
+        "review": "Review",
+        "toast": { "cancelled": "Request cancelled", "cancelFailed": "Failed to cancel" }
+      },
+      "loadError": "Failed to load data. Check your connection and try again.",
+      "retry": "Retry",
+      "empty": "No requests",
+      "pagination": "{{page}} / {{totalPages}}"
+    },
+    "admin": {
+      "holidays": {
+        "header": { "title": "Holidays", "subtitle": "Company holiday calendar — excluded from leave-day counting, auto-absent marking, and attendance rate" },
+        "form": { "namePlaceholder": "Holiday name, e.g. Idul Fitri", "add": "Add" },
+        "empty": "No holidays registered for {{year}}",
+        "toast": {
+          "added": "Holiday added",
+          "addFailed": "Failed to add holiday",
+          "removed": "Holiday removed",
+          "removeFailed": "Failed to remove"
+        }
+      },
+      "leaveTypes": {
+        "header": { "title": "Leave Types", "subtitle": "Leave policy — quotas, documents, carry-over, and tenure rules per leave type" },
+        "newType": "New Type",
+        "loadError": "Failed to load data. Check your connection and try again.",
+        "retry": "Retry",
+        "footerNote": "Deactivated types disappear from the request form but keep their history. Quota changes apply to this year's balances immediately; carry-over days are preserved.",
+        "card": {
+          "inactive": "Inactive",
+          "edit": "Edit",
+          "deactivate": "Deactivate",
+          "activate": "Activate",
+          "daysPerYear": "days/year",
+          "asNeeded": "as needed",
+          "earnedViaGrants": "earned via grants",
+          "unpaid": "Unpaid",
+          "document": "Document",
+          "documentAfterDays": "Document > {{days}}d",
+          "carryOver": "Carry-over",
+          "tenure": "Tenure {{months}}mo",
+          "earnedBalance": "Earned balance"
+        },
+        "toast": {
+          "updated": "Leave type updated",
+          "created": "Leave type created",
+          "saveFailed": "Failed to save leave type",
+          "deactivated": "{{name}} deactivated",
+          "activated": "{{name}} activated",
+          "updateFailed": "Failed to update"
+        },
+        "modal": {
+          "editTitle": "Edit — {{name}}",
+          "newTitle": "New Leave Type",
+          "name": "Name",
+          "namePlaceholder": "e.g. Annual Leave",
+          "color": "Color",
+          "quotaPerYear": "Quota per Year",
+          "quotaEarnedHint": "Earned via HR grants — no yearly quota",
+          "quotaFreeHint": "0 = no fixed quota (as needed)",
+          "minTenure": "Min. Tenure (months)",
+          "tenureHint": "Below tenure → request becomes unpaid",
+          "quotaChangedWarning": "Changing the quota immediately updates this year's balance for every employee (their carry-over days are kept).",
+          "paidLeave": "Paid leave",
+          "carryOverLabel": "Carry-over to next year",
+          "carryOverExpiry": "(expires Mar 31)",
+          "requiresDoc": "Requires supporting document",
+          "requiresDocAfterLabel": "Only when longer than … day(s)",
+          "requiresDocAfterHint": "(0 = always)",
+          "cancel": "Cancel",
+          "saveChanges": "Save Changes",
+          "create": "Create"
+        }
+      },
+      "locations": {
+        "header": { "title": "Office Locations", "subtitle": "Manage geofencing areas for employee attendance" },
+        "addLocation": "Add Location",
+        "addFirstLocation": "Add First Location",
+        "empty": { "title": "No office locations yet", "subtitle": "Add a location to enable attendance geofencing" },
+        "banner": {
+          "activeCount": "{{count}} active location",
+          "activeCount_plural": "{{count}} active locations",
+          "detail": "Employees can check in from any active location. If outside all radii, a warning with a force check-in option will appear."
+        },
+        "footerNote": "Click coordinates on a location card to open Google Maps. Radius is shown in the bottom-right corner of the circle.",
+        "card": {
+          "inactive": "Inactive",
+          "radius": "Radius",
+          "coordinates": "Coordinates"
+        },
+        "deleteConfirm": "Delete location \"{{name}}\"? Existing check-in records will not be affected.",
+        "toast": {
+          "gpsUnsupported": "Browser does not support GPS",
+          "locationObtained": "Location obtained",
+          "getLocationFailed": "Failed to get location",
+          "updated": "Location updated",
+          "added": "Location added",
+          "saveFailed": "Failed to save",
+          "deleted": "Location deleted",
+          "deleteFailed": "Failed to delete"
+        },
+        "modal": {
+          "editTitle": "Edit Office Location",
+          "addTitle": "Add Office Location",
+          "name": "Location Name",
+          "namePlaceholder": "e.g. Head Office Jakarta, Property Site A",
+          "address": "Address",
+          "addressPlaceholder": "Full address (optional)",
+          "gpsCoordinates": "GPS Coordinates",
+          "useMyLocation": "Use My Location",
+          "latitude": "Latitude",
+          "longitude": "Longitude",
+          "viewOnGoogleMaps": "View on Google Maps",
+          "geofencingRadius": "Geofencing Radius: {{radius}} meters",
+          "radiusTight": "Tight radius — suitable for small buildings or specific points",
+          "radiusStandard": "Standard radius — suitable for office areas",
+          "radiusWide": "Wide radius — suitable for property sites or outdoor areas",
+          "activeLocation": "Active Location",
+          "activeLocationHint": "Only active locations are used for geofencing",
+          "cancel": "Cancel",
+          "saveChanges": "Save Changes",
+          "addLocation": "Add Location"
+        }
+      },
+      "shifts": {
+        "header": { "title": "Manage Shifts", "subtitle": "Manage work shifts and employee assignments" },
+        "newShift": "New Shift",
+        "empty": "No shifts created yet",
+        "deleteConfirm": "Delete shift \"{{name}}\"? Employees using this shift will be reset to default.",
+        "toast": {
+          "updated": "Shift updated",
+          "created": "Shift created",
+          "saveFailed": "Failed to save",
+          "deleted": "Shift deleted",
+          "deleteFailed": "Failed to delete",
+          "assigned": "Shift assigned",
+          "assignFailed": "Failed to assign shift"
+        },
+        "card": {
+          "default": "Default",
+          "inactive": "Inactive",
+          "tolerance": "Tolerance: {{minutes}} min",
+          "employees": "{{count}} employees"
+        },
+        "modal": {
+          "editTitle": "Edit Shift",
+          "newTitle": "New Shift",
+          "name": "Shift Name",
+          "namePlaceholder": "e.g. Office Staff, Security Shift A",
+          "startTime": "Start Time",
+          "endTime": "End Time",
+          "lateTolerance": "Late Tolerance: {{minutes}} min",
+          "shiftColor": "Shift Color",
+          "defaultShift": "Default Shift",
+          "defaultShiftHint": "Employees without a shift will use this",
+          "activeShift": "Active Shift",
+          "cancel": "Cancel",
+          "saveChanges": "Save Changes",
+          "createShift": "Create Shift"
+        },
+        "assignPanel": {
+          "title": "Assign Employee Shifts",
+          "searchPlaceholder": "Search employee...",
+          "noEmployees": "No employees found",
+          "defaultOption": "— Default —",
+          "resetToDefault": "Reset to default"
+        }
+      }
+    }
+  },
+  "database": {
+    "header": {
+      "title": "Database Links",
+      "subtitle": "Quick access directory — click a folder to open",
+      "newFolder": "New Folder"
+    },
+    "emptyFolders": {
+      "title": "No folders yet",
+      "cta": "Create your first folder"
+    },
+    "folder": {
+      "itemCount": "{{count}} item",
+      "shareTitle": "Share folder"
+    },
+    "folderModal": {
+      "editTitle": "Edit Folder",
+      "newTitle": "New Folder",
+      "nameLabel": "Folder name",
+      "namePlaceholder": "e.g. HR Documents",
+      "descLabel": "Description (optional)",
+      "descPlaceholder": "Brief description…",
+      "colorLabel": "Color",
+      "cancel": "Cancel",
+      "save": "Save",
+      "create": "Create",
+      "nameRequired": "Folder name is required"
+    },
+    "linkModal": {
+      "editTitle": "Edit Link",
+      "newTitle": "Add Link",
+      "nameLabel": "Display name",
+      "namePlaceholder": "e.g. Attendance Report June",
+      "nameHint": "This name is shown to users, not the URL",
+      "urlLabel": "Link / URL",
+      "urlPlaceholder": "https://drive.google.com/…",
+      "notesLabel": "Notes (optional)",
+      "notesPlaceholder": "Brief description…",
+      "cancel": "Cancel",
+      "save": "Save",
+      "add": "Add",
+      "nameRequired": "Name is required",
+      "urlRequired": "Link/URL is required"
+    },
+    "shareModal": {
+      "title": "Share Folder",
+      "grantAccess": "Grant access",
+      "selectDivision": "Select division…",
+      "share": "Share",
+      "sharedWith": "Shared with",
+      "notShared": "Not shared with anyone yet",
+      "loadError": "Failed to load data"
+    },
+    "errors": {
+      "generic": "An error occurred"
+    },
+    "folderContents": {
+      "back": "Back to Database Links",
+      "searchPlaceholder": "Search…",
+      "addLink": "Add Link",
+      "noResults": "No results found",
+      "empty": "This folder is empty",
+      "addFirstLink": "Add your first link",
+      "itemCount": "{{count}} item"
+    },
+    "confirm": {
+      "deleteFolder": "Delete folder \"{{name}}\"? All links inside will also be deleted.",
+      "deleteLink": "Delete \"{{title}}\"?"
+    }
+  },
+  "profile": {
+    "header": {
+      "title": "My Profile",
+      "subtitle": "Manage your account information and security"
+    },
+    "avatar": {
+      "uploadTitle": "Upload photo",
+      "hint": "JPG, PNG, WebP — max. 2MB",
+      "maxSize": "Maximum file size is 2MB",
+      "uploadError": "Failed to upload avatar"
+    },
+    "accountInfo": {
+      "title": "Account Info",
+      "memberSince": "Member since",
+      "lastLogin": "Last login",
+      "status": "Account status",
+      "active": "Active",
+      "inactive": "Inactive"
+    },
+    "security": {
+      "title": "Security",
+      "changePassword": "Change Password"
+    },
+    "form": {
+      "title": "Personal Information",
+      "fullName": "Full Name",
+      "phone": "Phone Number",
+      "optional": "(optional)",
+      "phonePlaceholder": "e.g. +62812345678",
+      "save": "Save Changes",
+      "saved": "Saved",
+      "nameRequired": "Full name is required",
+      "genericError": "An error occurred"
+    },
+    "details": {
+      "title": "Account Details",
+      "note": "The following information is managed by the administrator and cannot be changed by yourself.",
+      "email": "Email",
+      "username": "Username",
+      "role": "Role",
+      "division": "Division",
+      "phone": "Phone Number"
+    },
+    "loadError": "Failed to load profile",
+    "tryAgain": "Try again"
+  },
+  "notes": {
+    "header": {
+      "title": "Notes",
+      "subtitle": "Personal notes & quick references",
+      "newNote": "New Note"
+    },
+    "toolbar": {
+      "searchPlaceholder": "Search notes...",
+      "colorLabel": "Color:",
+      "all": "All",
+      "count": "{{count}} note",
+      "count_plural": "{{count}} notes",
+      "ofTotal": "of {{total}}"
+    },
+    "modal": {
+      "editTitle": "Edit Note",
+      "newTitle": "New Note",
+      "titleLabel": "Title",
+      "optional": "(optional)",
+      "titlePlaceholder": "Add a title...",
+      "contentLabel": "Content",
+      "contentPlaceholder": "Write your note...",
+      "contentRequired": "Content cannot be empty",
+      "colorLabel": "Color",
+      "pinLabel": "Pin this note",
+      "cancel": "Cancel",
+      "save": "Save",
+      "create": "Create Note",
+      "genericError": "An error occurred"
+    },
+    "card": {
+      "unpin": "Unpin",
+      "pin": "Pin note",
+      "edit": "Edit",
+      "delete": "Delete",
+      "pinned": "Pinned",
+      "deleteConfirm": "Delete this note?"
+    },
+    "empty": {
+      "title": "No notes yet",
+      "subtitle": "Click \"New Note\" to create your first note"
+    },
+    "emptyFiltered": {
+      "title": "No matching notes",
+      "subtitle": "Try adjusting your search filters"
+    },
+    "tryAgain": "Try again",
+    "sections": {
+      "pinned": "Pinned",
+      "others": "Others"
+    }
+  },
+  "workOrderHistory": {
+    "pageTitle": "Work Order History",
+    "pageSubtitle": "Completed and cancelled work orders",
+    "searchPlaceholder": "Search code / title...",
+    "searchAriaLabel": "Search work order history",
+    "outcomeFilter": {
+      "doneAndCancelled": "Done + Cancelled",
+      "doneOnly": "Done only",
+      "cancelledOnly": "Cancelled only"
+    },
+    "toggleFiltersAriaLabel": "Toggle filters",
+    "refreshAriaLabel": "Refresh",
+    "allPriorities": "All Priorities",
+    "allCategories": "All Categories",
+    "dateTo": "to",
+    "loadMore": {
+      "showing": "Showing {{shown}} of {{total}} work orders.",
+      "button": "Load more"
+    }
+  },
+  "workOrderReports": {
+    "pageTitle": "Work Order Report",
+    "pageSubtitle": "Completion rate, resolution time, and technician performance",
+    "exportCsv": "Export CSV",
+    "loadErrorPrefix": "Failed to load report: {{error}}",
+    "tryAgain": "Try again",
+    "noReportData": "No report data",
+    "categories": {
+      "ELECTRICAL": "Electrical",
+      "PLUMBING": "Plumbing",
+      "HVAC": "HVAC",
+      "CIVIL": "Civil",
+      "CLEANING": "Cleaning",
+      "SECURITY": "Security",
+      "OTHER": "Other"
+    },
+    "currentlyOpen": {
+      "title": "Currently Open — How Long?",
+      "activeNow": "{{count}} active now",
+      "under1Day": "< 1 day",
+      "d1to3": "1–3 days",
+      "d3to7": "3–7 days",
+      "over7Days": "> 7 days"
+    },
+    "longestOpen": {
+      "title": "Longest Open Work Orders",
+      "empty": "No open work orders — everything is closed 🎉",
+      "table": {
+        "code": "Code",
+        "title": "Title",
+        "status": "Status",
+        "priority": "Priority",
+        "assignee": "Assignee",
+        "openFor": "Open For"
+      },
+      "unassigned": "Unassigned"
+    },
+    "noWorkOrdersInPeriod": "No work orders created in this period",
+    "summary": {
+      "totalWorkOrders": "Total Work Orders",
+      "completed": "Completed",
+      "completionRate": "Completion Rate"
+    },
+    "byCategory": {
+      "title": "Average Resolution Time by Category",
+      "empty": "No completed work orders yet",
+      "table": {
+        "category": "Category",
+        "completed": "Completed",
+        "avgTime": "Avg. Time"
+      }
+    },
+    "byTechnician": {
+      "title": "Technician Performance",
+      "empty": "No work orders assigned yet",
+      "table": {
+        "technician": "Technician",
+        "assigned": "Assigned",
+        "completed": "Completed",
+        "completionRate": "Completion Rate"
+      }
+    },
+    "csvExport": {
+      "sectionHeader": "Section",
+      "nameHeader": "Name",
+      "countAssignedHeader": "Count/Assigned",
+      "completedHeader": "Completed",
+      "avgResolutionRateHeader": "Avg Resolution / Rate",
+      "summary": "Summary",
+      "totalWorkOrders": "Total Work Orders",
+      "completed": "Completed",
+      "completionRate": "Completion Rate",
+      "category": "Category",
+      "technician": "Technician",
+      "openAging": "Open Aging",
+      "under1Day": "Under 1 day",
+      "d1to3": "1–3 days",
+      "d3to7": "3–7 days",
+      "over7Days": "Over 7 days",
+      "longestOpen": "Longest Open",
+      "unassigned": "Unassigned"
+    }
+  },
+  "login": {
+    "tagline": "Internal Management System",
+    "signIn": "Sign In",
+    "identifierLabel": "Email or Username",
+    "identifierPlaceholder": "your@email.com or username",
+    "passwordLabel": "Password",
+    "showPassword": "Show password",
+    "hidePassword": "Hide password",
+    "signingIn": "Signing in…",
+    "footer": "© {{year}} SAN Group — Confidential",
+    "errors": {
+      "identifierRequired": "Email or username is required.",
+      "passwordRequired": "Password is required.",
+      "generic": "Something went wrong. Please try again."
+    }
+  },
+  "shared": {
+    "header": {
+      "toggleSidebar": "Toggle sidebar",
+      "search": "Search...",
+      "notifications": {
+        "label": "Notifications",
+        "title": "Notifications",
+        "markAllRead": "Mark all as read",
+        "empty": "No notifications yet",
+        "seeAll": "See all notifications",
+        "moreNotifications": "+{{count}} more notification",
+        "moreNotifications_plural": "+{{count}} more notifications"
+      },
+      "time": {
+        "justNow": "Just now",
+        "minutesAgo": "{{count}} minute ago",
+        "minutesAgo_plural": "{{count}} minutes ago",
+        "hoursAgo": "{{count}} hour ago",
+        "hoursAgo_plural": "{{count}} hours ago",
+        "daysAgo": "{{count}} day ago",
+        "daysAgo_plural": "{{count}} days ago"
+      },
+      "language": {
+        "changeLabel": "Change language",
+        "en": "English",
+        "id": "Bahasa Indonesia"
+      },
+      "userMenu": {
+        "myProfile": "My Profile",
+        "changePassword": "Change Password",
+        "logout": "Logout"
+      },
+      "breadcrumbs": {
+        "dashboard": "Dashboard",
+        "tasks": "Tasks",
+        "bulletin": "Bulletin",
+        "notes": "Notes",
+        "dbLinks": "DB Links",
+        "myProfile": "My Profile",
+        "analytics": "Analytics",
+        "notifications": "Notifications",
+        "workOrders": "Work Orders",
+        "hris": "HRIS",
+        "attendance": "Attendance",
+        "leave": "Leave",
+        "requests": "Requests",
+        "holidays": "Holidays",
+        "attendanceReport": "Attendance Report",
+        "manageShifts": "Manage Shifts",
+        "officeLocations": "Office Locations",
+        "manageUsers": "Manage Users",
+        "rolesPermissions": "Roles & Permissions",
+        "auditLog": "Audit Log"
+      }
+    },
+    "changePasswordModal": {
+      "title": "Change Password",
+      "fields": {
+        "currentPassword": { "label": "Current Password", "placeholder": "Your current password" },
+        "newPassword": { "label": "New Password", "placeholder": "Min. 8 chars, 1 uppercase, 1 number" },
+        "confirmPassword": { "label": "Confirm New Password", "placeholder": "Repeat new password" }
+      },
+      "errors": {
+        "mismatch": "Password confirmation does not match",
+        "generic": "An error occurred"
+      },
+      "success": {
+        "message": "Password changed successfully",
+        "redirecting": "You will be redirected to the login page..."
+      },
+      "logoutNotice": "After changing your password, you will be automatically logged out from all devices.",
+      "cancel": "Cancel",
+      "save": "Save"
+    },
+    "commandPalette": {
+      "searchPlaceholder": "Search tasks, bulletins, notes, files...",
+      "typeToSearch": "Type to search the entire system",
+      "navigateHint": "navigate",
+      "openHint": "open",
+      "noResults": "No results for “{{query}}”",
+      "sections": {
+        "task": "Task",
+        "bulletin": "Bulletin",
+        "notes": "Notes",
+        "filesAndDb": "Database & File"
+      },
+      "status": {
+        "todo": "Todo",
+        "done": "Done",
+        "cancelled": "Cancelled"
+      },
+      "inFolder": "in {{folder}}",
+      "resultsCount": "{{count}} result",
+      "resultsCount_plural": "{{count}} results",
+      "pressEnter": "Press Enter to open"
+    },
+    "createTaskModal": {
+      "title": "New Task",
+      "titlePlaceholder": "Task title...",
+      "descriptionPlaceholder": "Description (optional)...",
+      "status": "Status",
+      "statusOptions": { "todo": "To Do", "done": "Done" },
+      "priority": "Priority",
+      "priorityOptions": { "urgent": "Urgent", "high": "High", "medium": "Medium", "low": "Low" },
+      "startDate": "Start date",
+      "dueDate": "Due date",
+      "assignTo": "Assign to",
+      "searchPeoplePlaceholder": "Search people…",
+      "noneOption": "— None —",
+      "list": "List",
+      "noListOption": "— No List —",
+      "shareWith": "Share with",
+      "visibilityOptions": {
+        "onlyMe": "Only Me (default)",
+        "myDivision": "My Division",
+        "selectDivisions": "Select Divisions",
+        "allStaff": "All Staff"
+      },
+      "selectDivisionsLabel": "Select divisions that can view",
+      "cancel": "Cancel",
+      "create": "Create Task",
+      "errors": {
+        "titleRequired": "Title is required",
+        "dateOrder": "Start date must be on or before the due date",
+        "generic": "An error occurred"
+      }
+    },
+    "pageSizeSelect": {
+      "perPage": "{{count}} / page"
+    },
+    "sidebar": {
+      "modules": {
+        "internal": "Internal",
+        "workOrders": "Work Orders",
+        "hris": "HRIS",
+        "admin": "Admin"
+      },
+      "sections": {
+        "menu": "Menu",
+        "administration": "Administration",
+        "monitoring": "Monitoring"
+      },
+      "nav": {
+        "dashboard": "Dashboard",
+        "tasks": "Tasks",
+        "bulletin": "Bulletin",
+        "notifications": "Notifications",
+        "notes": "Notes",
+        "dbLinks": "DB Links",
+        "analytics": "Analytics",
+        "workOrders": "Work Orders",
+        "history": "History",
+        "reports": "Reports",
+        "overview": "Overview",
+        "attendance": "Attendance",
+        "leave": "Leave",
+        "requests": "Requests",
+        "shifts": "Shifts",
+        "locations": "Locations",
+        "holidays": "Holidays",
+        "leaveTypes": "Leave Types",
+        "manageUsers": "Manage Users",
+        "rolesPermissions": "Roles & Permissions",
+        "auditLog": "Audit Log"
+      },
+      "collapseSidebar": "Collapse sidebar",
+      "expandSidebar": "Expand sidebar"
+    },
+    "toasts": {
+      "undo": "Undo"
+    },
+    "userSearchInput": {
+      "placeholder": "Search people…",
+      "clearLabel": "— Unassigned —",
+      "clear": "Clear",
+      "noMatches": "No matches"
+    }
+  }
+}

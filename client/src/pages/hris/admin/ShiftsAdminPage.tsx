@@ -3,6 +3,7 @@ import {
   CalendarClock, Plus, Pencil, Trash2, Loader2, X, CheckCircle2,
   Users, UserMinus, Search,
 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import api from '@/lib/api';
 import { cn } from '@/lib/cn';
 import { toast } from '@/stores/toastStore';
@@ -48,6 +49,7 @@ interface ShiftFormProps {
 }
 
 function ShiftFormModal({ initial, onClose, onSaved }: ShiftFormProps) {
+  const { t } = useTranslation();
   const isEdit = !!initial;
   const [form, setForm] = useState({
     name: initial?.name ?? '',
@@ -68,15 +70,15 @@ function ShiftFormModal({ initial, onClose, onSaved }: ShiftFormProps) {
     try {
       if (isEdit) {
         await api.put(`/hris/shifts/${initial!.id}`, form);
-        toast.success('Shift updated');
+        toast.success(t('hris.admin.shifts.toast.updated'));
       } else {
         await api.post('/hris/shifts', form);
-        toast.success('Shift created');
+        toast.success(t('hris.admin.shifts.toast.created'));
       }
       onSaved();
       onClose();
     } catch (err: any) {
-      toast.error(err?.response?.data?.message ?? 'Failed to save');
+      toast.error(err?.response?.data?.message ?? t('hris.admin.shifts.toast.saveFailed'));
     } finally { setSaving(false); }
   }
 
@@ -86,31 +88,31 @@ function ShiftFormModal({ initial, onClose, onSaved }: ShiftFormProps) {
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
           <div className="flex items-center gap-2">
             <div className="w-3 h-3 rounded-full" style={{ backgroundColor: form.color }} />
-            <h3 className="font-semibold text-gray-900">{isEdit ? 'Edit Shift' : 'New Shift'}</h3>
+            <h3 className="font-semibold text-gray-900">{isEdit ? t('hris.admin.shifts.modal.editTitle') : t('hris.admin.shifts.modal.newTitle')}</h3>
           </div>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
         </div>
         <div className="px-5 py-4 space-y-4">
           <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1.5">Shift Name <span className="text-red-500">*</span></label>
-            <input value={form.name} onChange={(e) => set('name', e.target.value)} placeholder="e.g. Office Staff, Security Shift A"
+            <label className="block text-xs font-medium text-gray-500 mb-1.5">{t('hris.admin.shifts.modal.name')} <span className="text-red-500">*</span></label>
+            <input value={form.name} onChange={(e) => set('name', e.target.value)} placeholder={t('hris.admin.shifts.modal.namePlaceholder')}
               className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-navy/20 focus:border-navy/30" />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1.5">Start Time</label>
+              <label className="block text-xs font-medium text-gray-500 mb-1.5">{t('hris.admin.shifts.modal.startTime')}</label>
               <input type="time" value={form.startTime} onChange={(e) => set('startTime', e.target.value)}
                 className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-navy/20 focus:border-navy/30" />
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1.5">End Time</label>
+              <label className="block text-xs font-medium text-gray-500 mb-1.5">{t('hris.admin.shifts.modal.endTime')}</label>
               <input type="time" value={form.endTime} onChange={(e) => set('endTime', e.target.value)}
                 className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-navy/20 focus:border-navy/30" />
             </div>
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-500 mb-1.5">
-              Late Tolerance: <span className="font-semibold text-gray-700">{form.lateThresholdMinutes} min</span>
+              {t('hris.admin.shifts.modal.lateTolerance', { minutes: form.lateThresholdMinutes })}
             </label>
             <input type="range" min={0} max={60} step={5} value={form.lateThresholdMinutes}
               onChange={(e) => set('lateThresholdMinutes', parseInt(e.target.value))}
@@ -120,7 +122,7 @@ function ShiftFormModal({ initial, onClose, onSaved }: ShiftFormProps) {
             </div>
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-500 mb-2">Shift Color</label>
+            <label className="block text-xs font-medium text-gray-500 mb-2">{t('hris.admin.shifts.modal.shiftColor')}</label>
             <div className="flex gap-2 flex-wrap">
               {COLORS.map((c) => (
                 <button key={c} onClick={() => set('color', c)}
@@ -136,8 +138,8 @@ function ShiftFormModal({ initial, onClose, onSaved }: ShiftFormProps) {
                 <div className={cn('absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform', form.isDefault ? 'left-4' : 'left-0.5')} />
               </div>
               <div>
-                <p className="text-sm font-medium text-gray-700">Default Shift</p>
-                <p className="text-xs text-gray-400">Employees without a shift will use this</p>
+                <p className="text-sm font-medium text-gray-700">{t('hris.admin.shifts.modal.defaultShift')}</p>
+                <p className="text-xs text-gray-400">{t('hris.admin.shifts.modal.defaultShiftHint')}</p>
               </div>
             </label>
             <label className="flex items-center gap-3 cursor-pointer">
@@ -145,18 +147,18 @@ function ShiftFormModal({ initial, onClose, onSaved }: ShiftFormProps) {
                 className={cn('relative w-9 h-5 rounded-full transition-colors flex-shrink-0', form.isActive ? 'bg-green-500' : 'bg-gray-200')}>
                 <div className={cn('absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform', form.isActive ? 'left-4' : 'left-0.5')} />
               </div>
-              <p className="text-sm font-medium text-gray-700">Active Shift</p>
+              <p className="text-sm font-medium text-gray-700">{t('hris.admin.shifts.modal.activeShift')}</p>
             </label>
           </div>
         </div>
         <div className="px-5 pb-5 flex gap-3">
           <button onClick={onClose} className="flex-1 py-2.5 text-sm font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors">
-            Cancel
+            {t('hris.admin.shifts.modal.cancel')}
           </button>
           <button onClick={handleSave} disabled={saving || !form.name.trim()}
             className="flex-1 py-2.5 text-sm font-medium text-white bg-navy hover:bg-navy/90 disabled:opacity-40 rounded-lg transition-colors flex items-center justify-center gap-2">
             {saving ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
-            {isEdit ? 'Save Changes' : 'Create Shift'}
+            {isEdit ? t('hris.admin.shifts.modal.saveChanges') : t('hris.admin.shifts.modal.createShift')}
           </button>
         </div>
       </div>
@@ -166,6 +168,7 @@ function ShiftFormModal({ initial, onClose, onSaved }: ShiftFormProps) {
 
 // ── Assign Panel ───────────────────────────────────────────────
 function AssignPanel({ shifts }: { shifts: Shift[] }) {
+  const { t } = useTranslation();
   const [users, setUsers]       = useState<UserEntry[]>([]);
   const [loading, setLoading]   = useState(false);
   const [search, setSearch]     = useState('');
@@ -186,10 +189,10 @@ function AssignPanel({ shifts }: { shifts: Shift[] }) {
     setSaving(userId);
     try {
       await api.post('/hris/shifts/assign', { userId, shiftId });
-      toast.success('Shift assigned');
+      toast.success(t('hris.admin.shifts.toast.assigned'));
       loadUsers();
     } catch (err: any) {
-      toast.error(err?.response?.data?.message ?? 'Failed to assign shift');
+      toast.error(err?.response?.data?.message ?? t('hris.admin.shifts.toast.assignFailed'));
     } finally { setSaving(null); }
   }
 
@@ -198,11 +201,11 @@ function AssignPanel({ shifts }: { shifts: Shift[] }) {
       <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <Users size={16} className="text-gray-400" />
-          <span className="text-sm font-semibold text-gray-700">Assign Employee Shifts</span>
+          <span className="text-sm font-semibold text-gray-700">{t('hris.admin.shifts.assignPanel.title')}</span>
         </div>
         <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5 flex-1 max-w-[220px]">
           <Search size={13} className="text-gray-400" />
-          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search employee..."
+          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t('hris.admin.shifts.assignPanel.searchPlaceholder')}
             className="flex-1 text-xs bg-transparent focus:outline-none placeholder:text-gray-400" />
         </div>
       </div>
@@ -210,7 +213,7 @@ function AssignPanel({ shifts }: { shifts: Shift[] }) {
         {loading ? (
           <div className="flex items-center justify-center py-10"><Loader2 size={20} className="animate-spin text-gray-300" /></div>
         ) : users.length === 0 ? (
-          <div className="py-10 text-center text-sm text-gray-400">No employees found</div>
+          <div className="py-10 text-center text-sm text-gray-400">{t('hris.admin.shifts.assignPanel.noEmployees')}</div>
         ) : users.map((u) => (
           <div key={u.id} className="flex items-center gap-3 px-5 py-3 hover:bg-gray-50/50 transition-colors">
             <div className="w-8 h-8 rounded-full bg-navy flex items-center justify-center text-white text-xs font-semibold flex-shrink-0 overflow-hidden">
@@ -230,13 +233,13 @@ function AssignPanel({ shifts }: { shifts: Shift[] }) {
                     onChange={(e) => assignShift(u.id, e.target.value || null)}
                     className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-navy/20 bg-white max-w-[140px]"
                   >
-                    <option value="">— Default —</option>
+                    <option value="">{t('hris.admin.shifts.assignPanel.defaultOption')}</option>
                     {shifts.filter((s) => s.isActive).map((s) => (
                       <option key={s.id} value={s.id}>{s.name}</option>
                     ))}
                   </select>
                   {u.shift && (
-                    <button onClick={() => assignShift(u.id, null)} title="Reset to default"
+                    <button onClick={() => assignShift(u.id, null)} title={t('hris.admin.shifts.assignPanel.resetToDefault')}
                       className="text-gray-400 hover:text-red-500 transition-colors">
                       <UserMinus size={14} />
                     </button>
@@ -253,6 +256,7 @@ function AssignPanel({ shifts }: { shifts: Shift[] }) {
 
 // ── Main Page ──────────────────────────────────────────────────
 export default function ShiftsAdminPage() {
+  const { t } = useTranslation();
   const [shifts, setShifts]     = useState<Shift[]>([]);
   const [loading, setLoading]   = useState(false);
   const [formOpen, setFormOpen] = useState(false);
@@ -270,13 +274,13 @@ export default function ShiftsAdminPage() {
   useEffect(() => { loadShifts(); }, [loadShifts]);
 
   async function handleDelete(shift: Shift) {
-    if (!confirm(`Delete shift "${shift.name}"? Employees using this shift will be reset to default.`)) return;
+    if (!confirm(t('hris.admin.shifts.deleteConfirm', { name: shift.name }))) return;
     try {
       await api.delete(`/hris/shifts/${shift.id}`);
-      toast.success('Shift deleted');
+      toast.success(t('hris.admin.shifts.toast.deleted'));
       loadShifts();
     } catch (err: any) {
-      toast.error(err?.response?.data?.message ?? 'Failed to delete');
+      toast.error(err?.response?.data?.message ?? t('hris.admin.shifts.toast.deleteFailed'));
     }
   }
 
@@ -295,13 +299,13 @@ export default function ShiftsAdminPage() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-              <CalendarClock size={20} className="text-navy" /> Manage Shifts
+              <CalendarClock size={20} className="text-navy" /> {t('hris.admin.shifts.header.title')}
             </h1>
-            <p className="text-sm text-gray-500 mt-0.5">Manage work shifts and employee assignments</p>
+            <p className="text-sm text-gray-500 mt-0.5">{t('hris.admin.shifts.header.subtitle')}</p>
           </div>
           <button onClick={() => setFormOpen(true)}
             className="flex items-center gap-2 px-4 py-2 bg-navy text-white rounded-lg text-sm font-medium hover:bg-navy/90 transition-colors">
-            <Plus size={15} /> New Shift
+            <Plus size={15} /> {t('hris.admin.shifts.newShift')}
           </button>
         </div>
 
@@ -320,10 +324,10 @@ export default function ShiftsAdminPage() {
                       <div className="flex items-center gap-2">
                         <p className="font-semibold text-gray-800">{s.name}</p>
                         {s.isDefault && (
-                          <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-navy/10 text-navy font-medium">Default</span>
+                          <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-navy/10 text-navy font-medium">{t('hris.admin.shifts.card.default')}</span>
                         )}
                         {!s.isActive && (
-                          <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-400 font-medium">Inactive</span>
+                          <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-400 font-medium">{t('hris.admin.shifts.card.inactive')}</span>
                         )}
                       </div>
                       <p className="text-sm text-gray-500 mt-0.5">{s.startTime} – {s.endTime}</p>
@@ -340,9 +344,9 @@ export default function ShiftsAdminPage() {
                     </div>
                   </div>
                   <div className="flex items-center justify-between text-xs text-gray-500">
-                    <span>Tolerance: {s.lateThresholdMinutes} min</span>
+                    <span>{t('hris.admin.shifts.card.tolerance', { minutes: s.lateThresholdMinutes })}</span>
                     <span className="flex items-center gap-1">
-                      <Users size={12} /> {s._count?.users ?? 0} employees
+                      <Users size={12} /> {t('hris.admin.shifts.card.employees', { count: s._count?.users ?? 0 })}
                     </span>
                   </div>
                 </div>
@@ -351,7 +355,7 @@ export default function ShiftsAdminPage() {
             {shifts.length === 0 && (
               <div className="col-span-3 py-10 text-center">
                 <CalendarClock size={28} className="text-gray-200 mx-auto mb-2" />
-                <p className="text-gray-400 text-sm">No shifts created yet</p>
+                <p className="text-gray-400 text-sm">{t('hris.admin.shifts.empty')}</p>
               </div>
             )}
           </div>

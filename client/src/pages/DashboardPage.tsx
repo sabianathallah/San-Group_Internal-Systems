@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef, useCallback, FormEvent } from 'react';
 import {
-  Star, AlertCircle, Megaphone, Users,
+  Star, AlertCircle, Users,
   ArrowRight, CheckCircle2, Circle,
   Loader2, Sun, ChevronDown, ChevronRight,
   Plus, StickyNote as StickyNoteIcon,
@@ -9,30 +9,31 @@ import {
   Wrench, HardHat, Shield, Bell, ImagePlus, Check, Upload,
 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '@/stores/authStore';
 import { useTaskStore, Task, isInMyDay } from '@/stores/taskStore';
 import { useNoteStore } from '@/stores/noteStore';
 import { usePermStore } from '@/stores/permStore';
 import { useClickOutside } from '@/hooks/useClickOutside';
+import { useLanguageStore } from '@/stores/languageStore';
 import { ROUTES } from '@/lib/constants';
 import api from '@/lib/api';
 import { cn } from '@/lib/cn';
+import CreateTaskModal, { type CreatedTask } from '@/components/shared/CreateTaskModal';
 
 // ── Helpers ────────────────────────────────────────────────
-function getGreeting(): string {
-  const h = new Date().getHours();
-  if (h < 11) return 'Good morning';
-  if (h < 15) return 'Good afternoon';
-  return 'Good evening';
+/** Locale for date formatting — mirrors i18next's active language. */
+function dateLocale(language: string): string {
+  return language === 'id' ? 'id-ID' : 'en-US';
 }
 
-function formatDateShort(): string {
-  return new Date().toLocaleDateString('en-US', {
+function formatDateShort(language: string): string {
+  return new Date().toLocaleDateString(dateLocale(language), {
     weekday: 'long', day: 'numeric', month: 'long',
   });
 }
 
-function relativeDate(iso: string | null): { label: string; overdue: boolean } {
+function relativeDate(iso: string | null, language: string): { label: string; overdue: boolean } {
   if (!iso) return { label: '', overdue: false };
   const d    = new Date(iso);
   const now  = new Date();
@@ -42,21 +43,13 @@ function relativeDate(iso: string | null): { label: string; overdue: boolean } {
   if (diff === 0) return { label: 'Today', overdue: false };
   if (diff === 1) return { label: 'Tomorrow', overdue: false };
   return {
-    label: d.toLocaleDateString('en-US', { day: '2-digit', month: 'short' }),
+    label: d.toLocaleDateString(dateLocale(language), { day: '2-digit', month: 'short' }),
     overdue: false,
   };
 }
 
-function bulletinAge(iso: string): string {
-  const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000);
-  if (diff === 0) return 'Today';
-  if (diff === 1) return 'Yesterday';
-  if (diff < 7)  return `${diff} days ago`;
-  return new Date(iso).toLocaleDateString('en-US', { day: '2-digit', month: 'short' });
-}
-
-function fmtTime(iso: string | null): string {
-  return iso ? new Date(iso).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : '—';
+function fmtTime(iso: string | null, language: string): string {
+  return iso ? new Date(iso).toLocaleTimeString(dateLocale(language), { hour: '2-digit', minute: '2-digit' }) : '—';
 }
 
 function fmtMins(total: number): string {
@@ -69,17 +62,7 @@ function fmtMins(total: number): string {
 
 // ── Types ──────────────────────────────────────────────────
 type TaskPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
-type BulletinPriority = 'NORMAL' | 'IMPORTANT' | 'URGENT';
 type AttendanceStatus = 'PRESENT' | 'LATE' | 'WFH' | 'PERMISSION' | 'ABSENT' | 'HOLIDAY';
-
-interface Bulletin {
-  id:          string;
-  title:       string;
-  priority:    BulletinPriority;
-  category:    string;
-  publishedAt: string | null;
-  isRead:      boolean;
-}
 
 interface TaskStats {
   personal: { todo: number; inProgress: number; done: number; assigned: number };
@@ -105,18 +88,6 @@ const PRIORITY_COLOR: Record<TaskPriority, string> = {
   MEDIUM: 'text-info',
   LOW:    'text-gray-300',
 };
-
-const BULLETIN_BADGE: Record<BulletinPriority, { bg: string; dot: string; accent: string }> = {
-  URGENT:    { bg: 'bg-danger/10 text-danger',   dot: 'bg-danger',  accent: 'bg-danger'  },
-  IMPORTANT: { bg: 'bg-warning/10 text-warning', dot: 'bg-warning', accent: 'bg-warning' },
-  NORMAL:    { bg: 'bg-gray-100 text-gray-500',  dot: 'bg-gray-400', accent: 'bg-gray-200' },
-};
-
-const BULLETIN_LABEL: Record<BulletinPriority, string> = {
-  URGENT: 'Urgent', IMPORTANT: 'Important', NORMAL: 'General',
-};
-
-const BULLETIN_RANK: Record<BulletinPriority, number> = { URGENT: 0, IMPORTANT: 1, NORMAL: 2 };
 
 // Keep keys in sync with WALLPAPER_PRESET_KEYS on the server (user.service.ts) —
 // server only validates the key, the gradient/label lives here.
@@ -168,15 +139,17 @@ function ProgressRing({ done, total, size = 60 }: { done: number; total: number;
 }
 
 // ── Task Row ───────────────────────────────────────────────
+// IN_PROGRESS is merged into "To Do" visually (backend enum/logic untouched) —
+// so a task row no longer special-cases it, it just reads as a plain to-do.
 function TaskRow({ task, onNavigate }: { task: Task; onNavigate: (id: string) => void }) {
-  const isDone     = task.status === 'DONE';
-  const isProgress = task.status === 'IN_PROGRESS';
-  const isPending  = task.assignmentStatus === 'PENDING';
+  const { t, i18n } = useTranslation();
+  const isDone    = task.status === 'DONE';
+  const isPending = task.assignmentStatus === 'PENDING';
   const { label: dueLabel, overdue } = task.dueDate
-    ? relativeDate(task.dueDate)
+    ? relativeDate(task.dueDate, i18n.language)
     : { label: '', overdue: false };
 
-  const dotColor = isDone ? '#22c55e' : isPending ? '#f59e0b' : isProgress ? '#3b82f6' : '#d1d5db';
+  const dotColor = isDone ? '#22c55e' : isPending ? '#f59e0b' : '#d1d5db';
 
   return (
     <button
@@ -188,7 +161,7 @@ function TaskRow({ task, onNavigate }: { task: Task; onNavigate: (id: string) =>
         style={{ borderColor: dotColor, backgroundColor: isDone ? dotColor : 'transparent' }}
       >
         {isDone && <CheckCircle2 size={9} className="text-white" strokeWidth={3} />}
-        {!isDone && (isProgress || isPending) && (
+        {!isDone && isPending && (
           <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: dotColor }} />
         )}
       </span>
@@ -199,10 +172,7 @@ function TaskRow({ task, onNavigate }: { task: Task; onNavigate: (id: string) =>
         </p>
         <div className="flex items-center gap-2 mt-0.5">
           {isPending && (
-            <span className="text-[10px] font-medium text-amber-500">Waiting</span>
-          )}
-          {isProgress && !isPending && (
-            <span className="text-[10px] font-medium text-info">In progress</span>
+            <span className="text-[10px] font-medium text-amber-500">{t('dashboard.toDoToday.waiting')}</span>
           )}
           {dueLabel && (
             <span className={cn('text-[10px]', overdue ? 'text-danger font-semibold' : 'text-gray-400')}>
@@ -227,6 +197,7 @@ function TaskRow({ task, onNavigate }: { task: Task; onNavigate: (id: string) =>
 
 // ── Quick Add Task ─────────────────────────────────────────
 function QuickAddTask({ onAdded }: { onAdded: (task: Task) => void }) {
+  const { t } = useTranslation();
   const [active, setActive] = useState(false);
   const [title,  setTitle]  = useState('');
   const [saving, setSaving] = useState(false);
@@ -258,7 +229,7 @@ function QuickAddTask({ onAdded }: { onAdded: (task: Task) => void }) {
         className="flex items-center gap-2.5 w-full px-5 py-3.5 text-sm text-gray-400 hover:text-navy hover:bg-gray-50/60 transition-colors border-t border-gray-100"
       >
         <Plus size={15} className="text-navy" />
-        Add task to My Day
+        {t('dashboard.toDoToday.addTask')}
       </button>
     );
   }
@@ -271,17 +242,17 @@ function QuickAddTask({ onAdded }: { onAdded: (task: Task) => void }) {
         value={title}
         onChange={(e) => setTitle(e.target.value)}
         onKeyDown={(e) => e.key === 'Escape' && setActive(false)}
-        placeholder="Enter task title..."
+        placeholder={t('dashboard.toDoToday.titlePlaceholder')}
         className="flex-1 text-sm bg-transparent outline-none text-gray-800 placeholder:text-gray-400"
       />
       <button
         type="submit" disabled={saving || !title.trim()}
         className="px-3 py-1 text-xs font-medium text-white bg-navy rounded hover:bg-navy-light disabled:opacity-40 transition-colors"
       >
-        {saving ? <Loader2 size={12} className="animate-spin" /> : 'Add'}
+        {saving ? <Loader2 size={12} className="animate-spin" /> : t('dashboard.toDoToday.add')}
       </button>
       <button type="button" onClick={() => setActive(false)} className="text-xs text-gray-400 hover:text-gray-600">
-        Cancel
+        {t('dashboard.toDoToday.cancel')}
       </button>
     </form>
   );
@@ -294,6 +265,7 @@ function WallpaperPicker({
   wallpaperType: string | null; wallpaperValue: string | null;
   onChange: (type: string, value: string) => void;
 }) {
+  const { t } = useTranslation();
   const [open, setOpen]         = useState(false);
   const [saving, setSaving]     = useState(false);
   const [error, setError]       = useState('');
@@ -310,7 +282,7 @@ function WallpaperPicker({
       onChange(res.data.data.wallpaperType, res.data.data.wallpaperValue);
       setOpen(false);
     } catch {
-      setError('Failed to apply wallpaper');
+      setError(t('dashboard.wallpaper.applyError'));
     } finally {
       setSaving(false);
     }
@@ -319,7 +291,7 @@ function WallpaperPicker({
   async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 3 * 1024 * 1024) { setError('Maximum file size is 3MB'); return; }
+    if (file.size > 3 * 1024 * 1024) { setError(t('dashboard.wallpaper.maxSize')); return; }
     setSaving(true);
     setError('');
     const form = new FormData();
@@ -331,7 +303,7 @@ function WallpaperPicker({
       onChange(res.data.data.wallpaperType, res.data.data.wallpaperValue);
       setOpen(false);
     } catch {
-      setError('Failed to upload wallpaper');
+      setError(t('dashboard.wallpaper.uploadError'));
     } finally {
       setSaving(false);
       if (fileRef.current) fileRef.current.value = '';
@@ -342,7 +314,7 @@ function WallpaperPicker({
     <div ref={popRef} className="relative">
       <button
         onClick={() => setOpen((v) => !v)}
-        title="Change header wallpaper"
+        title={t('dashboard.wallpaper.changeTitle')}
         className="w-7 h-7 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 text-white/70 hover:text-white transition-colors"
       >
         <ImagePlus size={14} />
@@ -350,7 +322,7 @@ function WallpaperPicker({
 
       {open && (
         <div className="absolute right-0 top-9 w-64 bg-white border border-gray-200 rounded-lg shadow-lg z-50 p-3">
-          <p className="text-xs font-semibold text-gray-700 mb-2">Header wallpaper</p>
+          <p className="text-xs font-semibold text-gray-700 mb-2">{t('dashboard.wallpaper.header')}</p>
           <div className="grid grid-cols-3 gap-2 mb-3">
             {Object.entries(WALLPAPER_PRESETS).map(([key, { label, gradient }]) => {
               const isActive = wallpaperType === 'preset' && wallpaperValue === key
@@ -379,76 +351,10 @@ function WallpaperPicker({
             className="flex items-center justify-center gap-1.5 w-full text-xs font-medium text-navy bg-navy/5 hover:bg-navy/10 rounded-lg py-2 transition-colors disabled:opacity-50"
           >
             {saving ? <Loader2 size={12} className="animate-spin" /> : <Upload size={12} />}
-            Upload custom image
+            {t('dashboard.wallpaper.upload')}
           </button>
           <input ref={fileRef} type="file" accept="image/*" onChange={handleUpload} className="hidden" />
           {error && <p className="text-[10px] text-danger mt-1.5">{error}</p>}
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ── Bulletin Spotlight (prominent, above the fold, no click-in required) ───
-function BulletinSpotlight({ bulletins, loading }: { bulletins: Bulletin[]; loading: boolean }) {
-  const unreadCount = bulletins.filter((b) => !b.isRead).length;
-
-  const sorted = [...bulletins].sort((a, b) => {
-    if (a.isRead !== b.isRead) return a.isRead ? 1 : -1;
-    return BULLETIN_RANK[a.priority] - BULLETIN_RANK[b.priority];
-  }).slice(0, 8);
-
-  return (
-    <div className="bg-white border-b border-gray-100">
-      <div className="flex items-center justify-between px-6 sm:px-8 pt-4 pb-2.5">
-        <div className="flex items-center gap-2">
-          <Megaphone size={15} className="text-navy" />
-          <span className="text-sm font-semibold text-gray-800">Bulletin</span>
-          {unreadCount > 0 && (
-            <span className="text-[10px] font-semibold text-white bg-danger rounded-full px-1.5 py-0.5 leading-none">
-              {unreadCount} new
-            </span>
-          )}
-        </div>
-        <Link to={ROUTES.BULLETIN} className="flex items-center gap-1 text-xs text-gray-400 hover:text-navy transition-colors">
-          All announcements <ArrowRight size={11} />
-        </Link>
-      </div>
-
-      {loading ? (
-        <div className="flex gap-3 px-6 sm:px-8 pb-4">
-          {[0, 1, 2].map((i) => (
-            <div key={i} className="w-64 h-20 flex-shrink-0 rounded-xl bg-gray-100 animate-pulse" />
-          ))}
-        </div>
-      ) : sorted.length === 0 ? (
-        <div className="flex items-center gap-2.5 px-6 sm:px-8 pb-5 text-gray-400">
-          <Megaphone size={16} className="text-gray-200" />
-          <p className="text-xs">No announcements yet</p>
-        </div>
-      ) : (
-        <div className="flex gap-3 px-6 sm:px-8 pb-5 overflow-x-auto scroll-smooth snap-x snap-mandatory">
-          {sorted.map((b) => (
-            <Link
-              key={b.id}
-              to={ROUTES.BULLETIN}
-              className="group relative flex-shrink-0 w-64 snap-start rounded-xl border border-gray-100 bg-white pl-4 pr-3.5 py-3 hover:shadow-md hover:-translate-y-0.5 transition-all duration-150 overflow-hidden"
-            >
-              <span className={cn('absolute left-0 top-0 bottom-0 w-1', BULLETIN_BADGE[b.priority].accent)} />
-              <div className="flex items-center gap-1.5 mb-1.5">
-                <span className={cn('text-[10px] font-semibold px-1.5 py-0.5 rounded-full', BULLETIN_BADGE[b.priority].bg)}>
-                  {BULLETIN_LABEL[b.priority]}
-                </span>
-                {!b.isRead && <span className="w-1.5 h-1.5 rounded-full bg-info flex-shrink-0" />}
-              </div>
-              <p className={cn('text-xs leading-snug line-clamp-2', !b.isRead ? 'font-semibold text-gray-800' : 'text-gray-500')}>
-                {b.title}
-              </p>
-              {b.publishedAt && (
-                <p className="text-[10px] text-gray-400 mt-1.5">{bulletinAge(b.publishedAt)}</p>
-              )}
-            </Link>
-          ))}
         </div>
       )}
     </div>
@@ -463,6 +369,7 @@ function BulletinSpotlight({ bulletins, loading }: { bulletins: Bulletin[]; load
 const DEFAULT_MIN_WORK_MINUTES = 480;
 
 function CheckInWidget({ today, loading }: { today: TodayAttendance | null; loading: boolean }) {
+  const { t, i18n } = useTranslation();
   const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
@@ -487,28 +394,30 @@ function CheckInWidget({ today, loading }: { today: TodayAttendance | null; load
             <MapPin size={17} className="text-info" />
           </div>
           <div className="min-w-0">
-            <p className="text-sm font-semibold text-gray-800">Attendance Today</p>
+            <p className="text-sm font-semibold text-gray-800">{t('dashboard.checkIn.title')}</p>
             {loading ? (
               <div className="h-3.5 w-28 bg-gray-100 rounded animate-pulse mt-1" />
             ) : !today?.checkIn ? (
-              <p className="text-xs text-gray-400">Not checked in yet</p>
+              <p className="text-xs text-gray-400">{t('dashboard.checkIn.notCheckedIn')}</p>
             ) : !today?.checkOut ? (
               <p className="text-xs text-gray-400 truncate">
-                Checked in {fmtTime(today.checkIn)}
-                {today.isLate && <span className="text-warning font-medium"> · Late {today.lateMinutes}m</span>}
+                {t('dashboard.checkIn.checkedIn', { time: fmtTime(today.checkIn, i18n.language) })}
+                {today.isLate && <span className="text-warning font-medium"> · {t('dashboard.checkIn.late', { minutes: today.lateMinutes })}</span>}
               </p>
             ) : (
-              <p className="text-xs text-success font-medium">Done · {fmtTime(today.checkIn)}–{fmtTime(today.checkOut)}</p>
+              <p className="text-xs text-success font-medium">
+                {t('dashboard.checkIn.done', { checkIn: fmtTime(today.checkIn, i18n.language), checkOut: fmtTime(today.checkOut, i18n.language) })}
+              </p>
             )}
           </div>
         </div>
         <div className="flex items-center gap-1.5 flex-shrink-0">
           {!today?.checkIn ? (
-            <span className="text-xs font-medium text-white bg-navy px-3 py-1.5 rounded-lg">Check In</span>
+            <span className="text-xs font-medium text-white bg-navy px-3 py-1.5 rounded-lg">{t('dashboard.checkIn.checkInBtn')}</span>
           ) : !today?.checkOut ? (
-            <span className="text-xs font-medium text-navy bg-navy/10 px-3 py-1.5 rounded-lg">Check Out</span>
+            <span className="text-xs font-medium text-navy bg-navy/10 px-3 py-1.5 rounded-lg">{t('dashboard.checkIn.checkOutBtn')}</span>
           ) : (
-            <span className="text-[10px] font-bold text-success bg-success/10 px-2 py-1 rounded-full">Complete</span>
+            <span className="text-[10px] font-bold text-success bg-success/10 px-2 py-1 rounded-full">{t('dashboard.checkIn.complete')}</span>
           )}
           <ChevronRight size={15} className="text-gray-300" />
         </div>
@@ -520,7 +429,7 @@ function CheckInWidget({ today, loading }: { today: TodayAttendance | null; load
             <span className="flex items-center gap-1 font-medium text-gray-500">
               <Timer size={11} /> {fmtMins(worked)} / {fmtMins(DEFAULT_MIN_WORK_MINUTES)}
             </span>
-            {today.shift && <span className="text-gray-400">Shift {today.shift.name}</span>}
+            {today.shift && <span className="text-gray-400">{t('dashboard.checkIn.shift', { name: today.shift.name })}</span>}
           </div>
           <div className="h-1.5 rounded-full bg-gray-100 overflow-hidden">
             <div className="h-full rounded-full bg-info transition-all" style={{ width: `${pct}%` }} />
@@ -535,9 +444,10 @@ function CheckInWidget({ today, loading }: { today: TodayAttendance | null; load
 interface QuickAccessItem { label: string; to: string; icon: React.ElementType; accent: string }
 
 function QuickAccessGrid({ items }: { items: QuickAccessItem[] }) {
+  const { t } = useTranslation();
   return (
     <div className="rounded-xl border border-gray-100 bg-white px-4 py-3.5">
-      <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2.5">Quick Access</p>
+      <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2.5">{t('dashboard.quickAccess.title')}</p>
       <div className="grid grid-cols-3 gap-2">
         {items.map(({ label, to, icon: Icon, accent }) => (
           <Link
@@ -561,13 +471,14 @@ function QuickAccessGrid({ items }: { items: QuickAccessItem[] }) {
 
 // ── Team Stats ─────────────────────────────────────────────
 function TeamStats({ stats, loading, roleLevel }: { stats: TaskStats | null; loading: boolean; roleLevel: number }) {
+  const { t } = useTranslation();
   if (roleLevel > 5) return null;
 
   const teamDonePct = stats?.team && stats.team.total > 0
     ? Math.round((stats.team.done / stats.team.total) * 100)
     : 0;
 
-  const label = roleLevel <= 3 ? 'My Division' : 'My Team';
+  const label = roleLevel <= 3 ? t('dashboard.team.myDivision') : t('dashboard.team.myTeam');
 
   return (
     <div className="rounded-xl border border-gray-100 bg-white px-4 py-3.5">
@@ -578,19 +489,19 @@ function TeamStats({ stats, loading, roleLevel }: { stats: TaskStats | null; loa
         <div className="rounded-lg bg-gray-50 px-3 py-2.5 grid grid-cols-3 gap-2 text-center">
           <div>
             <p className="text-base font-bold text-gray-800">{stats.team.total}</p>
-            <p className="text-[10px] text-gray-400">Tasks</p>
+            <p className="text-[10px] text-gray-400">{t('dashboard.team.tasks')}</p>
           </div>
           <div>
             <p className="text-base font-bold text-navy">{teamDonePct}%</p>
-            <p className="text-[10px] text-gray-400">Done</p>
+            <p className="text-[10px] text-gray-400">{t('dashboard.team.done')}</p>
           </div>
           <div>
             <p className="text-base font-bold text-gray-800">{stats.team.memberCount}</p>
-            <p className="text-[10px] text-gray-400">Members</p>
+            <p className="text-[10px] text-gray-400">{t('dashboard.team.members')}</p>
           </div>
         </div>
       ) : (
-        <p className="text-xs text-gray-400 py-2 text-center">No team data</p>
+        <p className="text-xs text-gray-400 py-2 text-center">{t('dashboard.team.noData')}</p>
       )}
     </div>
   );
@@ -598,16 +509,16 @@ function TeamStats({ stats, loading, roleLevel }: { stats: TaskStats | null; loa
 
 // ── System Stats (Admin only) ──────────────────────────────
 function SystemStats({ stats, loading }: { stats: TaskStats | null; loading: boolean }) {
+  const { t } = useTranslation();
   if (!stats?.system) return null;
 
   return (
     <div className="rounded-xl border border-gray-100 bg-white px-4 py-3.5">
-      <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2">System</p>
-      <div className="grid grid-cols-3 gap-1.5 text-center">
+      <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2">{t('dashboard.system.title')}</p>
+      <div className="grid grid-cols-2 gap-1.5 text-center">
         {[
-          { label: 'Users',    value: stats.system.totalUsers     },
-          { label: 'Tasks',    value: stats.system.totalTasks     },
-          { label: 'Bulletin', value: stats.system.totalBulletins },
+          { label: t('dashboard.system.users'), value: stats.system.totalUsers },
+          { label: t('dashboard.system.tasks'), value: stats.system.totalTasks },
         ].map(({ label, value }) => (
           <div key={label} className="rounded-lg bg-gray-50 py-2.5">
             {loading ? (
@@ -625,6 +536,8 @@ function SystemStats({ stats, loading }: { stats: TaskStats | null; loading: boo
 
 // ── Main ───────────────────────────────────────────────────
 export default function DashboardPage() {
+  const { t } = useTranslation();
+  const language = useLanguageStore((s) => s.language);
   const user       = useAuthStore((s) => s.user);
   const updateUser = useAuthStore((s) => s.updateUser);
   const navigate  = useNavigate();
@@ -643,21 +556,18 @@ export default function DashboardPage() {
 
   const allNotes = useNoteStore((s) => s.notes);
 
-  const [bulletins,    setBulletins]    = useState<Bulletin[]>([]);
   const [activeUsers,  setActiveUsers]  = useState(0);
   const [showDone,     setShowDone]     = useState(false);
   const [stats,        setStats]        = useState<TaskStats | null>(null);
   const [statsLoading, setStatsLoading] = useState(true);
   const [attendance,        setAttendance]        = useState<TodayAttendance | null>(null);
   const [attendanceLoading, setAttendanceLoading] = useState(true);
+  const [showCreateTask, setShowCreateTask] = useState(false);
+  const [taskLists, setTaskLists] = useState<{ id: string; name: string; color: string; icon: string | null }[]>([]);
 
   useEffect(() => {
     useTaskStore.getState().fetchTasks();
     useNoteStore.getState().fetchNotes();
-
-    api.get('/bulletins', { params: { limit: 50 } })
-      .then((r) => setBulletins(r.data.data ?? []))
-      .catch(() => {});
 
     api.get('/tasks/stats')
       .then((r) => setStats(r.data.data ?? null))
@@ -668,6 +578,10 @@ export default function DashboardPage() {
       .then((r) => setAttendance(r.data.data ?? null))
       .catch(() => {})
       .finally(() => setAttendanceLoading(false));
+
+    api.get('/task-lists')
+      .then((r) => setTaskLists(r.data.data ?? []))
+      .catch(() => {});
 
     if (isAdmin) {
       api.get('/users', { params: { isActive: 'true', limit: 1 } })
@@ -682,7 +596,6 @@ export default function DashboardPage() {
   const active          = myDayTasks.filter((t) => t.status !== 'DONE');
   const done            = myDayTasks.filter((t) => t.status === 'DONE');
   const overdue         = active.filter((t) => t.dueDate && new Date(t.dueDate) < now);
-  const unreadBulletins = bulletins.filter((b) => !b.isRead);
   const awaiting        = stats?.personal.assigned ?? 0;
 
   const sortedActive = [...active].sort((a, b) => {
@@ -705,15 +618,22 @@ export default function DashboardPage() {
     : { background: WALLPAPER_PRESETS[user?.wallpaperValue ?? 'default']?.gradient ?? WALLPAPER_PRESETS.default.gradient };
 
   const quickAccessItems: QuickAccessItem[] = [
-    { label: 'Tasks',       to: ROUTES.TASKS,       icon: CheckSquare2, accent: '#0F2942' },
-    { label: 'Bulletin',    to: ROUTES.BULLETIN,    icon: Bell,         accent: '#D97706' },
-    { label: 'Notes',       to: ROUTES.NOTES,       icon: StickyNoteIcon, accent: '#C9A84C' },
-    { label: 'DB Links',    to: ROUTES.DATABASE,    icon: Database,     accent: '#2563EB' },
-    { label: 'Work Orders', to: ROUTES.WORK_ORDERS, icon: Wrench,       accent: '#EA580C' },
-    { label: 'HRIS',        to: ROUTES.HRIS,        icon: HardHat,      accent: '#059669' },
-    ...(canAnalytics ? [{ label: 'Analytics', to: ROUTES.ANALYTICS, icon: BarChart3, accent: '#7C3AED' }] : []),
-    ...(isAdmin ? [{ label: 'Admin', to: ROUTES.ADMIN_USERS, icon: Shield, accent: '#4B5563' }] : []),
+    { label: t('dashboard.quickAccess.tasks'),      to: ROUTES.TASKS,       icon: CheckSquare2,   accent: '#0F2942' },
+    { label: t('dashboard.quickAccess.bulletin'),   to: ROUTES.BULLETIN,    icon: Bell,           accent: '#D97706' },
+    { label: t('dashboard.quickAccess.notes'),      to: ROUTES.NOTES,       icon: StickyNoteIcon, accent: '#C9A84C' },
+    { label: t('dashboard.quickAccess.dbLinks'),    to: ROUTES.DATABASE,    icon: Database,       accent: '#2563EB' },
+    { label: t('dashboard.quickAccess.workOrders'), to: ROUTES.WORK_ORDERS, icon: Wrench,         accent: '#EA580C' },
+    { label: t('dashboard.quickAccess.hris'),       to: ROUTES.HRIS,        icon: HardHat,        accent: '#059669' },
+    ...(canAnalytics ? [{ label: t('dashboard.quickAccess.analytics'), to: ROUTES.ANALYTICS, icon: BarChart3, accent: '#7C3AED' }] : []),
+    ...(isAdmin ? [{ label: t('dashboard.quickAccess.admin'), to: ROUTES.ADMIN_USERS, icon: Shield, accent: '#4B5563' }] : []),
   ];
+
+  function greetingKey(): 'morning' | 'afternoon' | 'evening' {
+    const h = new Date().getHours();
+    if (h < 11) return 'morning';
+    if (h < 15) return 'afternoon';
+    return 'evening';
+  }
 
   return (
     <div className="space-y-0 -m-6">
@@ -730,17 +650,17 @@ export default function DashboardPage() {
         <div className="flex items-start justify-between">
           <div>
             <p className="text-white/40 text-xs font-medium tracking-widest uppercase mb-1">
-              {formatDateShort()}
+              {formatDateShort(language)}
             </p>
             <h1 className="text-white text-2xl font-semibold leading-tight">
-              {getGreeting()}, {firstName}
+              {t(`dashboard.greeting.${greetingKey()}`)}, {firstName}
             </h1>
             <p className="text-white/50 text-sm mt-1">
               {myDayTasks.length === 0
-                ? 'No tasks in My Day — add one below'
+                ? t('dashboard.subtitle.empty')
                 : active.length === 0
-                  ? 'All My Day tasks completed!'
-                  : `${active.length} task${active.length !== 1 ? 's' : ''} remaining today`}
+                  ? t('dashboard.subtitle.allDone')
+                  : t('dashboard.subtitle.remaining', { count: active.length })}
             </p>
             {user?.role && (
               <span className="inline-flex items-center gap-1 mt-2 text-[10px] font-medium text-white/50 bg-white/10 px-2 py-0.5 rounded-full">
@@ -757,33 +677,26 @@ export default function DashboardPage() {
               : <ProgressRing done={done.length} total={myDayTasks.length} />
             }
             <p className="text-white/40 text-[10px]">
-              {done.length}/{myDayTasks.length} done
+              {done.length}/{myDayTasks.length} {t('dashboard.done')}
             </p>
           </div>
         </div>
 
         {/* Alert chips — only shown when non-zero */}
-        {(overdue.length > 0 || unreadBulletins.length > 0 || awaiting > 0 || (isAdmin && activeUsers > 0)) && (
+        {(overdue.length > 0 || awaiting > 0 || (isAdmin && activeUsers > 0)) && (
           <div className="flex items-center gap-2.5 mt-5 flex-wrap">
             {overdue.length > 0 && (
-              <AlertChip icon={AlertCircle} label={`${overdue.length} overdue`} danger />
-            )}
-            {unreadBulletins.length > 0 && (
-              <AlertChip icon={Megaphone} label={`${unreadBulletins.length} unread`} />
+              <AlertChip icon={AlertCircle} label={t('dashboard.alerts.overdue', { count: overdue.length })} danger />
             )}
             {awaiting > 0 && (
-              <AlertChip icon={UserCheck} label={`${awaiting} awaiting`} />
+              <AlertChip icon={UserCheck} label={t('dashboard.alerts.awaiting', { count: awaiting })} />
             )}
             {isAdmin && activeUsers > 0 && (
-              <AlertChip icon={Users} label={`${activeUsers} users`} />
+              <AlertChip icon={Users} label={t('dashboard.alerts.users', { count: activeUsers })} />
             )}
           </div>
         )}
       </div>
-
-      {/* ── Bulletin spotlight — important info surfaced immediately, ── */}
-      {/* no click-through required to see what's new                  */}
-      <BulletinSpotlight bulletins={bulletins} loading={false} />
 
       {/* ── Body ──────────────────────────────────────────── */}
       <div className="grid grid-cols-3 bg-gray-50 min-h-[calc(100vh-320px)]">
@@ -797,7 +710,7 @@ export default function DashboardPage() {
             <div className="flex items-center justify-between px-5 py-3.5 border-b border-gray-100">
               <div className="flex items-center gap-2">
                 <Sun size={15} className="text-navy" />
-                <span className="text-sm font-semibold text-gray-800">To Do Today</span>
+                <span className="text-sm font-semibold text-gray-800">{t('dashboard.toDoToday.title')}</span>
                 {active.length > 0 && (
                   <span className="text-[10px] font-semibold text-white bg-navy rounded-full px-1.5 py-0.5 leading-none">
                     {active.length}
@@ -805,23 +718,23 @@ export default function DashboardPage() {
                 )}
               </div>
               <Link to={ROUTES.TASKS} className="flex items-center gap-1 text-xs text-gray-400 hover:text-navy transition-colors">
-                All tasks <ArrowRight size={11} />
+                {t('dashboard.toDoToday.allTasks')} <ArrowRight size={11} />
               </Link>
             </div>
 
             {taskLoading ? (
               <div className="flex flex-col items-center justify-center py-16 gap-2">
                 <Loader2 size={22} className="animate-spin text-gray-300" />
-                <p className="text-xs text-gray-400">Loading tasks…</p>
+                <p className="text-xs text-gray-400">{t('dashboard.toDoToday.loading')}</p>
               </div>
             ) : sortedActive.length === 0 && done.length === 0 ? (
-              <EmptyMyDay onNavigate={() => navigate(ROUTES.TASKS)} />
+              <EmptyMyDay onCreateTask={() => setShowCreateTask(true)} />
             ) : (
               <>
                 {sortedActive.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-10 gap-2">
                     <CheckCircle2 size={28} className="text-success" />
-                    <p className="text-sm font-medium text-gray-700">All tasks done for today!</p>
+                    <p className="text-sm font-medium text-gray-700">{t('dashboard.toDoToday.allDone')}</p>
                   </div>
                 ) : (
                   sortedActive.map((task) => (
@@ -829,7 +742,7 @@ export default function DashboardPage() {
                   ))
                 )}
 
-                <QuickAddTask onAdded={(t) => addTask(t)} />
+                <QuickAddTask onAdded={(task) => addTask(task)} />
 
                 {done.length > 0 && (
                   <div className="border-t border-gray-100">
@@ -838,7 +751,7 @@ export default function DashboardPage() {
                       className="flex items-center gap-2 w-full px-5 py-3 text-xs text-gray-500 hover:bg-gray-50 transition-colors"
                     >
                       {showDone ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
-                      <span className="font-medium">Completed</span>
+                      <span className="font-medium">{t('dashboard.toDoToday.completed')}</span>
                       <span className="ml-1 text-gray-400">{done.length}</span>
                     </button>
                     {showDone && done.map((task) => (
@@ -855,17 +768,17 @@ export default function DashboardPage() {
             <div className="flex items-center justify-between px-5 py-3.5 border-b border-gray-100">
               <div className="flex items-center gap-2">
                 <StickyNoteIcon size={15} className="text-navy" />
-                <span className="text-sm font-semibold text-gray-800">Sticky Notes</span>
+                <span className="text-sm font-semibold text-gray-800">{t('dashboard.stickyNotes.title')}</span>
               </div>
               <Link to={ROUTES.NOTES} className="flex items-center gap-1 text-xs text-gray-400 hover:text-navy transition-colors">
-                All <ArrowRight size={11} />
+                {t('dashboard.stickyNotes.all')} <ArrowRight size={11} />
               </Link>
             </div>
 
             {dashNotes.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-6 text-center px-4">
                 <StickyNoteIcon size={18} className="text-gray-200 mb-1.5" />
-                <p className="text-xs text-gray-400">No pinned notes</p>
+                <p className="text-xs text-gray-400">{t('dashboard.stickyNotes.empty')}</p>
               </div>
             ) : (
               <div className="p-3 grid grid-cols-2 gap-2">
@@ -886,7 +799,7 @@ export default function DashboardPage() {
                 })}
                 {allNotes.filter((n) => n.isPinned).length > 4 && (
                   <Link to={ROUTES.NOTES} className="col-span-2 block text-center text-xs text-gray-400 hover:text-navy py-1 transition-colors">
-                    +{allNotes.filter((n) => n.isPinned).length - 4} more
+                    {t('dashboard.stickyNotes.more', { count: allNotes.filter((n) => n.isPinned).length - 4 })}
                   </Link>
                 )}
               </div>
@@ -905,6 +818,15 @@ export default function DashboardPage() {
 
         </div>
       </div>
+
+      {showCreateTask && (
+        <CreateTaskModal
+          onClose={() => setShowCreateTask(false)}
+          onCreated={(task: CreatedTask) => addTask(task)}
+          extraPayload={{ myDay: true }}
+          taskLists={taskLists}
+        />
+      )}
     </div>
   );
 }
@@ -924,21 +846,22 @@ function AlertChip({ icon: Icon, label, danger }: {
   );
 }
 
-function EmptyMyDay({ onNavigate }: { onNavigate: () => void }) {
+function EmptyMyDay({ onCreateTask }: { onCreateTask: () => void }) {
+  const { t } = useTranslation();
   return (
     <div className="flex flex-col items-center justify-center py-20 text-center px-8">
       <div className="w-14 h-14 rounded-full bg-navy/5 flex items-center justify-center mb-4">
         <Sun size={24} className="text-navy/30" />
       </div>
-      <p className="text-sm font-semibold text-gray-700">My Day is empty</p>
+      <p className="text-sm font-semibold text-gray-700">{t('dashboard.emptyMyDay.title')}</p>
       <p className="text-xs text-gray-400 mt-1 leading-relaxed max-w-[220px]">
-        Add a task below, or open Tasks and mark any task as My Day.
+        {t('dashboard.emptyMyDay.subtitle')}
       </p>
       <button
-        onClick={onNavigate}
+        onClick={onCreateTask}
         className="mt-4 text-xs text-white bg-navy hover:bg-navy-light px-4 py-2 rounded transition-colors"
       >
-        Open Tasks
+        {t('dashboard.emptyMyDay.cta')}
       </button>
     </div>
   );

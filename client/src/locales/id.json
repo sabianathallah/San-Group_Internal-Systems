@@ -1,0 +1,2085 @@
+{
+  "dashboard": {
+    "greeting": {
+      "morning": "Selamat pagi",
+      "afternoon": "Selamat siang",
+      "evening": "Selamat malam"
+    },
+    "subtitle": {
+      "empty": "Belum ada task di My Day — tambahkan di bawah",
+      "allDone": "Semua task My Day sudah selesai!",
+      "remaining": "{{count}} task tersisa hari ini",
+      "remaining_plural": "{{count}} task tersisa hari ini"
+    },
+    "done": "selesai",
+    "alerts": {
+      "overdue": "{{count}} terlambat",
+      "awaiting": "{{count}} menunggu",
+      "users": "{{count}} pengguna"
+    },
+    "checkIn": {
+      "title": "Absensi Hari Ini",
+      "notCheckedIn": "Belum check in",
+      "checkedIn": "Check in {{time}}",
+      "late": "Terlambat {{minutes}}m",
+      "done": "Selesai · {{checkIn}}–{{checkOut}}",
+      "checkInBtn": "Check In",
+      "checkOutBtn": "Check Out",
+      "complete": "Selesai",
+      "shift": "Shift {{name}}"
+    },
+    "toDoToday": {
+      "title": "To Do Hari Ini",
+      "allTasks": "Semua task",
+      "loading": "Memuat task…",
+      "allDone": "Semua task hari ini selesai!",
+      "addTask": "Tambah task ke My Day",
+      "titlePlaceholder": "Masukkan judul task...",
+      "add": "Tambah",
+      "cancel": "Batal",
+      "completed": "Selesai",
+      "waiting": "Menunggu",
+      "inProgress": "Sedang berjalan"
+    },
+    "emptyMyDay": {
+      "title": "My Day masih kosong",
+      "subtitle": "Tambahkan task di bawah, atau buat sekarang.",
+      "cta": "Buat Task"
+    },
+    "stickyNotes": {
+      "title": "Sticky Notes",
+      "all": "Semua",
+      "empty": "Belum ada catatan yang di-pin",
+      "more": "+{{count}} lainnya"
+    },
+    "quickAccess": {
+      "title": "Akses Cepat",
+      "tasks": "Task",
+      "bulletin": "Bulletin",
+      "notes": "Catatan",
+      "dbLinks": "DB Links",
+      "workOrders": "Work Order",
+      "hris": "HRIS",
+      "analytics": "Analitik",
+      "admin": "Admin"
+    },
+    "team": {
+      "myDivision": "Divisi Saya",
+      "myTeam": "Tim Saya",
+      "tasks": "Task",
+      "done": "Selesai",
+      "members": "Anggota",
+      "noData": "Belum ada data tim"
+    },
+    "system": {
+      "title": "Sistem",
+      "users": "Pengguna",
+      "tasks": "Task"
+    },
+    "wallpaper": {
+      "changeTitle": "Ubah wallpaper header",
+      "header": "Wallpaper header",
+      "upload": "Unggah gambar kustom",
+      "applyError": "Gagal menerapkan wallpaper",
+      "uploadError": "Gagal mengunggah wallpaper",
+      "maxSize": "Ukuran file maksimum 3MB"
+    }
+  },
+  "tasks": {
+    "sidebar": {
+      "personal": "Personal",
+      "workspace": "Workspace",
+      "lists": "List",
+      "myDay": "My Day",
+      "important": "Penting",
+      "planned": "Terjadwal",
+      "assigned": "Ditugaskan ke Saya",
+      "myTasks": "Task Saya",
+      "completed": "Selesai",
+      "allTasks": "Semua Task",
+      "teamTasks": "Task Tim",
+      "newList": "List Baru"
+    },
+    "filterPanel": {
+      "status": "Status",
+      "priority": "Prioritas",
+      "assignee": "Assignee",
+      "other": "Lainnya",
+      "all": "Semua",
+      "hasDueDate": "Ada tenggat",
+      "overdueOnly": "Hanya yang terlambat",
+      "clearAll": "Hapus semua"
+    },
+    "status": {
+      "todo": "To Do",
+      "inProgress": "Sedang Berjalan",
+      "done": "Selesai",
+      "waitingConfirmation": "Menunggu Konfirmasi"
+    },
+    "priority": {
+      "urgent": "Mendesak",
+      "high": "Tinggi",
+      "medium": "Sedang",
+      "low": "Rendah"
+    },
+    "visibility": {
+      "onlyMe": "Hanya Saya",
+      "myDivision": "Divisi Saya",
+      "selectDivisions": "Pilih Divisi",
+      "allStaff": "Semua Staff"
+    },
+    "assignBadge": {
+      "accepted": "Diterima",
+      "rejected": "Ditolak"
+    },
+    "due": {
+      "overdue": "Terlambat {{count}}h",
+      "overdue_plural": "Terlambat {{count}}h",
+      "today": "Hari ini",
+      "tomorrow": "Besok",
+      "ago": "{{count}}h lalu",
+      "ago_plural": "{{count}}h lalu"
+    },
+    "listView": {
+      "colTitle": "Judul",
+      "colStatus": "Status",
+      "colPriority": "Prioritas",
+      "colDue": "Tenggat",
+      "doneOf": "{{done}}/{{total}} selesai",
+      "newTaskPlaceholder": "Judul task baru...",
+      "addTask": "Tambah task",
+      "ok": "OK",
+      "clickToggle": "Klik: To Do → Selesai",
+      "removeFromMyDay": "Hapus dari My Day",
+      "addToMyDay": "Tambah ke My Day",
+      "removeFromImportant": "Hapus dari Penting",
+      "markImportant": "Tandai sebagai penting",
+      "unassigned": "Belum ditugaskan"
+    },
+    "boardView": {
+      "taskTitlePlaceholder": "Judul task...",
+      "addTask": "Tambah task",
+      "ok": "OK",
+      "cancel": "Batal"
+    },
+    "tableView": {
+      "colTitle": "Judul",
+      "colStatus": "Status",
+      "colPriority": "Prioritas",
+      "colAssignee": "Assignee",
+      "colDueDate": "Tenggat",
+      "colList": "List",
+      "noTasksFound": "Task tidak ditemukan"
+    },
+    "calendarView": {
+      "weekdays": {
+        "mon": "Sen", "tue": "Sel", "wed": "Rab", "thu": "Kam", "fri": "Jum", "sat": "Sab", "sun": "Min"
+      },
+      "noDueDate": "Tanpa tenggat",
+      "dragHint": "{{count}} task · seret ke tanggal",
+      "dragHint_plural": "{{count}} task · seret ke tanggal",
+      "taskPlaceholder": "Task…",
+      "add": "Tambah",
+      "rangeMore": "+{{count}} rentang",
+      "chipMore": "+{{count}} lainnya",
+      "rangeTitle": "{{title}} (mulai → tenggat)"
+    },
+    "plannedView": {
+      "overdue": "Terlambat",
+      "today": "Hari Ini",
+      "tomorrow": "Besok",
+      "thisWeek": "Minggu Ini",
+      "thisMonth": "Bulan Ini",
+      "later": "Nanti",
+      "noScheduledTasks": "Belum ada task terjadwal"
+    },
+    "descriptionEditor": {
+      "write": "Tulis",
+      "preview": "Pratinjau",
+      "placeholder": "Tambah deskripsi... (mendukung Markdown)",
+      "previewEmpty": "Pratinjau akan muncul di sini"
+    },
+    "detailPanel": {
+      "backToParent": "Kembali ke parent",
+      "taskNotFound": "Task tidak ditemukan",
+      "delete": "Hapus",
+      "assignedBy": "Task ini ditugaskan kepada Anda oleh {{name}}",
+      "accept": "Terima",
+      "reject": "Tolak",
+      "rejectPlaceholder": "Tulis alasan penolakan...",
+      "submit": "Kirim",
+      "cancel": "Batal",
+      "taskRejected": "Task ditolak",
+      "status": "Status",
+      "priority": "Prioritas",
+      "startDate": "Tanggal mulai",
+      "dueDate": "Tenggat",
+      "assignTo": "Tugaskan ke",
+      "list": "List",
+      "myLists": "List Saya",
+      "flags": "Penanda",
+      "shareWith": "Bagikan ke",
+      "toSupervisor": "Ke atasan",
+      "division": "Divisi",
+      "createdBy": "Dibuat oleh",
+      "duration": "Durasi",
+      "noListOption": "— Tanpa list —",
+      "searchPeoplePlaceholder": "Cari orang…",
+      "unassigned": "— Belum ditugaskan —",
+      "myDayFlag": "My Day",
+      "importantFlag": "Penting",
+      "hiddenFromSupervisor": "Disembunyikan dari atasan",
+      "visibleToSupervisor": "Terlihat oleh atasan",
+      "startDateError": "Tanggal mulai harus sebelum atau sama dengan tenggat",
+      "dueDateError": "Tenggat harus setelah atau sama dengan tanggal mulai",
+      "completedIn": "Selesai dalam {{duration}}",
+      "inProgressFor": "Berjalan selama {{duration}}",
+      "openFor": "Terbuka selama {{duration}}",
+      "description": "Deskripsi",
+      "subtasksTab": "Subtask",
+      "linksTab": "Link",
+      "notesTab": "Catatan",
+      "add": "Tambah",
+      "subtaskPlaceholder": "Nama subtask...",
+      "linkUrlPlaceholder": "https://…",
+      "linkTitlePlaceholder": "Nama link (opsional)",
+      "addLink": "Tambah link",
+      "noNotesYet": "Belum ada catatan",
+      "notePlaceholder": "Tulis catatan... (Enter untuk kirim, Shift+Enter untuk baris baru)",
+      "send": "Kirim"
+    },
+    "newListModal": {
+      "title": "List Baru",
+      "namePlaceholder": "Nama list…",
+      "iconPlaceholder": "Ikon emoji (opsional)",
+      "color": "Warna",
+      "cancel": "Batal",
+      "create": "Buat List"
+    },
+    "divisionGrid": {
+      "loading": "Memuat divisi…",
+      "empty": "Belum ada divisi tersedia",
+      "selectDivision": "Pilih Divisi",
+      "subtitle": "Klik sebuah divisi untuk melihat task-nya",
+      "myDivision": "Divisi Saya",
+      "open": "Buka"
+    },
+    "completedView": {
+      "empty": "Belum ada task yang selesai",
+      "taskCount": "{{count}} task",
+      "taskCount_plural": "{{count}} task",
+      "noneThisMonth": "Belum ada task selesai bulan ini"
+    },
+    "toolbar": {
+      "allStaff": "Semua Staff",
+      "byDivision": "Per Divisi",
+      "viewList": "List",
+      "viewBoard": "Board",
+      "viewCal": "Kalender",
+      "viewTable": "Tabel",
+      "groupStatus": "Kelompok: Status",
+      "groupPriority": "Kelompok: Prioritas",
+      "groupAssignee": "Kelompok: Assignee",
+      "sortLatest": "Urutkan: Terbaru",
+      "sortDueDate": "Urutkan: Tenggat",
+      "sortPriority": "Urutkan: Prioritas",
+      "sortAlpha": "Urutkan: A–Z",
+      "searchPlaceholder": "Cari…",
+      "filter": "Filter",
+      "exportCsv": "CSV",
+      "exportCsvTitle": "Ekspor ke CSV",
+      "hideDone": "Sembunyikan selesai",
+      "showDone": "Tampilkan selesai ({{count}})",
+      "doneOf": "{{done}}/{{total}} selesai",
+      "newTask": "Task Baru",
+      "allTasksBreadcrumb": "Semua Task",
+      "loadMore": "Muat lebih banyak"
+    },
+    "myDay": {
+      "title": "My Day",
+      "greeting": {
+        "morning": "Selamat pagi",
+        "afternoon": "Selamat siang",
+        "evening": "Selamat malam",
+        "night": "Selamat malam"
+      },
+      "importantTitle": "Penting",
+      "importantSubtitle": "Task yang Anda tandai sebagai penting",
+      "suggestions": "Saran ({{count}})",
+      "suggestionsHint": "terlambat · tenggat hari ini · belum selesai kemarin",
+      "addToMyDay": "My Day"
+    },
+    "team": {
+      "allLists": "Semua list"
+    },
+    "emptyState": {
+      "noTasksHere": "Belum ada task di sini",
+      "createFirstTask": "Buat task pertama",
+      "loadingTasks": "Memuat task…",
+      "loading": "Memuat…"
+    },
+    "errors": {
+      "generic": "Terjadi kesalahan"
+    },
+    "toast": {
+      "markedDone": "\"{{title}}\" ditandai selesai",
+      "deleted": "\"{{title}}\" dihapus"
+    },
+    "csv": {
+      "title": "Judul",
+      "status": "Status",
+      "priority": "Prioritas",
+      "dueDate": "Tenggat",
+      "creator": "Pembuat",
+      "assignee": "Assignee",
+      "list": "List",
+      "createdAt": "Dibuat Pada"
+    }
+  },
+  "workOrder": {
+    "title": "Work Order",
+    "createBtn": "Buat WO",
+    "createBtnShort": "Buat",
+    "sections": {
+      "myWork": "Pekerjaan Saya",
+      "management": "Manajemen"
+    },
+    "views": {
+      "mine": "Tugas Saya",
+      "reported": "Dilaporkan oleh Saya",
+      "all": "Semua Work Order",
+      "unassigned": "Belum Ditugaskan",
+      "pendingReview": "Menunggu Peninjauan"
+    },
+    "stats": {
+      "active": "Aktif",
+      "pendingReview": "Menunggu Peninjauan",
+      "overdue": "Terlambat",
+      "urgent": "Mendesak"
+    },
+    "toolbar": {
+      "searchPlaceholder": "Cari kode / judul...",
+      "searchAriaLabel": "Cari work order",
+      "toggleFiltersAriaLabel": "Tampilkan/sembunyikan filter",
+      "refreshAriaLabel": "Muat ulang",
+      "exportCsvTitle": "Ekspor semua work order terfilter ke CSV",
+      "exportCsvAriaLabel": "Ekspor CSV",
+      "kanbanView": "Kanban",
+      "tableView": "Tabel",
+      "allPriorities": "Semua Prioritas",
+      "allCategories": "Semua Kategori",
+      "allTechnicians": "Semua Teknisi",
+      "dateTo": "sampai"
+    },
+    "loadMore": {
+      "showing": "Menampilkan {{shown}} dari {{total}} work order.",
+      "button": "Muat lebih banyak"
+    },
+    "noWorkOrders": "Tidak ada work order",
+    "empty": "Kosong",
+    "noMatchingEmployee": "Tidak ada pegawai yang cocok",
+    "card": {
+      "reportedByPrefix": "oleh {{name}}"
+    },
+    "table": {
+      "code": "Kode",
+      "title": "Judul",
+      "category": "Kategori",
+      "priority": "Prioritas",
+      "status": "Status",
+      "technician": "Teknisi",
+      "due": "Tenggat",
+      "closed": "Ditutup",
+      "age": "Usia",
+      "duration": "Durasi"
+    },
+    "common": {
+      "close": "Tutup",
+      "cancel": "Batal",
+      "save": "Simpan"
+    },
+    "modal": {
+      "createTitle": "Buat Work Order",
+      "editTitle": "Edit {{code}}",
+      "titleLabel": "Judul *",
+      "titlePlaceholder": "Deskripsi singkat masalahnya...",
+      "descriptionLabel": "Deskripsi",
+      "descriptionPlaceholder": "Detail lebih lanjut tentang masalahnya...",
+      "priorityLabel": "Prioritas",
+      "categoryLabel": "Kategori",
+      "locationLabel": "Lokasi",
+      "locationPlaceholder": "Gedung / lantai / ruangan",
+      "dueDateLabel": "Tenggat Waktu (SLA)",
+      "dueDateAutoHint": "Otomatis diatur berdasarkan prioritas — sesuaikan jika perlu",
+      "assignLabel": "Tugaskan ke Teknisi",
+      "unassignedOption": "— Belum Ditugaskan —",
+      "technicianNotesLabel": "Catatan Teknisi",
+      "technicianNotesPlaceholder": "Catatan internal untuk teknisi...",
+      "titleRequired": "Judul wajib diisi",
+      "created": "Work order berhasil dibuat",
+      "updated": "Work order berhasil diperbarui"
+    },
+    "statusModal": {
+      "title": "Ubah Status",
+      "finalStatus": "Status ini sudah final.",
+      "noteLabel": "Catatan (opsional)",
+      "notePlaceholder": "Alasan perubahan status...",
+      "updated": "Status berhasil diperbarui",
+      "afterPhotoRequiredAgain": "Membutuhkan foto \"sesudah\" baru yang diunggah setelah penolakan",
+      "afterPhotoRequired": "Membutuhkan minimal 1 foto \"sesudah\""
+    },
+    "reviewModal": {
+      "title": "Tinjau Pekerjaan Selesai",
+      "afterPhotosLabel": "Foto Sesudah Pengerjaan",
+      "noPhotos": "Tidak ada foto",
+      "approve": "Setujui",
+      "reject": "Tolak",
+      "rejectionReasonLabel": "Alasan penolakan *",
+      "noteLabel": "Catatan (opsional)",
+      "rejectionPlaceholder": "Jelaskan apa yang perlu diperbaiki...",
+      "notePlaceholder": "Catatan tambahan...",
+      "sendRejection": "Kirim Penolakan",
+      "approveAndClose": "Setujui & Tutup WO",
+      "rejectionRequired": "Alasan penolakan wajib diisi",
+      "approved": "Work order disetujui dan ditutup",
+      "rejected": "Work order dikembalikan untuk direvisi"
+    },
+    "assignModal": {
+      "title": "Tugaskan Work Order",
+      "pickTechnicianFor": "Pilih teknisi untuk \"{{title}}\"",
+      "searchPlaceholder": "Cari nama...",
+      "assigned": "Work order berhasil ditugaskan"
+    },
+    "detail": {
+      "reportedBy": "Dilaporkan oleh",
+      "assignedTo": "Ditugaskan kepada",
+      "assignedBy": "Ditugaskan oleh",
+      "unassigned": "Belum ditugaskan",
+      "location": "Lokasi",
+      "created": "Dibuat",
+      "dueDate": "Tenggat Waktu",
+      "closed": "Ditutup",
+      "description": "Deskripsi",
+      "technicianNotes": "Catatan Teknisi",
+      "reviewNote": "Catatan Peninjauan",
+      "reviewNoteBy": "Catatan Peninjauan — {{name}}",
+      "photoEvidence": "Bukti Foto",
+      "history": "Riwayat ({{count}})",
+      "changedFrom": "diubah dari",
+      "reviewWorkBtn": "Tinjau Pekerjaan",
+      "changeStatusBtn": "Ubah Status",
+      "editBtn": "Edit",
+      "deleteBtn": "Hapus",
+      "confirmDelete": "Klik sekali lagi untuk menghapus",
+      "deleted": "Work order berhasil dihapus"
+    },
+    "timeline": {
+      "title": "Linimasa",
+      "created": "Dibuat",
+      "assigned": "Ditugaskan",
+      "workStarted": "Pekerjaan dimulai",
+      "submittedForReview": "Diajukan untuk peninjauan",
+      "cancelled": "Dibatalkan",
+      "closed": "Ditutup",
+      "totalDuration": "Total waktu dibuka → ditutup: {{duration}}",
+      "openFor": "Terbuka selama {{duration}}"
+    },
+    "photos": {
+      "before": "Sebelum",
+      "after": "Sesudah",
+      "noPhotoYet": "Belum ada foto",
+      "afterRequiredHint": "Wajib ada sebelum diajukan untuk peninjauan",
+      "uploadBeforeAriaLabel": "Unggah foto sebelum",
+      "uploadAfterAriaLabel": "Unggah foto sesudah",
+      "photoUploaded": "Foto berhasil diunggah",
+      "videoUploaded": "Video berhasil diunggah"
+    },
+    "errors": {
+      "generic": "Terjadi kesalahan",
+      "transitionNotAllowed": "Perubahan status ini tidak diperbolehkan"
+    },
+    "relative": {
+      "justNow": "baru saja",
+      "minsAgo": "{{count}}m lalu",
+      "hrsAgo": "{{count}}j lalu",
+      "daysAgo": "{{count}}h lalu"
+    },
+    "age": {
+      "totalDurationTitle": "Total durasi dari dibuka hingga ditutup",
+      "openForTitle": "Terbuka selama"
+    },
+    "units": {
+      "day": "h",
+      "hour": "j",
+      "minute": "m"
+    },
+    "csv": {
+      "code": "Kode",
+      "title": "Judul",
+      "status": "Status",
+      "priority": "Prioritas",
+      "category": "Kategori",
+      "location": "Lokasi",
+      "reportedBy": "Dilaporkan Oleh",
+      "assignee": "Assignee",
+      "dueDate": "Tenggat Waktu",
+      "createdAt": "Dibuat Pada",
+      "closedAt": "Ditutup Pada",
+      "ageDuration": "Usia / Durasi"
+    }
+  },
+  "language": {
+    "label": "Bahasa",
+    "en": "EN",
+    "id": "ID"
+  },
+  "bulletin": {
+    "header": {
+      "title": "Bulletin",
+      "subtitleCount": "{{count}} bulletin",
+      "subtitleCount_plural": "{{count}} bulletin",
+      "subtitleDefault": "Papan pengumuman",
+      "subtitleScheduledCount": "{{count}} terjadwal",
+      "create": "Buat",
+      "add": "Tambah"
+    },
+    "tabs": {
+      "bulletins": "Bulletin",
+      "scheduled": "Terjadwal"
+    },
+    "category": {
+      "all": "Semua",
+      "announcement": "Pengumuman",
+      "holiday": "Libur",
+      "maintenance": "Maintenance",
+      "event": "Acara",
+      "general": "Umum"
+    },
+    "priority": {
+      "urgent": "Mendesak",
+      "important": "Penting",
+      "normal": "Normal"
+    },
+    "search": {
+      "placeholder": "Cari bulletin..."
+    },
+    "drafts": {
+      "hide": "Sembunyikan draft",
+      "show": "Tampilkan draft"
+    },
+    "feed": {
+      "draft": "Draft",
+      "division": "Divisi",
+      "limited": "Terbatas",
+      "by": "Oleh {{name}}",
+      "readers": "{{count}} pembaca",
+      "readers_plural": "{{count}} pembaca",
+      "validUntil": "Berlaku sampai: {{date}}",
+      "unpublish": "Batalkan publikasi",
+      "publish": "Publikasikan"
+    },
+    "pagination": {
+      "pageOf": "{{page}} / {{totalPages}}"
+    },
+    "scheduledTab": {
+      "emptyTitle": "Belum ada pengumuman terjadwal",
+      "emptySubtitle": "Tambahkan notifikasi berulang untuk tim Anda.",
+      "deactivate": "Nonaktifkan",
+      "activate": "Aktifkan",
+      "lastSent": "Terakhir dikirim: {{date}}",
+      "audienceAll": "Semua staf",
+      "audienceDivision": "Divisi pembuat"
+    },
+    "recurrence": {
+      "daily": "Setiap hari",
+      "weekdays": "Hari kerja (Sen–Jum)",
+      "weekly": "Setiap minggu pada…",
+      "weeklySpecific": "Setiap minggu pada hari tertentu"
+    },
+    "days": {
+      "sunday": "Minggu",
+      "monday": "Senin",
+      "tuesday": "Selasa",
+      "wednesday": "Rabu",
+      "thursday": "Kamis",
+      "friday": "Jumat",
+      "saturday": "Sabtu"
+    },
+    "confirm": {
+      "deleteScheduled": "Hapus pengumuman terjadwal ini?",
+      "deleteBulletin": "Hapus bulletin ini?"
+    },
+    "toast": {
+      "toggleScheduledError": "Gagal mengubah status pengumuman terjadwal",
+      "deleteScheduledError": "Gagal menghapus pengumuman terjadwal",
+      "deleteBulletinError": "Gagal menghapus bulletin",
+      "togglePublishError": "Gagal mengubah status publikasi bulletin"
+    },
+    "emptyState": {
+      "title": "Belum ada bulletin",
+      "subtitle": "Pengumuman dari manajemen akan muncul di sini.",
+      "cta": "Buat Bulletin"
+    },
+    "errorState": {
+      "loadFailed": "Gagal memuat bulletin.",
+      "tryAgain": "Coba lagi"
+    },
+    "loadingDivisions": "Memuat divisi...",
+    "form": {
+      "editTitle": "Edit Bulletin",
+      "createTitle": "Buat Bulletin",
+      "titleLabel": "Judul *",
+      "titlePlaceholder": "Judul bulletin...",
+      "contentLabel": "Konten *",
+      "contentPlaceholder": "Isi pengumuman...",
+      "categoryLabel": "Kategori",
+      "priorityLabel": "Prioritas",
+      "audienceLabel": "Audiens",
+      "audienceEveryone": "Semua Orang",
+      "audienceMyDivision": "Divisi Saya",
+      "audienceSelectDivisions": "Pilih Divisi",
+      "selectDivisionsLabel": "Pilih Divisi",
+      "validUntilLabel": "Berlaku sampai",
+      "publishNow": "Publikasikan sekarang",
+      "cancel": "Batal",
+      "save": "Simpan",
+      "create": "Buat Bulletin",
+      "errors": {
+        "titleRequired": "Judul wajib diisi",
+        "contentRequired": "Konten wajib diisi",
+        "divisionRequired": "Pilih minimal satu divisi untuk audiens kustom",
+        "generic": "Terjadi kesalahan"
+      }
+    },
+    "scheduledForm": {
+      "editTitle": "Edit Pengumuman Terjadwal",
+      "createTitle": "Pengumuman Terjadwal Baru",
+      "titleLabel": "Judul",
+      "titlePlaceholder": "mis. Pengingat Absensi Harian",
+      "messageLabel": "Pesan",
+      "messagePlaceholder": "mis. Jangan lupa mengisi absensi hari ini!",
+      "recurrenceLabel": "Pengulangan",
+      "dayOfWeekLabel": "Hari dalam minggu",
+      "hourLabel": "Jam (WIB)",
+      "minuteLabel": "Menit",
+      "audienceLabel": "Audiens",
+      "audienceAll": "Semua staf",
+      "audienceDivision": "Hanya divisi pembuat",
+      "audienceCustom": "Divisi tertentu",
+      "divisionsLabel": "Divisi",
+      "cancel": "Batal",
+      "save": "Simpan perubahan",
+      "create": "Buat",
+      "errors": {
+        "required": "Judul dan konten wajib diisi.",
+        "divisionRequired": "Pilih minimal satu divisi.",
+        "saveFailed": "Gagal menyimpan. Silakan coba lagi."
+      }
+    }
+  },
+  "analytics": {
+    "title": "Analitik",
+    "subtitle": "Ringkasan produktivitas · {{scope}}",
+    "scope": {
+      "all": "Semua Divisi",
+      "division": "Divisi Saya",
+      "personal": "Task Saya"
+    },
+    "last30Days": "30 hari terakhir",
+    "accessRestricted": {
+      "title": "Akses Dibatasi",
+      "message": "Anda tidak memiliki izin untuk melihat halaman analitik."
+    },
+    "error": {
+      "loadFailed": "Gagal memuat data analitik",
+      "loadFailedGeneric": "Gagal memuat data",
+      "tryAgain": "Coba lagi"
+    },
+    "stats": {
+      "totalTasks": "Total Task",
+      "completedPct": "{{pct}}% selesai",
+      "completed": "Selesai",
+      "inProgress": "Sedang Berjalan",
+      "overdue": "Terlambat",
+      "newThisWeek": "Baru minggu ini",
+      "todo": "To Do",
+      "activeUsers": "Pengguna aktif",
+      "ofTotal": "dari {{total}} total",
+      "completionRate": "Tingkat penyelesaian"
+    },
+    "charts": {
+      "completionTrend": "Task Selesai — 7 Hari Terakhir",
+      "priorityDistribution": "Distribusi Prioritas",
+      "noData": "Belum ada data",
+      "perDivision": "Produktivitas per Divisi",
+      "doneOfTotal": "{{done}}/{{total}} selesai ({{rate}}%)"
+    },
+    "priority": {
+      "urgent": "Mendesak",
+      "high": "Tinggi",
+      "medium": "Sedang",
+      "low": "Rendah"
+    }
+  },
+  "notifications": {
+    "title": "Notifikasi",
+    "unread": "{{count}} belum dibaca",
+    "unread_plural": "{{count}} belum dibaca",
+    "allCaughtUp": "Semua sudah dibaca",
+    "markAllRead": "Tandai semua dibaca",
+    "emptyState": {
+      "title": "Belum ada notifikasi",
+      "subtitle": "Semua sudah dibaca! Cek lagi nanti."
+    },
+    "loadMore": "Muat lebih banyak",
+    "groups": {
+      "today": "Hari Ini",
+      "yesterday": "Kemarin"
+    },
+    "time": {
+      "justNow": "Baru saja",
+      "minsAgo": "{{count}}m lalu",
+      "hrsAgo": "{{count}}j lalu"
+    }
+  },
+  "admin": {
+    "permissions": {
+      "levels": {
+        "l1": "Akses penuh ke sistem",
+        "l2": "Pimpinan organisasi",
+        "l3": "Manajemen operasional",
+        "l4": "Kepala divisi / departemen",
+        "l5": "Kepala unit / sub-divisi",
+        "l6": "Anggota tim / staf"
+      },
+      "loadError": "Gagal memuat role dan permission",
+      "unsavedChangesConfirm": "Anda memiliki perubahan yang belum disimpan. Lanjutkan?",
+      "toast": {
+        "saved": "Permission berhasil disimpan",
+        "saveFailed": "Gagal menyimpan permission"
+      },
+      "addRoleModal": {
+        "title": "Tambah Role Kustom",
+        "roleNameLabel": "Nama role",
+        "namePlaceholder": "mis. Senior Engineer",
+        "slugPrefix": "slug: {{slug}}",
+        "hierarchyLevelLabel": "Level hierarki",
+        "descriptionLabel": "Deskripsi",
+        "optional": "(opsional)",
+        "descriptionPlaceholder": "Deskripsi singkat role ini…",
+        "cancel": "Batal",
+        "create": "Buat Role",
+        "errors": {
+          "nameRequired": "Nama role wajib diisi",
+          "invalidName": "Nama harus mengandung minimal satu huruf atau angka"
+        }
+      },
+      "roleList": {
+        "title": "Role",
+        "subtitle": "Pilih untuk melihat permission",
+        "addTitle": "Tambah role kustom",
+        "footerNote": "Role L1–L2 tidak dapat dihapus. Role kustom dapat dihapus jika tidak ada pengguna yang ditugaskan.",
+        "customPermissionsBadge": "Permission kustom",
+        "editTitle": "Edit nama & warna",
+        "deleteTitle": "Hapus role",
+        "cannotDeleteTitle": "Tidak dapat dihapus — {{count}} pengguna ditugaskan",
+        "cannotDeleteAlert": "Tidak dapat dihapus — {{count}} pengguna masih ditugaskan ke role ini.",
+        "confirmDelete": "Hapus role \"{{name}}\"? Tindakan ini tidak dapat dibatalkan.",
+        "nameEmptyError": "Nama tidak boleh kosong",
+        "save": "Simpan",
+        "cancel": "Batal"
+      },
+      "editor": {
+        "fullAccessNote": "Akses penuh — tidak dapat dikonfigurasi",
+        "customPermissions": "Permission kustom",
+        "defaultPermissions": "Permission default",
+        "save": "Simpan",
+        "readOnlyTitle": "Hanya SuperAdmin yang dapat mengedit permission",
+        "superAdminBanner": "SuperAdmin selalu memiliki permission penuh dan tidak dapat dikonfigurasi.",
+        "readOnlyBanner": "Hanya SuperAdmin yang dapat mengubah permission. Anda memiliki akses lihat saja.",
+        "selectRolePrompt": "Pilih role untuk mengatur permission"
+      },
+      "scope": {
+        "none": "Tidak Ada",
+        "own": "Milik Sendiri",
+        "division": "Divisi",
+        "all": "Semua",
+        "ownDivision": "Divisi Sendiri"
+      },
+      "sections": {
+        "task": {
+          "title": "Task",
+          "view": "Lihat task",
+          "create": "Buat task",
+          "edit": "Edit task",
+          "delete": "Hapus task",
+          "viewPrivate": "Lihat task privat milik orang lain"
+        },
+        "bulletin": {
+          "title": "Bulletin",
+          "view": "Lihat bulletin",
+          "create": "Buat & publikasikan bulletin",
+          "audienceScope": "Target audiens",
+          "edit": "Edit bulletin",
+          "delete": "Hapus bulletin"
+        },
+        "dbLinks": {
+          "title": "DB Links",
+          "view": "Lihat folder",
+          "addLink": "Tambah link ke folder",
+          "manageFolder": "Kelola folder (buat/edit/hapus)",
+          "shareFolder": "Bagikan folder ke divisi lain"
+        },
+        "notes": {
+          "title": "Catatan",
+          "view": "Lihat catatan",
+          "create": "Buat catatan",
+          "edit": "Edit catatan",
+          "delete": "Hapus catatan"
+        },
+        "analytics": {
+          "title": "Analitik",
+          "view": "Lihat analitik"
+        },
+        "auditLog": {
+          "title": "Audit Log",
+          "view": "Lihat audit log"
+        },
+        "hris": {
+          "title": "HRIS",
+          "reviewLeave": "Tinjau pengajuan cuti",
+          "editAttendance": "Edit data absensi",
+          "manageShifts": "Kelola shift",
+          "manageLocations": "Kelola lokasi kantor",
+          "viewReports": "Lihat laporan absensi"
+        },
+        "workOrder": {
+          "title": "Work Order",
+          "view": "Lihat work order",
+          "create": "Buat work order",
+          "edit": "Edit work order",
+          "delete": "Hapus work order",
+          "canBeAssignee": "Dapat ditugaskan sebagai teknisi/pelaksana"
+        },
+        "userMgmt": {
+          "title": "Manajemen Pengguna",
+          "create": "Buat pengguna",
+          "edit": "Edit pengguna",
+          "toggleStatus": "Aktifkan / nonaktifkan pengguna",
+          "delete": "Hapus pengguna"
+        },
+        "roleMgmt": {
+          "title": "Manajemen Role",
+          "create": "Buat role",
+          "edit": "Edit role",
+          "delete": "Hapus role"
+        },
+        "divisionMgmt": {
+          "title": "Manajemen Divisi",
+          "create": "Buat divisi",
+          "edit": "Edit divisi",
+          "delete": "Hapus divisi"
+        }
+      },
+      "errors": {
+        "generic": "Terjadi kesalahan"
+      }
+    },
+    "users": {
+      "pageTitle": "Manajemen Pengguna",
+      "pageSubtitle": "Kelola pengguna, divisi, dan role untuk SAN Group",
+      "addUser": "Tambah Pengguna",
+      "addDivision": "Tambah Divisi",
+      "rolesTabHint": "6 role sistem · edit nama & warna lewat ikon pensil",
+      "tabs": {
+        "users": "Pengguna",
+        "divisions": "Divisi",
+        "roles": "Role"
+      },
+      "usersTab": {
+        "searchPlaceholder": "Cari nama, email, username...",
+        "allRoles": "Semua Role",
+        "allDivisions": "Semua Divisi",
+        "allStatus": "Semua Status",
+        "active": "Aktif",
+        "inactive": "Nonaktif",
+        "reset": "Reset",
+        "totalCount": "{{count}} pengguna",
+        "totalCount_plural": "{{count}} pengguna",
+        "loadError": "Gagal memuat data. Coba lagi.",
+        "tryAgain": "Coba lagi",
+        "noMatchingUsers": "Tidak ada pengguna yang cocok",
+        "noUsersYet": "Belum ada pengguna",
+        "resetFilters": "Reset filter",
+        "table": {
+          "user": "Pengguna",
+          "username": "Username",
+          "role": "Role",
+          "division": "Divisi",
+          "status": "Status",
+          "lastLogin": "Login Terakhir"
+        },
+        "youBadge": "Anda",
+        "editTitle": "Edit",
+        "deactivateTitle": "Nonaktifkan",
+        "activateTitle": "Aktifkan",
+        "deleteTitle": "Hapus",
+        "paginationRange": "{{from}}–{{to}} dari {{total}} pengguna",
+        "confirmDeactivate": "Nonaktifkan pengguna \"{{name}}\"?",
+        "confirmActivate": "Aktifkan pengguna \"{{name}}\"?",
+        "confirmDelete": "Nonaktifkan pengguna \"{{name}}\" secara permanen?",
+        "actionFailed": "Gagal"
+      },
+      "divisionsTab": {
+        "noDivisions": "Belum ada divisi",
+        "addFirst": "Tambah divisi pertama Anda",
+        "userCount": "{{count}} pengguna",
+        "roleCount": "{{count}} role",
+        "cannotDeleteTitle": "Tidak dapat dihapus — divisi masih memiliki pengguna",
+        "deleteTitle": "Hapus"
+      },
+      "deleteConfirmModal": {
+        "deleteDivisionTitle": "Hapus Divisi",
+        "deletePrefix": "Hapus",
+        "deleteSuffix": "? Tindakan ini tidak dapat dibatalkan.",
+        "cancel": "Batal",
+        "delete": "Hapus"
+      },
+      "divisionModal": {
+        "editTitle": "Edit Divisi",
+        "createTitle": "Tambah Divisi",
+        "nameLabel": "Nama",
+        "namePlaceholder": "Finance",
+        "slugLabel": "Slug",
+        "slugPlaceholder": "finance",
+        "colorLabel": "Warna",
+        "descriptionLabel": "Deskripsi",
+        "descriptionPlaceholder": "Deskripsi singkat…",
+        "cancel": "Batal",
+        "save": "Simpan",
+        "create": "Buat Divisi",
+        "errors": {
+          "nameRequired": "Nama wajib diisi",
+          "generic": "Terjadi kesalahan"
+        }
+      },
+      "roleModal": {
+        "title": "Edit Role · L{{level}}",
+        "nameLabel": "Nama",
+        "colorLabel": "Warna",
+        "cancel": "Batal",
+        "save": "Simpan",
+        "errors": {
+          "nameRequired": "Nama wajib diisi",
+          "generic": "Terjadi kesalahan"
+        }
+      },
+      "userFormModal": {
+        "createTitle": "Tambah Pengguna Baru",
+        "editTitle": "Edit Pengguna",
+        "fullNameLabel": "Nama Lengkap",
+        "fullNamePlaceholder": "Budi Santoso",
+        "emailLabel": "Email",
+        "emailPlaceholder": "budi@sangroup.id",
+        "usernameLabel": "Username",
+        "usernamePlaceholder": "budi.s",
+        "passwordLabel": "Password",
+        "passwordPlaceholder": "Min. 8 karakter",
+        "phoneLabel": "Nomor Telepon",
+        "phonePlaceholder": "08xxxxxxxx",
+        "joinDateLabel": "Tanggal Bergabung",
+        "joinDateHint": "Dasar aturan masa kerja cuti — kuota tahunan berlaku setelah 1 tahun bekerja",
+        "roleLabel": "Role",
+        "selectRolePlaceholder": "-- Pilih role --",
+        "divisionLabel": "Divisi",
+        "selectDivisionPlaceholder": "-- Pilih divisi --",
+        "cancel": "Batal",
+        "save": "Simpan",
+        "createUser": "Buat Pengguna",
+        "errors": {
+          "roleRequired": "Silakan pilih role",
+          "divisionRequired": "Silakan pilih divisi",
+          "generic": "Terjadi kesalahan"
+        }
+      },
+      "colorPicker": {
+        "hexPlaceholder": "#000000"
+      }
+    },
+    "divisions": {
+      "pageTitle": "Manajemen Divisi",
+      "pageSubtitle": "Kelola divisi untuk SAN Group",
+      "addDivision": "Tambah Divisi",
+      "loadError": "Gagal memuat divisi.",
+      "tryAgain": "Coba lagi",
+      "noDivisionsYet": "Belum ada divisi",
+      "table": {
+        "color": "Warna",
+        "name": "Nama",
+        "slug": "Slug",
+        "users": "Pengguna",
+        "roles": "Role"
+      },
+      "userCount": "{{count}} pengguna",
+      "userCount_plural": "{{count}} pengguna",
+      "roleCount": "{{count}} role",
+      "roleCount_plural": "{{count}} role",
+      "editTitle": "Edit divisi",
+      "deleteTitle": "Hapus divisi",
+      "cannotDeleteTitle": "Tidak dapat dihapus — divisi masih memiliki pengguna",
+      "modal": {
+        "editTitle": "Edit Divisi",
+        "addTitle": "Tambah Divisi",
+        "nameLabel": "Nama",
+        "namePlaceholder": "Finance",
+        "slugLabel": "Slug",
+        "slugPlaceholder": "finance",
+        "colorLabel": "Warna",
+        "descriptionLabel": "Deskripsi",
+        "descriptionPlaceholder": "Deskripsi singkat divisi…",
+        "cancel": "Batal",
+        "save": "Simpan",
+        "create": "Buat Divisi",
+        "errors": {
+          "nameRequired": "Nama wajib diisi",
+          "generic": "Terjadi kesalahan"
+        }
+      },
+      "deleteConfirm": {
+        "title": "Hapus Divisi",
+        "deletePrefix": "Hapus divisi",
+        "deleteSuffix": "? Tindakan ini tidak dapat dibatalkan.",
+        "cancel": "Batal",
+        "delete": "Hapus",
+        "genericError": "Gagal menghapus divisi"
+      }
+    },
+    "roles": {
+      "pageTitle": "Manajemen Role",
+      "pageSubtitle": "Kelola role hierarki — ubah nama/warna, atau tambah role khusus",
+      "addRole": "Tambah Role",
+      "loadError": "Gagal memuat role.",
+      "tryAgain": "Coba lagi",
+      "noRolesYet": "Belum ada role",
+      "hierarchyTitle": "Hierarki",
+      "userCount": "{{count}} pengguna",
+      "userCount_plural": "{{count}} pengguna",
+      "editTitle": "Edit nama & warna",
+      "deleteTitle": "Hapus role",
+      "cannotDeleteTitle": "Tidak dapat dihapus — {{count}} pengguna masih terdaftar",
+      "confirmDelete": "Hapus role \"{{name}}\"? Tindakan ini tidak dapat dibatalkan.",
+      "save": "Simpan",
+      "cancel": "Batal",
+      "nameEmptyError": "Nama tidak boleh kosong",
+      "footerNote": "Role sistem (L1–L2) hanya bisa diubah nama dan warnanya. Role khusus dapat dihapus selama tidak ada pengguna yang ditugaskan.",
+      "levels": {
+        "l1": { "label": "L1", "desc": "Akses penuh sistem" },
+        "l2": { "label": "L2", "desc": "Pimpinan organisasi" },
+        "l3": { "label": "L3", "desc": "Manajemen operasional" },
+        "l4": { "label": "L4", "desc": "Kepala divisi / departemen" },
+        "l5": { "label": "L5", "desc": "Kepala unit / sub-divisi" },
+        "l6": { "label": "L6", "desc": "Anggota tim / staf" }
+      },
+      "addModal": {
+        "title": "Tambah Role Khusus",
+        "roleNameLabel": "Nama role",
+        "namePlaceholder": "cth. Senior Engineer",
+        "slugPrefix": "slug: {{slug}}",
+        "hierarchyLevelLabel": "Level hierarki",
+        "descriptionLabel": "Deskripsi",
+        "optional": "(opsional)",
+        "descriptionPlaceholder": "Deskripsi singkat role ini…",
+        "cancel": "Batal",
+        "create": "Buat Role",
+        "errors": {
+          "nameRequired": "Nama role wajib diisi",
+          "invalidName": "Nama harus mengandung minimal satu huruf atau angka",
+          "generic": "Terjadi kesalahan"
+        }
+      }
+    },
+    "auditLog": {
+      "pageTitle": "Log Aktivitas",
+      "pageSubtitle": "Riwayat aktivitas sistem",
+      "allTypes": "Semua jenis",
+      "entities": {
+        "task": "Task",
+        "user": "Pengguna",
+        "permission": "Permission"
+      },
+      "actions": {
+        "CREATE": "Dibuat",
+        "UPDATE": "Diperbarui",
+        "DELETE": "Dihapus"
+      },
+      "loadError": "Gagal memuat log aktivitas",
+      "tryAgain": "Coba lagi",
+      "noActivity": "Belum ada aktivitas tercatat",
+      "accessRestricted": {
+        "title": "Akses Dibatasi",
+        "message": "Anda tidak memiliki izin untuk melihat log aktivitas."
+      },
+      "table": {
+        "time": "Waktu",
+        "user": "Pengguna",
+        "action": "Aksi",
+        "entity": "Entitas",
+        "detail": "Detail"
+      },
+      "paginationRange": "{{from}}–{{to}} dari {{total}} entri"
+    }
+  },
+  "hris": {
+    "overview": {
+      "loadError": "Gagal memuat data. Periksa koneksi Anda dan coba lagi.",
+      "retry": "Coba Lagi",
+      "attendanceThisMonth": "Kehadiran bulan ini",
+      "status": {
+        "present": "Hadir",
+        "late": "Terlambat",
+        "wfh": "WFH",
+        "onLeave": "Cuti",
+        "absent": "Tidak Hadir",
+        "holiday": "Libur"
+      },
+      "today": {
+        "title": "Kehadiran Hari Ini",
+        "shiftInfo": "Shift {{name}} · Mulai {{time}}",
+        "notCheckedIn": "Belum check-in",
+        "outOfArea": "Di Luar Area",
+        "notCheckedInYet": "Anda belum check-in hari ini.",
+        "gpsHint": "Lokasi GPS akan terdeteksi otomatis saat check-in.",
+        "retryCheckIn": "Coba Check In Lagi",
+        "checkIn": "Check In",
+        "wfh": "WFH",
+        "checkInLabel": "Check In",
+        "checkOutLabel": "Check Out",
+        "late": "Terlambat {{minutes}} menit",
+        "workDuration": "{{mins}} kerja",
+        "selfieAlt": "Foto selfie check-in",
+        "checkOut": "Check Out",
+        "locationDefault": "Lokasi Anda"
+      },
+      "summary": {
+        "workedThisMonth": "{{mins}} bulan ini"
+      },
+      "leaveBalance": {
+        "title": "Saldo Cuti {{year}}",
+        "detail": "Detail",
+        "empty": "Belum ada data saldo cuti.",
+        "asNeeded": "Sesuai kebutuhan",
+        "asNeededTooltip": "Tidak ada kuota tetap — setiap pengajuan tetap perlu disetujui",
+        "ofDays": "/ {{total}} hari",
+        "carriedOver": "termasuk {{days}} sisa cuti tahun lalu — berlaku hingga 31 Mar",
+        "pendingApproval": "{{days}} hari menunggu persetujuan"
+      },
+      "leaveRequests": {
+        "title": "Pengajuan Cuti",
+        "all": "Semua",
+        "empty": "Belum ada pengajuan cuti.",
+        "dateRange": "{{start}} – {{end}} · {{count}} hari",
+        "dateRange_plural": "{{start}} – {{end}} · {{count}} hari"
+      },
+      "leaveStatus": {
+        "pending": "Menunggu",
+        "approved": "Disetujui",
+        "rejected": "Ditolak",
+        "cancelled": "Dibatalkan"
+      },
+      "outOfAreaModal": {
+        "title": "Di Luar Area Kantor",
+        "subtitle": "Anda berada di luar radius check-in",
+        "nearestLocation": "Lokasi terdekat",
+        "yourDistance": "Jarak Anda",
+        "allowedRadius": "Radius yang diizinkan",
+        "reasonLabel": "Alasan berada di luar area",
+        "reasonPlaceholder": "cth. Kunjungan klien, rapat di luar kantor, dll. (min. 10 karakter)",
+        "charCountMin": "{{count}}/10 karakter minimum",
+        "warning": "Check-in di luar area akan dicatat dan terlihat oleh atasan Anda.",
+        "cancel": "Batal",
+        "checkInAnyway": "Tetap Check In"
+      },
+      "cameraModal": {
+        "title": "Foto Selfie",
+        "cameraError": "Tidak dapat mengakses kamera. Mohon izinkan akses kamera.",
+        "continueWithoutPhotoHint": "Anda tetap bisa check-in tanpa foto",
+        "close": "Tutup",
+        "continueWithoutPhoto": "Lanjut tanpa foto",
+        "positionFace": "Posisikan wajah Anda di dalam oval",
+        "takePhoto": "Ambil Foto",
+        "retake": "Ambil Ulang",
+        "usePhoto": "Gunakan Foto"
+      },
+      "toast": {
+        "checkInSuccess": "Berhasil check-in!",
+        "checkInFailed": "Check-in gagal",
+        "checkOutSuccess": "Berhasil check-out!",
+        "checkOutFailed": "Check-out gagal",
+        "locationError": "Tidak dapat mendeteksi lokasi Anda. Izinkan akses lokasi, lalu coba lagi — foto Anda tetap tersimpan."
+      }
+    },
+    "leave": {
+      "header": {
+        "title": "Cuti",
+        "subtitle": "Pengajuan cuti dan saldo"
+      },
+      "viewMode": {
+        "mine": "Saya",
+        "team": "Tim"
+      },
+      "grantCompOffBtn": "Comp Off",
+      "requestLeaveBtn": "Ajukan Cuti",
+      "loadError": "Gagal memuat data. Periksa koneksi Anda dan coba lagi.",
+      "retry": "Coba Lagi",
+      "empty": "Belum ada pengajuan cuti.",
+      "status": {
+        "pending": "Menunggu",
+        "approved": "Disetujui",
+        "rejected": "Ditolak",
+        "cancelled": "Dibatalkan"
+      },
+      "filterAll": "Semua",
+      "balanceCard": {
+        "ofDaysUsed": "dari {{total}} hari · {{used}} terpakai",
+        "carriedOver": "termasuk {{days}} sisa cuti tahun lalu — berlaku hingga 31 Mar",
+        "asNeeded": "Sesuai kebutuhan",
+        "asNeededHint": "Tidak ada kuota tetap — setiap pengajuan tetap perlu disetujui",
+        "asNeededHintDoc": "Tidak ada kuota tetap — setiap pengajuan tetap perlu disetujui + dokumen"
+      },
+      "list": {
+        "dateRange": "{{start}} — {{end}} · {{count}} hari kerja",
+        "dateRange_plural": "{{start}} — {{end}} · {{count}} hari kerja",
+        "unpaidBadge": "Tanpa Gaji",
+        "attachmentDefault": "Lampiran",
+        "approvedBy": "Disetujui oleh",
+        "rejectedBy": "Ditolak oleh",
+        "reviewBtn": "Tinjau",
+        "cancelBtn": "Batal"
+      },
+      "toast": {
+        "cancelSuccess": "Pengajuan cuti dibatalkan",
+        "cancelFailed": "Gagal membatalkan pengajuan"
+      },
+      "pagination": "{{page}} / {{totalPages}}",
+      "createModal": {
+        "title": "Ajukan Cuti",
+        "leaveTypeLabel": "Jenis Cuti",
+        "remainingBalance": "Sisa saldo: {{days}} hari",
+        "requiresDoc": "⚠ Memerlukan dokumen pendukung",
+        "requiresDocAfterDays": "⚠ Memerlukan dokumen pendukung jika lebih dari {{days}} hari",
+        "startDateLabel": "Tanggal Mulai",
+        "endDateLabel": "Tanggal Selesai",
+        "totalWorkingDays": "Total: {{count}} hari kerja",
+        "documentLabel": "Dokumen Pendukung",
+        "optional": "(opsional)",
+        "reasonLabel": "Alasan",
+        "reasonPlaceholder": "Masukkan alasan cuti...",
+        "attachmentName": "📎 {{name}}",
+        "cancel": "Batal",
+        "submit": "Ajukan Permintaan",
+        "toast": {
+          "maxFileSize": "Ukuran file maksimum 5 MB",
+          "docRequired": "Dokumen pendukung wajib untuk cuti ini",
+          "unpaidSubmitted": "Pengajuan diajukan sebagai cuti TANPA GAJI (masa kerja di bawah 1 tahun — akan ada potongan gaji)",
+          "submitted": "Pengajuan cuti berhasil dikirim",
+          "submitFailed": "Gagal mengajukan permintaan cuti"
+        }
+      },
+      "reviewModal": {
+        "title": "Tinjau Pengajuan Cuti",
+        "remainingBalance": "Sisa saldo:",
+        "noFixedQuota": "tidak ada kuota tetap",
+        "remainingOfTotal": "{{remaining}} dari {{total}} hari",
+        "pendingIncluded": "(termasuk {{count}} hari tertunda untuk pengajuan ini)",
+        "unpaidNote": "TANPA GAJI — masa kerja belum memenuhi syarat, akan ada potongan gaji",
+        "viewAttachment": "Lihat lampiran",
+        "noteLabel": "Catatan (opsional)",
+        "notePlaceholder": "Tambahkan catatan untuk karyawan...",
+        "reject": "Tolak",
+        "approve": "Setujui",
+        "toast": {
+          "approved": "Cuti disetujui",
+          "rejected": "Cuti ditolak",
+          "failed": "Gagal memproses pengajuan"
+        }
+      },
+      "grantModal": {
+        "title": "Berikan Comp Off",
+        "descriptionPrefix": "Berikan hari libur tambahan untuk kerja di akhir pekan atau hari libur nasional. Hari tersebut akan masuk ke saldo",
+        "descriptionSuffix": "milik karyawan.",
+        "employeeLabel": "Karyawan",
+        "selectEmployee": "— Pilih karyawan —",
+        "daysLabel": "Jumlah Hari",
+        "reasonLabel": "Alasan",
+        "reasonPlaceholder": "cth. bekerja hari Sabtu 5 Juli (acara kantor)",
+        "cancel": "Batal",
+        "grant": "Berikan",
+        "toast": {
+          "granted": "Comp-off berhasil diberikan",
+          "grantFailed": "Gagal memberikan comp-off"
+        }
+      }
+    },
+    "attendance": {
+      "header": { "title": "Absensi", "subtitle": "Ringkasan absensi bulanan" },
+      "viewMode": { "me": "Saya", "team": "Tim — {{name}}", "teamAll": "Tim — Semua", "teamDivision": "Divisi" },
+      "status": {
+        "present": "Hadir",
+        "late": "Terlambat",
+        "wfh": "WFH",
+        "permission": "Cuti",
+        "absent": "Alpa",
+        "holiday": "Libur"
+      },
+      "summary": { "workHrs": "Jam Kerja" },
+      "calendar": { "off": "Libur" },
+      "log": {
+        "title": "Log Absensi",
+        "teamTitle": "Absensi Tim",
+        "showAllMonth": "← Tampilkan semua bulan",
+        "loadError": "Gagal memuat data. Periksa koneksi Anda dan coba lagi.",
+        "retry": "Coba Lagi",
+        "empty": "Tidak ada catatan absensi untuk periode ini.",
+        "lateSuffix": "terlambat",
+        "table": {
+          "employee": "Karyawan",
+          "date": "Tanggal",
+          "status": "Status",
+          "checkIn": "Check In",
+          "checkOut": "Check Out",
+          "duration": "Durasi",
+          "location": "Lokasi",
+          "photo": "Foto",
+          "outOfArea": "Di luar area"
+        }
+      },
+      "photoAlt": "Foto check-in",
+      "selfieAlt": "swafoto"
+    },
+    "reports": {
+      "header": { "title": "Laporan Absensi", "subtitle": "Ringkasan absensi karyawan bulanan" },
+      "exportCsv": "Ekspor CSV",
+      "exportSuccess": "File CSV berhasil diunduh",
+      "filters": { "allDivisions": "Semua Divisi", "searchPlaceholder": "Cari karyawan..." },
+      "summaryCards": {
+        "totalPresent": "Total Hadir",
+        "late": "Terlambat",
+        "absent": "Alpa",
+        "wfh": "WFH",
+        "outOfArea": "Di Luar Area"
+      },
+      "avgRate": "Rata-rata Tingkat Kehadiran",
+      "employeeCount": "{{count}} karyawan · {{month}}",
+      "table": {
+        "employee": "Karyawan",
+        "shift": "Shift",
+        "present": "H",
+        "late": "T",
+        "wfh": "WFH",
+        "absent": "A",
+        "outOfArea": "Di Luar Area",
+        "workHours": "Jam Kerja",
+        "attendance": "Kehadiran",
+        "total": "Total ({{count}} karyawan)"
+      },
+      "loadError": "Gagal memuat data. Periksa koneksi Anda dan coba lagi.",
+      "retry": "Coba Lagi",
+      "empty": "Tidak ada data absensi untuk periode ini",
+      "legend": "H = Hadir · T = Terlambat · A = Alpa · Di Luar Area = Check-in di luar radius kantor",
+      "csv": {
+        "name": "Nama",
+        "username": "Username",
+        "division": "Divisi",
+        "shift": "Shift",
+        "present": "Hadir",
+        "late": "Terlambat",
+        "absent": "Alpa",
+        "wfh": "WFH",
+        "permission": "Izin",
+        "holiday": "Libur",
+        "totalWorkHours": "Total Jam Kerja",
+        "totalLateMin": "Total Terlambat (menit)",
+        "outOfArea": "Di Luar Area",
+        "attendancePct": "Kehadiran (%)"
+      }
+    },
+    "requests": {
+      "header": { "title": "Pengajuan", "subtitle": "Izin keterlambatan dan pengajuan perubahan shift" },
+      "kind": { "late": "Izin Terlambat", "shift": "Perubahan Shift", "lateTabs": "Izin Terlambat", "shiftTabs": "Perubahan Shift" },
+      "viewMode": { "me": "Saya", "team": "Tim" },
+      "statusTabs": { "all": "Semua", "pending": "Menunggu", "approved": "Disetujui", "rejected": "Ditolak", "cancelled": "Dibatalkan" },
+      "status": { "pending": "Menunggu", "approved": "Disetujui", "rejected": "Ditolak", "cancelled": "Dibatalkan" },
+      "createLateModal": {
+        "title": "Izin Terlambat (Pemberitahuan Awal)",
+        "description": "Ajukan sebelum Anda check-in. Jika disetujui, check-in hari itu tidak akan terhitung terlambat.",
+        "dateLabel": "Tanggal",
+        "expectedArrivalLabel": "Perkiraan Kedatangan",
+        "reasonLabel": "Alasan",
+        "reasonPlaceholder": "cth. ada janji dokter pagi hari (min. 5 karakter)",
+        "cancel": "Batal",
+        "submit": "Kirim",
+        "toast": { "submitted": "Izin terlambat berhasil diajukan", "failed": "Gagal mengirim pengajuan" }
+      },
+      "createShiftModal": {
+        "title": "Ajukan Perubahan Shift",
+        "newShiftLabel": "Shift Baru",
+        "selectShiftPlaceholder": "— Pilih shift —",
+        "effectiveFromLabel": "Berlaku Mulai",
+        "reasonLabel": "Alasan",
+        "reasonPlaceholder": "Mengapa Anda perlu mengubah shift? (min. 5 karakter)",
+        "cancel": "Batal",
+        "submit": "Kirim",
+        "toast": { "submitted": "Pengajuan perubahan shift berhasil dikirim", "failed": "Gagal mengirim pengajuan" }
+      },
+      "reviewModal": {
+        "titleLate": "Tinjau Izin Terlambat",
+        "titleShift": "Tinjau Perubahan Shift",
+        "employee": "Karyawan",
+        "date": "Tanggal",
+        "expectedArrival": "Perkiraan kedatangan",
+        "newShift": "Shift baru",
+        "effectiveFrom": "Berlaku mulai",
+        "reason": "Alasan",
+        "noteLabel": "Catatan (opsional)",
+        "notePlaceholder": "Catatan untuk karyawan...",
+        "reject": "Tolak",
+        "approve": "Setujui",
+        "toast": { "approved": "Pengajuan disetujui", "rejected": "Pengajuan ditolak", "failed": "Gagal memproses" }
+      },
+      "list": {
+        "expectedArrival": "Perkiraan kedatangan {{time}}",
+        "effective": "Berlaku {{date}}",
+        "cancel": "Batal",
+        "review": "Tinjau",
+        "toast": { "cancelled": "Pengajuan dibatalkan", "cancelFailed": "Gagal membatalkan" }
+      },
+      "loadError": "Gagal memuat data. Periksa koneksi Anda dan coba lagi.",
+      "retry": "Coba Lagi",
+      "empty": "Tidak ada pengajuan",
+      "pagination": "{{page}} / {{totalPages}}"
+    },
+    "admin": {
+      "holidays": {
+        "header": { "title": "Hari Libur", "subtitle": "Kalender hari libur perusahaan — dikecualikan dari perhitungan hari cuti, penandaan alpa otomatis, dan tingkat kehadiran" },
+        "form": { "namePlaceholder": "Nama hari libur, cth. Idul Fitri", "add": "Tambah" },
+        "empty": "Belum ada hari libur terdaftar untuk {{year}}",
+        "toast": {
+          "added": "Hari libur ditambahkan",
+          "addFailed": "Gagal menambahkan hari libur",
+          "removed": "Hari libur dihapus",
+          "removeFailed": "Gagal menghapus"
+        }
+      },
+      "leaveTypes": {
+        "header": { "title": "Jenis Cuti", "subtitle": "Kebijakan cuti — kuota, dokumen, carry-over, dan aturan masa kerja per jenis cuti" },
+        "newType": "Jenis Baru",
+        "loadError": "Gagal memuat data. Periksa koneksi Anda dan coba lagi.",
+        "retry": "Coba Lagi",
+        "footerNote": "Jenis yang dinonaktifkan hilang dari formulir pengajuan tetapi riwayatnya tetap tersimpan. Perubahan kuota langsung berlaku pada saldo tahun ini; hari carry-over tetap dipertahankan.",
+        "card": {
+          "inactive": "Nonaktif",
+          "edit": "Ubah",
+          "deactivate": "Nonaktifkan",
+          "activate": "Aktifkan",
+          "daysPerYear": "hari/tahun",
+          "asNeeded": "sesuai kebutuhan",
+          "earnedViaGrants": "diperoleh dari pemberian",
+          "unpaid": "Tidak dibayar",
+          "document": "Dokumen",
+          "documentAfterDays": "Dokumen > {{days}} hari",
+          "carryOver": "Carry-over",
+          "tenure": "Masa kerja {{months}} bln",
+          "earnedBalance": "Saldo diperoleh"
+        },
+        "toast": {
+          "updated": "Jenis cuti diperbarui",
+          "created": "Jenis cuti dibuat",
+          "saveFailed": "Gagal menyimpan jenis cuti",
+          "deactivated": "{{name}} dinonaktifkan",
+          "activated": "{{name}} diaktifkan",
+          "updateFailed": "Gagal memperbarui"
+        },
+        "modal": {
+          "editTitle": "Ubah — {{name}}",
+          "newTitle": "Jenis Cuti Baru",
+          "name": "Nama",
+          "namePlaceholder": "cth. Cuti Tahunan",
+          "color": "Warna",
+          "quotaPerYear": "Kuota per Tahun",
+          "quotaEarnedHint": "Diperoleh melalui pemberian HR — tanpa kuota tahunan",
+          "quotaFreeHint": "0 = tanpa kuota tetap (sesuai kebutuhan)",
+          "minTenure": "Min. Masa Kerja (bulan)",
+          "tenureHint": "Di bawah masa kerja → pengajuan menjadi tidak dibayar",
+          "quotaChangedWarning": "Mengubah kuota langsung memperbarui saldo tahun ini untuk setiap karyawan (hari carry-over mereka tetap dipertahankan).",
+          "paidLeave": "Cuti dibayar",
+          "carryOverLabel": "Carry-over ke tahun berikutnya",
+          "carryOverExpiry": "(berlaku hingga 31 Mar)",
+          "requiresDoc": "Memerlukan dokumen pendukung",
+          "requiresDocAfterLabel": "Hanya jika lebih dari … hari",
+          "requiresDocAfterHint": "(0 = selalu)",
+          "cancel": "Batal",
+          "saveChanges": "Simpan Perubahan",
+          "create": "Buat"
+        }
+      },
+      "locations": {
+        "header": { "title": "Lokasi Kantor", "subtitle": "Kelola area geofencing untuk absensi karyawan" },
+        "addLocation": "Tambah Lokasi",
+        "addFirstLocation": "Tambah Lokasi Pertama",
+        "empty": { "title": "Belum ada lokasi kantor", "subtitle": "Tambahkan lokasi untuk mengaktifkan geofencing absensi" },
+        "banner": {
+          "activeCount": "{{count}} lokasi aktif",
+          "activeCount_plural": "{{count}} lokasi aktif",
+          "detail": "Karyawan dapat absen dari lokasi aktif mana pun. Jika berada di luar semua radius, peringatan dengan opsi absen paksa akan muncul."
+        },
+        "footerNote": "Klik koordinat pada kartu lokasi untuk membuka Google Maps. Radius ditampilkan di sudut kanan bawah lingkaran.",
+        "card": {
+          "inactive": "Nonaktif",
+          "radius": "Radius",
+          "coordinates": "Koordinat"
+        },
+        "deleteConfirm": "Hapus lokasi \"{{name}}\"? Catatan absensi yang ada tidak akan terpengaruh.",
+        "toast": {
+          "gpsUnsupported": "Browser tidak mendukung GPS",
+          "locationObtained": "Lokasi berhasil didapatkan",
+          "getLocationFailed": "Gagal mendapatkan lokasi",
+          "updated": "Lokasi diperbarui",
+          "added": "Lokasi ditambahkan",
+          "saveFailed": "Gagal menyimpan",
+          "deleted": "Lokasi dihapus",
+          "deleteFailed": "Gagal menghapus"
+        },
+        "modal": {
+          "editTitle": "Ubah Lokasi Kantor",
+          "addTitle": "Tambah Lokasi Kantor",
+          "name": "Nama Lokasi",
+          "namePlaceholder": "cth. Kantor Pusat Jakarta, Lokasi Properti A",
+          "address": "Alamat",
+          "addressPlaceholder": "Alamat lengkap (opsional)",
+          "gpsCoordinates": "Koordinat GPS",
+          "useMyLocation": "Gunakan Lokasi Saya",
+          "latitude": "Lintang",
+          "longitude": "Bujur",
+          "viewOnGoogleMaps": "Lihat di Google Maps",
+          "geofencingRadius": "Radius Geofencing: {{radius}} meter",
+          "radiusTight": "Radius sempit — cocok untuk gedung kecil atau titik spesifik",
+          "radiusStandard": "Radius standar — cocok untuk area perkantoran",
+          "radiusWide": "Radius lebar — cocok untuk lokasi properti atau area luar ruangan",
+          "activeLocation": "Lokasi Aktif",
+          "activeLocationHint": "Hanya lokasi aktif yang digunakan untuk geofencing",
+          "cancel": "Batal",
+          "saveChanges": "Simpan Perubahan",
+          "addLocation": "Tambah Lokasi"
+        }
+      },
+      "shifts": {
+        "header": { "title": "Kelola Shift", "subtitle": "Kelola shift kerja dan penugasan karyawan" },
+        "newShift": "Shift Baru",
+        "empty": "Belum ada shift dibuat",
+        "deleteConfirm": "Hapus shift \"{{name}}\"? Karyawan yang menggunakan shift ini akan direset ke default.",
+        "toast": {
+          "updated": "Shift diperbarui",
+          "created": "Shift dibuat",
+          "saveFailed": "Gagal menyimpan",
+          "deleted": "Shift dihapus",
+          "deleteFailed": "Gagal menghapus",
+          "assigned": "Shift ditetapkan",
+          "assignFailed": "Gagal menetapkan shift"
+        },
+        "card": {
+          "default": "Default",
+          "inactive": "Nonaktif",
+          "tolerance": "Toleransi: {{minutes}} mnt",
+          "employees": "{{count}} karyawan"
+        },
+        "modal": {
+          "editTitle": "Ubah Shift",
+          "newTitle": "Shift Baru",
+          "name": "Nama Shift",
+          "namePlaceholder": "cth. Staf Kantor, Shift Keamanan A",
+          "startTime": "Jam Mulai",
+          "endTime": "Jam Selesai",
+          "lateTolerance": "Toleransi Keterlambatan: {{minutes}} mnt",
+          "shiftColor": "Warna Shift",
+          "defaultShift": "Shift Default",
+          "defaultShiftHint": "Karyawan tanpa shift akan menggunakan ini",
+          "activeShift": "Shift Aktif",
+          "cancel": "Batal",
+          "saveChanges": "Simpan Perubahan",
+          "createShift": "Buat Shift"
+        },
+        "assignPanel": {
+          "title": "Tetapkan Shift Karyawan",
+          "searchPlaceholder": "Cari karyawan...",
+          "noEmployees": "Tidak ada karyawan ditemukan",
+          "defaultOption": "— Default —",
+          "resetToDefault": "Reset ke default"
+        }
+      }
+    }
+  },
+  "database": {
+    "header": {
+      "title": "Tautan Database",
+      "subtitle": "Direktori akses cepat — klik folder untuk membuka",
+      "newFolder": "Folder Baru"
+    },
+    "emptyFolders": {
+      "title": "Belum ada folder",
+      "cta": "Buat folder pertama Anda"
+    },
+    "folder": {
+      "itemCount": "{{count}} item",
+      "shareTitle": "Bagikan folder"
+    },
+    "folderModal": {
+      "editTitle": "Edit Folder",
+      "newTitle": "Folder Baru",
+      "nameLabel": "Nama folder",
+      "namePlaceholder": "cth. Dokumen HR",
+      "descLabel": "Deskripsi (opsional)",
+      "descPlaceholder": "Deskripsi singkat…",
+      "colorLabel": "Warna",
+      "cancel": "Batal",
+      "save": "Simpan",
+      "create": "Buat",
+      "nameRequired": "Nama folder wajib diisi"
+    },
+    "linkModal": {
+      "editTitle": "Edit Tautan",
+      "newTitle": "Tambah Tautan",
+      "nameLabel": "Nama tampilan",
+      "namePlaceholder": "cth. Laporan Absensi Juni",
+      "nameHint": "Nama ini ditampilkan ke pengguna, bukan URL-nya",
+      "urlLabel": "Tautan / URL",
+      "urlPlaceholder": "https://drive.google.com/…",
+      "notesLabel": "Catatan (opsional)",
+      "notesPlaceholder": "Deskripsi singkat…",
+      "cancel": "Batal",
+      "save": "Simpan",
+      "add": "Tambah",
+      "nameRequired": "Nama wajib diisi",
+      "urlRequired": "Tautan/URL wajib diisi"
+    },
+    "shareModal": {
+      "title": "Bagikan Folder",
+      "grantAccess": "Berikan akses",
+      "selectDivision": "Pilih divisi…",
+      "share": "Bagikan",
+      "sharedWith": "Dibagikan dengan",
+      "notShared": "Belum dibagikan dengan siapa pun",
+      "loadError": "Gagal memuat data"
+    },
+    "errors": {
+      "generic": "Terjadi kesalahan"
+    },
+    "folderContents": {
+      "back": "Kembali ke Tautan Database",
+      "searchPlaceholder": "Cari…",
+      "addLink": "Tambah Tautan",
+      "noResults": "Tidak ada hasil ditemukan",
+      "empty": "Folder ini kosong",
+      "addFirstLink": "Tambahkan tautan pertama Anda",
+      "itemCount": "{{count}} item"
+    },
+    "confirm": {
+      "deleteFolder": "Hapus folder \"{{name}}\"? Semua tautan di dalamnya juga akan terhapus.",
+      "deleteLink": "Hapus \"{{title}}\"?"
+    }
+  },
+  "profile": {
+    "header": {
+      "title": "Profil Saya",
+      "subtitle": "Kelola informasi akun dan keamanan Anda"
+    },
+    "avatar": {
+      "uploadTitle": "Unggah foto",
+      "hint": "JPG, PNG, WebP — maks. 2MB",
+      "maxSize": "Ukuran file maksimum adalah 2MB",
+      "uploadError": "Gagal mengunggah avatar"
+    },
+    "accountInfo": {
+      "title": "Info Akun",
+      "memberSince": "Bergabung sejak",
+      "lastLogin": "Login terakhir",
+      "status": "Status akun",
+      "active": "Aktif",
+      "inactive": "Nonaktif"
+    },
+    "security": {
+      "title": "Keamanan",
+      "changePassword": "Ubah Kata Sandi"
+    },
+    "form": {
+      "title": "Informasi Pribadi",
+      "fullName": "Nama Lengkap",
+      "phone": "Nomor Telepon",
+      "optional": "(opsional)",
+      "phonePlaceholder": "cth. +62812345678",
+      "save": "Simpan Perubahan",
+      "saved": "Tersimpan",
+      "nameRequired": "Nama lengkap wajib diisi",
+      "genericError": "Terjadi kesalahan"
+    },
+    "details": {
+      "title": "Detail Akun",
+      "note": "Informasi berikut dikelola oleh administrator dan tidak dapat diubah sendiri.",
+      "email": "Email",
+      "username": "Username",
+      "role": "Peran",
+      "division": "Divisi",
+      "phone": "Nomor Telepon"
+    },
+    "loadError": "Gagal memuat profil",
+    "tryAgain": "Coba lagi"
+  },
+  "notes": {
+    "header": {
+      "title": "Catatan",
+      "subtitle": "Catatan pribadi & referensi cepat",
+      "newNote": "Catatan Baru"
+    },
+    "toolbar": {
+      "searchPlaceholder": "Cari catatan...",
+      "colorLabel": "Warna:",
+      "all": "Semua",
+      "count": "{{count}} catatan",
+      "count_plural": "{{count}} catatan",
+      "ofTotal": "dari {{total}}"
+    },
+    "modal": {
+      "editTitle": "Edit Catatan",
+      "newTitle": "Catatan Baru",
+      "titleLabel": "Judul",
+      "optional": "(opsional)",
+      "titlePlaceholder": "Tambahkan judul...",
+      "contentLabel": "Isi",
+      "contentPlaceholder": "Tulis catatan Anda...",
+      "contentRequired": "Isi catatan tidak boleh kosong",
+      "colorLabel": "Warna",
+      "pinLabel": "Sematkan catatan ini",
+      "cancel": "Batal",
+      "save": "Simpan",
+      "create": "Buat Catatan",
+      "genericError": "Terjadi kesalahan"
+    },
+    "card": {
+      "unpin": "Lepas sematan",
+      "pin": "Sematkan catatan",
+      "edit": "Edit",
+      "delete": "Hapus",
+      "pinned": "Disematkan",
+      "deleteConfirm": "Hapus catatan ini?"
+    },
+    "empty": {
+      "title": "Belum ada catatan",
+      "subtitle": "Klik \"Catatan Baru\" untuk membuat catatan pertama Anda"
+    },
+    "emptyFiltered": {
+      "title": "Tidak ada catatan yang cocok",
+      "subtitle": "Coba sesuaikan filter pencarian Anda"
+    },
+    "tryAgain": "Coba lagi",
+    "sections": {
+      "pinned": "Disematkan",
+      "others": "Lainnya"
+    }
+  },
+  "workOrderHistory": {
+    "pageTitle": "Riwayat Work Order",
+    "pageSubtitle": "Work order yang selesai dan dibatalkan",
+    "searchPlaceholder": "Cari kode / judul...",
+    "searchAriaLabel": "Cari riwayat work order",
+    "outcomeFilter": {
+      "doneAndCancelled": "Selesai + Dibatalkan",
+      "doneOnly": "Hanya Selesai",
+      "cancelledOnly": "Hanya Dibatalkan"
+    },
+    "toggleFiltersAriaLabel": "Tampilkan/sembunyikan filter",
+    "refreshAriaLabel": "Muat ulang",
+    "allPriorities": "Semua Prioritas",
+    "allCategories": "Semua Kategori",
+    "dateTo": "sampai",
+    "loadMore": {
+      "showing": "Menampilkan {{shown}} dari {{total}} work order.",
+      "button": "Muat lebih banyak"
+    }
+  },
+  "workOrderReports": {
+    "pageTitle": "Laporan Work Order",
+    "pageSubtitle": "Tingkat penyelesaian, waktu penyelesaian, dan performa teknisi",
+    "exportCsv": "Ekspor CSV",
+    "loadErrorPrefix": "Gagal memuat laporan: {{error}}",
+    "tryAgain": "Coba lagi",
+    "noReportData": "Tidak ada data laporan",
+    "categories": {
+      "ELECTRICAL": "Kelistrikan",
+      "PLUMBING": "Perpipaan",
+      "HVAC": "HVAC",
+      "CIVIL": "Sipil",
+      "CLEANING": "Kebersihan",
+      "SECURITY": "Keamanan",
+      "OTHER": "Lainnya"
+    },
+    "currentlyOpen": {
+      "title": "Sedang Terbuka — Sudah Berapa Lama?",
+      "activeNow": "{{count}} aktif sekarang",
+      "under1Day": "< 1 hari",
+      "d1to3": "1–3 hari",
+      "d3to7": "3–7 hari",
+      "over7Days": "> 7 hari"
+    },
+    "longestOpen": {
+      "title": "Work Order Terlama Terbuka",
+      "empty": "Tidak ada work order terbuka — semua sudah selesai 🎉",
+      "table": {
+        "code": "Kode",
+        "title": "Judul",
+        "status": "Status",
+        "priority": "Prioritas",
+        "assignee": "Penanggung Jawab",
+        "openFor": "Lama Terbuka"
+      },
+      "unassigned": "Belum ditugaskan"
+    },
+    "noWorkOrdersInPeriod": "Tidak ada work order dibuat pada periode ini",
+    "summary": {
+      "totalWorkOrders": "Total Work Order",
+      "completed": "Selesai",
+      "completionRate": "Tingkat Penyelesaian"
+    },
+    "byCategory": {
+      "title": "Rata-rata Waktu Penyelesaian per Kategori",
+      "empty": "Belum ada work order yang selesai",
+      "table": {
+        "category": "Kategori",
+        "completed": "Selesai",
+        "avgTime": "Rata-rata Waktu"
+      }
+    },
+    "byTechnician": {
+      "title": "Performa Teknisi",
+      "empty": "Belum ada work order yang ditugaskan",
+      "table": {
+        "technician": "Teknisi",
+        "assigned": "Ditugaskan",
+        "completed": "Selesai",
+        "completionRate": "Tingkat Penyelesaian"
+      }
+    },
+    "csvExport": {
+      "sectionHeader": "Bagian",
+      "nameHeader": "Nama",
+      "countAssignedHeader": "Jumlah/Ditugaskan",
+      "completedHeader": "Selesai",
+      "avgResolutionRateHeader": "Rata-rata Penyelesaian / Tingkat",
+      "summary": "Ringkasan",
+      "totalWorkOrders": "Total Work Order",
+      "completed": "Selesai",
+      "completionRate": "Tingkat Penyelesaian",
+      "category": "Kategori",
+      "technician": "Teknisi",
+      "openAging": "Usia Terbuka",
+      "under1Day": "Di bawah 1 hari",
+      "d1to3": "1–3 hari",
+      "d3to7": "3–7 hari",
+      "over7Days": "Di atas 7 hari",
+      "longestOpen": "Terlama Terbuka",
+      "unassigned": "Belum ditugaskan"
+    }
+  },
+  "login": {
+    "tagline": "Sistem Manajemen Internal",
+    "signIn": "Masuk",
+    "identifierLabel": "Email atau Username",
+    "identifierPlaceholder": "email@anda.com atau username",
+    "passwordLabel": "Kata Sandi",
+    "showPassword": "Tampilkan kata sandi",
+    "hidePassword": "Sembunyikan kata sandi",
+    "signingIn": "Sedang masuk…",
+    "footer": "© {{year}} SAN Group — Rahasia",
+    "errors": {
+      "identifierRequired": "Email atau username wajib diisi.",
+      "passwordRequired": "Kata sandi wajib diisi.",
+      "generic": "Terjadi kesalahan. Silakan coba lagi."
+    }
+  },
+  "shared": {
+    "header": {
+      "toggleSidebar": "Buka/tutup sidebar",
+      "search": "Cari...",
+      "notifications": {
+        "label": "Notifikasi",
+        "title": "Notifikasi",
+        "markAllRead": "Tandai semua dibaca",
+        "empty": "Belum ada notifikasi",
+        "seeAll": "Lihat semua notifikasi",
+        "moreNotifications": "+{{count}} notifikasi lainnya",
+        "moreNotifications_plural": "+{{count}} notifikasi lainnya"
+      },
+      "time": {
+        "justNow": "Baru saja",
+        "minutesAgo": "{{count}} menit lalu",
+        "minutesAgo_plural": "{{count}} menit lalu",
+        "hoursAgo": "{{count}} jam lalu",
+        "hoursAgo_plural": "{{count}} jam lalu",
+        "daysAgo": "{{count}} hari lalu",
+        "daysAgo_plural": "{{count}} hari lalu"
+      },
+      "language": {
+        "changeLabel": "Ubah bahasa",
+        "en": "English",
+        "id": "Bahasa Indonesia"
+      },
+      "userMenu": {
+        "myProfile": "Profil Saya",
+        "changePassword": "Ubah Kata Sandi",
+        "logout": "Keluar"
+      },
+      "breadcrumbs": {
+        "dashboard": "Dashboard",
+        "tasks": "Task",
+        "bulletin": "Bulletin",
+        "notes": "Catatan",
+        "dbLinks": "DB Links",
+        "myProfile": "Profil Saya",
+        "analytics": "Analitik",
+        "notifications": "Notifikasi",
+        "workOrders": "Work Order",
+        "hris": "HRIS",
+        "attendance": "Absensi",
+        "leave": "Cuti",
+        "requests": "Permintaan",
+        "holidays": "Hari Libur",
+        "attendanceReport": "Laporan Absensi",
+        "manageShifts": "Kelola Shift",
+        "officeLocations": "Lokasi Kantor",
+        "manageUsers": "Kelola Pengguna",
+        "rolesPermissions": "Peran & Izin",
+        "auditLog": "Log Audit"
+      }
+    },
+    "changePasswordModal": {
+      "title": "Ubah Kata Sandi",
+      "fields": {
+        "currentPassword": { "label": "Kata Sandi Saat Ini", "placeholder": "Kata sandi Anda saat ini" },
+        "newPassword": { "label": "Kata Sandi Baru", "placeholder": "Min. 8 karakter, 1 huruf kapital, 1 angka" },
+        "confirmPassword": { "label": "Konfirmasi Kata Sandi Baru", "placeholder": "Ulangi kata sandi baru" }
+      },
+      "errors": {
+        "mismatch": "Konfirmasi kata sandi tidak cocok",
+        "generic": "Terjadi kesalahan"
+      },
+      "success": {
+        "message": "Kata sandi berhasil diubah",
+        "redirecting": "Anda akan diarahkan ke halaman login..."
+      },
+      "logoutNotice": "Setelah mengubah kata sandi, Anda akan otomatis keluar dari semua perangkat.",
+      "cancel": "Batal",
+      "save": "Simpan"
+    },
+    "commandPalette": {
+      "searchPlaceholder": "Cari task, bulletin, notes, file...",
+      "typeToSearch": "Ketik untuk mencari di seluruh sistem",
+      "navigateHint": "navigasi",
+      "openHint": "buka",
+      "noResults": "Tidak ada hasil untuk “{{query}}”",
+      "sections": {
+        "task": "Task",
+        "bulletin": "Bulletin",
+        "notes": "Notes",
+        "filesAndDb": "Database & File"
+      },
+      "status": {
+        "todo": "Todo",
+        "done": "Selesai",
+        "cancelled": "Dibatalkan"
+      },
+      "inFolder": "di {{folder}}",
+      "resultsCount": "{{count}} hasil",
+      "resultsCount_plural": "{{count}} hasil",
+      "pressEnter": "Tekan Enter untuk membuka"
+    },
+    "createTaskModal": {
+      "title": "Task Baru",
+      "titlePlaceholder": "Judul task...",
+      "descriptionPlaceholder": "Deskripsi (opsional)...",
+      "status": "Status",
+      "statusOptions": { "todo": "To Do", "done": "Selesai" },
+      "priority": "Prioritas",
+      "priorityOptions": { "urgent": "Urgent", "high": "Tinggi", "medium": "Sedang", "low": "Rendah" },
+      "startDate": "Tanggal mulai",
+      "dueDate": "Tenggat waktu",
+      "assignTo": "Tugaskan ke",
+      "searchPeoplePlaceholder": "Cari orang…",
+      "noneOption": "— Tidak Ada —",
+      "list": "List",
+      "noListOption": "— Tanpa List —",
+      "shareWith": "Bagikan ke",
+      "visibilityOptions": {
+        "onlyMe": "Hanya Saya (default)",
+        "myDivision": "Divisi Saya",
+        "selectDivisions": "Pilih Divisi",
+        "allStaff": "Semua Staf"
+      },
+      "selectDivisionsLabel": "Pilih divisi yang dapat melihat",
+      "cancel": "Batal",
+      "create": "Buat Task",
+      "errors": {
+        "titleRequired": "Judul wajib diisi",
+        "dateOrder": "Tanggal mulai harus sebelum atau sama dengan tenggat waktu",
+        "generic": "Terjadi kesalahan"
+      }
+    },
+    "pageSizeSelect": {
+      "perPage": "{{count}} / halaman"
+    },
+    "sidebar": {
+      "modules": {
+        "internal": "Internal",
+        "workOrders": "Work Orders",
+        "hris": "HRIS",
+        "admin": "Admin"
+      },
+      "sections": {
+        "menu": "Menu",
+        "administration": "Administrasi",
+        "monitoring": "Monitoring"
+      },
+      "nav": {
+        "dashboard": "Dashboard",
+        "tasks": "Tasks",
+        "bulletin": "Bulletin",
+        "notifications": "Notifikasi",
+        "notes": "Notes",
+        "dbLinks": "DB Links",
+        "analytics": "Analytics",
+        "workOrders": "Work Orders",
+        "history": "Riwayat",
+        "reports": "Laporan",
+        "overview": "Ringkasan",
+        "attendance": "Absensi",
+        "leave": "Cuti",
+        "requests": "Pengajuan",
+        "shifts": "Shift",
+        "locations": "Lokasi",
+        "holidays": "Hari Libur",
+        "leaveTypes": "Jenis Cuti",
+        "manageUsers": "Kelola Pengguna",
+        "rolesPermissions": "Peran & Izin",
+        "auditLog": "Log Audit"
+      },
+      "collapseSidebar": "Ciutkan sidebar",
+      "expandSidebar": "Perluas sidebar"
+    },
+    "toasts": {
+      "undo": "Urungkan"
+    },
+    "userSearchInput": {
+      "placeholder": "Cari orang…",
+      "clearLabel": "— Tidak Ditugaskan —",
+      "clear": "Hapus",
+      "noMatches": "Tidak ada hasil"
+    }
+  }
+}

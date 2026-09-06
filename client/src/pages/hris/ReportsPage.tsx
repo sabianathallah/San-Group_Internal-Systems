@@ -3,11 +3,17 @@ import {
   BarChart3, ChevronLeft, ChevronRight, Download, Loader2,
   Users, CheckCircle2, Clock, XCircle, MapPinOff, Filter, Search, RefreshCw,
 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import api from '@/lib/api';
 import { cn } from '@/lib/cn';
 import { useAuthStore } from '@/stores/authStore';
 import { usePermStore } from '@/stores/permStore';
 import { toast } from '@/stores/toastStore';
+
+/** Locale for date formatting — mirrors i18next's active language. */
+function dateLocale(language: string): string {
+  return language === 'id' ? 'id-ID' : 'en-US';
+}
 
 // ── Types ──────────────────────────────────────────────────────
 interface ReportRow {
@@ -43,9 +49,14 @@ function getInitials(name: string) {
 }
 
 // ── Export CSV ─────────────────────────────────────────────────
-function exportCSV(rows: ReportRow[], month: number, year: number) {
-  const monthLabel = new Date(year, month - 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-  const header = ['Name', 'Username', 'Division', 'Shift', 'Present', 'Late', 'Absent', 'WFH', 'Permission', 'Holiday', 'Total Work Hours', 'Total Late (min)', 'Out of Area', 'Attendance (%)'];
+function exportCSV(rows: ReportRow[], month: number, year: number, t: (key: string) => string, language: string) {
+  const monthLabel = new Date(year, month - 1).toLocaleDateString(dateLocale(language), { month: 'long', year: 'numeric' });
+  const header = [
+    t('hris.reports.csv.name'), t('hris.reports.csv.username'), t('hris.reports.csv.division'), t('hris.reports.csv.shift'),
+    t('hris.reports.csv.present'), t('hris.reports.csv.late'), t('hris.reports.csv.absent'), t('hris.reports.csv.wfh'),
+    t('hris.reports.csv.permission'), t('hris.reports.csv.holiday'), t('hris.reports.csv.totalWorkHours'),
+    t('hris.reports.csv.totalLateMin'), t('hris.reports.csv.outOfArea'), t('hris.reports.csv.attendancePct'),
+  ];
   const csvRows = rows.map((r) => [
     r.fullName, r.username, r.divisionName, r.shiftName ?? '-',
     r.totalPresent, r.totalLate, r.totalAbsent, r.totalWFH, r.totalPermission, r.totalHoliday,
@@ -59,11 +70,12 @@ function exportCSV(rows: ReportRow[], month: number, year: number) {
   a.download = `attendance-report-${monthLabel.replace(' ', '-')}.csv`;
   a.click();
   URL.revokeObjectURL(url);
-  toast.success('CSV file downloaded');
+  toast.success(t('hris.reports.exportSuccess'));
 }
 
 // ── Component ──────────────────────────────────────────────────
 export default function ReportsPage() {
+  const { t, i18n } = useTranslation();
   useAuthStore((s) => s.user);
   const perms = usePermStore((s) => s.perms);
   const isHRAdmin = perms.hris.viewReports === 'all';
@@ -108,7 +120,7 @@ export default function ReportsPage() {
     else setMonth((m) => m + 1);
   }
 
-  const monthLabel = new Date(year, month - 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  const monthLabel = new Date(year, month - 1).toLocaleDateString(dateLocale(i18n.language), { month: 'long', year: 'numeric' });
 
   const totals = rows.reduce((acc, r) => ({
     present:  acc.present  + r.totalPresent,
@@ -126,17 +138,17 @@ export default function ReportsPage() {
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-            <BarChart3 size={20} className="text-navy" /> Attendance Report
+            <BarChart3 size={20} className="text-navy" /> {t('hris.reports.header.title')}
           </h1>
-          <p className="text-sm text-gray-500 mt-0.5">Monthly employee attendance summary</p>
+          <p className="text-sm text-gray-500 mt-0.5">{t('hris.reports.header.subtitle')}</p>
         </div>
         <button
-          onClick={() => { setExporting(true); exportCSV(rows, month, year); setExporting(false); }}
+          onClick={() => { setExporting(true); exportCSV(rows, month, year, t, i18n.language); setExporting(false); }}
           disabled={exporting || rows.length === 0}
           className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors disabled:opacity-40"
         >
           {exporting ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
-          Export CSV
+          {t('hris.reports.exportCsv')}
         </button>
       </div>
 
@@ -157,7 +169,7 @@ export default function ReportsPage() {
             <Filter size={14} className="text-gray-400" />
             <select value={divisionId} onChange={(e) => setDivisionId(e.target.value)}
               className="text-sm text-gray-700 bg-transparent focus:outline-none">
-              <option value="">All Divisions</option>
+              <option value="">{t('hris.reports.filters.allDivisions')}</option>
               {divisions.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
             </select>
           </div>
@@ -168,7 +180,7 @@ export default function ReportsPage() {
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search employee..."
+            placeholder={t('hris.reports.filters.searchPlaceholder')}
             className="flex-1 text-sm text-gray-700 bg-transparent focus:outline-none placeholder:text-gray-400"
           />
         </div>
@@ -177,11 +189,11 @@ export default function ReportsPage() {
       {/* Summary cards */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
         {[
-          { label: 'Total Present', value: totals.present, icon: CheckCircle2, color: 'text-green-600',  bg: 'bg-green-50'  },
-          { label: 'Late',          value: totals.late,    icon: Clock,        color: 'text-orange-600', bg: 'bg-orange-50' },
-          { label: 'Absent',        value: totals.absent,  icon: XCircle,      color: 'text-red-600',    bg: 'bg-red-50'    },
-          { label: 'WFH',           value: totals.wfh,     icon: Users,        color: 'text-blue-600',   bg: 'bg-blue-50'   },
-          { label: 'Out of Area',   value: totals.outArea, icon: MapPinOff,    color: 'text-purple-600', bg: 'bg-purple-50' },
+          { label: t('hris.reports.summaryCards.totalPresent'), value: totals.present, icon: CheckCircle2, color: 'text-green-600',  bg: 'bg-green-50'  },
+          { label: t('hris.reports.summaryCards.late'),          value: totals.late,    icon: Clock,        color: 'text-orange-600', bg: 'bg-orange-50' },
+          { label: t('hris.reports.summaryCards.absent'),        value: totals.absent,  icon: XCircle,      color: 'text-red-600',    bg: 'bg-red-50'    },
+          { label: t('hris.reports.summaryCards.wfh'),           value: totals.wfh,     icon: Users,        color: 'text-blue-600',   bg: 'bg-blue-50'   },
+          { label: t('hris.reports.summaryCards.outOfArea'),     value: totals.outArea, icon: MapPinOff,    color: 'text-purple-600', bg: 'bg-purple-50' },
         ].map((s) => {
           const Icon = s.icon;
           return (
@@ -199,7 +211,7 @@ export default function ReportsPage() {
       {/* Rate bar */}
       <div className="bg-white border border-gray-200 rounded-xl px-5 py-4">
         <div className="flex items-center justify-between mb-2">
-          <span className="text-sm font-medium text-gray-700">Average Attendance Rate</span>
+          <span className="text-sm font-medium text-gray-700">{t('hris.reports.avgRate')}</span>
           <span className="text-sm font-bold text-navy">{avgRate.toFixed(1)}%</span>
         </div>
         <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
@@ -208,7 +220,7 @@ export default function ReportsPage() {
             style={{ width: `${Math.min(100, avgRate)}%` }}
           />
         </div>
-        <p className="text-xs text-gray-400 mt-1.5">{rows.length} employees · {monthLabel}</p>
+        <p className="text-xs text-gray-400 mt-1.5">{t('hris.reports.employeeCount', { count: rows.length, month: monthLabel })}</p>
       </div>
 
       {/* Table */}
@@ -218,15 +230,15 @@ export default function ReportsPage() {
         </div>
       ) : loadError ? (
         <div className="text-center py-16">
-          <p className="text-sm text-gray-500 mb-3">Failed to load data. Check your connection and try again.</p>
+          <p className="text-sm text-gray-500 mb-3">{t('hris.reports.loadError')}</p>
           <button onClick={fetch} className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
-            <RefreshCw size={14} /> Retry
+            <RefreshCw size={14} /> {t('hris.reports.retry')}
           </button>
         </div>
       ) : rows.length === 0 ? (
         <div className="text-center py-16">
           <BarChart3 size={32} className="text-gray-200 mx-auto mb-3" />
-          <p className="text-gray-400 text-sm">No attendance data for this period</p>
+          <p className="text-gray-400 text-sm">{t('hris.reports.empty')}</p>
         </div>
       ) : (
         <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
@@ -234,15 +246,15 @@ export default function ReportsPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-gray-100 bg-gray-50/60">
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Employee</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Shift</th>
-                  <th className="text-center px-3 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">P</th>
-                  <th className="text-center px-3 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">L</th>
-                  <th className="text-center px-3 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">WFH</th>
-                  <th className="text-center px-3 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">A</th>
-                  <th className="text-center px-3 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Out of Area</th>
-                  <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Work Hours</th>
-                  <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Attendance</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">{t('hris.reports.table.employee')}</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">{t('hris.reports.table.shift')}</th>
+                  <th className="text-center px-3 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">{t('hris.reports.table.present')}</th>
+                  <th className="text-center px-3 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">{t('hris.reports.table.late')}</th>
+                  <th className="text-center px-3 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">{t('hris.reports.table.wfh')}</th>
+                  <th className="text-center px-3 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">{t('hris.reports.table.absent')}</th>
+                  <th className="text-center px-3 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">{t('hris.reports.table.outOfArea')}</th>
+                  <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">{t('hris.reports.table.workHours')}</th>
+                  <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">{t('hris.reports.table.attendance')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
@@ -317,7 +329,7 @@ export default function ReportsPage() {
               <tfoot>
                 <tr className="border-t border-gray-200 bg-gray-50/60">
                   <td className="px-4 py-3 text-xs font-semibold text-gray-600" colSpan={2}>
-                    Total ({rows.length} employees)
+                    {t('hris.reports.table.total', { count: rows.length })}
                   </td>
                   <td className="px-3 py-3 text-center text-xs font-bold text-green-600">{totals.present}</td>
                   <td className="px-3 py-3 text-center text-xs font-bold text-orange-500">{totals.late}</td>
@@ -336,7 +348,7 @@ export default function ReportsPage() {
       )}
 
       <p className="text-xs text-gray-400">
-        P = Present · L = Late · A = Absent · Out of Area = Check-in outside office radius
+        {t('hris.reports.legend')}
       </p>
     </div>
   );

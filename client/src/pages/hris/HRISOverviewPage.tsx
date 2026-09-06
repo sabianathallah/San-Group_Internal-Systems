@@ -6,6 +6,7 @@ import {
   MapPin, MapPinOff, AlertTriangle, X, Camera, CameraOff,
   TrendingUp, CalendarDays, CalendarX2, RefreshCw,
 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import api from '@/lib/api';
 import { cn } from '@/lib/cn';
 import { ROUTES } from '@/lib/constants';
@@ -13,6 +14,11 @@ import { getHolidaySet } from '@/lib/holidays';
 import { useEscapeClose } from '@/hooks/useEscapeClose';
 import { useAuthStore } from '@/stores/authStore';
 import { toast } from '@/stores/toastStore';
+
+/** Locale for date formatting — mirrors i18next's active language. */
+function dateLocale(language: string): string {
+  return language === 'id' ? 'id-ID' : 'en-US';
+}
 
 // ── Types ──────────────────────────────────────────────────────
 type AttendanceStatus = 'PRESENT' | 'LATE' | 'WFH' | 'PERMISSION' | 'ABSENT' | 'HOLIDAY';
@@ -69,19 +75,19 @@ function getPosition(): Promise<GeolocationPosition> {
   });
 }
 
-const STATUS_CONFIG: Record<AttendanceStatus, { label: string; color: string; bg: string; border: string; icon: React.ElementType }> = {
-  PRESENT:    { label: 'Present',    color: 'text-green-700',  bg: 'bg-green-50',   border: 'border-green-200',  icon: CheckCircle2 },
-  LATE:       { label: 'Late',color: 'text-orange-700', bg: 'bg-orange-50',  border: 'border-orange-200', icon: Timer        },
-  WFH:        { label: 'WFH',      color: 'text-blue-700',   bg: 'bg-blue-50',    border: 'border-blue-200',   icon: Home         },
-  PERMISSION: { label: 'On Leave',     color: 'text-purple-700', bg: 'bg-purple-50',  border: 'border-purple-200', icon: CalendarCheck },
-  ABSENT:     { label: 'Absent',    color: 'text-red-700',    bg: 'bg-red-50',     border: 'border-red-200',    icon: CalendarX2   },
-  HOLIDAY:    { label: 'Holiday',    color: 'text-gray-500',   bg: 'bg-gray-100',   border: 'border-gray-200',   icon: CalendarCheck },
+const STATUS_CONFIG: Record<AttendanceStatus, { labelKey: string; color: string; bg: string; border: string; icon: React.ElementType }> = {
+  PRESENT:    { labelKey: 'hris.overview.status.present', color: 'text-green-700',  bg: 'bg-green-50',   border: 'border-green-200',  icon: CheckCircle2 },
+  LATE:       { labelKey: 'hris.overview.status.late', color: 'text-orange-700', bg: 'bg-orange-50',  border: 'border-orange-200', icon: Timer        },
+  WFH:        { labelKey: 'hris.overview.status.wfh',      color: 'text-blue-700',   bg: 'bg-blue-50',    border: 'border-blue-200',   icon: Home         },
+  PERMISSION: { labelKey: 'hris.overview.status.onLeave',     color: 'text-purple-700', bg: 'bg-purple-50',  border: 'border-purple-200', icon: CalendarCheck },
+  ABSENT:     { labelKey: 'hris.overview.status.absent',    color: 'text-red-700',    bg: 'bg-red-50',     border: 'border-red-200',    icon: CalendarX2   },
+  HOLIDAY:    { labelKey: 'hris.overview.status.holiday',    color: 'text-gray-500',   bg: 'bg-gray-100',   border: 'border-gray-200',   icon: CalendarCheck },
 };
 
 
-function fmt(iso: string | null) {
+function fmt(iso: string | null, language: string) {
   if (!iso) return '—';
-  return new Date(iso).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
+  return new Date(iso).toLocaleTimeString(dateLocale(language), { hour: '2-digit', minute: '2-digit', hour12: false });
 }
 
 function fmtMins(mins: number) {
@@ -90,15 +96,15 @@ function fmtMins(mins: number) {
   return h > 0 ? `${h}h ${m}m` : `${m}m`;
 }
 
-function fmtDate(iso: string) {
-  return new Date(iso).toLocaleDateString('en-US', { day: 'numeric', month: 'short' });
+function fmtDate(iso: string, language: string) {
+  return new Date(iso).toLocaleDateString(dateLocale(language), { day: 'numeric', month: 'short' });
 }
 
-const LEAVE_STATUS_LABEL: Record<LeaveStatus, string> = {
-  PENDING:   'Pending',
-  APPROVED:  'Approved',
-  REJECTED:  'Rejected',
-  CANCELLED: 'Cancelled',
+const LEAVE_STATUS_LABEL_KEY: Record<LeaveStatus, string> = {
+  PENDING:   'hris.overview.leaveStatus.pending',
+  APPROVED:  'hris.overview.leaveStatus.approved',
+  REJECTED:  'hris.overview.leaveStatus.rejected',
+  CANCELLED: 'hris.overview.leaveStatus.cancelled',
 };
 
 const LEAVE_STATUS_STYLE: Record<LeaveStatus, string> = {
@@ -123,6 +129,7 @@ function OutOfAreaModal({ info, onCancel, onForce }: {
   onCancel: () => void;
   onForce: (reason: string) => void;
 }) {
+  const { t, i18n } = useTranslation();
   const [reason, setReason] = useState('');
   const [submitting, setSubmitting] = useState(false);
   useEscapeClose(onCancel);
@@ -143,8 +150,8 @@ function OutOfAreaModal({ info, onCancel, onForce }: {
               <MapPinOff size={18} className="text-white" />
             </div>
             <div>
-              <p className="text-white font-semibold text-sm">Out of Office Area</p>
-              <p className="text-red-100 text-xs mt-0.5">You are outside the check-in radius</p>
+              <p className="text-white font-semibold text-sm">{t('hris.overview.outOfAreaModal.title')}</p>
+              <p className="text-red-100 text-xs mt-0.5">{t('hris.overview.outOfAreaModal.subtitle')}</p>
             </div>
           </div>
           <button onClick={onCancel} className="text-white/70 hover:text-white mt-0.5">
@@ -155,15 +162,15 @@ function OutOfAreaModal({ info, onCancel, onForce }: {
         <div className="px-5 py-4 space-y-4">
           <div className="bg-gray-50 rounded-xl p-4 space-y-2.5 border border-gray-100">
             <div className="flex items-center justify-between text-sm">
-              <span className="text-gray-500">Nearest location</span>
+              <span className="text-gray-500">{t('hris.overview.outOfAreaModal.nearestLocation')}</span>
               <span className="font-semibold text-gray-800">{info.nearestLocation.name}</span>
             </div>
             <div className="flex items-center justify-between text-sm">
-              <span className="text-gray-500">Your distance</span>
-              <span className="font-bold text-gray-900">{info.distanceMeters.toLocaleString('en-US')} m</span>
+              <span className="text-gray-500">{t('hris.overview.outOfAreaModal.yourDistance')}</span>
+              <span className="font-bold text-gray-900">{info.distanceMeters.toLocaleString(dateLocale(i18n.language))} m</span>
             </div>
             <div className="flex items-center justify-between text-sm">
-              <span className="text-gray-500">Allowed radius</span>
+              <span className="text-gray-500">{t('hris.overview.outOfAreaModal.allowedRadius')}</span>
               <span className="text-gray-700">{info.nearestLocation.radiusMeters} m</span>
             </div>
             <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden mt-1">
@@ -176,24 +183,24 @@ function OutOfAreaModal({ info, onCancel, onForce }: {
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1.5">
-              Reason for being out of area <span className="text-red-500">*</span>
+              {t('hris.overview.outOfAreaModal.reasonLabel')} <span className="text-red-500">*</span>
             </label>
             <textarea
               value={reason}
               onChange={(e) => setReason(e.target.value)}
-              placeholder="e.g. Client visit, off-site meeting, etc. (min. 10 characters)"
+              placeholder={t('hris.overview.outOfAreaModal.reasonPlaceholder')}
               rows={3}
               className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-navy/20 resize-none"
             />
             <p className="text-xs mt-1 text-gray-400">
-              {reason.length}/10 characters minimum
+              {t('hris.overview.outOfAreaModal.charCountMin', { count: reason.length })}
             </p>
           </div>
 
           <div className="bg-gray-50 border border-gray-200 rounded-xl p-3 flex gap-2.5">
             <AlertTriangle size={14} className="text-gray-400 flex-shrink-0 mt-0.5" />
             <p className="text-xs text-gray-500">
-              Check-in outside the area will be recorded and visible to your manager.
+              {t('hris.overview.outOfAreaModal.warning')}
             </p>
           </div>
         </div>
@@ -203,7 +210,7 @@ function OutOfAreaModal({ info, onCancel, onForce }: {
             onClick={onCancel}
             className="flex-1 py-2.5 text-sm font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-xl transition-colors"
           >
-            Cancel
+            {t('hris.overview.outOfAreaModal.cancel')}
           </button>
           <button
             onClick={handleForce}
@@ -211,7 +218,7 @@ function OutOfAreaModal({ info, onCancel, onForce }: {
             className="flex-1 py-2.5 text-sm font-medium text-white bg-navy hover:bg-navy/90 disabled:opacity-40 rounded-xl transition-colors flex items-center justify-center gap-2"
           >
             {submitting ? <Loader2 size={14} className="animate-spin" /> : <MapPinOff size={14} />}
-            Check In Anyway
+            {t('hris.overview.outOfAreaModal.checkInAnyway')}
           </button>
         </div>
       </div>
@@ -221,6 +228,7 @@ function OutOfAreaModal({ info, onCancel, onForce }: {
 
 // ── Camera Modal ───────────────────────────────────────────────
 function CameraModal({ onCapture, onClose }: { onCapture: (photo: string | null) => void; onClose: () => void }) {
+  const { t } = useTranslation();
   const videoRef  = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -244,7 +252,7 @@ function CameraModal({ onCapture, onClose }: { onCapture: (photo: string | null)
           };
         }
       })
-      .catch(() => { if (mounted) setError('Cannot access camera. Please allow camera permissions.'); });
+      .catch(() => { if (mounted) setError(t('hris.overview.cameraModal.cameraError')); });
     return () => {
       mounted = false;
       streamRef.current?.getTracks().forEach(t => t.stop());
@@ -281,7 +289,7 @@ function CameraModal({ onCapture, onClose }: { onCapture: (photo: string | null)
             <div className="w-7 h-7 rounded-full bg-green-100 flex items-center justify-center">
               <Camera size={14} className="text-green-600" />
             </div>
-            <span className="font-semibold text-sm text-gray-800">Selfie Photo</span>
+            <span className="font-semibold text-sm text-gray-800">{t('hris.overview.cameraModal.title')}</span>
           </div>
           <button onClick={handleClose} className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-gray-100 text-gray-400">
             <X size={16} />
@@ -295,14 +303,14 @@ function CameraModal({ onCapture, onClose }: { onCapture: (photo: string | null)
                 <CameraOff size={28} className="text-gray-300" />
               </div>
               <p className="text-sm text-gray-500 mb-1">{error}</p>
-              <p className="text-xs text-gray-400 mb-4">You can still check-in without a photo</p>
+              <p className="text-xs text-gray-400 mb-4">{t('hris.overview.cameraModal.continueWithoutPhotoHint')}</p>
               <div className="flex gap-2 justify-center">
-                <button onClick={handleClose} className="px-4 py-2 text-sm bg-gray-100 rounded-xl hover:bg-gray-200 font-medium">Close</button>
+                <button onClick={handleClose} className="px-4 py-2 text-sm bg-gray-100 rounded-xl hover:bg-gray-200 font-medium">{t('hris.overview.cameraModal.close')}</button>
                 <button
                   onClick={() => { handleClose(); onCapture(null); }}
                   className="px-4 py-2 text-sm bg-navy text-white rounded-xl hover:bg-navy/90 font-medium"
                 >
-                  Continue without photo
+                  {t('hris.overview.cameraModal.continueWithoutPhoto')}
                 </button>
               </div>
             </div>
@@ -330,7 +338,7 @@ function CameraModal({ onCapture, onClose }: { onCapture: (photo: string | null)
               <canvas ref={canvasRef} className="hidden" />
 
               {!preview && !loading && (
-                <p className="text-xs text-gray-400 text-center mt-2">Position your face inside the oval</p>
+                <p className="text-xs text-gray-400 text-center mt-2">{t('hris.overview.cameraModal.positionFace')}</p>
               )}
 
               <div className="flex gap-2 mt-4">
@@ -341,7 +349,7 @@ function CameraModal({ onCapture, onClose }: { onCapture: (photo: string | null)
                     className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-xl text-sm font-medium disabled:opacity-50 transition-colors"
                   >
                     <Camera size={16} />
-                    Take Photo
+                    {t('hris.overview.cameraModal.takePhoto')}
                   </button>
                 ) : (
                   <>
@@ -349,14 +357,14 @@ function CameraModal({ onCapture, onClose }: { onCapture: (photo: string | null)
                       onClick={() => setPreview(null)}
                       className="flex-1 py-2.5 border border-gray-200 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-50 transition-colors"
                     >
-                      Retake
+                      {t('hris.overview.cameraModal.retake')}
                     </button>
                     <button
                       onClick={handleConfirm}
                       className="flex-1 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-xl text-sm font-medium transition-colors flex items-center justify-center gap-2"
                     >
                       <CheckCircle2 size={15} />
-                      Use Photo
+                      {t('hris.overview.cameraModal.usePhoto')}
                     </button>
                   </>
                 )}
@@ -371,6 +379,7 @@ function CameraModal({ onCapture, onClose }: { onCapture: (photo: string | null)
 
 // ── Component ──────────────────────────────────────────────────
 export default function HRISOverviewPage() {
+  const { t, i18n } = useTranslation();
   const user = useAuthStore((s) => s.user);
   const [today, setToday]       = useState<TodayRecord | null>(null);
   const [attSummary, setAttSummary] = useState<AttSummary | null>(null);
@@ -395,8 +404,8 @@ export default function HRISOverviewPage() {
 
   const now = new Date();
   const hour = now.getHours();
-  const greeting = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
-  const dateStr  = now.toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+  const greeting = hour < 12 ? t('dashboard.greeting.morning') : hour < 18 ? t('dashboard.greeting.afternoon') : t('dashboard.greeting.evening');
+  const dateStr  = now.toLocaleDateString(dateLocale(i18n.language), { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
 
   async function load() {
     setLoading(true);
@@ -441,7 +450,7 @@ export default function HRISOverviewPage() {
       setToday(res.data.data);
       setGpsRetry(false);
       pendingPhotoDataUrl.current = null;
-      toast.success('Checked in successfully!');
+      toast.success(t('hris.overview.toast.checkInSuccess'));
     } catch (err: any) {
       const data = err?.response?.data;
       if (err?.response?.status === 422 && data?.data?.distanceMeters !== undefined) {
@@ -450,11 +459,11 @@ export default function HRISOverviewPage() {
           nearestLocation: data.data.nearestLocation,
           userLat: opts.lat!,
           userLng: opts.lng!,
-          locationName: 'Your location',
+          locationName: t('hris.overview.today.locationDefault'),
           checkInStatus: opts.status,
         });
       } else {
-        toast.error(data?.message ?? 'Check-in failed');
+        toast.error(data?.message ?? t('hris.overview.toast.checkInFailed'));
       }
     } finally {
       setCheckinLoading(false);
@@ -482,7 +491,7 @@ export default function HRISOverviewPage() {
       await doCheckIn({ status, lat: pos.coords.latitude, lng: pos.coords.longitude, photoDataUrl: photo });
     } catch {
       setGpsRetry(true);
-      toast.error('Could not get your location. Allow location access, then retry — your photo is kept.');
+      toast.error(t('hris.overview.toast.locationError'));
     }
   }
 
@@ -515,9 +524,9 @@ export default function HRISOverviewPage() {
     try {
       const res = await api.post('/hris/attendance/check-out', {});
       setToday(res.data.data);
-      toast.success('Checked out successfully!');
+      toast.success(t('hris.overview.toast.checkOutSuccess'));
     } catch (err: any) {
-      toast.error(err?.response?.data?.message ?? 'Check-out failed');
+      toast.error(err?.response?.data?.message ?? t('hris.overview.toast.checkOutFailed'));
     } finally { setCheckoutLoading(false); }
   }
 
@@ -533,12 +542,12 @@ export default function HRISOverviewPage() {
     return (
       <div className="flex flex-col items-center justify-center h-64 gap-3">
         <AlertCircle size={28} className="text-gray-300" />
-        <p className="text-sm text-gray-500">Failed to load data. Check your connection and try again.</p>
+        <p className="text-sm text-gray-500">{t('hris.overview.loadError')}</p>
         <button
           onClick={load}
           className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
         >
-          <RefreshCw size={14} /> Retry
+          <RefreshCw size={14} /> {t('hris.overview.retry')}
         </button>
       </div>
     );
@@ -589,7 +598,7 @@ export default function HRISOverviewPage() {
             <div className="hidden sm:flex items-center gap-2 bg-navy/5 rounded-xl px-3 py-2">
               <TrendingUp size={14} className="text-navy" />
               <div className="text-right">
-                <p className="text-xs text-gray-500">Attendance this month</p>
+                <p className="text-xs text-gray-500">{t('hris.overview.attendanceThisMonth')}</p>
                 <p className="text-sm font-bold text-navy">{attendanceRate}%</p>
               </div>
             </div>
@@ -606,26 +615,26 @@ export default function HRISOverviewPage() {
                   <Clock size={18} className="text-white" />
                 </div>
                 <div>
-                  <p className="text-white/80 text-xs font-medium">Today's Attendance</p>
+                  <p className="text-white/80 text-xs font-medium">{t('hris.overview.today.title')}</p>
                   {today?.shift ? (
                     <p className="text-white font-semibold text-sm mt-0.5">
-                      Shift {today.shift.name} · Starts {today.shift.startTime}
+                      {t('hris.overview.today.shiftInfo', { name: today.shift.name, time: today.shift.startTime })}
                     </p>
                   ) : (
-                    <p className="text-white font-semibold text-sm mt-0.5">Not checked in</p>
+                    <p className="text-white font-semibold text-sm mt-0.5">{t('hris.overview.today.notCheckedIn')}</p>
                   )}
                 </div>
               </div>
               <div className="flex items-center gap-2">
                 {today?.isOutOfArea && (
                   <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-white/20 text-white">
-                    <MapPinOff size={10} /> Out of Area
+                    <MapPinOff size={10} /> {t('hris.overview.today.outOfArea')}
                   </span>
                 )}
                 {today && statusCfg && (
                   <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-full bg-white/20 text-white">
                     <StatusIcon size={12} />
-                    {statusCfg.label}
+                    {t(statusCfg.labelKey)}
                   </span>
                 )}
               </div>
@@ -637,9 +646,9 @@ export default function HRISOverviewPage() {
             {!today ? (
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                 <div>
-                  <p className="text-gray-700 text-sm font-medium">You haven't checked in today.</p>
+                  <p className="text-gray-700 text-sm font-medium">{t('hris.overview.today.notCheckedInYet')}</p>
                   <p className="text-gray-400 text-xs mt-1 flex items-center gap-1">
-                    <MapPin size={10} /> GPS will be detected automatically on check-in.
+                    <MapPin size={10} /> {t('hris.overview.today.gpsHint')}
                   </p>
                 </div>
                 <div className="flex gap-2">
@@ -649,7 +658,7 @@ export default function HRISOverviewPage() {
                     className="flex items-center gap-2 px-5 py-2.5 bg-navy text-white rounded-xl text-sm font-semibold hover:bg-navy/90 transition-colors disabled:opacity-50 shadow-sm"
                   >
                     {checkinLoading ? <Loader2 size={14} className="animate-spin" /> : gpsRetry ? <RefreshCw size={15} /> : <CheckCircle2 size={15} />}
-                    {gpsRetry ? 'Retry Check In' : 'Check In'}
+                    {gpsRetry ? t('hris.overview.today.retryCheckIn') : t('hris.overview.today.checkIn')}
                   </button>
                   <button
                     onClick={() => handleCheckIn('WFH')}
@@ -657,7 +666,7 @@ export default function HRISOverviewPage() {
                     className="flex items-center gap-2 px-5 py-2.5 bg-gray-100 text-gray-700 rounded-xl text-sm font-semibold hover:bg-gray-200 transition-colors disabled:opacity-50 border border-gray-200"
                   >
                     <Home size={15} />
-                    WFH
+                    {t('hris.overview.today.wfh')}
                   </button>
                 </div>
               </div>
@@ -665,19 +674,19 @@ export default function HRISOverviewPage() {
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                 <div className="flex gap-8">
                   <div>
-                    <p className="text-xs text-gray-400 mb-1">Check In</p>
-                    <p className="text-2xl font-bold text-gray-900 tabular-nums">{fmt(today.checkIn)}</p>
+                    <p className="text-xs text-gray-400 mb-1">{t('hris.overview.today.checkInLabel')}</p>
+                    <p className="text-2xl font-bold text-gray-900 tabular-nums">{fmt(today.checkIn, i18n.language)}</p>
                     {today.isLate && (
                       <p className="text-xs text-orange-500 mt-1 flex items-center gap-1">
-                        <AlertCircle size={10} /> Late {today.lateMinutes} min
+                        <AlertCircle size={10} /> {t('hris.overview.today.late', { minutes: today.lateMinutes })}
                       </p>
                     )}
                   </div>
                   <div>
-                    <p className="text-xs text-gray-400 mb-1">Check Out</p>
-                    <p className="text-2xl font-bold text-gray-900 tabular-nums">{fmt(today.checkOut)}</p>
+                    <p className="text-xs text-gray-400 mb-1">{t('hris.overview.today.checkOutLabel')}</p>
+                    <p className="text-2xl font-bold text-gray-900 tabular-nums">{fmt(today.checkOut, i18n.language)}</p>
                     {today.checkOut && today.workMinutes != null && today.workMinutes > 0 && (
-                      <p className="text-xs text-gray-400 mt-1">{fmtMins(today.workMinutes)} work</p>
+                      <p className="text-xs text-gray-400 mt-1">{t('hris.overview.today.workDuration', { mins: fmtMins(today.workMinutes) })}</p>
                     )}
                   </div>
                 </div>
@@ -687,7 +696,7 @@ export default function HRISOverviewPage() {
                     <a href={today.photoUrl} target="_blank" rel="noopener noreferrer" className="group">
                       <img
                         src={today.photoUrl}
-                        alt="Check-in selfie"
+                        alt={t('hris.overview.today.selfieAlt')}
                         className="w-14 h-14 rounded-xl object-cover border-2 border-gray-100 group-hover:border-navy/30 transition-colors shadow-sm"
                       />
                     </a>
@@ -700,7 +709,7 @@ export default function HRISOverviewPage() {
                         className="flex items-center gap-2 px-5 py-2.5 bg-navy text-white rounded-xl text-sm font-semibold hover:bg-navy/90 transition-colors disabled:opacity-50 shadow-sm"
                       >
                         {checkoutLoading ? <Loader2 size={14} className="animate-spin" /> : <Clock size={15} />}
-                        Check Out
+                        {t('hris.overview.today.checkOut')}
                       </button>
                     )}
                     {today.locationName && (
@@ -718,11 +727,11 @@ export default function HRISOverviewPage() {
           {attSummary && (
             <div className="border-t border-gray-100 px-6 py-3 flex gap-5 overflow-x-auto">
               {[
-                { label: 'Present', val: attSummary.present    },
-                { label: 'Late',    val: attSummary.late       },
-                { label: 'WFH',     val: attSummary.wfh        },
-                { label: 'On Leave',val: attSummary.permission },
-                { label: 'Absent',  val: attSummary.absent     },
+                { label: t('hris.overview.status.present'), val: attSummary.present    },
+                { label: t('hris.overview.status.late'),    val: attSummary.late       },
+                { label: t('hris.overview.status.wfh'),     val: attSummary.wfh        },
+                { label: t('hris.overview.status.onLeave'), val: attSummary.permission },
+                { label: t('hris.overview.status.absent'),  val: attSummary.absent     },
               ].map((s) => (
                 <div key={s.label} className="flex items-center gap-1.5 flex-shrink-0">
                   <span className="text-base font-bold tabular-nums text-gray-700">{s.val}</span>
@@ -732,7 +741,7 @@ export default function HRISOverviewPage() {
               {attSummary.totalWorkMinutes > 0 && (
                 <div className="flex items-center gap-1.5 flex-shrink-0 ml-auto">
                   <Clock size={12} className="text-gray-400" />
-                  <span className="text-xs text-gray-500 font-medium">{fmtMins(attSummary.totalWorkMinutes)} this month</span>
+                  <span className="text-xs text-gray-500 font-medium">{t('hris.overview.summary.workedThisMonth', { mins: fmtMins(attSummary.totalWorkMinutes) })}</span>
                 </div>
               )}
             </div>
@@ -749,15 +758,15 @@ export default function HRISOverviewPage() {
                 <div className="w-7 h-7 rounded-lg bg-gray-100 flex items-center justify-center">
                   <CalendarCheck size={14} className="text-gray-500" />
                 </div>
-                <span className="text-sm font-semibold text-gray-800">Leave Balance {now.getFullYear()}</span>
+                <span className="text-sm font-semibold text-gray-800">{t('hris.overview.leaveBalance.title', { year: now.getFullYear() })}</span>
               </div>
               <Link to={ROUTES.HRIS_LEAVE} className="text-xs text-navy hover:underline flex items-center gap-0.5 font-medium">
-                Detail <ChevronRight size={12} />
+                {t('hris.overview.leaveBalance.detail')} <ChevronRight size={12} />
               </Link>
             </div>
             <div className="px-5 py-4 space-y-4">
               {balances.length === 0 && (
-                <p className="text-sm text-gray-400 py-2">No leave balance data.</p>
+                <p className="text-sm text-gray-400 py-2">{t('hris.overview.leaveBalance.empty')}</p>
               )}
               {balances.map((b) => (
                 <div key={b.leaveType.id}>
@@ -769,10 +778,10 @@ export default function HRISOverviewPage() {
                     {b.remainingDays !== null ? (
                       <div className="text-right">
                         <span className="text-sm font-bold text-gray-800">{b.remainingDays}</span>
-                        <span className="text-xs text-gray-400"> / {b.totalDays} days</span>
+                        <span className="text-xs text-gray-400"> {t('hris.overview.leaveBalance.ofDays', { total: b.totalDays })}</span>
                       </div>
                     ) : (
-                      <span className="text-xs text-gray-400" title="No fixed quota — every request still needs approval">As needed</span>
+                      <span className="text-xs text-gray-400" title={t('hris.overview.leaveBalance.asNeededTooltip')}>{t('hris.overview.leaveBalance.asNeeded')}</span>
                     )}
                   </div>
                   {b.remainingDays !== null && (
@@ -787,10 +796,10 @@ export default function HRISOverviewPage() {
                     </div>
                   )}
                   {b.carriedOverDays > 0 && (
-                    <p className="text-[11px] text-amber-600 mt-1">incl. {b.carriedOverDays} carried over — expires Mar 31</p>
+                    <p className="text-[11px] text-amber-600 mt-1">{t('hris.overview.leaveBalance.carriedOver', { days: b.carriedOverDays })}</p>
                   )}
                   {b.pendingDays > 0 && (
-                    <p className="text-xs text-gray-400 mt-1">{b.pendingDays} days pending approval</p>
+                    <p className="text-xs text-gray-400 mt-1">{t('hris.overview.leaveBalance.pendingApproval', { days: b.pendingDays })}</p>
                   )}
                 </div>
               ))}
@@ -806,15 +815,15 @@ export default function HRISOverviewPage() {
                   <div className="w-7 h-7 rounded-lg bg-gray-100 flex items-center justify-center">
                     <CalendarDays size={14} className="text-gray-500" />
                   </div>
-                  <span className="text-sm font-semibold text-gray-800">Leave Requests</span>
+                  <span className="text-sm font-semibold text-gray-800">{t('hris.overview.leaveRequests.title')}</span>
                 </div>
                 <Link to={ROUTES.HRIS_LEAVE} className="text-xs text-navy hover:underline flex items-center gap-0.5 font-medium">
-                  All <ChevronRight size={12} />
+                  {t('hris.overview.leaveRequests.all')} <ChevronRight size={12} />
                 </Link>
               </div>
               <div className="divide-y divide-gray-50">
                 {recentLeaves.length === 0 && (
-                  <p className="text-sm text-gray-400 py-5 text-center">No leave requests.</p>
+                  <p className="text-sm text-gray-400 py-5 text-center">{t('hris.overview.leaveRequests.empty')}</p>
                 )}
                 {recentLeaves.slice(0, 4).map((r) => (
                   <div key={r.id} className="flex items-center justify-between px-5 py-3">
@@ -823,12 +832,16 @@ export default function HRISOverviewPage() {
                       <div className="min-w-0">
                         <p className="text-sm font-medium text-gray-800 truncate">{r.leaveType.name}</p>
                         <p className="text-xs text-gray-400">
-                          {fmtDate(r.startDate)} – {fmtDate(r.endDate)} · {r.totalDays} {r.totalDays > 1 ? 'days' : 'day'}
+                          {t('hris.overview.leaveRequests.dateRange', {
+                            start: fmtDate(r.startDate, i18n.language),
+                            end: fmtDate(r.endDate, i18n.language),
+                            count: r.totalDays,
+                          })}
                         </p>
                       </div>
                     </div>
                     <span className={cn('text-[11px] font-semibold px-2 py-0.5 rounded-full flex-shrink-0 ml-2', LEAVE_STATUS_STYLE[r.status])}>
-                      {LEAVE_STATUS_LABEL[r.status]}
+                      {t(LEAVE_STATUS_LABEL_KEY[r.status])}
                     </span>
                   </div>
                 ))}

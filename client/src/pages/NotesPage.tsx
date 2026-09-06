@@ -3,10 +3,17 @@ import {
   StickyNote, Plus, Search, X, Pin, PinOff,
   Trash2, Edit2, Loader2, AlertCircle,
 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import api from '@/lib/api';
 import { cn } from '@/lib/cn';
 import { useNoteStore, Note, NoteColor } from '@/stores/noteStore';
 import { usePermStore } from '@/stores/permStore';
+
+// ── Helpers ────────────────────────────────────────────────
+/** Locale for date formatting — mirrors i18next's active language. */
+function dateLocale(language: string): string {
+  return language === 'id' ? 'id-ID' : 'en-US';
+}
 
 // ── Color Config ───────────────────────────────────────────
 const COLOR_MAP: Record<NoteColor, { bg: string; border: string; dot: string }> = {
@@ -42,6 +49,7 @@ function NoteFormModal({
   onClose: () => void;
   onSaved: (n: Note) => void;
 }) {
+  const { t } = useTranslation();
   const [form, setForm]     = useState<FormState>(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
   const [error, setError]   = useState('');
@@ -60,7 +68,7 @@ function NoteFormModal({
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    if (!form.content.trim()) { setError('Content cannot be empty'); return; }
+    if (!form.content.trim()) { setError(t('notes.modal.contentRequired')); return; }
     setSaving(true);
     setError('');
     try {
@@ -77,7 +85,7 @@ function NoteFormModal({
       onClose();
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
-      setError(msg ?? 'An error occurred');
+      setError(msg ?? t('notes.modal.genericError'));
     } finally {
       setSaving(false);
     }
@@ -92,7 +100,7 @@ function NoteFormModal({
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200">
           <h2 className="text-sm font-semibold text-gray-800">
-            {note ? 'Edit Note' : 'New Note'}
+            {note ? t('notes.modal.editTitle') : t('notes.modal.newTitle')}
           </h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
             <X size={16} />
@@ -103,12 +111,12 @@ function NoteFormModal({
           {/* Title */}
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">
-              Title <span className="font-normal text-gray-400">(optional)</span>
+              {t('notes.modal.titleLabel')} <span className="font-normal text-gray-400">{t('notes.modal.optional')}</span>
             </label>
             <input
               type="text"
               maxLength={100}
-              placeholder="Add a title..."
+              placeholder={t('notes.modal.titlePlaceholder')}
               value={form.title}
               onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
               className="w-full border border-gray-200 rounded px-3 py-2 text-sm focus:outline-none focus:border-navy focus:ring-1 focus:ring-navy"
@@ -118,13 +126,13 @@ function NoteFormModal({
           {/* Content */}
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">
-              Content <span className="text-danger">*</span>
+              {t('notes.modal.contentLabel')} <span className="text-danger">*</span>
             </label>
             <textarea
               ref={textRef}
               rows={6}
               maxLength={2000}
-              placeholder="Write your note..."
+              placeholder={t('notes.modal.contentPlaceholder')}
               value={form.content}
               onChange={(e) => setForm((f) => ({ ...f, content: e.target.value }))}
               className="w-full border border-gray-200 rounded px-3 py-2 text-sm resize-none focus:outline-none focus:border-navy focus:ring-1 focus:ring-navy"
@@ -134,7 +142,7 @@ function NoteFormModal({
 
           {/* Color picker */}
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-2">Color</label>
+            <label className="block text-xs font-medium text-gray-600 mb-2">{t('notes.modal.colorLabel')}</label>
             <div className="flex gap-2">
               {COLOR_OPTS.map((c) => (
                 <button
@@ -159,7 +167,7 @@ function NoteFormModal({
               onChange={(e) => setForm((f) => ({ ...f, isPinned: e.target.checked }))}
               className="w-4 h-4 rounded border-gray-300 text-navy focus:ring-navy"
             />
-            <span className="text-sm text-gray-700">Pin this note</span>
+            <span className="text-sm text-gray-700">{t('notes.modal.pinLabel')}</span>
           </label>
 
           {error && (
@@ -175,7 +183,7 @@ function NoteFormModal({
               onClick={onClose}
               className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 border border-gray-200 rounded hover:bg-gray-50"
             >
-              Cancel
+              {t('notes.modal.cancel')}
             </button>
             <button
               type="submit"
@@ -183,7 +191,7 @@ function NoteFormModal({
               className="flex items-center gap-1.5 px-4 py-2 text-sm text-white bg-navy hover:bg-navy-light rounded disabled:opacity-50"
             >
               {saving && <Loader2 size={13} className="animate-spin" />}
-              {note ? 'Save' : 'Create Note'}
+              {note ? t('notes.modal.save') : t('notes.modal.create')}
             </button>
           </div>
         </form>
@@ -204,12 +212,13 @@ function NoteCard({
   onDelete:    (id: string) => void;
   onTogglePin: (note: Note) => void;
 }) {
+  const { t, i18n } = useTranslation();
   const [deleting, setDeleting] = useState(false);
   const { bg, border } = COLOR_MAP[note.color] ?? COLOR_MAP.yellow;
 
   async function handleDelete(e: React.MouseEvent) {
     e.stopPropagation();
-    if (!confirm('Delete this note?')) return;
+    if (!confirm(t('notes.card.deleteConfirm'))) return;
     setDeleting(true);
     try {
       await api.delete(`/notes/${note.id}`);
@@ -224,7 +233,7 @@ function NoteCard({
     onTogglePin(note);
   }
 
-  const date = new Date(note.updatedAt).toLocaleDateString('en-US', {
+  const date = new Date(note.updatedAt).toLocaleDateString(dateLocale(i18n.language), {
     day: '2-digit', month: 'short', year: 'numeric',
   });
 
@@ -241,7 +250,7 @@ function NoteCard({
       <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
         <button
           onClick={handlePin}
-          title={note.isPinned ? 'Unpin' : 'Pin note'}
+          title={note.isPinned ? t('notes.card.unpin') : t('notes.card.pin')}
           className={cn(
             'w-6 h-6 flex items-center justify-center rounded',
             'bg-white/70 hover:bg-white text-gray-500 hover:text-navy transition-colors',
@@ -251,7 +260,7 @@ function NoteCard({
         </button>
         <button
           onClick={(e) => { e.stopPropagation(); onEdit(note); }}
-          title="Edit"
+          title={t('notes.card.edit')}
           className="w-6 h-6 flex items-center justify-center rounded bg-white/70 hover:bg-white text-gray-500 hover:text-navy transition-colors"
         >
           <Edit2 size={12} />
@@ -259,7 +268,7 @@ function NoteCard({
         <button
           onClick={handleDelete}
           disabled={deleting}
-          title="Delete"
+          title={t('notes.card.delete')}
           className="w-6 h-6 flex items-center justify-center rounded bg-white/70 hover:bg-white text-gray-500 hover:text-danger transition-colors"
         >
           {deleting ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
@@ -270,7 +279,7 @@ function NoteCard({
       {note.isPinned && (
         <div className="flex items-center gap-1 mb-2">
           <Pin size={10} className="text-gray-500" />
-          <span className="text-xs text-gray-500">Pinned</span>
+          <span className="text-xs text-gray-500">{t('notes.card.pinned')}</span>
         </div>
       )}
 
@@ -287,6 +296,7 @@ function NoteCard({
 
 // ── Main Page ──────────────────────────────────────────────
 export default function NotesPage() {
+  const { t } = useTranslation();
   const { notes: allNotes, loading, error, fetchNotes, addNote, updateNote, removeNote } = useNoteStore();
   const { perms } = usePermStore();
   const [search, setSearch]               = useState('');
@@ -346,8 +356,8 @@ export default function NotesPage() {
       {/* Page header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-xl font-semibold text-gray-800">Notes</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Personal notes & quick references</p>
+          <h1 className="text-xl font-semibold text-gray-800">{t('notes.header.title')}</h1>
+          <p className="text-sm text-gray-500 mt-0.5">{t('notes.header.subtitle')}</p>
         </div>
         {perms.note.create && (
           <button
@@ -355,7 +365,7 @@ export default function NotesPage() {
             className="flex items-center gap-1.5 px-3 py-2 text-sm text-white bg-navy hover:bg-navy-light rounded transition-colors"
           >
             <Plus size={15} />
-            New Note
+            {t('notes.header.newNote')}
           </button>
         )}
       </div>
@@ -367,7 +377,7 @@ export default function NotesPage() {
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
           <input
             type="text"
-            placeholder="Search notes..."
+            placeholder={t('notes.toolbar.searchPlaceholder')}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="pl-8 pr-8 py-2 text-sm border border-gray-200 rounded focus:outline-none focus:border-navy focus:ring-1 focus:ring-navy w-56"
@@ -384,7 +394,7 @@ export default function NotesPage() {
 
         {/* Color filter */}
         <div className="flex items-center gap-1.5">
-          <span className="text-xs text-gray-500">Color:</span>
+          <span className="text-xs text-gray-500">{t('notes.toolbar.colorLabel')}</span>
           <button
             onClick={() => setColorFilter('')}
             className={cn(
@@ -394,7 +404,7 @@ export default function NotesPage() {
                 : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300',
             )}
           >
-            All
+            {t('notes.toolbar.all')}
           </button>
           {COLOR_OPTS.map((c) => (
             <button
@@ -412,7 +422,8 @@ export default function NotesPage() {
 
         {allNotes.length > 0 && (
           <span className="ml-auto text-xs text-gray-400">
-            {notes.length} note{notes.length !== 1 ? 's' : ''}{notes.length !== allNotes.length ? ` of ${allNotes.length}` : ''}
+            {t('notes.toolbar.count', { count: notes.length })}
+            {notes.length !== allNotes.length ? ` ${t('notes.toolbar.ofTotal', { total: allNotes.length })}` : ''}
           </span>
         )}
       </div>
@@ -432,7 +443,7 @@ export default function NotesPage() {
             onClick={fetchNotes}
             className="mt-3 px-4 py-1.5 text-sm text-navy border border-navy rounded hover:bg-navy-50"
           >
-            Try again
+            {t('notes.tryAgain')}
           </button>
         </div>
       )}
@@ -440,9 +451,9 @@ export default function NotesPage() {
       {!loading && !error && allNotes.length === 0 && (
         <div className="flex flex-col items-center justify-center py-16 text-center">
           <StickyNote size={40} className="text-gray-300 mb-3" />
-          <p className="text-sm font-medium text-gray-600">No notes yet</p>
+          <p className="text-sm font-medium text-gray-600">{t('notes.empty.title')}</p>
           <p className="text-xs text-gray-400 mt-1">
-            Click "New Note" to create your first note
+            {t('notes.empty.subtitle')}
           </p>
         </div>
       )}
@@ -450,8 +461,8 @@ export default function NotesPage() {
       {!loading && !error && allNotes.length > 0 && notes.length === 0 && (
         <div className="flex flex-col items-center justify-center py-16 text-center">
           <StickyNote size={40} className="text-gray-300 mb-3" />
-          <p className="text-sm font-medium text-gray-600">No matching notes</p>
-          <p className="text-xs text-gray-400 mt-1">Try adjusting your search filters</p>
+          <p className="text-sm font-medium text-gray-600">{t('notes.emptyFiltered.title')}</p>
+          <p className="text-xs text-gray-400 mt-1">{t('notes.emptyFiltered.subtitle')}</p>
         </div>
       )}
 
@@ -462,7 +473,7 @@ export default function NotesPage() {
             <div className="mb-6">
               <p className="flex items-center gap-1.5 text-xs font-medium text-gray-500 uppercase tracking-wider mb-3">
                 <Pin size={11} />
-                Pinned
+                {t('notes.sections.pinned')}
               </p>
               <div className="columns-1 sm:columns-2 lg:columns-3 xl:columns-4 gap-4">
                 {pinned.map((note) => (
@@ -483,7 +494,7 @@ export default function NotesPage() {
             <div>
               {pinned.length > 0 && (
                 <p className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-3">
-                  Others
+                  {t('notes.sections.others')}
                 </p>
               )}
               <div className="columns-1 sm:columns-2 lg:columns-3 xl:columns-4 gap-4">

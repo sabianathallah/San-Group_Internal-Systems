@@ -29,7 +29,7 @@ const USER_MINI = { id: true, fullName: true, avatar: true } as const;
 const TASK_SELECT = {
   id: true, title: true, description: true, status: true, priority: true,
   isImportant: true, myDayDate: true, parentTaskId: true,
-  dueDate: true, startedAt: true, completedAt: true, isPrivate: true, visibility: true,
+  startDate: true, dueDate: true, startedAt: true, completedAt: true, isPrivate: true, visibility: true,
   assignmentStatus: true, assignmentNote: true, position: true,
   createdAt: true, updatedAt: true,
   creator:  { select: USER_MINI },
@@ -278,7 +278,7 @@ export async function getTaskByIdService(
 export async function createTaskService(userId: string, data: {
   title: string; description?: string; status?: TaskStatus;
   priority?: TaskPriority; isImportant?: boolean; myDay?: boolean;
-  dueDate?: string | null; assignedToId?: string | null;
+  startDate?: string | null; dueDate?: string | null; assignedToId?: string | null;
   listId?: string | null; parentTaskId?: string | null;
   visibility?: TaskVisibility; divisionIds?: string[]; isPrivate?: boolean;
 }) {
@@ -313,6 +313,7 @@ export async function createTaskService(userId: string, data: {
       priority:         data.priority     ?? TaskPriority.MEDIUM,
       isImportant:      data.isImportant  ?? false,
       myDayDate:        data.myDay ? jakartaToday() : null,
+      startDate:        data.startDate     ? new Date(data.startDate) : null,
       dueDate:          data.dueDate      ? new Date(data.dueDate) : null,
       assignedToId:     data.assignedToId ?? null,
       listId:           data.listId       ?? null,
@@ -382,7 +383,7 @@ export async function createTaskService(userId: string, data: {
 export async function updateTaskService(id: string, userId: string, permScope: string, data: {
   title?: string; description?: string | null; status?: TaskStatus;
   priority?: TaskPriority; isImportant?: boolean; myDay?: boolean;
-  dueDate?: string | null; assignedToId?: string | null;
+  startDate?: string | null; dueDate?: string | null; assignedToId?: string | null;
   listId?: string | null; parentTaskId?: string | null;
   visibility?: TaskVisibility; divisionIds?: string[]; isPrivate?: boolean;
 }) {
@@ -449,6 +450,7 @@ export async function updateTaskService(id: string, userId: string, permScope: s
       ...(data.priority         !== undefined && { priority: data.priority }),
       ...(data.isImportant      !== undefined && { isImportant: data.isImportant }),
       ...(data.myDay            !== undefined && { myDayDate: data.myDay ? jakartaToday() : null }),
+      ...(data.startDate        !== undefined && { startDate: data.startDate ? new Date(data.startDate) : null }),
       ...(data.dueDate          !== undefined && { dueDate: data.dueDate ? new Date(data.dueDate) : null }),
       ...(data.assignedToId     !== undefined && { assignedToId: data.assignedToId }),
       ...(data.listId           !== undefined && { listId: data.listId }),
@@ -457,9 +459,12 @@ export async function updateTaskService(id: string, userId: string, permScope: s
       ...(data.isPrivate        !== undefined && { isPrivate: data.isPrivate }),
       ...(newAssignmentStatus   !== undefined && { assignmentStatus: newAssignmentStatus }),
       ...(completedAt           !== undefined && { completedAt }),
-      // Stamp the first move into IN_PROGRESS; kept on later transitions so
-      // the work duration always measures from the original start.
-      ...(data.status === TaskStatus.IN_PROGRESS && !task.startedAt && { startedAt: new Date() }),
+      // Stamp the first "work started" touch; kept on later transitions so the
+      // work duration always measures from the original start. Historically this
+      // only fired on the move into IN_PROGRESS, but the UI now lets a task go
+      // TODO → DONE directly (IN_PROGRESS merged into "To Do" visually) — so also
+      // stamp on the transition into DONE if it hasn't been stamped yet.
+      ...((data.status === TaskStatus.IN_PROGRESS || data.status === TaskStatus.DONE) && !task.startedAt && { startedAt: new Date() }),
       ...(syncDivisions && data.divisionIds!.length > 0 && {
         divisionAccess: {
           deleteMany: {},

@@ -3,6 +3,7 @@ import {
   Camera, Loader2, AlertCircle, CheckCircle2,
   Mail, Phone, Shield, Building2, Calendar, Clock, KeyRound, User,
 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import api from '@/lib/api';
 import { useAuthStore } from '@/stores/authStore';
 import { cn } from '@/lib/cn';
@@ -25,20 +26,25 @@ interface FullProfile {
 
 
 // ── Helpers ────────────────────────────────────────────────
+/** Locale for date formatting — mirrors i18next's active language. */
+function dateLocale(language: string): string {
+  return language === 'id' ? 'id-ID' : 'en-US';
+}
+
 function initials(name: string) {
   return name.split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase();
 }
 
-function fmt(iso: string | null) {
+function fmt(iso: string | null, language: string) {
   if (!iso) return '—';
-  return new Date(iso).toLocaleDateString('en-US', {
+  return new Date(iso).toLocaleDateString(dateLocale(language), {
     day: '2-digit', month: 'long', year: 'numeric',
   });
 }
 
-function fmtDatetime(iso: string | null) {
+function fmtDatetime(iso: string | null, language: string) {
   if (!iso) return '—';
-  return new Date(iso).toLocaleString('en-US', {
+  return new Date(iso).toLocaleString(dateLocale(language), {
     day: '2-digit', month: 'short', year: 'numeric',
     hour: '2-digit', minute: '2-digit',
   });
@@ -52,6 +58,7 @@ function AvatarUpload({
   profile:   FullProfile;
   onUpdated: (avatar: string) => void;
 }) {
+  const { t } = useTranslation();
   const [uploading, setUploading] = useState(false);
   const [error, setError]         = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
@@ -59,7 +66,7 @@ function AvatarUpload({
   async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 2 * 1024 * 1024) { setError('Maximum file size is 2MB'); return; }
+    if (file.size > 2 * 1024 * 1024) { setError(t('profile.avatar.maxSize')); return; }
     setError('');
     setUploading(true);
     const form = new FormData();
@@ -70,7 +77,7 @@ function AvatarUpload({
       });
       onUpdated(res.data.data.avatar);
     } catch {
-      setError('Failed to upload avatar');
+      setError(t('profile.avatar.uploadError'));
     } finally {
       setUploading(false);
       if (inputRef.current) inputRef.current.value = '';
@@ -90,14 +97,14 @@ function AvatarUpload({
           onClick={() => inputRef.current?.click()}
           disabled={uploading}
           className="absolute bottom-0 right-0 w-7 h-7 rounded-full bg-navy border-2 border-white flex items-center justify-center text-white hover:bg-navy-light transition-colors disabled:opacity-60"
-          title="Upload photo"
+          title={t('profile.avatar.uploadTitle')}
         >
           {uploading ? <Loader2 size={12} className="animate-spin" /> : <Camera size={12} />}
         </button>
         <input ref={inputRef} type="file" accept="image/*" className="hidden" onChange={handleFile} />
       </div>
       {error && <p className="text-xs text-danger">{error}</p>}
-      <p className="text-xs text-gray-400">JPG, PNG, WebP — max. 2MB</p>
+      <p className="text-xs text-gray-400">{t('profile.avatar.hint')}</p>
     </div>
   );
 }
@@ -127,6 +134,7 @@ function EditProfileForm({
   profile:  FullProfile;
   onSaved:  (updated: FullProfile) => void;
 }) {
+  const { t } = useTranslation();
   const [form, setForm]     = useState({ fullName: profile.fullName, phone: profile.phone ?? '' });
   const [saving, setSaving] = useState(false);
   const [error, setError]   = useState('');
@@ -138,7 +146,7 @@ function EditProfileForm({
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    if (!form.fullName.trim()) { setError('Full name is required'); return; }
+    if (!form.fullName.trim()) { setError(t('profile.form.nameRequired')); return; }
     setSaving(true); setError(''); setSaved(false);
     try {
       const res = await api.patch('/users/me', {
@@ -150,7 +158,7 @@ function EditProfileForm({
       setTimeout(() => setSaved(false), 3000);
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
-      setError(msg ?? 'An error occurred');
+      setError(msg ?? t('profile.form.genericError'));
     } finally {
       setSaving(false);
     }
@@ -160,7 +168,7 @@ function EditProfileForm({
     <form onSubmit={handleSubmit} className="space-y-4">
       <div>
         <label className="block text-xs font-medium text-gray-600 mb-1">
-          Full Name <span className="text-danger">*</span>
+          {t('profile.form.fullName')} <span className="text-danger">*</span>
         </label>
         <input
           type="text" maxLength={100}
@@ -171,11 +179,11 @@ function EditProfileForm({
       </div>
       <div>
         <label className="block text-xs font-medium text-gray-600 mb-1">
-          Phone Number <span className="text-gray-400 font-normal">(optional)</span>
+          {t('profile.form.phone')} <span className="text-gray-400 font-normal">{t('profile.form.optional')}</span>
         </label>
         <input
           type="text"
-          placeholder="e.g. +62812345678"
+          placeholder={t('profile.form.phonePlaceholder')}
           value={form.phone}
           onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
           className="w-full border border-gray-200 rounded px-3 py-2 text-sm focus:outline-none focus:border-navy focus:ring-1 focus:ring-navy"
@@ -192,11 +200,11 @@ function EditProfileForm({
         <button type="submit" disabled={saving}
           className="flex items-center gap-1.5 px-4 py-2 text-sm text-white bg-navy hover:bg-navy-light rounded disabled:opacity-50 transition-colors">
           {saving && <Loader2 size={13} className="animate-spin" />}
-          Save Changes
+          {t('profile.form.save')}
         </button>
         {saved && (
           <span className="flex items-center gap-1 text-xs text-success">
-            <CheckCircle2 size={13} /> Saved
+            <CheckCircle2 size={13} /> {t('profile.form.saved')}
           </span>
         )}
       </div>
@@ -206,6 +214,7 @@ function EditProfileForm({
 
 // ── Main Page ──────────────────────────────────────────────
 export default function ProfilePage() {
+  const { t, i18n } = useTranslation();
   const updateStore = useAuthStore((s) => s.updateUser);
 
   const [profile, setProfile]   = useState<FullProfile | null>(null);
@@ -216,8 +225,9 @@ export default function ProfilePage() {
   useEffect(() => {
     api.get('/auth/me')
       .then((res) => setProfile(res.data.data))
-      .catch(() => setError('Failed to load profile'))
+      .catch(() => setError(t('profile.loadError')))
       .finally(() => setLoading(false));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   function handleProfileSaved(updated: FullProfile) {
@@ -242,10 +252,10 @@ export default function ProfilePage() {
     return (
       <div className="flex flex-col items-center justify-center py-20 text-center">
         <AlertCircle size={32} className="text-danger mb-3" />
-        <p className="text-sm text-gray-600">{error || 'Failed to load profile'}</p>
+        <p className="text-sm text-gray-600">{error || t('profile.loadError')}</p>
         <button onClick={() => window.location.reload()}
           className="mt-3 px-4 py-1.5 text-sm text-navy border border-navy rounded hover:bg-navy-50">
-          Try again
+          {t('profile.tryAgain')}
         </button>
       </div>
     );
@@ -255,8 +265,8 @@ export default function ProfilePage() {
     <div className="max-w-4xl">
       {/* Page header */}
       <div className="mb-6">
-        <h1 className="text-xl font-semibold text-gray-800">My Profile</h1>
-        <p className="text-sm text-gray-500 mt-0.5">Manage your account information and security</p>
+        <h1 className="text-xl font-semibold text-gray-800">{t('profile.header.title')}</h1>
+        <p className="text-sm text-gray-500 mt-0.5">{t('profile.header.subtitle')}</p>
       </div>
 
       <div className="grid grid-cols-3 gap-5">
@@ -287,18 +297,18 @@ export default function ProfilePage() {
 
           {/* Account info */}
           <div className="bg-white border border-gray-200 rounded-lg p-4">
-            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Account Info</h3>
-            <InfoRow icon={Calendar} label="Member since"  value={fmt(profile.createdAt)} />
-            <InfoRow icon={Clock}    label="Last login"    value={fmtDatetime(profile.lastLoginAt)} />
+            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">{t('profile.accountInfo.title')}</h3>
+            <InfoRow icon={Calendar} label={t('profile.accountInfo.memberSince')}  value={fmt(profile.createdAt, i18n.language)} />
+            <InfoRow icon={Clock}    label={t('profile.accountInfo.lastLogin')}    value={fmtDatetime(profile.lastLoginAt, i18n.language)} />
             <InfoRow
               icon={Shield}
-              label="Account status"
+              label={t('profile.accountInfo.status')}
               value={
                 <span className={cn(
                   'inline-block text-xs px-2 py-0.5 rounded-full font-medium',
                   profile.isActive ? 'bg-success/10 text-success' : 'bg-gray-100 text-gray-500',
                 )}>
-                  {profile.isActive ? 'Active' : 'Inactive'}
+                  {profile.isActive ? t('profile.accountInfo.active') : t('profile.accountInfo.inactive')}
                 </span>
               }
             />
@@ -306,13 +316,13 @@ export default function ProfilePage() {
 
           {/* Security */}
           <div className="bg-white border border-gray-200 rounded-lg p-4">
-            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Security</h3>
+            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">{t('profile.security.title')}</h3>
             <button
               onClick={() => setChangePwOpen(true)}
               className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm text-gray-700 border border-gray-200 rounded hover:bg-gray-50 hover:border-gray-300 transition-colors"
             >
               <KeyRound size={15} className="text-gray-400" />
-              Change Password
+              {t('profile.security.changePassword')}
             </button>
           </div>
         </div>
@@ -323,7 +333,7 @@ export default function ProfilePage() {
           <div className="bg-white border border-gray-200 rounded-lg p-5">
             <h2 className="text-sm font-semibold text-gray-800 mb-4 flex items-center gap-2">
               <User size={15} className="text-gray-400" />
-              Personal Information
+              {t('profile.form.title')}
             </h2>
             <EditProfileForm profile={profile} onSaved={handleProfileSaved} />
           </div>
@@ -332,23 +342,23 @@ export default function ProfilePage() {
           <div className="bg-white border border-gray-200 rounded-lg p-5">
             <h2 className="text-sm font-semibold text-gray-800 mb-1 flex items-center gap-2">
               <Shield size={15} className="text-gray-400" />
-              Account Details
+              {t('profile.details.title')}
             </h2>
             <p className="text-xs text-gray-400 mb-3">
-              The following information is managed by the administrator and cannot be changed by yourself.
+              {t('profile.details.note')}
             </p>
             <div className="grid grid-cols-2 gap-x-6">
               <div>
-                <InfoRow icon={Mail}      label="Email"    value={profile.email} />
-                <InfoRow icon={User}      label="Username" value={<span className="font-mono">@{profile.username}</span>} />
+                <InfoRow icon={Mail}      label={t('profile.details.email')}    value={profile.email} />
+                <InfoRow icon={User}      label={t('profile.details.username')} value={<span className="font-mono">@{profile.username}</span>} />
               </div>
               <div>
-                <InfoRow icon={Shield}    label="Role"      value={profile.role.name} />
-                <InfoRow icon={Building2} label="Division"  value={profile.division.name} />
+                <InfoRow icon={Shield}    label={t('profile.details.role')}      value={profile.role.name} />
+                <InfoRow icon={Building2} label={t('profile.details.division')}  value={profile.division.name} />
               </div>
             </div>
             {profile.phone && (
-              <InfoRow icon={Phone} label="Phone Number" value={profile.phone} />
+              <InfoRow icon={Phone} label={t('profile.details.phone')} value={profile.phone} />
             )}
           </div>
         </div>

@@ -298,6 +298,7 @@ model Task {
   priority    TaskPriority @default(MEDIUM)
   isImportant Boolean      @default(false)
   myDayDate   DateTime?    @db.Date
+  startDate        DateTime?         @db.Date
   dueDate          DateTime?
   startedAt        DateTime? // first move to IN_PROGRESS — basis of work-duration tracking
   completedAt      DateTime?

@@ -1,20 +1,30 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Bell, CheckCheck, Loader2, Clock } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { useNotificationStore, Notification } from '@/stores/notificationStore';
 import { NotifIcon } from '@/components/shared/Header';
 import { cn } from '@/lib/cn';
 
-function notifAge(iso: string) {
-  const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
-  if (diff < 1)  return 'Just now';
-  if (diff < 60) return `${diff}m ago`;
-  const h = Math.floor(diff / 60);
-  if (h < 24)   return `${h}h ago`;
-  return new Date(iso).toLocaleDateString('en-US', { day: 'numeric', month: 'short' });
+/** Locale for date formatting — mirrors i18next's active language. */
+function dateLocale(language: string): string {
+  return language === 'id' ? 'id-ID' : 'en-US';
 }
 
-function groupByDate(notifications: Notification[]): { label: string; items: Notification[] }[] {
+function notifAge(iso: string, t: (key: string, opts?: Record<string, unknown>) => string, language: string) {
+  const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
+  if (diff < 1)  return t('notifications.time.justNow');
+  if (diff < 60) return t('notifications.time.minsAgo', { count: diff });
+  const h = Math.floor(diff / 60);
+  if (h < 24)   return t('notifications.time.hrsAgo', { count: h });
+  return new Date(iso).toLocaleDateString(dateLocale(language), { day: 'numeric', month: 'short' });
+}
+
+function groupByDate(
+  notifications: Notification[],
+  t: (key: string, opts?: Record<string, unknown>) => string,
+  language: string,
+): { label: string; items: Notification[] }[] {
   const today     = new Date(); today.setHours(0, 0, 0, 0);
   const yesterday = new Date(today); yesterday.setDate(yesterday.getDate() - 1);
 
@@ -23,9 +33,9 @@ function groupByDate(notifications: Notification[]): { label: string; items: Not
   for (const n of notifications) {
     const d = new Date(n.createdAt); d.setHours(0, 0, 0, 0);
     let label: string;
-    if (d.getTime() === today.getTime())     label = 'Today';
-    else if (d.getTime() === yesterday.getTime()) label = 'Yesterday';
-    else label = d.toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'long' });
+    if (d.getTime() === today.getTime())     label = t('notifications.groups.today');
+    else if (d.getTime() === yesterday.getTime()) label = t('notifications.groups.yesterday');
+    else label = d.toLocaleDateString(dateLocale(language), { weekday: 'long', day: 'numeric', month: 'long' });
     if (!groups[label]) groups[label] = [];
     groups[label].push(n);
   }
@@ -34,6 +44,7 @@ function groupByDate(notifications: Notification[]): { label: string; items: Not
 }
 
 export default function NotificationsPage() {
+  const { t, i18n } = useTranslation();
   const navigate    = useNavigate();
   const fetch       = useNotificationStore((s) => s.fetch);
   const loadMore    = useNotificationStore((s) => s.loadMore);
@@ -51,7 +62,7 @@ export default function NotificationsPage() {
     fetch(50).finally(() => setInitialLoad(false));
   }, [fetch]);
 
-  const groups = groupByDate(notifications);
+  const groups = groupByDate(notifications, t, i18n.language);
 
   async function handleClick(n: Notification) {
     if (!n.isRead) await markRead(n.id);
@@ -63,9 +74,9 @@ export default function NotificationsPage() {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-xl font-semibold text-gray-800">Notifications</h1>
+          <h1 className="text-xl font-semibold text-gray-800">{t('notifications.title')}</h1>
           <p className="text-sm text-gray-400 mt-0.5">
-            {unreadCount > 0 ? `${unreadCount} unread` : 'All caught up'}
+            {unreadCount > 0 ? t('notifications.unread', { count: unreadCount }) : t('notifications.allCaughtUp')}
           </p>
         </div>
         {unreadCount > 0 && (
@@ -73,7 +84,7 @@ export default function NotificationsPage() {
             onClick={markAllRead}
             className="flex items-center gap-1.5 h-8 px-3 text-xs font-medium text-gray-600 border border-gray-300 rounded hover:bg-gray-50 transition-colors"
           >
-            <CheckCheck size={13} /> Mark all as read
+            <CheckCheck size={13} /> {t('notifications.markAllRead')}
           </button>
         )}
       </div>
@@ -88,8 +99,8 @@ export default function NotificationsPage() {
           <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mb-4">
             <Bell size={28} className="text-gray-300" />
           </div>
-          <p className="text-sm font-medium text-gray-600">No notifications yet</p>
-          <p className="text-xs text-gray-400 mt-1">You're all caught up! Check back later.</p>
+          <p className="text-sm font-medium text-gray-600">{t('notifications.emptyState.title')}</p>
+          <p className="text-xs text-gray-400 mt-1">{t('notifications.emptyState.subtitle')}</p>
         </div>
       ) : (
         <div className="space-y-6">
@@ -133,7 +144,7 @@ export default function NotificationsPage() {
                           {n.title}
                         </p>
                         <span className="flex items-center gap-1 text-[11px] text-gray-400 flex-shrink-0 mt-0.5">
-                          <Clock size={10} /> {notifAge(n.createdAt)}
+                          <Clock size={10} /> {notifAge(n.createdAt, t, i18n.language)}
                         </span>
                       </div>
 
@@ -170,7 +181,7 @@ export default function NotificationsPage() {
                 className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-navy px-3 py-1.5 rounded-lg hover:bg-gray-50 disabled:opacity-50"
               >
                 {loadingMore ? <Loader2 size={12} className="animate-spin" /> : null}
-                Load more
+                {t('notifications.loadMore')}
               </button>
             </div>
           )}

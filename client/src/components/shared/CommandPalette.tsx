@@ -1,11 +1,18 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import {
   Search, X, Loader2, CheckSquare, Megaphone, StickyNote,
   Folder, Link2, ArrowRight,
 } from 'lucide-react';
 import api from '@/lib/api';
 import { cn } from '@/lib/cn';
+import { useLanguageStore } from '@/stores/languageStore';
+
+/** Locale for date formatting — mirrors i18next's active language. */
+function dateLocale(language: string): string {
+  return language === 'id' ? 'id-ID' : 'en-US';
+}
 
 // ── Types ─────────────────────────────────────────────────────
 interface TaskResult    { id: string; type: 'task';    title: string; status: string; priority: string }
@@ -22,23 +29,29 @@ interface SearchResults {
   files:    FileResult[];
 }
 
+// IN_PROGRESS is merged into "To Do" visually across the app (see TasksPage) —
+// the search palette shows the same 2-state coloring/labels for consistency.
 const STATUS_COLORS: Record<string, string> = {
   TODO:        'bg-gray-100 text-gray-600',
-  IN_PROGRESS: 'bg-blue-100 text-blue-700',
+  IN_PROGRESS: 'bg-gray-100 text-gray-600',
   DONE:        'bg-green-100 text-green-700',
   CANCELLED:   'bg-red-100 text-red-600',
-};
-const STATUS_LABELS: Record<string, string> = {
-  TODO: 'Todo', IN_PROGRESS: 'In Progress', DONE: 'Done', CANCELLED: 'Cancelled',
 };
 
 // ── Single Result Item ────────────────────────────────────────
 function ResultItem({
-  result, active, onClick,
+  result, active, onClick, t, language,
 }: {
   result: AnyResult; active: boolean; onClick: () => void;
+  t: (key: string, opts?: Record<string, unknown>) => string; language: string;
 }) {
   const base = 'flex items-center gap-3 px-4 py-2.5 cursor-pointer transition-colors rounded-md mx-1';
+  const statusLabels: Record<string, string> = {
+    TODO: t('shared.commandPalette.status.todo'),
+    IN_PROGRESS: t('shared.commandPalette.status.todo'),
+    DONE: t('shared.commandPalette.status.done'),
+    CANCELLED: t('shared.commandPalette.status.cancelled'),
+  };
 
   if (result.type === 'task') {
     return (
@@ -48,7 +61,7 @@ function ResultItem({
           <p className="text-sm text-gray-800 truncate">{result.title}</p>
         </div>
         <span className={cn('text-xs px-1.5 py-0.5 rounded flex-shrink-0', STATUS_COLORS[result.status] ?? 'bg-gray-100 text-gray-600')}>
-          {STATUS_LABELS[result.status] ?? result.status}
+          {statusLabels[result.status] ?? result.status}
         </span>
       </div>
     );
@@ -60,7 +73,7 @@ function ResultItem({
         <Megaphone size={14} className="text-amber-500 flex-shrink-0" />
         <p className="flex-1 text-sm text-gray-800 truncate">{result.title}</p>
         <span className="text-xs text-gray-400 flex-shrink-0">
-          {new Date(result.createdAt).toLocaleDateString('en-US', { day: '2-digit', month: 'short' })}
+          {new Date(result.createdAt).toLocaleDateString(dateLocale(language), { day: '2-digit', month: 'short' })}
         </span>
       </div>
     );
@@ -84,7 +97,7 @@ function ResultItem({
       <div className="flex-1 min-w-0">
         <p className="text-sm text-gray-800 truncate">{result.name}</p>
         {result.type === 'link' && result.folder && (
-          <p className="text-xs text-gray-400 truncate">in {result.folder.name}</p>
+          <p className="text-xs text-gray-400 truncate">{t('shared.commandPalette.inFolder', { folder: result.folder.name })}</p>
         )}
       </div>
     </div>
@@ -102,6 +115,8 @@ function SectionHeader({ label }: { label: string }) {
 interface Props { open: boolean; onClose: () => void; }
 
 export default function CommandPalette({ open, onClose }: Props) {
+  const { t } = useTranslation();
+  const language = useLanguageStore((s) => s.language);
   const navigate  = useNavigate();
   const inputRef  = useRef<HTMLInputElement>(null);
   const listRef   = useRef<HTMLDivElement>(null);
@@ -188,7 +203,7 @@ export default function CommandPalette({ open, onClose }: Props) {
           <input
             ref={inputRef}
             type="text"
-            placeholder="Search tasks, bulletins, notes, files..."
+            placeholder={t('shared.commandPalette.searchPlaceholder')}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={handleKeyDown}
@@ -208,17 +223,17 @@ export default function CommandPalette({ open, onClose }: Props) {
           {!query && (
             <div className="flex flex-col items-center gap-2 py-10 text-center">
               <Search size={24} className="text-gray-200" />
-              <p className="text-sm text-gray-400">Type to search the entire system</p>
+              <p className="text-sm text-gray-400">{t('shared.commandPalette.typeToSearch')}</p>
               <div className="flex items-center gap-3 mt-2 text-xs text-gray-300">
-                <span className="flex items-center gap-1"><kbd className="bg-gray-100 px-1.5 py-0.5 rounded font-mono">↑↓</kbd> navigate</span>
-                <span className="flex items-center gap-1"><kbd className="bg-gray-100 px-1.5 py-0.5 rounded font-mono">↵</kbd> open</span>
+                <span className="flex items-center gap-1"><kbd className="bg-gray-100 px-1.5 py-0.5 rounded font-mono">↑↓</kbd> {t('shared.commandPalette.navigateHint')}</span>
+                <span className="flex items-center gap-1"><kbd className="bg-gray-100 px-1.5 py-0.5 rounded font-mono">↵</kbd> {t('shared.commandPalette.openHint')}</span>
               </div>
             </div>
           )}
 
           {query && !loading && !hasResults && query.length >= 2 && (
             <p className="text-center text-sm text-gray-400 py-10">
-              No results for &ldquo;<strong>{query}</strong>&rdquo;
+              {t('shared.commandPalette.noResults', { query })}
             </p>
           )}
 
@@ -228,40 +243,40 @@ export default function CommandPalette({ open, onClose }: Props) {
               <>
                 {results!.tasks.length > 0 && (
                   <>
-                    <SectionHeader label="Task" />
-                    {results!.tasks.map((t) => {
+                    <SectionHeader label={t('shared.commandPalette.sections.task')} />
+                    {results!.tasks.map((rt) => {
                       const idx = cursor++;
-                      return <ResultItem key={t.id} result={t} active={activeIdx === idx}
-                        onClick={() => handleNavigate('/tasks', t, { selectedTaskId: t.id })} />;
+                      return <ResultItem key={rt.id} result={rt} active={activeIdx === idx} t={t} language={language}
+                        onClick={() => handleNavigate('/tasks', rt, { selectedTaskId: rt.id })} />;
                     })}
                   </>
                 )}
                 {results!.bulletins.length > 0 && (
                   <>
-                    <SectionHeader label="Bulletin" />
+                    <SectionHeader label={t('shared.commandPalette.sections.bulletin')} />
                     {results!.bulletins.map((b) => {
                       const idx = cursor++;
-                      return <ResultItem key={b.id} result={b} active={activeIdx === idx}
+                      return <ResultItem key={b.id} result={b} active={activeIdx === idx} t={t} language={language}
                         onClick={() => handleNavigate('/bulletin', b)} />;
                     })}
                   </>
                 )}
                 {results!.notes.length > 0 && (
                   <>
-                    <SectionHeader label="Notes" />
+                    <SectionHeader label={t('shared.commandPalette.sections.notes')} />
                     {results!.notes.map((n) => {
                       const idx = cursor++;
-                      return <ResultItem key={n.id} result={n} active={activeIdx === idx}
+                      return <ResultItem key={n.id} result={n} active={activeIdx === idx} t={t} language={language}
                         onClick={() => handleNavigate('/notes', n)} />;
                     })}
                   </>
                 )}
                 {results!.files.length > 0 && (
                   <>
-                    <SectionHeader label="Database & File" />
+                    <SectionHeader label={t('shared.commandPalette.sections.filesAndDb')} />
                     {results!.files.map((f) => {
                       const idx = cursor++;
-                      return <ResultItem key={f.id} result={f} active={activeIdx === idx}
+                      return <ResultItem key={f.id} result={f} active={activeIdx === idx} t={t} language={language}
                         onClick={() => handleNavigate(f.url ?? '/database', f)} />;
                     })}
                   </>
@@ -274,9 +289,9 @@ export default function CommandPalette({ open, onClose }: Props) {
         {/* Footer hint */}
         {hasResults && (
           <div className="flex items-center justify-between px-4 py-2 border-t border-gray-100 bg-gray-50">
-            <span className="text-xs text-gray-400">{flat.length} results</span>
+            <span className="text-xs text-gray-400">{t('shared.commandPalette.resultsCount', { count: flat.length })}</span>
             <span className="flex items-center gap-1 text-xs text-gray-400">
-              <ArrowRight size={11} /> Press Enter to open
+              <ArrowRight size={11} /> {t('shared.commandPalette.pressEnter')}
             </span>
           </div>
         )}

@@ -4,6 +4,7 @@ import {
   X, Edit2, Trash2, ExternalLink, Search, FileText,
   AlertCircle, Share2, ShieldCheck,
 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import api from '@/lib/api';
 import { useAuthStore } from '@/stores/authStore';
 import { usePermStore } from '@/stores/permStore';
@@ -46,14 +47,15 @@ interface DbLink {
 // ── Helpers ────────────────────────────────────────────────
 const COLORS = ['#6366f1','#10b981','#f59e0b','#ef4444','#3b82f6','#8b5cf6','#ec4899','#14b8a6','#f97316','#64748b'];
 
-function extractErr(err: unknown): string {
-  return (err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'An error occurred';
+function extractErr(err: unknown, fallback: string): string {
+  return (err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? fallback;
 }
 
 // ── Folder Modal ───────────────────────────────────────────
 function FolderModal({ folder, onClose, onSaved }: {
   folder?: DbFolder; onClose: () => void; onSaved: (f: DbFolder) => void;
 }) {
+  const { t } = useTranslation();
   const [name,  setName]  = useState(folder?.name  ?? '');
   const [color, setColor] = useState(folder?.color ?? '#6366f1');
   const [desc,  setDesc]  = useState(folder?.description ?? '');
@@ -62,7 +64,7 @@ function FolderModal({ folder, onClose, onSaved }: {
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    if (!name.trim()) { setError('Folder name is required'); return; }
+    if (!name.trim()) { setError(t('database.folderModal.nameRequired')); return; }
     setSaving(true); setError('');
     try {
       const payload = { name: name.trim(), icon: null, color, description: desc.trim() || null };
@@ -71,7 +73,7 @@ function FolderModal({ folder, onClose, onSaved }: {
         : await api.post('/db-folders', payload);
       onSaved(res.data.data);
       onClose();
-    } catch (err) { setError(extractErr(err)); } finally { setSaving(false); }
+    } catch (err) { setError(extractErr(err, t('database.errors.generic'))); } finally { setSaving(false); }
   }
 
   return (
@@ -79,24 +81,24 @@ function FolderModal({ folder, onClose, onSaved }: {
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
       <div className="relative bg-white rounded-xl shadow-xl w-full max-w-sm">
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
-          <h2 className="text-sm font-semibold text-gray-800">{folder ? 'Edit Folder' : 'New Folder'}</h2>
+          <h2 className="text-sm font-semibold text-gray-800">{folder ? t('database.folderModal.editTitle') : t('database.folderModal.newTitle')}</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={16} /></button>
         </div>
         <form onSubmit={handleSubmit} className="p-5 space-y-4">
           <div>
-            <label className="block text-xs text-gray-500 mb-1">Folder name</label>
+            <label className="block text-xs text-gray-500 mb-1">{t('database.folderModal.nameLabel')}</label>
             <input autoFocus type="text" value={name} onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. HR Documents"
+              placeholder={t('database.folderModal.namePlaceholder')}
               className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-navy" />
           </div>
           <div>
-            <label className="block text-xs text-gray-500 mb-1">Description (optional)</label>
+            <label className="block text-xs text-gray-500 mb-1">{t('database.folderModal.descLabel')}</label>
             <input type="text" value={desc} onChange={(e) => setDesc(e.target.value)}
-              placeholder="Brief description…"
+              placeholder={t('database.folderModal.descPlaceholder')}
               className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-navy" />
           </div>
           <div>
-            <label className="block text-xs text-gray-500 mb-2">Color</label>
+            <label className="block text-xs text-gray-500 mb-2">{t('database.folderModal.colorLabel')}</label>
             <div className="flex gap-2 flex-wrap">
               {COLORS.map((c) => (
                 <button key={c} type="button" onClick={() => setColor(c)}
@@ -107,10 +109,10 @@ function FolderModal({ folder, onClose, onSaved }: {
           </div>
           {error && <p className="text-xs text-red-500 flex items-center gap-1"><AlertCircle size={12} />{error}</p>}
           <div className="flex justify-end gap-2 pt-1">
-            <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50">Cancel</button>
+            <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50">{t('database.folderModal.cancel')}</button>
             <button type="submit" disabled={saving || !name.trim()}
               className="flex items-center gap-1.5 px-4 py-2 text-sm text-white bg-navy rounded-lg hover:bg-navy-light disabled:opacity-50">
-              {saving && <Loader2 size={13} className="animate-spin" />}{folder ? 'Save' : 'Create'}
+              {saving && <Loader2 size={13} className="animate-spin" />}{folder ? t('database.folderModal.save') : t('database.folderModal.create')}
             </button>
           </div>
         </form>
@@ -123,6 +125,7 @@ function FolderModal({ folder, onClose, onSaved }: {
 function LinkModal({ link, folderId, onClose, onSaved }: {
   link?: DbLink; folderId: string; onClose: () => void; onSaved: (l: DbLink) => void;
 }) {
+  const { t } = useTranslation();
   const [title, setTitle] = useState(link?.title ?? '');
   const [url,   setUrl]   = useState(link?.url   ?? '');
   const [desc,  setDesc]  = useState(link?.description ?? '');
@@ -131,8 +134,8 @@ function LinkModal({ link, folderId, onClose, onSaved }: {
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    if (!title.trim()) { setError('Name is required'); return; }
-    if (!url.trim())   { setError('Link/URL is required'); return; }
+    if (!title.trim()) { setError(t('database.linkModal.nameRequired')); return; }
+    if (!url.trim())   { setError(t('database.linkModal.urlRequired')); return; }
     setSaving(true); setError('');
     try {
       const payload = { title: title.trim(), url: url.trim(), description: desc.trim() || undefined, folderId };
@@ -141,7 +144,7 @@ function LinkModal({ link, folderId, onClose, onSaved }: {
         : await api.post('/db-links', payload);
       onSaved(res.data.data);
       onClose();
-    } catch (err) { setError(extractErr(err)); } finally { setSaving(false); }
+    } catch (err) { setError(extractErr(err, t('database.errors.generic'))); } finally { setSaving(false); }
   }
 
   return (
@@ -149,36 +152,36 @@ function LinkModal({ link, folderId, onClose, onSaved }: {
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
       <div className="relative bg-white rounded-xl shadow-xl w-full max-w-sm">
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
-          <h2 className="text-sm font-semibold text-gray-800">{link ? 'Edit Link' : 'Add Link'}</h2>
+          <h2 className="text-sm font-semibold text-gray-800">{link ? t('database.linkModal.editTitle') : t('database.linkModal.newTitle')}</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={16} /></button>
         </div>
         <form onSubmit={handleSubmit} className="p-5 space-y-4">
           <div>
-            <label className="block text-xs text-gray-500 mb-1">Display name</label>
+            <label className="block text-xs text-gray-500 mb-1">{t('database.linkModal.nameLabel')}</label>
             <input autoFocus type="text" value={title} onChange={(e) => setTitle(e.target.value)}
-              placeholder="e.g. Attendance Report June"
+              placeholder={t('database.linkModal.namePlaceholder')}
               className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-navy" />
-            <p className="text-[10px] text-gray-400 mt-1">This name is shown to users, not the URL</p>
+            <p className="text-[10px] text-gray-400 mt-1">{t('database.linkModal.nameHint')}</p>
           </div>
           <div>
-            <label className="block text-xs text-gray-500 mb-1">Link / URL</label>
+            <label className="block text-xs text-gray-500 mb-1">{t('database.linkModal.urlLabel')}</label>
 
             <input type="url" value={url} onChange={(e) => setUrl(e.target.value)}
-              placeholder="https://drive.google.com/…"
+              placeholder={t('database.linkModal.urlPlaceholder')}
               className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-navy" />
           </div>
           <div>
-            <label className="block text-xs text-gray-500 mb-1">Notes (optional)</label>
+            <label className="block text-xs text-gray-500 mb-1">{t('database.linkModal.notesLabel')}</label>
             <input type="text" value={desc} onChange={(e) => setDesc(e.target.value)}
-              placeholder="Brief description…"
+              placeholder={t('database.linkModal.notesPlaceholder')}
               className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-navy" />
           </div>
           {error && <p className="text-xs text-red-500 flex items-center gap-1"><AlertCircle size={12} />{error}</p>}
           <div className="flex justify-end gap-2 pt-1">
-            <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50">Cancel</button>
+            <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50">{t('database.linkModal.cancel')}</button>
             <button type="submit" disabled={saving || !title.trim() || !url.trim()}
               className="flex items-center gap-1.5 px-4 py-2 text-sm text-white bg-navy rounded-lg hover:bg-navy-light disabled:opacity-50">
-              {saving && <Loader2 size={13} className="animate-spin" />}{link ? 'Save' : 'Add'}
+              {saving && <Loader2 size={13} className="animate-spin" />}{link ? t('database.linkModal.save') : t('database.linkModal.add')}
             </button>
           </div>
         </form>
@@ -191,6 +194,7 @@ function LinkModal({ link, folderId, onClose, onSaved }: {
 function ShareFolderModal({ folderId, folderName, onClose }: {
   folderId: string; folderName: string; onClose: () => void;
 }) {
+  const { t } = useTranslation();
   const [shares,    setShares]    = useState<ShareEntry[]>([]);
   const [divisions, setDivisions] = useState<DivisionOption[]>([]);
   const [selDiv,    setSelDiv]    = useState('');
@@ -205,7 +209,7 @@ function ShareFolderModal({ folderId, folderName, onClose }: {
     ]).then(([s, d]) => {
       setShares(s.data.data ?? []);
       setDivisions(d.data.data ?? []);
-    }).catch(() => setError('Failed to load data'))
+    }).catch(() => setError(t('database.shareModal.loadError')))
       .finally(() => setLoading(false));
   }, [folderId]);
 
@@ -222,7 +226,7 @@ function ShareFolderModal({ folderId, folderName, onClose }: {
       setShares((prev) => [...prev, res.data.data]);
       setSelDiv('');
     } catch (err) {
-      setError(extractErr(err));
+      setError(extractErr(err, t('database.errors.generic')));
     } finally { setAdding(false); }
   }
 
@@ -244,7 +248,7 @@ function ShareFolderModal({ folderId, folderName, onClose }: {
       <div className="relative bg-white rounded-xl shadow-xl w-full max-w-md">
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
           <div>
-            <h2 className="text-sm font-semibold text-gray-800">Share Folder</h2>
+            <h2 className="text-sm font-semibold text-gray-800">{t('database.shareModal.title')}</h2>
             <p className="text-xs text-gray-400 mt-0.5">{folderName}</p>
           </div>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={16} /></button>
@@ -253,18 +257,18 @@ function ShareFolderModal({ folderId, folderName, onClose }: {
         <div className="p-5 space-y-4">
           {/* Section: Grant access */}
           <div>
-            <p className="text-xs text-gray-500 font-medium mb-2">Grant access</p>
+            <p className="text-xs text-gray-500 font-medium mb-2">{t('database.shareModal.grantAccess')}</p>
             <div className="flex gap-2">
               <select value={selDiv} onChange={(e) => setSelDiv(e.target.value)}
                 className="flex-1 text-sm border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-navy">
-                <option value="">Select division…</option>
+                <option value="">{t('database.shareModal.selectDivision')}</option>
                 {availableDivisions.map((d) => (
                   <option key={d.id} value={d.id}>{d.name}</option>
                 ))}
               </select>
               <button onClick={handleAdd} disabled={!selDiv || adding}
                 className="px-3 py-2 text-sm text-white bg-navy rounded-lg hover:bg-navy-light disabled:opacity-50 flex items-center gap-1.5">
-                {adding ? <Loader2 size={13} className="animate-spin" /> : <Plus size={13} />} Share
+                {adding ? <Loader2 size={13} className="animate-spin" /> : <Plus size={13} />} {t('database.shareModal.share')}
               </button>
             </div>
           </div>
@@ -273,13 +277,13 @@ function ShareFolderModal({ folderId, folderName, onClose }: {
 
           {/* Section: Shared with */}
           <div>
-            <p className="text-xs text-gray-500 font-medium mb-2">Shared with</p>
+            <p className="text-xs text-gray-500 font-medium mb-2">{t('database.shareModal.sharedWith')}</p>
             {loading ? (
               <div className="flex justify-center py-4"><Loader2 size={18} className="animate-spin text-gray-300" /></div>
             ) : shares.length === 0 ? (
               <div className="text-center py-6">
                 <ShieldCheck size={28} className="text-gray-200 mx-auto mb-2" />
-                <p className="text-xs text-gray-400">Not shared with anyone yet</p>
+                <p className="text-xs text-gray-400">{t('database.shareModal.notShared')}</p>
               </div>
             ) : (
               <div className="flex flex-wrap gap-2">
@@ -308,6 +312,7 @@ function ShareFolderModal({ folderId, folderName, onClose }: {
 
 // ── Main Page ──────────────────────────────────────────────
 export default function DatabasePage() {
+  const { t } = useTranslation();
   const { user } = useAuthStore();
   const { perms } = usePermStore();
 
@@ -358,7 +363,7 @@ export default function DatabasePage() {
   }
 
   async function handleDeleteFolder(folder: DbFolder) {
-    if (!confirm(`Delete folder "${folder.name}"? All links inside will also be deleted.`)) return;
+    if (!confirm(t('database.confirm.deleteFolder', { name: folder.name }))) return;
     try {
       await api.delete(`/db-folders/${folder.id}`);
       setFolders((prev) => prev.filter((f) => f.id !== folder.id));
@@ -380,7 +385,7 @@ export default function DatabasePage() {
   }
 
   async function handleDeleteLink(link: DbLink) {
-    if (!confirm(`Delete "${link.title}"?`)) return;
+    if (!confirm(t('database.confirm.deleteLink', { title: link.title }))) return;
     try {
       await api.delete(`/db-links/${link.id}`);
       setLinks((prev) => prev.filter((l) => l.id !== link.id));
@@ -396,13 +401,13 @@ export default function DatabasePage() {
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-lg font-semibold text-gray-900">Database Links</h1>
-            <p className="text-sm text-gray-500 mt-0.5">Quick access directory — click a folder to open</p>
+            <h1 className="text-lg font-semibold text-gray-900">{t('database.header.title')}</h1>
+            <p className="text-sm text-gray-500 mt-0.5">{t('database.header.subtitle')}</p>
           </div>
           {perms.db_link.manageFolder && (
             <button onClick={() => setFolderModal({ open: true })}
               className="flex items-center gap-1.5 px-4 py-2 text-sm text-white bg-navy hover:bg-navy-light rounded-lg transition-colors">
-              <Plus size={15} /> New Folder
+              <Plus size={15} /> {t('database.header.newFolder')}
             </button>
           )}
         </div>
@@ -414,11 +419,11 @@ export default function DatabasePage() {
         ) : folders.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-24 gap-3 text-gray-400">
             <Folder size={40} className="text-gray-200" />
-            <p className="text-sm">No folders yet</p>
+            <p className="text-sm">{t('database.emptyFolders.title')}</p>
             {perms.db_link.manageFolder && (
               <button onClick={() => setFolderModal({ open: true })}
                 className="text-xs text-navy hover:underline flex items-center gap-1">
-                <Plus size={12} /> Create your first folder
+                <Plus size={12} /> {t('database.emptyFolders.cta')}
               </button>
             )}
           </div>
@@ -439,7 +444,7 @@ export default function DatabasePage() {
                     {folder.description && (
                       <p className="text-[11px] text-gray-400 truncate">{folder.description}</p>
                     )}
-                    <p className="text-[11px] text-gray-300">{folder._count.links} item</p>
+                    <p className="text-[11px] text-gray-300">{t('database.folder.itemCount', { count: folder._count.links })}</p>
                   </div>
                 </button>
                 {(perms.db_link.manageFolder || perms.db_link.shareFolder) && (
@@ -447,7 +452,7 @@ export default function DatabasePage() {
                     {perms.db_link.shareFolder && (
                       <button onClick={(e) => { e.stopPropagation(); setShareFolderId(folder.id); setShareFolderName(folder.name); }}
                         className="p-1.5 bg-white border border-gray-200 rounded-lg text-gray-400 hover:text-info shadow-sm"
-                        title="Share folder">
+                        title={t('database.folder.shareTitle')}>
                         <Share2 size={11} />
                       </button>
                     )}
@@ -505,7 +510,7 @@ export default function DatabasePage() {
           <button onClick={() => { setActiveFolder(null); setSearch(''); setLinks([]); }}
             className="flex items-center gap-1 text-xs text-gray-500 hover:text-navy transition-colors mb-1.5">
             <ChevronLeft size={13} />
-            Back to Database Links
+            {t('database.folderContents.back')}
           </button>
           <div className="flex items-center gap-2">
             <FolderOpen size={16} style={{ color: activeFolder.color }} />
@@ -519,14 +524,14 @@ export default function DatabasePage() {
         <div className="flex items-center gap-2 flex-shrink-0">
           <div className="relative">
             <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
-            <input type="text" placeholder="Search…" value={search} onChange={(e) => setSearch(e.target.value)}
+            <input type="text" placeholder={t('database.folderContents.searchPlaceholder')} value={search} onChange={(e) => setSearch(e.target.value)}
               className="pl-7 pr-6 py-1.5 text-xs border border-gray-200 rounded-lg outline-none focus:border-navy w-32" />
             {search && <button onClick={() => setSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400"><X size={11} /></button>}
           </div>
           {perms.db_link.addLink && (
             <button onClick={() => setLinkModal({ open: true })}
               className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-white bg-navy hover:bg-navy-light rounded-lg transition-colors">
-              <Plus size={13} /> Add Link
+              <Plus size={13} /> {t('database.folderContents.addLink')}
             </button>
           )}
         </div>
@@ -541,11 +546,11 @@ export default function DatabasePage() {
         ) : filteredLinks.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 gap-2 text-gray-400">
             <FileText size={32} className="text-gray-200" />
-            <p className="text-sm">{search ? 'No results found' : 'This folder is empty'}</p>
+            <p className="text-sm">{search ? t('database.folderContents.noResults') : t('database.folderContents.empty')}</p>
             {!search && perms.db_link.addLink && (
               <button onClick={() => setLinkModal({ open: true })}
                 className="text-xs text-navy hover:underline flex items-center gap-1 mt-1">
-                <Plus size={12} /> Add your first link
+                <Plus size={12} /> {t('database.folderContents.addFirstLink')}
               </button>
             )}
           </div>
@@ -595,7 +600,7 @@ export default function DatabasePage() {
       </div>
 
       {!loadingLinks && filteredLinks.length > 0 && (
-        <p className="text-xs text-gray-400 text-right">{filteredLinks.length} item</p>
+        <p className="text-xs text-gray-400 text-right">{t('database.folderContents.itemCount', { count: filteredLinks.length })}</p>
       )}
 
       {linkModal.open && (

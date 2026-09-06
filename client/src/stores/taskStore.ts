@@ -27,6 +27,7 @@ export interface Task {
   priority:         TaskPriority;
   isImportant:      boolean;
   myDayDate:        string | null;
+  startDate:        string | null;
   dueDate:          string | null;
   completedAt:      string | null;
   isPrivate:        boolean;

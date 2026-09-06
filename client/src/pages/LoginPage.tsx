@@ -1,5 +1,6 @@
 import { useState, FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { Eye, EyeOff, Loader2 } from 'lucide-react';
 import { useAuthStore, User } from '@/stores/authStore';
 import { ROUTES } from '@/lib/constants';
@@ -16,6 +17,7 @@ interface LoginResponse {
 }
 
 export default function LoginPage() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const login = useAuthStore((s) => s.login);
 
@@ -26,8 +28,8 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
 
   const validate = (): string | null => {
-    if (!identifier.trim()) return 'Email or username is required.';
-    if (!password) return 'Password is required.';
+    if (!identifier.trim()) return t('login.errors.identifierRequired');
+    if (!password) return t('login.errors.passwordRequired');
     return null;
   };
 
@@ -53,7 +55,7 @@ export default function LoginPage() {
 
       navigate(ROUTES.DASHBOARD, { replace: true });
     } catch (err: unknown) {
-      const msg = extractErrorMessage(err);
+      const msg = extractErrorMessage(err, t('login.errors.generic'));
       setError(msg);
     } finally {
       setLoading(false);
@@ -71,12 +73,12 @@ export default function LoginPage() {
             alt="SAN Group"
             className="h-16 w-auto object-contain mb-2"
           />
-          <p className="text-xs text-gray-400 mt-0.5">Internal Management System</p>
+          <p className="text-xs text-gray-400 mt-0.5">{t('login.tagline')}</p>
         </div>
 
         {/* Form */}
         <form onSubmit={handleSubmit} noValidate className="space-y-4">
-          <h2 className="text-base font-semibold text-gray-800 mb-5">Sign In</h2>
+          <h2 className="text-base font-semibold text-gray-800 mb-5">{t('login.signIn')}</h2>
 
           {/* Error banner */}
           {error && (
@@ -88,7 +90,7 @@ export default function LoginPage() {
           {/* Identifier */}
           <div className="space-y-1">
             <label htmlFor="identifier" className="block text-sm font-medium text-gray-700">
-              Email or Username
+              {t('login.identifierLabel')}
             </label>
             <input
               id="identifier"
@@ -100,7 +102,7 @@ export default function LoginPage() {
                 setIdentifier(e.target.value);
                 if (error) setError(null);
               }}
-              placeholder="your@email.com or username"
+              placeholder={t('login.identifierPlaceholder')}
               disabled={loading}
               className={cn(
                 'w-full h-9 px-3 text-sm rounded border bg-white placeholder:text-gray-400 text-gray-800',
@@ -114,7 +116,7 @@ export default function LoginPage() {
           {/* Password */}
           <div className="space-y-1">
             <label htmlFor="password" className="block text-sm font-medium text-gray-700">
-              Password
+              {t('login.passwordLabel')}
             </label>
             <div className="relative">
               <input
@@ -140,7 +142,7 @@ export default function LoginPage() {
                 tabIndex={-1}
                 onClick={() => setShowPassword((prev) => !prev)}
                 className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
-                aria-label={showPassword ? 'Hide password' : 'Show password'}
+                aria-label={showPassword ? t('login.hidePassword') : t('login.showPassword')}
               >
                 {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
               </button>
@@ -162,10 +164,10 @@ export default function LoginPage() {
             {loading ? (
               <>
                 <Loader2 size={16} className="animate-spin" />
-                Signing in…
+                {t('login.signingIn')}
               </>
             ) : (
-              'Sign In'
+              t('login.signIn')
             )}
           </button>
         </form>
@@ -173,13 +175,13 @@ export default function LoginPage() {
 
       {/* Footer */}
       <p className="text-center text-xs text-gray-400 mt-5">
-        &copy; {new Date().getFullYear()} SAN Group — Confidential
+        {t('login.footer', { year: new Date().getFullYear() })}
       </p>
     </div>
   );
 }
 
-function extractErrorMessage(err: unknown): string {
+function extractErrorMessage(err: unknown, fallback: string): string {
   if (
     err &&
     typeof err === 'object' &&
@@ -194,5 +196,5 @@ function extractErrorMessage(err: unknown): string {
   ) {
     return (err.response.data as { message: string }).message;
   }
-  return 'Something went wrong. Please try again.';
+  return fallback;
 }

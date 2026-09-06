@@ -2,16 +2,31 @@ import { useEffect, useState, useCallback } from 'react';
 import {
   BarChart3, ChevronLeft, ChevronRight, Loader2, CheckCircle2, Wrench, Clock, Download, Hourglass,
 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import api from '@/lib/api';
 import { cn } from '@/lib/cn';
 import { toast } from '@/stores/toastStore';
 import { STATUS_CONFIG, PRIORITY_CONFIG, extractErr, type WOStatus, type WOPriority } from '@/pages/WorkOrderPage';
 
+// ── Helpers ────────────────────────────────────────────────
+/** Locale for date formatting — mirrors i18next's active language. */
+function dateLocale(language: string): string {
+  return language === 'id' ? 'id-ID' : 'en-US';
+}
+
 // ── Types ──────────────────────────────────────────────────────
-const CATEGORY_LABELS: Record<string, string> = {
-  ELECTRICAL: 'Electrical', PLUMBING: 'Plumbing', HVAC: 'HVAC', CIVIL: 'Civil',
-  CLEANING: 'Cleaning', SECURITY: 'Security', OTHER: 'Other',
-};
+function categoryLabels(t: TFunction): Record<string, string> {
+  return {
+    ELECTRICAL: t('workOrderReports.categories.ELECTRICAL'),
+    PLUMBING: t('workOrderReports.categories.PLUMBING'),
+    HVAC: t('workOrderReports.categories.HVAC'),
+    CIVIL: t('workOrderReports.categories.CIVIL'),
+    CLEANING: t('workOrderReports.categories.CLEANING'),
+    SECURITY: t('workOrderReports.categories.SECURITY'),
+    OTHER: t('workOrderReports.categories.OTHER'),
+  };
+}
 
 interface CategoryRow { category: string; avgResolutionMinutes: number; count: number }
 interface TechnicianRow { technicianId: string; fullName: string; assigned: number; completed: number }
@@ -34,25 +49,32 @@ function fmtDuration(mins: number) {
 }
 
 // ── Export CSV ─────────────────────────────────────────────────
-function exportCSV(report: Report, monthLabel: string) {
-  const header = ['Section', 'Name', 'Count/Assigned', 'Completed', 'Avg Resolution / Rate'];
+function exportCSV(report: Report, monthLabel: string, t: TFunction) {
+  const catLabels = categoryLabels(t);
+  const header = [
+    t('workOrderReports.csvExport.sectionHeader'),
+    t('workOrderReports.csvExport.nameHeader'),
+    t('workOrderReports.csvExport.countAssignedHeader'),
+    t('workOrderReports.csvExport.completedHeader'),
+    t('workOrderReports.csvExport.avgResolutionRateHeader'),
+  ];
   const rows: string[][] = [
-    ['Summary', 'Total Work Orders', String(report.total), '', ''],
-    ['Summary', 'Completed', String(report.completed), '', ''],
-    ['Summary', 'Completion Rate', `${report.completionRate}%`, '', ''],
+    [t('workOrderReports.csvExport.summary'), t('workOrderReports.csvExport.totalWorkOrders'), String(report.total), '', ''],
+    [t('workOrderReports.csvExport.summary'), t('workOrderReports.csvExport.completed'), String(report.completed), '', ''],
+    [t('workOrderReports.csvExport.summary'), t('workOrderReports.csvExport.completionRate'), `${report.completionRate}%`, '', ''],
     ...report.avgResolutionByCategory.map((c) => [
-      'Category', CATEGORY_LABELS[c.category] ?? c.category, String(c.count), '', fmtDuration(c.avgResolutionMinutes),
+      t('workOrderReports.csvExport.category'), catLabels[c.category] ?? c.category, String(c.count), '', fmtDuration(c.avgResolutionMinutes),
     ]),
-    ...report.byTechnician.map((t) => [
-      'Technician', t.fullName, String(t.assigned), String(t.completed),
-      t.assigned === 0 ? '0%' : `${Math.round((t.completed / t.assigned) * 100)}%`,
+    ...report.byTechnician.map((tech) => [
+      t('workOrderReports.csvExport.technician'), tech.fullName, String(tech.assigned), String(tech.completed),
+      tech.assigned === 0 ? '0%' : `${Math.round((tech.completed / tech.assigned) * 100)}%`,
     ]),
-    ['Open Aging', 'Under 1 day', String(report.openAging.under1d), '', ''],
-    ['Open Aging', '1–3 days', String(report.openAging.d1to3), '', ''],
-    ['Open Aging', '3–7 days', String(report.openAging.d3to7), '', ''],
-    ['Open Aging', 'Over 7 days', String(report.openAging.over7d), '', ''],
+    [t('workOrderReports.csvExport.openAging'), t('workOrderReports.csvExport.under1Day'), String(report.openAging.under1d), '', ''],
+    [t('workOrderReports.csvExport.openAging'), t('workOrderReports.csvExport.d1to3'), String(report.openAging.d1to3), '', ''],
+    [t('workOrderReports.csvExport.openAging'), t('workOrderReports.csvExport.d3to7'), String(report.openAging.d3to7), '', ''],
+    [t('workOrderReports.csvExport.openAging'), t('workOrderReports.csvExport.over7Days'), String(report.openAging.over7d), '', ''],
     ...report.oldestOpen.map((w) => [
-      'Longest Open', `${w.code} — ${w.title}`, w.assigneeName ?? 'Unassigned', '', fmtDuration(w.openMinutes),
+      t('workOrderReports.csvExport.longestOpen'), `${w.code} — ${w.title}`, w.assigneeName ?? t('workOrderReports.csvExport.unassigned'), '', fmtDuration(w.openMinutes),
     ]),
   ];
   // Neutralize leading =, +, -, @ so Excel/Sheets never executes a cell as a formula.
@@ -72,6 +94,8 @@ function exportCSV(report: Report, monthLabel: string) {
 }
 
 export default function WorkOrderReportsPage() {
+  const { t, i18n } = useTranslation();
+  const CATEGORY_LABELS = categoryLabels(t);
   const now = new Date();
   const [month, setMonth] = useState(now.getMonth() + 1);
   const [year, setYear]   = useState(now.getFullYear());
@@ -107,7 +131,7 @@ export default function WorkOrderReportsPage() {
     else setMonth((m) => m + 1);
   }
 
-  const monthLabel = new Date(year, month - 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  const monthLabel = new Date(year, month - 1).toLocaleDateString(dateLocale(i18n.language), { month: 'long', year: 'numeric' });
 
   return (
     <div className="space-y-5 max-w-5xl">
@@ -115,9 +139,9 @@ export default function WorkOrderReportsPage() {
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-            <BarChart3 size={20} className="text-navy" /> Work Order Report
+            <BarChart3 size={20} className="text-navy" /> {t('workOrderReports.pageTitle')}
           </h1>
-          <p className="text-sm text-gray-500 mt-0.5">Completion rate, resolution time, and technician performance</p>
+          <p className="text-sm text-gray-500 mt-0.5">{t('workOrderReports.pageSubtitle')}</p>
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
           <div className="flex items-center gap-1 bg-white border border-gray-200 rounded-lg px-1">
@@ -130,12 +154,12 @@ export default function WorkOrderReportsPage() {
             </button>
           </div>
           <button
-            onClick={() => { if (!report) return; setExporting(true); exportCSV(report, monthLabel); setExporting(false); }}
+            onClick={() => { if (!report) return; setExporting(true); exportCSV(report, monthLabel, t); setExporting(false); }}
             disabled={exporting || !report}
             className="flex items-center gap-1.5 text-sm font-medium px-3 py-2 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
           >
             {exporting ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
-            Export CSV
+            {t('workOrderReports.exportCsv')}
           </button>
         </div>
       </div>
@@ -147,18 +171,18 @@ export default function WorkOrderReportsPage() {
       ) : loadError ? (
         <div className="text-center py-16">
           <BarChart3 size={32} className="text-gray-200 mx-auto mb-3" />
-          <p className="text-gray-500 text-sm mb-3">Failed to load report: {loadError}</p>
+          <p className="text-gray-500 text-sm mb-3">{t('workOrderReports.loadErrorPrefix', { error: loadError })}</p>
           <button
             onClick={fetch}
             className="text-sm font-medium px-4 py-2 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50"
           >
-            Try again
+            {t('workOrderReports.tryAgain')}
           </button>
         </div>
       ) : !report ? (
         <div className="text-center py-16">
           <BarChart3 size={32} className="text-gray-200 mx-auto mb-3" />
-          <p className="text-gray-400 text-sm">No report data</p>
+          <p className="text-gray-400 text-sm">{t('workOrderReports.noReportData')}</p>
         </div>
       ) : (
         <>
@@ -167,16 +191,16 @@ export default function WorkOrderReportsPage() {
           <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
             <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
               <h2 className="text-sm font-semibold text-gray-800 flex items-center gap-1.5">
-                <Hourglass size={14} className="text-navy" /> Currently Open — How Long?
+                <Hourglass size={14} className="text-navy" /> {t('workOrderReports.currentlyOpen.title')}
               </h2>
-              <span className="text-xs text-gray-400">{report.openAging.total} active now</span>
+              <span className="text-xs text-gray-400">{t('workOrderReports.currentlyOpen.activeNow', { count: report.openAging.total })}</span>
             </div>
             <div className="grid grid-cols-4 divide-x divide-gray-100">
               {([
-                { label: '< 1 day',  value: report.openAging.under1d, cls: 'text-green-600' },
-                { label: '1–3 days', value: report.openAging.d1to3,   cls: 'text-blue-600' },
-                { label: '3–7 days', value: report.openAging.d3to7,   cls: 'text-amber-600' },
-                { label: '> 7 days', value: report.openAging.over7d,  cls: 'text-red-600' },
+                { label: t('workOrderReports.currentlyOpen.under1Day'), value: report.openAging.under1d, cls: 'text-green-600' },
+                { label: t('workOrderReports.currentlyOpen.d1to3'), value: report.openAging.d1to3,   cls: 'text-blue-600' },
+                { label: t('workOrderReports.currentlyOpen.d3to7'), value: report.openAging.d3to7,   cls: 'text-amber-600' },
+                { label: t('workOrderReports.currentlyOpen.over7Days'), value: report.openAging.over7d,  cls: 'text-red-600' },
               ]).map((b) => (
                 <div key={b.label} className="p-4 text-center">
                   <p className={cn('text-2xl font-bold', b.value === 0 ? 'text-gray-300' : b.cls)}>{b.value}</p>
@@ -189,20 +213,20 @@ export default function WorkOrderReportsPage() {
           {/* Longest-open work orders */}
           <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
             <div className="px-4 py-3 border-b border-gray-100">
-              <h2 className="text-sm font-semibold text-gray-800">Longest Open Work Orders</h2>
+              <h2 className="text-sm font-semibold text-gray-800">{t('workOrderReports.longestOpen.title')}</h2>
             </div>
             {report.oldestOpen.length === 0 ? (
-              <p className="text-center text-sm text-gray-400 py-8">No open work orders — everything is closed 🎉</p>
+              <p className="text-center text-sm text-gray-400 py-8">{t('workOrderReports.longestOpen.empty')}</p>
             ) : (
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-gray-100 bg-gray-50/60">
-                    <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide">Code</th>
-                    <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide">Title</th>
-                    <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide">Status</th>
-                    <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide">Priority</th>
-                    <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide">Assignee</th>
-                    <th className="text-center px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide">Open For</th>
+                    <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide">{t('workOrderReports.longestOpen.table.code')}</th>
+                    <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide">{t('workOrderReports.longestOpen.table.title')}</th>
+                    <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide">{t('workOrderReports.longestOpen.table.status')}</th>
+                    <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide">{t('workOrderReports.longestOpen.table.priority')}</th>
+                    <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide">{t('workOrderReports.longestOpen.table.assignee')}</th>
+                    <th className="text-center px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide">{t('workOrderReports.longestOpen.table.openFor')}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
@@ -214,7 +238,7 @@ export default function WorkOrderReportsPage() {
                         <td className="px-4 py-2.5 text-gray-700 max-w-xs truncate">{w.title}</td>
                         <td className="px-4 py-2.5 text-xs text-gray-600 whitespace-nowrap">{STATUS_CONFIG[w.status]?.label ?? w.status}</td>
                         <td className="px-4 py-2.5 text-xs text-gray-600">{PRIORITY_CONFIG[w.priority]?.label ?? w.priority}</td>
-                        <td className="px-4 py-2.5 text-xs text-gray-600">{w.assigneeName ?? <span className="text-gray-400">Unassigned</span>}</td>
+                        <td className="px-4 py-2.5 text-xs text-gray-600">{w.assigneeName ?? <span className="text-gray-400">{t('workOrderReports.longestOpen.unassigned')}</span>}</td>
                         <td className="px-4 py-2.5 text-center whitespace-nowrap">
                           <span className={cn('inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full',
                             days < 2 ? 'bg-green-50 text-green-600' : days < 7 ? 'bg-amber-50 text-amber-700' : 'bg-red-50 text-red-600')}>
@@ -232,7 +256,7 @@ export default function WorkOrderReportsPage() {
           {report.total === 0 ? (
             <div className="text-center py-10">
               <BarChart3 size={28} className="text-gray-200 mx-auto mb-2" />
-              <p className="text-gray-400 text-sm">No work orders created in this period</p>
+              <p className="text-gray-400 text-sm">{t('workOrderReports.noWorkOrdersInPeriod')}</p>
             </div>
           ) : (
             <>
@@ -241,34 +265,34 @@ export default function WorkOrderReportsPage() {
             <div className="rounded-xl p-4 bg-navy/5">
               <Wrench size={16} className="text-navy mb-1" />
               <p className="text-2xl font-bold text-navy">{report.total}</p>
-              <p className="text-xs text-gray-600 mt-0.5">Total Work Orders</p>
+              <p className="text-xs text-gray-600 mt-0.5">{t('workOrderReports.summary.totalWorkOrders')}</p>
             </div>
             <div className="rounded-xl p-4 bg-green-50">
               <CheckCircle2 size={16} className="text-green-600 mb-1" />
               <p className="text-2xl font-bold text-green-600">{report.completed}</p>
-              <p className="text-xs text-gray-600 mt-0.5">Completed</p>
+              <p className="text-xs text-gray-600 mt-0.5">{t('workOrderReports.summary.completed')}</p>
             </div>
             <div className="rounded-xl p-4 bg-amber-50">
               <Clock size={16} className="text-amber-600 mb-1" />
               <p className="text-2xl font-bold text-amber-600">{report.completionRate}%</p>
-              <p className="text-xs text-gray-600 mt-0.5">Completion Rate</p>
+              <p className="text-xs text-gray-600 mt-0.5">{t('workOrderReports.summary.completionRate')}</p>
             </div>
           </div>
 
           {/* Avg resolution by category */}
           <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
             <div className="px-4 py-3 border-b border-gray-100">
-              <h2 className="text-sm font-semibold text-gray-800">Average Resolution Time by Category</h2>
+              <h2 className="text-sm font-semibold text-gray-800">{t('workOrderReports.byCategory.title')}</h2>
             </div>
             {report.avgResolutionByCategory.length === 0 ? (
-              <p className="text-center text-sm text-gray-400 py-8">No completed work orders yet</p>
+              <p className="text-center text-sm text-gray-400 py-8">{t('workOrderReports.byCategory.empty')}</p>
             ) : (
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-gray-100 bg-gray-50/60">
-                    <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide">Category</th>
-                    <th className="text-center px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide">Completed</th>
-                    <th className="text-center px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide">Avg. Time</th>
+                    <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide">{t('workOrderReports.byCategory.table.category')}</th>
+                    <th className="text-center px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide">{t('workOrderReports.byCategory.table.completed')}</th>
+                    <th className="text-center px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide">{t('workOrderReports.byCategory.table.avgTime')}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
@@ -287,18 +311,18 @@ export default function WorkOrderReportsPage() {
           {/* Per-technician performance */}
           <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
             <div className="px-4 py-3 border-b border-gray-100">
-              <h2 className="text-sm font-semibold text-gray-800">Technician Performance</h2>
+              <h2 className="text-sm font-semibold text-gray-800">{t('workOrderReports.byTechnician.title')}</h2>
             </div>
             {report.byTechnician.length === 0 ? (
-              <p className="text-center text-sm text-gray-400 py-8">No work orders assigned yet</p>
+              <p className="text-center text-sm text-gray-400 py-8">{t('workOrderReports.byTechnician.empty')}</p>
             ) : (
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-gray-100 bg-gray-50/60">
-                    <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide">Technician</th>
-                    <th className="text-center px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide">Assigned</th>
-                    <th className="text-center px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide">Completed</th>
-                    <th className="text-center px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide">Completion Rate</th>
+                    <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide">{t('workOrderReports.byTechnician.table.technician')}</th>
+                    <th className="text-center px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide">{t('workOrderReports.byTechnician.table.assigned')}</th>
+                    <th className="text-center px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide">{t('workOrderReports.byTechnician.table.completed')}</th>
+                    <th className="text-center px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide">{t('workOrderReports.byTechnician.table.completionRate')}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">

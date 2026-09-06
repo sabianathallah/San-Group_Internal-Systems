@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Archive, Filter, RefreshCw, Loader2, Info, Search } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import api from '@/lib/api';
 import { cn } from '@/lib/cn';
 import { toast } from '@/stores/toastStore';
@@ -16,6 +17,7 @@ import {
 // hides Edit/Change Status/Review for terminal statuses on its own, so it's safe
 // to reuse directly here — this page just never shows the "in flight" board.
 export default function WorkOrderHistoryPage() {
+  const { t } = useTranslation();
   const user  = useAuthStore((s) => s.user);
   const perms = usePermStore((s) => s.perms);
   const woPerms = perms.work_order;
@@ -93,8 +95,8 @@ export default function WorkOrderHistoryPage() {
         <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-100 bg-white flex-shrink-0">
           <Archive size={18} className="text-navy" />
           <div>
-            <h1 className="font-semibold text-gray-900 text-sm">Work Order History</h1>
-            <p className="text-[11px] text-gray-400">Completed and cancelled work orders</p>
+            <h1 className="font-semibold text-gray-900 text-sm">{t('workOrderHistory.pageTitle')}</h1>
+            <p className="text-[11px] text-gray-400">{t('workOrderHistory.pageSubtitle')}</p>
           </div>
         </div>
 
@@ -105,8 +107,8 @@ export default function WorkOrderHistoryPage() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') setSearchQuery(search); }}
-              placeholder="Search code / title..."
-              aria-label="Search work order history"
+              placeholder={t('workOrderHistory.searchPlaceholder')}
+              aria-label={t('workOrderHistory.searchAriaLabel')}
               className="w-full text-sm border border-gray-200 rounded-lg pl-8 pr-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-navy/30"
             />
           </div>
@@ -115,18 +117,18 @@ export default function WorkOrderHistoryPage() {
             onChange={(e) => setOutcomeFilter(e.target.value as '' | 'DONE' | 'CANCELLED')}
             className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white focus:outline-none"
           >
-            <option value="">Done + Cancelled</option>
-            <option value="DONE">Done only</option>
-            <option value="CANCELLED">Cancelled only</option>
+            <option value="">{t('workOrderHistory.outcomeFilter.doneAndCancelled')}</option>
+            <option value="DONE">{t('workOrderHistory.outcomeFilter.doneOnly')}</option>
+            <option value="CANCELLED">{t('workOrderHistory.outcomeFilter.cancelledOnly')}</option>
           </select>
           <button
             onClick={() => setShowFilters((v) => !v)}
-            aria-label="Toggle filters"
+            aria-label={t('workOrderHistory.toggleFiltersAriaLabel')}
             className={cn('p-1.5 rounded-lg border transition-colors', showFilters ? 'border-navy bg-navy/5 text-navy' : 'border-gray-200 text-gray-500 hover:bg-gray-50')}
           >
             <Filter size={14} />
           </button>
-          <button onClick={() => fetchWOs()} aria-label="Refresh" className="p-1.5 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50">
+          <button onClick={() => fetchWOs()} aria-label={t('workOrderHistory.refreshAriaLabel')} className="p-1.5 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50">
             <RefreshCw size={14} />
           </button>
           <PageSizeSelect value={pageSize} onChange={(n) => setPageSize(n)} options={[25, 50, 100]} />
@@ -138,7 +140,7 @@ export default function WorkOrderHistoryPage() {
                 onChange={(e) => setPriorityFilter(e.target.value as WOPriority | '')}
                 className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white focus:outline-none"
               >
-                <option value="">All Priorities</option>
+                <option value="">{t('workOrderHistory.allPriorities')}</option>
                 {(Object.keys(PRIORITY_CONFIG) as WOPriority[]).map((p) => (
                   <option key={p} value={p}>{PRIORITY_CONFIG[p].label}</option>
                 ))}
@@ -148,7 +150,7 @@ export default function WorkOrderHistoryPage() {
                 onChange={(e) => setCategoryFilter(e.target.value as WOCategory | '')}
                 className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white focus:outline-none"
               >
-                <option value="">All Categories</option>
+                <option value="">{t('workOrderHistory.allCategories')}</option>
                 {(Object.keys(CATEGORY_CONFIG) as WOCategory[]).map((c) => (
                   <option key={c} value={c}>{CATEGORY_CONFIG[c].icon} {CATEGORY_CONFIG[c].label}</option>
                 ))}
@@ -157,7 +159,7 @@ export default function WorkOrderHistoryPage() {
                 type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)}
                 className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white focus:outline-none"
               />
-              <span className="text-xs text-gray-400">to</span>
+              <span className="text-xs text-gray-400">{t('workOrderHistory.dateTo')}</span>
               <input
                 type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)}
                 className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white focus:outline-none"
@@ -169,14 +171,14 @@ export default function WorkOrderHistoryPage() {
         {totalCount > workOrders.length && (
           <div className="flex items-center gap-2 px-4 py-1.5 text-[11px] text-gray-500 bg-gray-50 border-b border-gray-100 flex-shrink-0">
             <Info size={11} />
-            <span>Showing {workOrders.length} of {totalCount} work orders.</span>
+            <span>{t('workOrderHistory.loadMore.showing', { shown: workOrders.length, total: totalCount })}</span>
             <button
               onClick={() => fetchWOs(page + 1, true)}
               disabled={loadingMore}
               className="ml-auto flex items-center gap-1 font-medium text-navy hover:underline disabled:opacity-60"
             >
               {loadingMore ? <Loader2 size={11} className="animate-spin" /> : null}
-              Load more
+              {t('workOrderHistory.loadMore.button')}
             </button>
           </div>
         )}

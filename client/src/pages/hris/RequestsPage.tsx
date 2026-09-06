@@ -3,6 +3,7 @@ import {
   ClipboardEdit, Plus, Loader2, X, CheckCircle2, XCircle, Clock,
   AlertCircle, CalendarClock, AlarmClock, Users, User, RefreshCw,
 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import api from '@/lib/api';
 import { cn } from '@/lib/cn';
 import { useEscapeClose } from '@/hooks/useEscapeClose';
@@ -10,6 +11,11 @@ import { useAuthStore } from '@/stores/authStore';
 import { usePermStore } from '@/stores/permStore';
 import { toast } from '@/stores/toastStore';
 import { PageSizeSelect } from '@/components/shared/PageSizeSelect';
+
+/** Locale for date formatting — mirrors i18next's active language. */
+function dateLocale(language: string): string {
+  return language === 'id' ? 'id-ID' : 'en-US';
+}
 
 // ── Types ──────────────────────────────────────────────────────
 type ReqStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED';
@@ -33,15 +39,15 @@ interface ShiftChange {
 interface ShiftOption { id: string; name: string; startTime: string; endTime: string; isActive: boolean }
 interface Meta { total: number; page: number; limit: number; totalPages: number }
 
-const STATUS_CONFIG: Record<ReqStatus, { label: string; color: string; bg: string; icon: React.ElementType }> = {
-  PENDING:   { label: 'Pending',   color: 'text-yellow-700', bg: 'bg-yellow-50', icon: Clock        },
-  APPROVED:  { label: 'Approved',  color: 'text-green-700',  bg: 'bg-green-50',  icon: CheckCircle2 },
-  REJECTED:  { label: 'Rejected',  color: 'text-red-700',    bg: 'bg-red-50',    icon: XCircle      },
-  CANCELLED: { label: 'Cancelled', color: 'text-gray-500',   bg: 'bg-gray-100',  icon: X            },
+const STATUS_CONFIG: Record<ReqStatus, { labelKey: string; color: string; bg: string; icon: React.ElementType }> = {
+  PENDING:   { labelKey: 'hris.requests.status.pending',   color: 'text-yellow-700', bg: 'bg-yellow-50', icon: Clock        },
+  APPROVED:  { labelKey: 'hris.requests.status.approved',  color: 'text-green-700',  bg: 'bg-green-50',  icon: CheckCircle2 },
+  REJECTED:  { labelKey: 'hris.requests.status.rejected',  color: 'text-red-700',    bg: 'bg-red-50',    icon: XCircle      },
+  CANCELLED: { labelKey: 'hris.requests.status.cancelled', color: 'text-gray-500',   bg: 'bg-gray-100',  icon: X            },
 };
 
-function fmtDate(iso: string) {
-  return new Date(iso).toLocaleDateString('en-US', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+function fmtDate(iso: string, language: string) {
+  return new Date(iso).toLocaleDateString(dateLocale(language), { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
 }
 
 function getInitials(name: string) {
@@ -50,6 +56,7 @@ function getInitials(name: string) {
 
 // ── Create: Late Excuse ────────────────────────────────────────
 function CreateLateExcuseModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
+  const { t } = useTranslation();
   const today = new Date(Date.now() + 7 * 3600 * 1000).toISOString().slice(0, 10);
   const [form, setForm] = useState({ date: today, expectedTime: '', reason: '' });
   const [submitting, setSubmitting] = useState(false);
@@ -62,11 +69,11 @@ function CreateLateExcuseModal({ onClose, onCreated }: { onClose: () => void; on
       await api.post('/hris/late-excuses', {
         date: form.date, expectedTime: form.expectedTime || null, reason: form.reason.trim(),
       });
-      toast.success('Late excuse submitted');
+      toast.success(t('hris.requests.createLateModal.toast.submitted'));
       onCreated();
       onClose();
     } catch (err: any) {
-      toast.error(err?.response?.data?.message ?? 'Failed to submit');
+      toast.error(err?.response?.data?.message ?? t('hris.requests.createLateModal.toast.failed'));
     } finally { setSubmitting(false); }
   }
 
@@ -76,42 +83,41 @@ function CreateLateExcuseModal({ onClose, onCreated }: { onClose: () => void; on
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
           <div className="flex items-center gap-2">
             <AlarmClock size={18} className="text-navy" />
-            <h3 className="font-semibold text-gray-900">Late Excuse (Advance Notice)</h3>
+            <h3 className="font-semibold text-gray-900">{t('hris.requests.createLateModal.title')}</h3>
           </div>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
         </div>
         <div className="px-5 py-4 space-y-4">
           <p className="text-xs text-gray-500 bg-gray-50 rounded-lg px-3 py-2">
-            Submit <span className="font-medium">before you check in</span>. If approved, that day&apos;s
-            check-in won&apos;t count as late.
+            {t('hris.requests.createLateModal.description')}
           </p>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1.5">Date</label>
+              <label className="block text-xs font-medium text-gray-500 mb-1.5">{t('hris.requests.createLateModal.dateLabel')}</label>
               <input type="date" value={form.date} min={today} onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))}
                 className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-navy/20" />
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1.5">Expected Arrival</label>
+              <label className="block text-xs font-medium text-gray-500 mb-1.5">{t('hris.requests.createLateModal.expectedArrivalLabel')}</label>
               <input type="time" value={form.expectedTime} onChange={(e) => setForm((f) => ({ ...f, expectedTime: e.target.value }))}
                 className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-navy/20" />
             </div>
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1.5">Reason <span className="text-red-500">*</span></label>
+            <label className="block text-xs font-medium text-gray-500 mb-1.5">{t('hris.requests.createLateModal.reasonLabel')} <span className="text-red-500">*</span></label>
             <textarea value={form.reason} onChange={(e) => setForm((f) => ({ ...f, reason: e.target.value }))}
-              rows={3} placeholder="e.g. morning doctor's appointment (min. 5 characters)"
+              rows={3} placeholder={t('hris.requests.createLateModal.reasonPlaceholder')}
               className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-navy/20 resize-none" />
           </div>
         </div>
         <div className="px-5 pb-5 flex gap-3">
           <button onClick={onClose} className="flex-1 py-2.5 text-sm font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors">
-            Cancel
+            {t('hris.requests.createLateModal.cancel')}
           </button>
           <button onClick={handleSubmit} disabled={submitting || form.reason.trim().length < 5}
             className="flex-1 py-2.5 text-sm font-medium text-white bg-navy hover:bg-navy/90 disabled:opacity-40 rounded-lg transition-colors flex items-center justify-center gap-2">
             {submitting ? <Loader2 size={14} className="animate-spin" /> : <AlarmClock size={14} />}
-            Submit
+            {t('hris.requests.createLateModal.submit')}
           </button>
         </div>
       </div>
@@ -121,6 +127,7 @@ function CreateLateExcuseModal({ onClose, onCreated }: { onClose: () => void; on
 
 // ── Create: Shift Change ───────────────────────────────────────
 function CreateShiftChangeModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
+  const { t } = useTranslation();
   const today = new Date(Date.now() + 7 * 3600 * 1000).toISOString().slice(0, 10);
   const [shifts, setShifts] = useState<ShiftOption[]>([]);
   const [form, setForm] = useState({ requestedShiftId: '', effectiveDate: today, reason: '' });
@@ -140,11 +147,11 @@ function CreateShiftChangeModal({ onClose, onCreated }: { onClose: () => void; o
       await api.post('/hris/shift-changes', {
         requestedShiftId: form.requestedShiftId, effectiveDate: form.effectiveDate, reason: form.reason.trim(),
       });
-      toast.success('Shift change request submitted');
+      toast.success(t('hris.requests.createShiftModal.toast.submitted'));
       onCreated();
       onClose();
     } catch (err: any) {
-      toast.error(err?.response?.data?.message ?? 'Failed to submit');
+      toast.error(err?.response?.data?.message ?? t('hris.requests.createShiftModal.toast.failed'));
     } finally { setSubmitting(false); }
   }
 
@@ -154,41 +161,41 @@ function CreateShiftChangeModal({ onClose, onCreated }: { onClose: () => void; o
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
           <div className="flex items-center gap-2">
             <CalendarClock size={18} className="text-navy" />
-            <h3 className="font-semibold text-gray-900">Request Shift Change</h3>
+            <h3 className="font-semibold text-gray-900">{t('hris.requests.createShiftModal.title')}</h3>
           </div>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
         </div>
         <div className="px-5 py-4 space-y-4">
           <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1.5">New Shift <span className="text-red-500">*</span></label>
+            <label className="block text-xs font-medium text-gray-500 mb-1.5">{t('hris.requests.createShiftModal.newShiftLabel')} <span className="text-red-500">*</span></label>
             <select value={form.requestedShiftId} onChange={(e) => setForm((f) => ({ ...f, requestedShiftId: e.target.value }))}
               className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2.5 bg-white focus:outline-none focus:ring-2 focus:ring-navy/20">
-              <option value="">— Select shift —</option>
+              <option value="">{t('hris.requests.createShiftModal.selectShiftPlaceholder')}</option>
               {shifts.map((s) => (
                 <option key={s.id} value={s.id}>{s.name} ({s.startTime}–{s.endTime})</option>
               ))}
             </select>
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1.5">Effective From</label>
+            <label className="block text-xs font-medium text-gray-500 mb-1.5">{t('hris.requests.createShiftModal.effectiveFromLabel')}</label>
             <input type="date" value={form.effectiveDate} min={today} onChange={(e) => setForm((f) => ({ ...f, effectiveDate: e.target.value }))}
               className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-navy/20" />
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1.5">Reason <span className="text-red-500">*</span></label>
+            <label className="block text-xs font-medium text-gray-500 mb-1.5">{t('hris.requests.createShiftModal.reasonLabel')} <span className="text-red-500">*</span></label>
             <textarea value={form.reason} onChange={(e) => setForm((f) => ({ ...f, reason: e.target.value }))}
-              rows={3} placeholder="Why do you need to change shifts? (min. 5 characters)"
+              rows={3} placeholder={t('hris.requests.createShiftModal.reasonPlaceholder')}
               className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-navy/20 resize-none" />
           </div>
         </div>
         <div className="px-5 pb-5 flex gap-3">
           <button onClick={onClose} className="flex-1 py-2.5 text-sm font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors">
-            Cancel
+            {t('hris.requests.createShiftModal.cancel')}
           </button>
           <button onClick={handleSubmit} disabled={submitting || !form.requestedShiftId || form.reason.trim().length < 5}
             className="flex-1 py-2.5 text-sm font-medium text-white bg-navy hover:bg-navy/90 disabled:opacity-40 rounded-lg transition-colors flex items-center justify-center gap-2">
             {submitting ? <Loader2 size={14} className="animate-spin" /> : <CalendarClock size={14} />}
-            Submit
+            {t('hris.requests.createShiftModal.submit')}
           </button>
         </div>
       </div>
@@ -202,6 +209,7 @@ function ReviewModal({
 }: {
   kind: ReqKind; item: LateExcuse | ShiftChange; onClose: () => void; onDone: () => void;
 }) {
+  const { t, i18n } = useTranslation();
   const [note, setNote] = useState('');
   const [submitting, setSubmitting] = useState(false);
   useEscapeClose(onClose);
@@ -211,11 +219,11 @@ function ReviewModal({
     try {
       const base = kind === 'late' ? 'late-excuses' : 'shift-changes';
       await api.patch(`/hris/${base}/${item.id}/review`, { status, reviewNote: note.trim() || null });
-      toast.success(status === 'APPROVED' ? 'Request approved' : 'Request rejected');
+      toast.success(status === 'APPROVED' ? t('hris.requests.reviewModal.toast.approved') : t('hris.requests.reviewModal.toast.rejected'));
       onDone();
       onClose();
     } catch (err: any) {
-      toast.error(err?.response?.data?.message ?? 'Failed to process');
+      toast.error(err?.response?.data?.message ?? t('hris.requests.reviewModal.toast.failed'));
     } finally { setSubmitting(false); }
   }
 
@@ -226,41 +234,41 @@ function ReviewModal({
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-xl shadow-xl w-full max-w-md">
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
-          <h3 className="font-semibold text-gray-900">{kind === 'late' ? 'Review Late Excuse' : 'Review Shift Change'}</h3>
+          <h3 className="font-semibold text-gray-900">{kind === 'late' ? t('hris.requests.reviewModal.titleLate') : t('hris.requests.reviewModal.titleShift')}</h3>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
         </div>
         <div className="px-5 py-4 space-y-3">
           <div className="bg-gray-50 rounded-lg p-3 space-y-2 text-sm">
-            <div className="flex justify-between"><span className="text-gray-500">Employee</span><span className="font-medium">{item.user.fullName}</span></div>
+            <div className="flex justify-between"><span className="text-gray-500">{t('hris.requests.reviewModal.employee')}</span><span className="font-medium">{item.user.fullName}</span></div>
             {late && (
               <>
-                <div className="flex justify-between"><span className="text-gray-500">Date</span><span>{fmtDate(late.date)}</span></div>
-                {late.expectedTime && <div className="flex justify-between"><span className="text-gray-500">Expected arrival</span><span>{late.expectedTime}</span></div>}
+                <div className="flex justify-between"><span className="text-gray-500">{t('hris.requests.reviewModal.date')}</span><span>{fmtDate(late.date, i18n.language)}</span></div>
+                {late.expectedTime && <div className="flex justify-between"><span className="text-gray-500">{t('hris.requests.reviewModal.expectedArrival')}</span><span>{late.expectedTime}</span></div>}
               </>
             )}
             {shift && (
               <>
-                <div className="flex justify-between"><span className="text-gray-500">New shift</span><span>{shift.requestedShift.name} ({shift.requestedShift.startTime}–{shift.requestedShift.endTime})</span></div>
-                <div className="flex justify-between"><span className="text-gray-500">Effective from</span><span>{fmtDate(shift.effectiveDate)}</span></div>
+                <div className="flex justify-between"><span className="text-gray-500">{t('hris.requests.reviewModal.newShift')}</span><span>{shift.requestedShift.name} ({shift.requestedShift.startTime}–{shift.requestedShift.endTime})</span></div>
+                <div className="flex justify-between"><span className="text-gray-500">{t('hris.requests.reviewModal.effectiveFrom')}</span><span>{fmtDate(shift.effectiveDate, i18n.language)}</span></div>
               </>
             )}
-            <div className="flex justify-between items-start gap-4"><span className="text-gray-500 flex-shrink-0">Reason</span><span className="text-right">{item.reason}</span></div>
+            <div className="flex justify-between items-start gap-4"><span className="text-gray-500 flex-shrink-0">{t('hris.requests.reviewModal.reason')}</span><span className="text-right">{item.reason}</span></div>
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1.5">Note (optional)</label>
-            <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} placeholder="Note for employee..."
+            <label className="block text-xs font-medium text-gray-500 mb-1.5">{t('hris.requests.reviewModal.noteLabel')}</label>
+            <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} placeholder={t('hris.requests.reviewModal.notePlaceholder')}
               className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-gray-200 resize-none" />
           </div>
         </div>
         <div className="px-5 pb-5 flex gap-3">
           <button onClick={() => handleReview('REJECTED')} disabled={submitting}
             className="flex-1 py-2.5 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors flex items-center justify-center gap-2 disabled:opacity-40">
-            <XCircle size={14} /> Reject
+            <XCircle size={14} /> {t('hris.requests.reviewModal.reject')}
           </button>
           <button onClick={() => handleReview('APPROVED')} disabled={submitting}
             className="flex-1 py-2.5 text-sm font-medium text-white bg-navy hover:bg-navy/90 rounded-lg transition-colors flex items-center justify-center gap-2 disabled:opacity-40">
             {submitting ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
-            Approve
+            {t('hris.requests.reviewModal.approve')}
           </button>
         </div>
       </div>
@@ -269,15 +277,16 @@ function ReviewModal({
 }
 
 // ── Main Page ──────────────────────────────────────────────────
-const STATUS_TABS: { label: string; value: string }[] = [
-  { label: 'All',       value: ''          },
-  { label: 'Pending',   value: 'PENDING'   },
-  { label: 'Approved',  value: 'APPROVED'  },
-  { label: 'Rejected',  value: 'REJECTED'  },
-  { label: 'Cancelled', value: 'CANCELLED' },
+const STATUS_TABS: { labelKey: string; value: string }[] = [
+  { labelKey: 'hris.requests.statusTabs.all',       value: ''          },
+  { labelKey: 'hris.requests.statusTabs.pending',   value: 'PENDING'   },
+  { labelKey: 'hris.requests.statusTabs.approved',  value: 'APPROVED'  },
+  { labelKey: 'hris.requests.statusTabs.rejected',  value: 'REJECTED'  },
+  { labelKey: 'hris.requests.statusTabs.cancelled', value: 'CANCELLED' },
 ];
 
 export default function RequestsPage() {
+  const { t, i18n } = useTranslation();
   const user  = useAuthStore((s) => s.user);
   const perms = usePermStore((s) => s.perms);
 
@@ -314,10 +323,10 @@ export default function RequestsPage() {
   async function handleCancel(id: string) {
     try {
       await api.patch(`/hris/${kind === 'late' ? 'late-excuses' : 'shift-changes'}/${id}/cancel`);
-      toast.success('Request cancelled');
+      toast.success(t('hris.requests.list.toast.cancelled'));
       fetch();
     } catch (err: any) {
-      toast.error(err?.response?.data?.message ?? 'Failed to cancel');
+      toast.error(err?.response?.data?.message ?? t('hris.requests.list.toast.cancelFailed'));
     }
   }
 
@@ -332,21 +341,21 @@ export default function RequestsPage() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-              <ClipboardEdit size={20} className="text-navy" /> Requests
+              <ClipboardEdit size={20} className="text-navy" /> {t('hris.requests.header.title')}
             </h1>
-            <p className="text-sm text-gray-500 mt-0.5">Late excuses and shift change requests</p>
+            <p className="text-sm text-gray-500 mt-0.5">{t('hris.requests.header.subtitle')}</p>
           </div>
           <button onClick={() => setCreateOpen(true)}
             className="flex items-center gap-2 px-4 py-2 bg-navy text-white rounded-lg text-sm font-medium hover:bg-navy/90 transition-colors">
-            <Plus size={15} /> {kind === 'late' ? 'Late Excuse' : 'Shift Change'}
+            <Plus size={15} /> {kind === 'late' ? t('hris.requests.kind.late') : t('hris.requests.kind.shift')}
           </button>
         </div>
 
         {/* Kind switch */}
         <div className="flex bg-gray-100 rounded-lg p-1 gap-1 w-fit">
           {([
-            { v: 'late'  as const, label: 'Late Excuses',  icon: AlarmClock    },
-            { v: 'shift' as const, label: 'Shift Changes', icon: CalendarClock },
+            { v: 'late'  as const, label: t('hris.requests.kind.lateTabs'),  icon: AlarmClock    },
+            { v: 'shift' as const, label: t('hris.requests.kind.shiftTabs'), icon: CalendarClock },
           ]).map(({ v, label, icon: Icon }) => (
             <button key={v} onClick={() => { setKind(v); setStatusTab(''); setPage(1); }}
               className={cn('flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors',
@@ -359,11 +368,11 @@ export default function RequestsPage() {
         {/* Controls */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           <div className="flex gap-1 border-b border-gray-200 flex-1">
-            {STATUS_TABS.map((t) => (
-              <button key={t.value} onClick={() => { setStatusTab(t.value); setPage(1); }}
+            {STATUS_TABS.map((st) => (
+              <button key={st.value} onClick={() => { setStatusTab(st.value); setPage(1); }}
                 className={cn('px-3 py-2 text-sm font-medium transition-colors border-b-2 -mb-px',
-                  statusTab === t.value ? 'border-navy text-navy' : 'border-transparent text-gray-500 hover:text-gray-700')}>
-                {t.label}
+                  statusTab === st.value ? 'border-navy text-navy' : 'border-transparent text-gray-500 hover:text-gray-700')}>
+                {t(st.labelKey)}
               </button>
             ))}
           </div>
@@ -374,7 +383,7 @@ export default function RequestsPage() {
                   className={cn('flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors',
                     viewMode === v ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700')}>
                   {v === 'me' ? <User size={13} /> : <Users size={13} />}
-                  {v === 'me' ? 'Me' : 'Team'}
+                  {v === 'me' ? t('hris.requests.viewMode.me') : t('hris.requests.viewMode.team')}
                 </button>
               ))}
             </div>
@@ -388,15 +397,15 @@ export default function RequestsPage() {
           </div>
         ) : loadError ? (
           <div className="text-center py-12">
-            <p className="text-sm text-gray-500 mb-3">Failed to load data. Check your connection and try again.</p>
+            <p className="text-sm text-gray-500 mb-3">{t('hris.requests.loadError')}</p>
             <button onClick={fetch} className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
-              <RefreshCw size={14} /> Retry
+              <RefreshCw size={14} /> {t('hris.requests.retry')}
             </button>
           </div>
         ) : items.length === 0 ? (
           <div className="text-center py-12">
             <ClipboardEdit size={32} className="text-gray-200 mx-auto mb-3" />
-            <p className="text-gray-400 text-sm">No requests</p>
+            <p className="text-gray-400 text-sm">{t('hris.requests.empty')}</p>
           </div>
         ) : (
           <div className="space-y-2">
@@ -424,8 +433,8 @@ export default function RequestsPage() {
                     )}
                     {late && (
                       <>
-                        <p className="text-sm font-semibold text-gray-800">{fmtDate(late.date)}</p>
-                        {late.expectedTime && <p className="text-xs text-gray-500 mt-0.5">Expected arrival {late.expectedTime}</p>}
+                        <p className="text-sm font-semibold text-gray-800">{fmtDate(late.date, i18n.language)}</p>
+                        {late.expectedTime && <p className="text-xs text-gray-500 mt-0.5">{t('hris.requests.list.expectedArrival', { time: late.expectedTime })}</p>}
                       </>
                     )}
                     {shift && (
@@ -434,7 +443,7 @@ export default function RequestsPage() {
                           → {shift.requestedShift.name}
                           <span className="ml-1.5 text-xs font-normal text-gray-500">({shift.requestedShift.startTime}–{shift.requestedShift.endTime})</span>
                         </p>
-                        <p className="text-xs text-gray-500 mt-0.5">Effective {fmtDate(shift.effectiveDate)}</p>
+                        <p className="text-xs text-gray-500 mt-0.5">{t('hris.requests.list.effective', { date: fmtDate(shift.effectiveDate, i18n.language) })}</p>
                       </>
                     )}
                     <p className="text-xs text-gray-500 mt-1 line-clamp-1">{it.reason}</p>
@@ -446,18 +455,18 @@ export default function RequestsPage() {
                   </div>
                   <div className="flex items-center gap-2 flex-shrink-0">
                     <span className={cn('inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full', cfg.color, cfg.bg)}>
-                      <StatusIcon size={11} /> {cfg.label}
+                      <StatusIcon size={11} /> {t(cfg.labelKey)}
                     </span>
                     {showCancel && (
                       <button onClick={() => handleCancel(it.id)}
                         className="text-xs text-gray-500 hover:text-red-500 transition-colors px-2 py-1 rounded hover:bg-red-50">
-                        Cancel
+                        {t('hris.requests.list.cancel')}
                       </button>
                     )}
                     {showReview && (
                       <button onClick={() => setReviewTarget(it)}
                         className="text-xs font-medium text-navy hover:underline px-2 py-1 rounded hover:bg-navy/5 transition-colors">
-                        Review
+                        {t('hris.requests.list.review')}
                       </button>
                     )}
                   </div>
@@ -475,7 +484,7 @@ export default function RequestsPage() {
               <div className="flex items-center gap-2">
                 <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1}
                   className="p-2 text-gray-400 hover:text-gray-700 disabled:opacity-30 transition-colors">‹</button>
-                <span className="text-sm text-gray-500">{page} / {meta.totalPages}</span>
+                <span className="text-sm text-gray-500">{t('hris.requests.pagination', { page, totalPages: meta.totalPages })}</span>
                 <button onClick={() => setPage((p) => Math.min(meta.totalPages, p + 1))} disabled={page === meta.totalPages}
                   className="p-2 text-gray-400 hover:text-gray-700 disabled:opacity-30 transition-colors">›</button>
               </div>

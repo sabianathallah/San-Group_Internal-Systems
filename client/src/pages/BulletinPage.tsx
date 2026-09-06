@@ -5,12 +5,18 @@ import {
   Loader2, Trash2, Edit2, Clock, ToggleLeft, ToggleRight,
   ChevronLeft, ChevronRight,
 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import api from '@/lib/api';
 import { useAuthStore } from '@/stores/authStore';
 import { usePermStore } from '@/stores/permStore';
 import { useToastStore } from '@/stores/toastStore';
 import { cn } from '@/lib/cn';
 import { PageSizeSelect } from '@/components/shared/PageSizeSelect';
+
+/** Locale for date formatting — mirrors i18next's active language. */
+function dateLocale(language: string): string {
+  return language === 'id' ? 'id-ID' : 'en-US';
+}
 
 // ── Types ──────────────────────────────────────────────────
 type BulletinCategory = 'ANNOUNCEMENT' | 'HOLIDAY' | 'MAINTENANCE' | 'EVENT' | 'GENERAL';
@@ -41,51 +47,66 @@ interface Meta {
 }
 
 // ── Constants ──────────────────────────────────────────────
-const CATEGORY_TABS: { value: BulletinCategory | 'ALL'; label: string }[] = [
-  { value: 'ALL',          label: 'All'          },
-  { value: 'ANNOUNCEMENT', label: 'Announcement' },
-  { value: 'HOLIDAY',      label: 'Holiday'      },
-  { value: 'MAINTENANCE',  label: 'Maintenance'  },
-  { value: 'EVENT',        label: 'Event'        },
-  { value: 'GENERAL',      label: 'General'      },
-];
+type TFn = (key: string, opts?: Record<string, unknown>) => string;
 
-const CATEGORY_OPTS: { value: BulletinCategory; label: string }[] = CATEGORY_TABS.slice(1) as { value: BulletinCategory; label: string }[];
+function categoryTabs(t: TFn): { value: BulletinCategory | 'ALL'; label: string }[] {
+  return [
+    { value: 'ALL',          label: t('bulletin.category.all') },
+    { value: 'ANNOUNCEMENT', label: t('bulletin.category.announcement') },
+    { value: 'HOLIDAY',      label: t('bulletin.category.holiday') },
+    { value: 'MAINTENANCE',  label: t('bulletin.category.maintenance') },
+    { value: 'EVENT',        label: t('bulletin.category.event') },
+    { value: 'GENERAL',      label: t('bulletin.category.general') },
+  ];
+}
 
-const PRIORITY_OPTS: { value: BulletinPriority; label: string }[] = [
-  { value: 'URGENT',    label: 'Urgent'    },
-  { value: 'IMPORTANT', label: 'Important' },
-  { value: 'NORMAL',    label: 'Normal'    },
-];
+function categoryOpts(t: TFn): { value: BulletinCategory; label: string }[] {
+  return categoryTabs(t).slice(1) as { value: BulletinCategory; label: string }[];
+}
+
+function priorityOpts(t: TFn): { value: BulletinPriority; label: string }[] {
+  return [
+    { value: 'URGENT',    label: t('bulletin.priority.urgent') },
+    { value: 'IMPORTANT', label: t('bulletin.priority.important') },
+    { value: 'NORMAL',    label: t('bulletin.priority.normal') },
+  ];
+}
 
 // ── Helpers ────────────────────────────────────────────────
-function priorityConfig(p: BulletinPriority) {
+function priorityConfig(p: BulletinPriority, t: TFn) {
   return {
-    URGENT:    { cls: 'bg-danger-light text-danger border-l-danger',     icon: AlertTriangle, label: 'Urgent'    },
-    IMPORTANT: { cls: 'bg-warning-light text-warning border-l-warning',  icon: Info,          label: 'Important' },
-    NORMAL:    { cls: 'bg-gray-100 text-gray-500 border-l-gray-300',     icon: Info,          label: 'Normal'    },
+    URGENT:    { cls: 'bg-danger-light text-danger border-l-danger',     icon: AlertTriangle, label: t('bulletin.priority.urgent') },
+    IMPORTANT: { cls: 'bg-warning-light text-warning border-l-warning',  icon: Info,          label: t('bulletin.priority.important') },
+    NORMAL:    { cls: 'bg-gray-100 text-gray-500 border-l-gray-300',     icon: Info,          label: t('bulletin.priority.normal') },
   }[p];
 }
 
-function categoryLabel(c: BulletinCategory) {
+function categoryLabel(c: BulletinCategory, t: TFn) {
   return {
-    ANNOUNCEMENT: 'Announcement', HOLIDAY: 'Holiday',
-    MAINTENANCE: 'Maintenance', EVENT: 'Event', GENERAL: 'General',
+    ANNOUNCEMENT: t('bulletin.category.announcement'), HOLIDAY: t('bulletin.category.holiday'),
+    MAINTENANCE: t('bulletin.category.maintenance'), EVENT: t('bulletin.category.event'), GENERAL: t('bulletin.category.general'),
   }[c];
 }
 
-function formatDate(iso: string) {
-  return new Date(iso).toLocaleDateString('en-US', {
+function formatDate(iso: string, language: string) {
+  return new Date(iso).toLocaleDateString(dateLocale(language), {
     day: 'numeric', month: 'long', year: 'numeric',
   });
 }
 
 // ── Scheduled Announcement Types ──────────────────────────
 type RecurrenceType = 'DAILY' | 'WEEKDAYS' | 'WEEKLY';
-const DAY_LABELS = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
-const RECURRENCE_LABELS: Record<RecurrenceType, string> = {
-  DAILY: 'Every day', WEEKDAYS: 'Weekdays (Mon–Fri)', WEEKLY: 'Every week on…',
-};
+const DAY_LABEL_KEYS = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday'];
+function dayLabels(t: TFn) {
+  return DAY_LABEL_KEYS.map((k) => t(`bulletin.days.${k}`));
+}
+function recurrenceLabels(t: TFn): Record<RecurrenceType, string> {
+  return {
+    DAILY: t('bulletin.recurrence.daily'),
+    WEEKDAYS: t('bulletin.recurrence.weekdays'),
+    WEEKLY: t('bulletin.recurrence.weekly'),
+  };
+}
 
 interface ScheduledAnnouncement {
   id: string; title: string; content: string;
@@ -98,14 +119,15 @@ interface ScheduledAnnouncement {
 }
 
 function pad(n: number) { return String(n).padStart(2, '0'); }
-function scheduleLabel(sa: ScheduledAnnouncement) {
+function scheduleLabel(sa: ScheduledAnnouncement, t: TFn) {
   const time = `${pad(sa.sendHour)}:${pad(sa.sendMinute)} WIB`;
-  if (sa.recurrence === 'WEEKLY') return `${DAY_LABELS[sa.dayOfWeek ?? 0]}, ${time}`;
-  return `${RECURRENCE_LABELS[sa.recurrence]}, ${time}`;
+  if (sa.recurrence === 'WEEKLY') return `${dayLabels(t)[sa.dayOfWeek ?? 0]}, ${time}`;
+  return `${recurrenceLabels(t)[sa.recurrence]}, ${time}`;
 }
 
 // ── Main Page ──────────────────────────────────────────────
 export default function BulletinPage() {
+  const { t, i18n } = useTranslation();
   const user = useAuthStore((s) => s.user);
   const currentUserId = user?.id ?? '';
   const roleLevel = user?.role?.level ?? 99;
@@ -154,7 +176,7 @@ export default function BulletinPage() {
       setBulletins(res.data.data ?? []);
       setMeta(res.data.meta ?? null);
     } catch {
-      setError('Failed to load bulletins.');
+      setError(t('bulletin.errorState.loadFailed'));
     } finally {
       setLoading(false);
     }
@@ -210,27 +232,27 @@ export default function BulletinPage() {
       await api.patch(`/scheduled-announcements/${sa.id}`, { isActive: !sa.isActive });
       setScheduled((prev) => prev.map((s) => s.id === sa.id ? { ...s, isActive: !sa.isActive } : s));
     } catch {
-      pushToast('error', 'Gagal mengubah status pengumuman terjadwal');
+      pushToast('error', t('bulletin.toast.toggleScheduledError'));
     }
   };
 
   const handleDeleteScheduled = async (id: string) => {
-    if (!confirm('Delete this scheduled announcement?')) return;
+    if (!confirm(t('bulletin.confirm.deleteScheduled'))) return;
     try {
       await api.delete(`/scheduled-announcements/${id}`);
       setScheduled((prev) => prev.filter((s) => s.id !== id));
     } catch {
-      pushToast('error', 'Gagal menghapus pengumuman terjadwal');
+      pushToast('error', t('bulletin.toast.deleteScheduledError'));
     }
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Delete this bulletin?')) return;
+    if (!confirm(t('bulletin.confirm.deleteBulletin'))) return;
     try {
       await api.delete(`/bulletins/${id}`);
       fetchBulletins();
     } catch {
-      pushToast('error', 'Gagal menghapus bulletin');
+      pushToast('error', t('bulletin.toast.deleteBulletinError'));
     }
   };
 
@@ -239,7 +261,7 @@ export default function BulletinPage() {
       await api.patch(`/bulletins/${b.id}`, { isPublished: !b.isPublished });
       fetchBulletins();
     } catch {
-      pushToast('error', 'Gagal mengubah status publikasi bulletin');
+      pushToast('error', t('bulletin.toast.togglePublishError'));
     }
   };
 
@@ -248,11 +270,11 @@ export default function BulletinPage() {
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <div>
-          <h1 className="text-xl font-semibold text-gray-800">Bulletin</h1>
+          <h1 className="text-xl font-semibold text-gray-800">{t('bulletin.header.title')}</h1>
           <p className="text-sm text-gray-400 mt-0.5">
             {activeTab === 'bulletins'
-              ? (meta ? `${meta.total} bulletins` : 'Announcements board')
-              : `${scheduled.length} scheduled`}
+              ? (meta ? t('bulletin.header.subtitleCount', { count: meta.total }) : t('bulletin.header.subtitleDefault'))
+              : t('bulletin.header.subtitleScheduledCount', { count: scheduled.length })}
           </p>
         </div>
         {activeTab === 'bulletins' && perms.bulletin.create && (
@@ -260,7 +282,7 @@ export default function BulletinPage() {
             onClick={() => { setEditItem(null); setShowForm(true); }}
             className="flex items-center gap-1.5 h-9 px-3 bg-navy text-white text-sm font-medium rounded hover:bg-navy-light transition-colors"
           >
-            <Plus size={15} /> Create
+            <Plus size={15} /> {t('bulletin.header.create')}
           </button>
         )}
         {activeTab === 'scheduled' && canManageScheduled && (
@@ -268,7 +290,7 @@ export default function BulletinPage() {
             onClick={() => { setEditScheduled(null); setShowScheduledForm(true); }}
             className="flex items-center gap-1.5 h-9 px-3 bg-navy text-white text-sm font-medium rounded hover:bg-navy-light transition-colors"
           >
-            <Plus size={15} /> Add
+            <Plus size={15} /> {t('bulletin.header.add')}
           </button>
         )}
       </div>
@@ -276,12 +298,12 @@ export default function BulletinPage() {
       {/* Tabs */}
       {canManageScheduled && (
         <div className="flex gap-1 mb-4 border-b border-gray-100">
-          {(['bulletins', 'scheduled'] as const).map((t) => (
-            <button key={t} onClick={() => setActiveTab(t)}
+          {(['bulletins', 'scheduled'] as const).map((tabKey) => (
+            <button key={tabKey} onClick={() => setActiveTab(tabKey)}
               className={cn('px-3 py-2 text-xs font-medium border-b-2 -mb-px transition-colors capitalize',
-                activeTab === t ? 'border-navy text-navy' : 'border-transparent text-gray-500 hover:text-gray-700'
+                activeTab === tabKey ? 'border-navy text-navy' : 'border-transparent text-gray-500 hover:text-gray-700'
               )}>
-              {t === 'scheduled' ? <span className="flex items-center gap-1"><Clock size={11} /> Scheduled</span> : 'Bulletins'}
+              {tabKey === 'scheduled' ? <span className="flex items-center gap-1"><Clock size={11} /> {t('bulletin.tabs.scheduled')}</span> : t('bulletin.tabs.bulletins')}
             </button>
           ))}
         </div>
@@ -293,7 +315,7 @@ export default function BulletinPage() {
           <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
           <input
             type="text"
-            placeholder="Search bulletins..."
+            placeholder={t('bulletin.search.placeholder')}
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
             className="w-full h-9 pl-8 pr-3 text-sm border border-gray-300 rounded bg-white placeholder:text-gray-400 focus:border-navy focus:outline-none focus:ring-2 focus:ring-navy-50"
@@ -302,7 +324,7 @@ export default function BulletinPage() {
 
         {/* Category tabs */}
         <div className="flex items-center gap-1 flex-wrap mb-4">
-          {CATEGORY_TABS.map((tab) => (
+          {categoryTabs(t).map((tab) => (
             <button
               key={tab.value}
               onClick={() => { setCategory(tab.value); setPage(1); }}
@@ -325,7 +347,7 @@ export default function BulletinPage() {
               )}
             >
               {showDrafts ? <EyeOff size={12} /> : <Eye size={12} />}
-              {showDrafts ? 'Hide drafts' : 'Show drafts'}
+              {showDrafts ? t('bulletin.drafts.hide') : t('bulletin.drafts.show')}
             </button>
           )}
         </div>
@@ -363,7 +385,7 @@ export default function BulletinPage() {
                   className="p-2 text-gray-400 hover:text-gray-700 disabled:opacity-30 transition-colors">
                   <ChevronLeft size={16} />
                 </button>
-                <span className="text-sm text-gray-500">{page} / {meta.totalPages}</span>
+                <span className="text-sm text-gray-500">{t('bulletin.pagination.pageOf', { page, totalPages: meta.totalPages })}</span>
                 <button onClick={() => setPage((p) => Math.min(meta.totalPages, p + 1))} disabled={page === meta.totalPages}
                   className="p-2 text-gray-400 hover:text-gray-700 disabled:opacity-30 transition-colors">
                   <ChevronRight size={16} />
@@ -381,8 +403,8 @@ export default function BulletinPage() {
           ) : scheduled.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 text-center">
               <Clock size={32} className="text-gray-300 mb-3" />
-              <p className="text-sm font-medium text-gray-600">No scheduled announcements</p>
-              <p className="text-xs text-gray-400 mt-1">Add recurring notifications for your team.</p>
+              <p className="text-sm font-medium text-gray-600">{t('bulletin.scheduledTab.emptyTitle')}</p>
+              <p className="text-xs text-gray-400 mt-1">{t('bulletin.scheduledTab.emptySubtitle')}</p>
             </div>
           ) : scheduled.map((sa) => (
             <div key={sa.id} className={cn(
@@ -392,7 +414,7 @@ export default function BulletinPage() {
               <div className="flex items-start justify-between gap-2">
                 <p className="text-sm font-semibold text-gray-800 leading-snug">{sa.title}</p>
                 <div className="flex items-center gap-1 flex-shrink-0">
-                  <button onClick={() => handleToggleActive(sa)} title={sa.isActive ? 'Deactivate' : 'Activate'}
+                  <button onClick={() => handleToggleActive(sa)} title={sa.isActive ? t('bulletin.scheduledTab.deactivate') : t('bulletin.scheduledTab.activate')}
                     className="text-gray-400 hover:text-navy transition-colors">
                     {sa.isActive ? <ToggleRight size={18} className="text-navy" /> : <ToggleLeft size={18} />}
                   </button>
@@ -405,14 +427,14 @@ export default function BulletinPage() {
               <p className="text-xs text-gray-500 line-clamp-2">{sa.content}</p>
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="inline-flex items-center gap-1 text-[10px] bg-navy/10 text-navy px-2 py-0.5 rounded-full font-medium">
-                  <Clock size={9} /> {scheduleLabel(sa)}
+                  <Clock size={9} /> {scheduleLabel(sa, t)}
                 </span>
                 <span className="text-[10px] text-gray-400">
-                  {sa.audienceType === 'ALL' ? 'All staff' : sa.audienceType === 'DIVISION' ? "Creator's division" : sa.audiences.map(a => a.division.name).join(', ')}
+                  {sa.audienceType === 'ALL' ? t('bulletin.scheduledTab.audienceAll') : sa.audienceType === 'DIVISION' ? t('bulletin.scheduledTab.audienceDivision') : sa.audiences.map(a => a.division.name).join(', ')}
                 </span>
               </div>
               {sa.lastSentAt && (
-                <p className="text-[10px] text-gray-400">Last sent: {new Date(sa.lastSentAt).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' })}</p>
+                <p className="text-[10px] text-gray-400">{t('bulletin.scheduledTab.lastSent', { date: new Date(sa.lastSentAt).toLocaleString(dateLocale(i18n.language), { dateStyle: 'medium', timeStyle: 'short' }) })}</p>
               )}
             </div>
           ))}
@@ -450,7 +472,8 @@ function BulletinFeedCard({ bulletin: b, canEdit, canDelete, onEdit, onDelete, o
   bulletin: Bulletin; canEdit: boolean; canDelete: boolean;
   onEdit: () => void; onDelete: () => void; onTogglePublish: () => void;
 }) {
-  const cfg = priorityConfig(b.priority);
+  const { t, i18n } = useTranslation();
+  const cfg = priorityConfig(b.priority, t);
   const Icon = cfg.icon;
 
   return (
@@ -467,16 +490,16 @@ function BulletinFeedCard({ bulletin: b, canEdit, canDelete, onEdit, onDelete, o
                 <Icon size={11} /> {cfg.label}
               </span>
               <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded">
-                {categoryLabel(b.category)}
+                {categoryLabel(b.category, t)}
               </span>
               {!b.isPublished && (
-                <span className="text-xs font-medium text-warning bg-warning-light px-2 py-0.5 rounded">Draft</span>
+                <span className="text-xs font-medium text-warning bg-warning-light px-2 py-0.5 rounded">{t('bulletin.feed.draft')}</span>
               )}
               {b.audienceType === 'DIVISION' && (
-                <span className="text-xs text-blue-500 bg-blue-50 px-1.5 py-0.5 rounded">Division</span>
+                <span className="text-xs text-blue-500 bg-blue-50 px-1.5 py-0.5 rounded">{t('bulletin.feed.division')}</span>
               )}
               {b.audienceType === 'CUSTOM' && (
-                <span className="text-xs text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded">Limited</span>
+                <span className="text-xs text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded">{t('bulletin.feed.limited')}</span>
               )}
               {!b.isRead && <span className="w-1.5 h-1.5 rounded-full bg-info flex-shrink-0" />}
             </div>
@@ -484,11 +507,11 @@ function BulletinFeedCard({ bulletin: b, canEdit, canDelete, onEdit, onDelete, o
               {b.title}
             </h2>
             <div className="flex items-center gap-3 mt-1 text-xs text-gray-400 flex-wrap">
-              <span>By {b.author.fullName}</span>
+              <span>{t('bulletin.feed.by', { name: b.author.fullName })}</span>
               {b.publishedAt && (
-                <span className="flex items-center gap-1"><Calendar size={11} /> {formatDate(b.publishedAt)}</span>
+                <span className="flex items-center gap-1"><Calendar size={11} /> {formatDate(b.publishedAt, i18n.language)}</span>
               )}
-              <span>{b._count.readStatus} readers</span>
+              <span>{t('bulletin.feed.readers', { count: b._count.readStatus })}</span>
             </div>
           </div>
 
@@ -497,7 +520,7 @@ function BulletinFeedCard({ bulletin: b, canEdit, canDelete, onEdit, onDelete, o
               {canEdit && (
                 <button onClick={onTogglePublish}
                   className="p-1.5 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-700 transition-colors"
-                  title={b.isPublished ? 'Unpublish' : 'Publish'}
+                  title={b.isPublished ? t('bulletin.feed.unpublish') : t('bulletin.feed.publish')}
                 >
                   {b.isPublished ? <EyeOff size={13} /> : <Eye size={13} />}
                 </button>
@@ -522,7 +545,7 @@ function BulletinFeedCard({ bulletin: b, canEdit, canDelete, onEdit, onDelete, o
 
         {b.expiresAt && (
           <p className="mt-3 text-xs text-gray-400 border-t border-gray-100 pt-2.5">
-            Valid until: {formatDate(b.expiresAt)}
+            {t('bulletin.feed.validUntil', { date: formatDate(b.expiresAt, i18n.language) })}
           </p>
         )}
       </div>
@@ -534,6 +557,7 @@ function BulletinFeedCard({ bulletin: b, canEdit, canDelete, onEdit, onDelete, o
 function BulletinFormModal({ bulletin, onClose, onSaved }: {
   bulletin: Bulletin | null; onClose: () => void; onSaved: () => void;
 }) {
+  const { t } = useTranslation();
   const isEdit = !!bulletin;
   const [loading,          setLoading]          = useState(false);
   const [error,            setError]            = useState<string | null>(null);
@@ -563,10 +587,10 @@ function BulletinFormModal({ bulletin, onClose, onSaved }: {
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    if (!title.trim())   { setError('Title is required'); return; }
-    if (!content.trim()) { setError('Content is required'); return; }
+    if (!title.trim())   { setError(t('bulletin.form.errors.titleRequired')); return; }
+    if (!content.trim()) { setError(t('bulletin.form.errors.contentRequired')); return; }
     if (audienceType === 'CUSTOM' && selectedDivIds.length === 0) {
-      setError('Select at least one division for custom audience'); return;
+      setError(t('bulletin.form.errors.divisionRequired')); return;
     }
 
     setLoading(true);
@@ -591,7 +615,7 @@ function BulletinFormModal({ bulletin, onClose, onSaved }: {
     } catch (err: unknown) {
       const msg =
         (err as { response?: { data?: { message?: string } } })?.response?.data?.message
-        ?? 'An error occurred';
+        ?? t('bulletin.form.errors.generic');
       setError(msg);
     } finally {
       setLoading(false);
@@ -605,7 +629,7 @@ function BulletinFormModal({ bulletin, onClose, onSaved }: {
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 flex-shrink-0">
           <h2 className="text-md font-semibold text-gray-800">
-            {isEdit ? 'Edit Bulletin' : 'Create Bulletin'}
+            {isEdit ? t('bulletin.form.editTitle') : t('bulletin.form.createTitle')}
           </h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
             <X size={18} />
@@ -621,17 +645,17 @@ function BulletinFormModal({ bulletin, onClose, onSaved }: {
           )}
 
           <div className="space-y-1">
-            <label className="block text-sm font-medium text-gray-700">Title *</label>
+            <label className="block text-sm font-medium text-gray-700">{t('bulletin.form.titleLabel')}</label>
             <input type="text" value={title} onChange={(e) => setTitle(e.target.value)}
-              placeholder="Bulletin title..."
+              placeholder={t('bulletin.form.titlePlaceholder')}
               className="w-full h-9 px-3 text-sm border border-gray-300 rounded bg-white placeholder:text-gray-400 focus:border-navy focus:outline-none focus:ring-2 focus:ring-navy-50"
             />
           </div>
 
           <div className="space-y-1">
-            <label className="block text-sm font-medium text-gray-700">Content *</label>
+            <label className="block text-sm font-medium text-gray-700">{t('bulletin.form.contentLabel')}</label>
             <textarea value={content} onChange={(e) => setContent(e.target.value)}
-              placeholder="Announcement content..."
+              placeholder={t('bulletin.form.contentPlaceholder')}
               rows={8}
               className="w-full px-3 py-2 text-sm border border-gray-300 rounded bg-white placeholder:text-gray-400 focus:border-navy focus:outline-none focus:ring-2 focus:ring-navy-50 resize-none"
             />
@@ -639,30 +663,30 @@ function BulletinFormModal({ bulletin, onClose, onSaved }: {
 
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
-              <label className="block text-sm font-medium text-gray-700">Category</label>
+              <label className="block text-sm font-medium text-gray-700">{t('bulletin.form.categoryLabel')}</label>
               <select value={category} onChange={(e) => setCategory(e.target.value as BulletinCategory)}
                 className="w-full h-9 px-3 text-sm border border-gray-300 rounded bg-white focus:border-navy focus:outline-none focus:ring-2 focus:ring-navy-50"
               >
-                {CATEGORY_OPTS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                {categoryOpts(t).map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
               </select>
             </div>
             <div className="space-y-1">
-              <label className="block text-sm font-medium text-gray-700">Priority</label>
+              <label className="block text-sm font-medium text-gray-700">{t('bulletin.form.priorityLabel')}</label>
               <select value={priority} onChange={(e) => setPriority(e.target.value as BulletinPriority)}
                 className="w-full h-9 px-3 text-sm border border-gray-300 rounded bg-white focus:border-navy focus:outline-none focus:ring-2 focus:ring-navy-50"
               >
-                {PRIORITY_OPTS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                {priorityOpts(t).map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
               </select>
             </div>
           </div>
 
           <div className="space-y-1">
-            <label className="block text-sm font-medium text-gray-700">Audience</label>
+            <label className="block text-sm font-medium text-gray-700">{t('bulletin.form.audienceLabel')}</label>
             <div className="flex gap-2">
               {([
-                { value: 'ALL'      as AudienceType, label: 'Everyone'       },
-                { value: 'DIVISION' as AudienceType, label: 'My Division'    },
-                { value: 'CUSTOM'   as AudienceType, label: 'Select Divisions' },
+                { value: 'ALL'      as AudienceType, label: t('bulletin.form.audienceEveryone')       },
+                { value: 'DIVISION' as AudienceType, label: t('bulletin.form.audienceMyDivision')    },
+                { value: 'CUSTOM'   as AudienceType, label: t('bulletin.form.audienceSelectDivisions') },
               ] as { value: AudienceType; label: string }[]).map((opt) => (
                 <button
                   key={opt.value}
@@ -683,7 +707,7 @@ function BulletinFormModal({ bulletin, onClose, onSaved }: {
 
           {audienceType === 'CUSTOM' && (
             <div className="space-y-1">
-              <label className="block text-sm font-medium text-gray-700">Select Divisions</label>
+              <label className="block text-sm font-medium text-gray-700">{t('bulletin.form.selectDivisionsLabel')}</label>
               <div className="flex flex-wrap gap-1.5 p-2 border border-gray-300 rounded bg-white max-h-28 overflow-y-auto">
                 {divisions.map((div) => (
                   <button
@@ -702,7 +726,7 @@ function BulletinFormModal({ bulletin, onClose, onSaved }: {
                   </button>
                 ))}
                 {divisions.length === 0 && (
-                  <span className="text-xs text-gray-400 p-1">Loading divisions...</span>
+                  <span className="text-xs text-gray-400 p-1">{t('bulletin.loadingDivisions')}</span>
                 )}
               </div>
             </div>
@@ -710,7 +734,7 @@ function BulletinFormModal({ bulletin, onClose, onSaved }: {
 
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
-              <label className="block text-sm font-medium text-gray-700">Valid until</label>
+              <label className="block text-sm font-medium text-gray-700">{t('bulletin.form.validUntilLabel')}</label>
               <input type="date" value={expiresAt} onChange={(e) => setExpiresAt(e.target.value)}
                 className="w-full h-9 px-3 text-sm border border-gray-300 rounded bg-white focus:border-navy focus:outline-none focus:ring-2 focus:ring-navy-50"
               />
@@ -720,7 +744,7 @@ function BulletinFormModal({ bulletin, onClose, onSaved }: {
                 <input type="checkbox" checked={published} onChange={(e) => setPublished(e.target.checked)}
                   className="w-4 h-4 accent-navy rounded"
                 />
-                <span className="text-sm text-gray-700">Publish now</span>
+                <span className="text-sm text-gray-700">{t('bulletin.form.publishNow')}</span>
               </label>
             </div>
           </div>
@@ -731,14 +755,14 @@ function BulletinFormModal({ bulletin, onClose, onSaved }: {
           <button type="button" onClick={onClose}
             className="h-9 px-4 text-sm text-gray-700 border border-gray-300 rounded hover:bg-gray-50 transition-colors"
           >
-            Cancel
+            {t('bulletin.form.cancel')}
           </button>
           <button onClick={handleSubmit as unknown as React.MouseEventHandler}
             disabled={loading}
             className="h-9 px-5 text-sm font-medium bg-navy text-white rounded hover:bg-navy-light disabled:opacity-60 transition-colors flex items-center gap-2"
           >
             {loading && <Loader2 size={14} className="animate-spin" />}
-            {isEdit ? 'Save' : 'Create Bulletin'}
+            {isEdit ? t('bulletin.form.save') : t('bulletin.form.create')}
           </button>
         </div>
       </div>
@@ -761,16 +785,17 @@ function SkeletonList() {
 }
 
 function EmptyState({ isAdmin, canCreate, onAdd }: { isAdmin: boolean; canCreate?: boolean; onAdd: () => void }) {
+  const { t } = useTranslation();
   return (
     <div className="flex flex-col items-center justify-center py-16 text-center">
       <Megaphone size={36} className="text-gray-300 mb-3" />
-      <p className="text-sm font-medium text-gray-600">No bulletins yet</p>
-      <p className="text-xs text-gray-400 mt-1">Announcements from management will appear here.</p>
+      <p className="text-sm font-medium text-gray-600">{t('bulletin.emptyState.title')}</p>
+      <p className="text-xs text-gray-400 mt-1">{t('bulletin.emptyState.subtitle')}</p>
       {(canCreate ?? isAdmin) && (
         <button onClick={onAdd}
           className="mt-4 flex items-center gap-1.5 h-8 px-4 text-sm font-medium text-white bg-navy rounded hover:bg-navy-light transition-colors"
         >
-          <Plus size={14} /> Create Bulletin
+          <Plus size={14} /> {t('bulletin.emptyState.cta')}
         </button>
       )}
     </div>
@@ -778,12 +803,13 @@ function EmptyState({ isAdmin, canCreate, onAdd }: { isAdmin: boolean; canCreate
 }
 
 function ErrorState({ message, onRetry }: { message: string; onRetry: () => void }) {
+  const { t } = useTranslation();
   return (
     <div className="flex flex-col items-center justify-center py-12 text-center">
       <AlertTriangle size={28} className="text-danger mb-3" />
       <p className="text-sm text-gray-600">{message}</p>
       <button onClick={onRetry} className="mt-3 text-sm text-info hover:underline">
-        Try again
+        {t('bulletin.errorState.tryAgain')}
       </button>
     </div>
   );
@@ -795,6 +821,7 @@ function ScheduledAnnouncementFormModal({ item, onClose, onSaved }: {
   onClose: () => void;
   onSaved: () => void;
 }) {
+  const { t } = useTranslation();
   const [title,        setTitle]        = useState(item?.title ?? '');
   const [content,      setContent]      = useState(item?.content ?? '');
   const [audienceType, setAudienceType] = useState<AudienceType>(item?.audienceType ?? 'ALL');
@@ -815,8 +842,8 @@ function ScheduledAnnouncementFormModal({ item, onClose, onSaved }: {
     setDivisionIds((prev) => prev.includes(id) ? prev.filter((d) => d !== id) : [...prev, id]);
 
   const handleSubmit = async () => {
-    if (!title.trim() || !content.trim()) { setError('Title and content are required.'); return; }
-    if (audienceType === 'CUSTOM' && divisionIds.length === 0) { setError('Select at least one division.'); return; }
+    if (!title.trim() || !content.trim()) { setError(t('bulletin.scheduledForm.errors.required')); return; }
+    if (audienceType === 'CUSTOM' && divisionIds.length === 0) { setError(t('bulletin.scheduledForm.errors.divisionRequired')); return; }
     setSaving(true); setError('');
     try {
       const payload = {
@@ -832,7 +859,7 @@ function ScheduledAnnouncementFormModal({ item, onClose, onSaved }: {
         await api.post('/scheduled-announcements', payload);
       }
       onSaved();
-    } catch { setError('Failed to save. Please try again.'); }
+    } catch { setError(t('bulletin.scheduledForm.errors.saveFailed')); }
     finally { setSaving(false); }
   };
 
@@ -841,7 +868,7 @@ function ScheduledAnnouncementFormModal({ item, onClose, onSaved }: {
       <div className="bg-white rounded-xl shadow-xl w-full max-w-md max-h-[90vh] flex flex-col">
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
           <h2 className="text-base font-semibold text-gray-800">
-            {item ? 'Edit Scheduled Announcement' : 'New Scheduled Announcement'}
+            {item ? t('bulletin.scheduledForm.editTitle') : t('bulletin.scheduledForm.createTitle')}
           </h2>
           <button onClick={onClose} className="p-1 rounded hover:bg-gray-100 text-gray-400"><X size={16} /></button>
         </div>
@@ -850,65 +877,65 @@ function ScheduledAnnouncementFormModal({ item, onClose, onSaved }: {
           {error && <p className="text-xs text-danger bg-danger-light p-2 rounded">{error}</p>}
 
           <div className="space-y-1">
-            <label className="block text-sm font-medium text-gray-700">Title</label>
+            <label className="block text-sm font-medium text-gray-700">{t('bulletin.scheduledForm.titleLabel')}</label>
             <input value={title} onChange={(e) => setTitle(e.target.value)} required
-              placeholder="e.g. Daily Attendance Reminder"
+              placeholder={t('bulletin.scheduledForm.titlePlaceholder')}
               className="w-full h-9 px-3 text-sm border border-gray-300 rounded focus:border-navy focus:outline-none focus:ring-2 focus:ring-navy-50" />
           </div>
 
           <div className="space-y-1">
-            <label className="block text-sm font-medium text-gray-700">Message</label>
+            <label className="block text-sm font-medium text-gray-700">{t('bulletin.scheduledForm.messageLabel')}</label>
             <textarea value={content} onChange={(e) => setContent(e.target.value)} required rows={3}
-              placeholder="e.g. Don't forget to submit your attendance today!"
+              placeholder={t('bulletin.scheduledForm.messagePlaceholder')}
               className="w-full px-3 py-2 text-sm border border-gray-300 rounded resize-none focus:border-navy focus:outline-none focus:ring-2 focus:ring-navy-50" />
           </div>
 
           <div className="space-y-1">
-            <label className="block text-sm font-medium text-gray-700">Recurrence</label>
+            <label className="block text-sm font-medium text-gray-700">{t('bulletin.scheduledForm.recurrenceLabel')}</label>
             <select value={recurrence} onChange={(e) => setRecurrence(e.target.value as RecurrenceType)}
               className="w-full h-9 px-3 text-sm border border-gray-300 rounded focus:border-navy focus:outline-none">
-              <option value="DAILY">Every day</option>
-              <option value="WEEKDAYS">Weekdays (Mon–Fri)</option>
-              <option value="WEEKLY">Every week on a specific day</option>
+              <option value="DAILY">{t('bulletin.recurrence.daily')}</option>
+              <option value="WEEKDAYS">{t('bulletin.recurrence.weekdays')}</option>
+              <option value="WEEKLY">{t('bulletin.recurrence.weeklySpecific')}</option>
             </select>
           </div>
 
           {recurrence === 'WEEKLY' && (
             <div className="space-y-1">
-              <label className="block text-sm font-medium text-gray-700">Day of week</label>
+              <label className="block text-sm font-medium text-gray-700">{t('bulletin.scheduledForm.dayOfWeekLabel')}</label>
               <select value={dayOfWeek} onChange={(e) => setDayOfWeek(Number(e.target.value))}
                 className="w-full h-9 px-3 text-sm border border-gray-300 rounded focus:border-navy focus:outline-none">
-                {DAY_LABELS.map((d, i) => <option key={i} value={i}>{d}</option>)}
+                {dayLabels(t).map((d, i) => <option key={i} value={i}>{d}</option>)}
               </select>
             </div>
           )}
 
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
-              <label className="block text-sm font-medium text-gray-700">Hour (WIB)</label>
+              <label className="block text-sm font-medium text-gray-700">{t('bulletin.scheduledForm.hourLabel')}</label>
               <input type="number" min={0} max={23} value={sendHour} onChange={(e) => setSendHour(Number(e.target.value))}
                 className="w-full h-9 px-3 text-sm border border-gray-300 rounded focus:border-navy focus:outline-none" />
             </div>
             <div className="space-y-1">
-              <label className="block text-sm font-medium text-gray-700">Minute</label>
+              <label className="block text-sm font-medium text-gray-700">{t('bulletin.scheduledForm.minuteLabel')}</label>
               <input type="number" min={0} max={59} value={sendMinute} onChange={(e) => setSendMinute(Number(e.target.value))}
                 className="w-full h-9 px-3 text-sm border border-gray-300 rounded focus:border-navy focus:outline-none" />
             </div>
           </div>
 
           <div className="space-y-1">
-            <label className="block text-sm font-medium text-gray-700">Audience</label>
+            <label className="block text-sm font-medium text-gray-700">{t('bulletin.scheduledForm.audienceLabel')}</label>
             <select value={audienceType} onChange={(e) => setAudienceType(e.target.value as AudienceType)}
               className="w-full h-9 px-3 text-sm border border-gray-300 rounded focus:border-navy focus:outline-none">
-              <option value="ALL">All staff</option>
-              <option value="DIVISION">Creator's division only</option>
-              <option value="CUSTOM">Specific divisions</option>
+              <option value="ALL">{t('bulletin.scheduledForm.audienceAll')}</option>
+              <option value="DIVISION">{t('bulletin.scheduledForm.audienceDivision')}</option>
+              <option value="CUSTOM">{t('bulletin.scheduledForm.audienceCustom')}</option>
             </select>
           </div>
 
           {audienceType === 'CUSTOM' && (
             <div className="space-y-1">
-              <label className="block text-sm font-medium text-gray-700">Divisions</label>
+              <label className="block text-sm font-medium text-gray-700">{t('bulletin.scheduledForm.divisionsLabel')}</label>
               <div className="flex flex-wrap gap-1.5 border border-gray-200 rounded p-2">
                 {divisions.map((d) => (
                   <button type="button" key={d.id} onClick={() => toggleDiv(d.id)}
@@ -929,12 +956,12 @@ function ScheduledAnnouncementFormModal({ item, onClose, onSaved }: {
         <div className="px-5 py-4 border-t border-gray-100 flex justify-end gap-2">
           <button type="button" onClick={onClose}
             className="h-9 px-4 text-sm text-gray-600 border border-gray-300 rounded hover:bg-gray-50">
-            Cancel
+            {t('bulletin.scheduledForm.cancel')}
           </button>
           <button onClick={handleSubmit} disabled={saving}
             className="h-9 px-4 text-sm font-medium text-white bg-navy rounded hover:bg-navy-light disabled:opacity-50 flex items-center gap-1.5">
             {saving && <Loader2 size={13} className="animate-spin" />}
-            {item ? 'Save changes' : 'Create'}
+            {item ? t('bulletin.scheduledForm.save') : t('bulletin.scheduledForm.create')}
           </button>
         </div>
       </div>

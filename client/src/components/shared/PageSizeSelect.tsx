@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/cn';
 
 export function PageSizeSelect({
@@ -5,6 +6,7 @@ export function PageSizeSelect({
 }: {
   value: number; onChange: (n: number) => void; options?: number[]; className?: string;
 }) {
+  const { t } = useTranslation();
   return (
     <select
       value={value}
@@ -15,7 +17,7 @@ export function PageSizeSelect({
       )}
     >
       {options.map((n) => (
-        <option key={n} value={n}>{n} / halaman</option>
+        <option key={n} value={n}>{t('shared.pageSizeSelect.perPage', { count: n })}</option>
       ))}
     </select>
   );

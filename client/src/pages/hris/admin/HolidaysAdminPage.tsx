@@ -1,15 +1,22 @@
 import { useEffect, useState, useCallback } from 'react';
 import { CalendarOff, Plus, Trash2, Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import api from '@/lib/api';
 import { toast } from '@/stores/toastStore';
 
 interface Holiday { id: string; date: string; name: string }
 
-function fmtDate(iso: string) {
-  return new Date(iso).toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'long' });
+/** Locale for date formatting — mirrors i18next's active language. */
+function dateLocale(language: string): string {
+  return language === 'id' ? 'id-ID' : 'en-US';
+}
+
+function fmtDate(iso: string, language: string) {
+  return new Date(iso).toLocaleDateString(dateLocale(language), { weekday: 'long', day: 'numeric', month: 'long' });
 }
 
 export default function HolidaysAdminPage() {
+  const { t, i18n } = useTranslation();
   const [year, setYear] = useState(new Date().getFullYear());
   const [holidays, setHolidays] = useState<Holiday[]>([]);
   const [loading, setLoading] = useState(false);
@@ -33,11 +40,11 @@ export default function HolidaysAdminPage() {
     setSubmitting(true);
     try {
       await api.post('/hris/holidays', { date: form.date, name: form.name.trim() });
-      toast.success('Holiday added');
+      toast.success(t('hris.admin.holidays.toast.added'));
       setForm({ date: '', name: '' });
       fetch();
     } catch (err: any) {
-      toast.error(err?.response?.data?.message ?? 'Failed to add holiday');
+      toast.error(err?.response?.data?.message ?? t('hris.admin.holidays.toast.addFailed'));
     } finally { setSubmitting(false); }
   }
 
@@ -45,10 +52,10 @@ export default function HolidaysAdminPage() {
     setDeletingId(id);
     try {
       await api.delete(`/hris/holidays/${id}`);
-      toast.success('Holiday removed');
+      toast.success(t('hris.admin.holidays.toast.removed'));
       fetch();
     } catch (err: any) {
-      toast.error(err?.response?.data?.message ?? 'Failed to remove');
+      toast.error(err?.response?.data?.message ?? t('hris.admin.holidays.toast.removeFailed'));
     } finally { setDeletingId(null); }
   }
 
@@ -57,10 +64,10 @@ export default function HolidaysAdminPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-            <CalendarOff size={20} className="text-navy" /> Holidays
+            <CalendarOff size={20} className="text-navy" /> {t('hris.admin.holidays.header.title')}
           </h1>
           <p className="text-sm text-gray-500 mt-0.5">
-            Company holiday calendar — excluded from leave-day counting, auto-absent marking, and attendance rate
+            {t('hris.admin.holidays.header.subtitle')}
           </p>
         </div>
         <div className="flex items-center gap-1 bg-white border border-gray-200 rounded-lg px-1">
@@ -80,12 +87,12 @@ export default function HolidaysAdminPage() {
           className="text-sm border border-gray-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-navy/20" />
         <input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
           onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
-          placeholder="Holiday name, e.g. Idul Fitri"
+          placeholder={t('hris.admin.holidays.form.namePlaceholder')}
           className="flex-1 text-sm border border-gray-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-navy/20" />
         <button onClick={handleAdd} disabled={submitting || !form.date || !form.name.trim()}
           className="flex items-center justify-center gap-2 px-4 py-2.5 bg-navy text-white rounded-lg text-sm font-medium hover:bg-navy/90 disabled:opacity-40 transition-colors">
           {submitting ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
-          Add
+          {t('hris.admin.holidays.form.add')}
         </button>
       </div>
 
@@ -97,7 +104,7 @@ export default function HolidaysAdminPage() {
       ) : holidays.length === 0 ? (
         <div className="text-center py-12">
           <CalendarOff size={32} className="text-gray-200 mx-auto mb-3" />
-          <p className="text-gray-400 text-sm">No holidays registered for {year}</p>
+          <p className="text-gray-400 text-sm">{t('hris.admin.holidays.empty', { year })}</p>
         </div>
       ) : (
         <div className="bg-white border border-gray-200 rounded-xl divide-y divide-gray-50">
@@ -105,7 +112,7 @@ export default function HolidaysAdminPage() {
             <div key={h.id} className="flex items-center justify-between px-4 py-3">
               <div>
                 <p className="text-sm font-medium text-gray-800">{h.name}</p>
-                <p className="text-xs text-gray-500 mt-0.5">{fmtDate(h.date)}</p>
+                <p className="text-xs text-gray-500 mt-0.5">{fmtDate(h.date, i18n.language)}</p>
               </div>
               <button onClick={() => handleDelete(h.id)} disabled={deletingId === h.id}
                 className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-40">

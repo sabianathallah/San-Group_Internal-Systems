@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef, FormEvent } from 'react';
 import { Save, Loader2, ShieldCheck, AlertTriangle, Plus, Trash2, Edit2, Check, X, AlertCircle } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import api from '@/lib/api';
 import { cn } from '@/lib/cn';
 import { useAuthStore } from '@/stores/authStore';
@@ -55,13 +56,13 @@ interface RoleWithPerms {
 }
 
 // ── Role utilities ─────────────────────────────────────────────
-const LEVEL_META: Record<number, { label: string; desc: string; bg: string; text: string }> = {
-  1: { label: 'L1', desc: 'Full system access',          bg: 'bg-slate-100',   text: 'text-slate-700'   },
-  2: { label: 'L2', desc: 'Organization leadership',    bg: 'bg-purple-100',  text: 'text-purple-700'  },
-  3: { label: 'L3', desc: 'Operational management',     bg: 'bg-blue-100',    text: 'text-blue-700'    },
-  4: { label: 'L4', desc: 'Division / department head', bg: 'bg-cyan-100',    text: 'text-cyan-700'    },
-  5: { label: 'L5', desc: 'Unit / sub-division head',   bg: 'bg-emerald-100', text: 'text-emerald-700' },
-  6: { label: 'L6', desc: 'Team member / staff',        bg: 'bg-gray-100',    text: 'text-gray-600'    },
+const LEVEL_META: Record<number, { label: string; descKey: string; bg: string; text: string }> = {
+  1: { label: 'L1', descKey: 'l1', bg: 'bg-slate-100',   text: 'text-slate-700'   },
+  2: { label: 'L2', descKey: 'l2', bg: 'bg-purple-100',  text: 'text-purple-700'  },
+  3: { label: 'L3', descKey: 'l3', bg: 'bg-blue-100',    text: 'text-blue-700'    },
+  4: { label: 'L4', descKey: 'l4', bg: 'bg-cyan-100',    text: 'text-cyan-700'    },
+  5: { label: 'L5', descKey: 'l5', bg: 'bg-emerald-100', text: 'text-emerald-700' },
+  6: { label: 'L6', descKey: 'l6', bg: 'bg-gray-100',    text: 'text-gray-600'    },
 };
 
 const CUSTOM_LEVELS = [3, 4, 5, 6] as const;
@@ -76,29 +77,41 @@ function toSlug(name: string) {
   return name.trim().toUpperCase().replace(/[^A-Z0-9]+/g, '_').replace(/^_|_$/g, '');
 }
 
-function extractErr(err: unknown) {
-  return (err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'An error occurred';
+function extractErr(err: unknown, fallback: string) {
+  return (err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? fallback;
 }
 
 // ── Scope options ─────────────────────────────────────────────
-const TASK_SCOPE_OPTS: { value: Scope; label: string }[] = [
-  { value: 'none', label: 'None' }, { value: 'own', label: 'Own' },
-  { value: 'division', label: 'Division' }, { value: 'all', label: 'All' },
-];
-const EDIT_SCOPE_OPTS: { value: Scope; label: string }[] = [
-  { value: 'none', label: 'None' }, { value: 'own', label: 'Own' },
-  { value: 'division', label: 'Division' }, { value: 'all', label: 'All' },
-];
-const AUDIENCE_SCOPE_OPTS: { value: AudienceScope; label: string }[] = [
-  { value: 'none', label: 'None' }, { value: 'division', label: 'Own Division' }, { value: 'all', label: 'All' },
-];
-const VIEW_DB_SCOPE_OPTS: { value: Scope; label: string }[] = [
-  { value: 'none', label: 'None' }, { value: 'division', label: 'Division' }, { value: 'all', label: 'All' },
-];
-const VIEW_SCOPE_OPTS: { value: Scope; label: string }[] = [
-  { value: 'none', label: 'None' }, { value: 'own', label: 'Own' },
-  { value: 'division', label: 'Division' }, { value: 'all', label: 'All' },
-];
+// Built from translation keys inside the component (labels are locale-dependent).
+function useScopeOptions() {
+  const { t } = useTranslation();
+  const none     = t('admin.permissions.scope.none');
+  const own      = t('admin.permissions.scope.own');
+  const division = t('admin.permissions.scope.division');
+  const all      = t('admin.permissions.scope.all');
+  const ownDivision = t('admin.permissions.scope.ownDivision');
+
+  const TASK_SCOPE_OPTS: { value: Scope; label: string }[] = [
+    { value: 'none', label: none }, { value: 'own', label: own },
+    { value: 'division', label: division }, { value: 'all', label: all },
+  ];
+  const EDIT_SCOPE_OPTS: { value: Scope; label: string }[] = [
+    { value: 'none', label: none }, { value: 'own', label: own },
+    { value: 'division', label: division }, { value: 'all', label: all },
+  ];
+  const AUDIENCE_SCOPE_OPTS: { value: AudienceScope; label: string }[] = [
+    { value: 'none', label: none }, { value: 'division', label: ownDivision }, { value: 'all', label: all },
+  ];
+  const VIEW_DB_SCOPE_OPTS: { value: Scope; label: string }[] = [
+    { value: 'none', label: none }, { value: 'division', label: division }, { value: 'all', label: all },
+  ];
+  const VIEW_SCOPE_OPTS: { value: Scope; label: string }[] = [
+    { value: 'none', label: none }, { value: 'own', label: own },
+    { value: 'division', label: division }, { value: 'all', label: all },
+  ];
+
+  return { TASK_SCOPE_OPTS, EDIT_SCOPE_OPTS, AUDIENCE_SCOPE_OPTS, VIEW_DB_SCOPE_OPTS, VIEW_SCOPE_OPTS };
+}
 
 // ── Color Picker ──────────────────────────────────────────────
 function ColorPicker({ value, onChange, onClose }: {
@@ -139,6 +152,7 @@ function ColorPicker({ value, onChange, onClose }: {
 function AddRoleModal({ onClose, onCreated }: {
   onClose: () => void; onCreated: (id: string) => void;
 }) {
+  const { t } = useTranslation();
   const [name,       setName]       = useState('');
   const [level,      setLevel]      = useState<number>(6);
   const [color,      setColor]      = useState('#6366f1');
@@ -151,8 +165,8 @@ function AddRoleModal({ onClose, onCreated }: {
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    if (!name.trim()) { setError('Role name is required'); return; }
-    if (!slug)        { setError('Name must contain at least one letter or number'); return; }
+    if (!name.trim()) { setError(t('admin.permissions.addRoleModal.errors.nameRequired')); return; }
+    if (!slug)        { setError(t('admin.permissions.addRoleModal.errors.invalidName')); return; }
     setSaving(true); setError('');
     try {
       const res = await api.post('/roles', {
@@ -162,7 +176,7 @@ function AddRoleModal({ onClose, onCreated }: {
       onCreated(res.data.data.id);
       onClose();
     } catch (err) {
-      setError(extractErr(err));
+      setError(extractErr(err, t('admin.permissions.errors.generic')));
     } finally {
       setSaving(false);
     }
@@ -173,13 +187,13 @@ function AddRoleModal({ onClose, onCreated }: {
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
       <div className="relative bg-white rounded-xl shadow-xl w-full max-w-sm">
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
-          <h2 className="text-sm font-semibold text-gray-800">Add Custom Role</h2>
+          <h2 className="text-sm font-semibold text-gray-800">{t('admin.permissions.addRoleModal.title')}</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={16} /></button>
         </div>
 
         <form onSubmit={handleSubmit} className="p-5 space-y-4">
           <div>
-            <label className="block text-xs text-gray-500 mb-1.5">Role name</label>
+            <label className="block text-xs text-gray-500 mb-1.5">{t('admin.permissions.addRoleModal.roleNameLabel')}</label>
             <div className="flex items-center gap-2">
               <div className="relative flex-shrink-0">
                 <button type="button" onClick={() => setShowPicker((v) => !v)}
@@ -191,17 +205,17 @@ function AddRoleModal({ onClose, onCreated }: {
               </div>
               <input
                 autoFocus type="text" value={name} onChange={(e) => setName(e.target.value)}
-                placeholder="e.g. Senior Engineer"
+                placeholder={t('admin.permissions.addRoleModal.namePlaceholder')}
                 className="flex-1 text-sm border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-navy"
               />
             </div>
             {slug && (
-              <p className="text-[11px] text-gray-400 mt-1 ml-10 font-mono">slug: {slug}</p>
+              <p className="text-[11px] text-gray-400 mt-1 ml-10 font-mono">{t('admin.permissions.addRoleModal.slugPrefix', { slug })}</p>
             )}
           </div>
 
           <div>
-            <label className="block text-xs text-gray-500 mb-1.5">Hierarchy level</label>
+            <label className="block text-xs text-gray-500 mb-1.5">{t('admin.permissions.addRoleModal.hierarchyLevelLabel')}</label>
             <div className="grid grid-cols-4 gap-2">
               {CUSTOM_LEVELS.map((l) => {
                 const m = LEVEL_META[l];
@@ -214,7 +228,7 @@ function AddRoleModal({ onClose, onCreated }: {
                     <span className={cn('text-xs font-bold px-1.5 py-0.5 rounded-full', m.bg, m.text)}>
                       {m.label}
                     </span>
-                    <span className="text-[10px] text-gray-400 leading-tight">{m.desc}</span>
+                    <span className="text-[10px] text-gray-400 leading-tight">{t(`admin.permissions.levels.${m.descKey}`)}</span>
                   </button>
                 );
               })}
@@ -223,10 +237,10 @@ function AddRoleModal({ onClose, onCreated }: {
 
           <div>
             <label className="block text-xs text-gray-500 mb-1.5">
-              Description <span className="text-gray-400 font-normal">(optional)</span>
+              {t('admin.permissions.addRoleModal.descriptionLabel')} <span className="text-gray-400 font-normal">{t('admin.permissions.addRoleModal.optional')}</span>
             </label>
             <input type="text" value={desc} onChange={(e) => setDesc(e.target.value)}
-              placeholder="Brief description of this role…"
+              placeholder={t('admin.permissions.addRoleModal.descriptionPlaceholder')}
               className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-navy"
             />
           </div>
@@ -240,12 +254,12 @@ function AddRoleModal({ onClose, onCreated }: {
           <div className="flex justify-end gap-2 pt-1">
             <button type="button" onClick={onClose}
               className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50">
-              Cancel
+              {t('admin.permissions.addRoleModal.cancel')}
             </button>
             <button type="submit" disabled={saving || !name.trim()}
               className="flex items-center gap-1.5 px-4 py-2 text-sm text-white bg-navy rounded-lg hover:bg-navy-light disabled:opacity-50">
               {saving && <Loader2 size={13} className="animate-spin" />}
-              Create Role
+              {t('admin.permissions.addRoleModal.create')}
             </button>
           </div>
         </form>
@@ -263,6 +277,7 @@ function RoleListItem({ role, isSelected, canEdit, onClick, onUpdated, onDeleted
   onUpdated: (id: string, name: string, color: string) => void;
   onDeleted: (id: string) => void;
 }) {
+  const { t } = useTranslation();
   const [editing,    setEditing]    = useState(false);
   const [nameVal,    setNameVal]    = useState(role.name);
   const [colorVal,   setColorVal]   = useState(role.color);
@@ -294,7 +309,7 @@ function RoleListItem({ role, isSelected, canEdit, onClick, onUpdated, onDeleted
   async function handleSave(e: FormEvent) {
     e.preventDefault();
     e.stopPropagation();
-    if (!nameVal.trim()) { setEditErr('Name cannot be empty'); return; }
+    if (!nameVal.trim()) { setEditErr(t('admin.permissions.roleList.nameEmptyError')); return; }
     setSaving(true); setEditErr('');
     try {
       await api.patch(`/roles/${role.id}`, { name: nameVal.trim(), color: colorVal });
@@ -302,7 +317,7 @@ function RoleListItem({ role, isSelected, canEdit, onClick, onUpdated, onDeleted
       setEditing(false);
       setShowPicker(false);
     } catch (err) {
-      setEditErr(extractErr(err));
+      setEditErr(extractErr(err, t('admin.permissions.errors.generic')));
     } finally {
       setSaving(false);
     }
@@ -311,16 +326,16 @@ function RoleListItem({ role, isSelected, canEdit, onClick, onUpdated, onDeleted
   async function handleDelete(e: React.MouseEvent) {
     e.stopPropagation();
     if (userCount > 0) {
-      alert(`Cannot delete — ${userCount} user(s) are assigned to this role.`);
+      alert(t('admin.permissions.roleList.cannotDeleteAlert', { count: userCount }));
       return;
     }
-    if (!confirm(`Delete role "${role.name}"? This cannot be undone.`)) return;
+    if (!confirm(t('admin.permissions.roleList.confirmDelete', { name: role.name }))) return;
     setDeleting(true);
     try {
       await api.delete(`/roles/${role.id}`);
       onDeleted(role.id);
     } catch (err) {
-      alert(extractErr(err));
+      alert(extractErr(err, t('admin.permissions.errors.generic')));
       setDeleting(false);
     }
   }
@@ -353,11 +368,11 @@ function RoleListItem({ role, isSelected, canEdit, onClick, onUpdated, onDeleted
             <button type="submit" disabled={saving}
               className="flex items-center gap-1 px-2 py-0.5 text-xs text-white bg-navy hover:bg-navy-light rounded disabled:opacity-50">
               {saving ? <Loader2 size={10} className="animate-spin" /> : <Check size={10} />}
-              Save
+              {t('admin.permissions.roleList.save')}
             </button>
             <button type="button" onClick={cancelEdit}
               className="px-2 py-0.5 text-xs text-gray-500 border border-gray-200 rounded hover:bg-gray-50">
-              Cancel
+              {t('admin.permissions.roleList.cancel')}
             </button>
           </div>
         </form>
@@ -383,7 +398,7 @@ function RoleListItem({ role, isSelected, canEdit, onClick, onUpdated, onDeleted
             {meta.label}
           </span>
           {role.hasCustomPermissions && (
-            <span className="w-1.5 h-1.5 rounded-full bg-info flex-shrink-0" title="Custom permissions" />
+            <span className="w-1.5 h-1.5 rounded-full bg-info flex-shrink-0" title={t('admin.permissions.roleList.customPermissionsBadge')} />
           )}
         </div>
       </div>
@@ -392,7 +407,7 @@ function RoleListItem({ role, isSelected, canEdit, onClick, onUpdated, onDeleted
           <button
             onClick={startEdit}
             className="w-5 h-5 flex items-center justify-center rounded text-gray-400 hover:text-navy hover:bg-navy/10"
-            title="Edit name & color"
+            title={t('admin.permissions.roleList.editTitle')}
           >
             <Edit2 size={11} />
           </button>
@@ -401,7 +416,7 @@ function RoleListItem({ role, isSelected, canEdit, onClick, onUpdated, onDeleted
               onClick={handleDelete}
               disabled={deleting}
               className="w-5 h-5 flex items-center justify-center rounded text-gray-400 hover:text-red-500 hover:bg-red-50 disabled:opacity-40"
-              title={userCount > 0 ? `Cannot delete — ${userCount} user(s) assigned` : 'Delete role'}
+              title={userCount > 0 ? t('admin.permissions.roleList.cannotDeleteTitle', { count: userCount }) : t('admin.permissions.roleList.deleteTitle')}
             >
               {deleting ? <Loader2 size={11} className="animate-spin" /> : <Trash2 size={11} />}
             </button>
@@ -475,6 +490,8 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 
 // ── Main Page ─────────────────────────────────────────────────
 export default function PermissionPage() {
+  const { t } = useTranslation();
+  const { TASK_SCOPE_OPTS, EDIT_SCOPE_OPTS, AUDIENCE_SCOPE_OPTS, VIEW_DB_SCOPE_OPTS, VIEW_SCOPE_OPTS } = useScopeOptions();
   const currentUser = useAuthStore((s) => s.user);
   const canEdit     = (currentUser?.role?.level ?? 99) <= 1;
 
@@ -503,7 +520,7 @@ export default function PermissionPage() {
         setIsDirty(false);
       }
     } catch {
-      setError('Failed to load roles and permissions');
+      setError(t('admin.permissions.loadError'));
     } finally {
       setLoading(false);
     }
@@ -512,7 +529,7 @@ export default function PermissionPage() {
   useEffect(() => { loadRoles(); }, []);
 
   function handleSelectRole(role: RoleWithPerms) {
-    if (isDirty && !confirm('You have unsaved changes. Continue?')) return;
+    if (isDirty && !confirm(t('admin.permissions.unsavedChangesConfirm'))) return;
     setSelectedId(role.id);
     setPerms(JSON.parse(JSON.stringify(role.permissions)));
     setIsDirty(false);
@@ -566,10 +583,10 @@ export default function PermissionPage() {
           : r,
       ));
       setIsDirty(false);
-      setToast('Permissions saved');
+      setToast(t('admin.permissions.toast.saved'));
       setTimeout(() => setToast(null), 3000);
     } catch {
-      setToast('Failed to save permissions');
+      setToast(t('admin.permissions.toast.saveFailed'));
       setTimeout(() => setToast(null), 3000);
     } finally {
       setSaving(false);
@@ -610,14 +627,14 @@ export default function PermissionPage() {
       <div className="w-60 flex-shrink-0 flex flex-col bg-white border border-gray-200 rounded-lg overflow-hidden">
         <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 flex-shrink-0">
           <div>
-            <h2 className="text-sm font-semibold text-gray-800">Roles</h2>
-            <p className="text-xs text-gray-400 mt-0.5">Select to view permissions</p>
+            <h2 className="text-sm font-semibold text-gray-800">{t('admin.permissions.roleList.title')}</h2>
+            <p className="text-xs text-gray-400 mt-0.5">{t('admin.permissions.roleList.subtitle')}</p>
           </div>
           {canEdit && (
             <button
               onClick={() => setAddOpen(true)}
               className="w-7 h-7 flex items-center justify-center rounded-lg bg-navy/5 text-navy hover:bg-navy/10 transition-colors"
-              title="Add custom role"
+              title={t('admin.permissions.roleList.addTitle')}
             >
               <Plus size={15} />
             </button>
@@ -638,7 +655,7 @@ export default function PermissionPage() {
         </div>
         <div className="px-3 py-2 border-t border-gray-100">
           <p className="text-[10px] text-gray-400 leading-relaxed">
-            L1–L2 roles cannot be deleted. Custom roles can be deleted if no users are assigned.
+            {t('admin.permissions.roleList.footerNote')}
           </p>
         </div>
       </div>
@@ -656,17 +673,17 @@ export default function PermissionPage() {
                   <p className="text-xs text-gray-400">
                     {LEVEL_META[selectedRole.level]?.label ?? `L${selectedRole.level}`} ·{' '}
                     {isSuperAdmin
-                      ? 'Full access — cannot be configured'
+                      ? t('admin.permissions.editor.fullAccessNote')
                       : selectedRole.hasCustomPermissions
-                        ? 'Custom permissions'
-                        : 'Default permissions'}
+                        ? t('admin.permissions.editor.customPermissions')
+                        : t('admin.permissions.editor.defaultPermissions')}
                   </p>
                 </div>
               </div>
               <button
                 onClick={handleSave}
                 disabled={!isDirty || saving || isSuperAdmin || isReadOnly}
-                title={isReadOnly ? 'Only SuperAdmin can edit permissions' : undefined}
+                title={isReadOnly ? t('admin.permissions.editor.readOnlyTitle') : undefined}
                 className={cn(
                   'flex items-center gap-1.5 h-8 px-4 text-sm font-medium rounded transition-colors',
                   isDirty && !isSuperAdmin && !isReadOnly
@@ -675,215 +692,215 @@ export default function PermissionPage() {
                 )}
               >
                 {saving ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
-                Save
+                {t('admin.permissions.editor.save')}
               </button>
             </div>
 
             {isSuperAdmin && (
               <div className="mx-6 mt-4 px-4 py-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-700 flex items-center gap-2">
                 <ShieldCheck size={15} />
-                SuperAdmin always has full permissions and cannot be configured.
+                {t('admin.permissions.editor.superAdminBanner')}
               </div>
             )}
 
             {isReadOnly && !isSuperAdmin && (
               <div className="mx-6 mt-4 px-4 py-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-700 flex items-center gap-2">
                 <ShieldCheck size={15} />
-                Only SuperAdmin can modify permissions. You have view-only access.
+                {t('admin.permissions.editor.readOnlyBanner')}
               </div>
             )}
 
             {/* Permission matrix */}
             <div className="flex-1 overflow-y-auto px-6 py-4">
-              <Section title="Task">
-                <PermRow label="View tasks">
+              <Section title={t('admin.permissions.sections.task.title')}>
+                <PermRow label={t('admin.permissions.sections.task.view')}>
                   <ScopeSelector value={perms.task.view} options={TASK_SCOPE_OPTS}
                     onChange={(v) => update('task', 'view', v)} disabled={isSuperAdmin || isReadOnly} />
                 </PermRow>
-                <PermRow label="Create tasks">
+                <PermRow label={t('admin.permissions.sections.task.create')}>
                   <Toggle checked={perms.task.create} onChange={(v) => update('task', 'create', v)}
                     disabled={isSuperAdmin || isReadOnly} />
                 </PermRow>
-                <PermRow label="Edit tasks">
+                <PermRow label={t('admin.permissions.sections.task.edit')}>
                   <ScopeSelector value={perms.task.edit} options={TASK_SCOPE_OPTS}
                     onChange={(v) => update('task', 'edit', v)} disabled={isSuperAdmin || isReadOnly} />
                 </PermRow>
-                <PermRow label="Delete tasks">
+                <PermRow label={t('admin.permissions.sections.task.delete')}>
                   <ScopeSelector value={perms.task.delete} options={TASK_SCOPE_OPTS}
                     onChange={(v) => update('task', 'delete', v)} disabled={isSuperAdmin || isReadOnly} />
                 </PermRow>
-                <PermRow label="View others' private tasks">
+                <PermRow label={t('admin.permissions.sections.task.viewPrivate')}>
                   <Toggle checked={perms.task.viewPrivate} onChange={(v) => update('task', 'viewPrivate', v)}
                     disabled={isSuperAdmin || isReadOnly} />
                 </PermRow>
               </Section>
 
-              <Section title="Bulletin">
-                <PermRow label="View bulletins">
+              <Section title={t('admin.permissions.sections.bulletin.title')}>
+                <PermRow label={t('admin.permissions.sections.bulletin.view')}>
                   <Toggle checked={perms.bulletin.view} onChange={(v) => update('bulletin', 'view', v)}
                     disabled={isSuperAdmin || isReadOnly} />
                 </PermRow>
-                <PermRow label="Create & publish bulletins">
+                <PermRow label={t('admin.permissions.sections.bulletin.create')}>
                   <Toggle checked={perms.bulletin.create} onChange={(v) => update('bulletin', 'create', v)}
                     disabled={isSuperAdmin || isReadOnly} />
                 </PermRow>
-                <PermRow label="Target audience">
+                <PermRow label={t('admin.permissions.sections.bulletin.audienceScope')}>
                   <ScopeSelector value={perms.bulletin.audienceScope} options={AUDIENCE_SCOPE_OPTS}
                     onChange={(v) => update('bulletin', 'audienceScope', v)}
                     disabled={isSuperAdmin || isReadOnly || !perms.bulletin.create} />
                 </PermRow>
-                <PermRow label="Edit bulletins">
+                <PermRow label={t('admin.permissions.sections.bulletin.edit')}>
                   <ScopeSelector value={perms.bulletin.edit} options={EDIT_SCOPE_OPTS}
                     onChange={(v) => update('bulletin', 'edit', v)} disabled={isSuperAdmin || isReadOnly} />
                 </PermRow>
-                <PermRow label="Delete bulletins">
+                <PermRow label={t('admin.permissions.sections.bulletin.delete')}>
                   <ScopeSelector value={perms.bulletin.delete} options={EDIT_SCOPE_OPTS}
                     onChange={(v) => update('bulletin', 'delete', v)} disabled={isSuperAdmin || isReadOnly} />
                 </PermRow>
               </Section>
 
-              <Section title="DB Links">
-                <PermRow label="View folders">
+              <Section title={t('admin.permissions.sections.dbLinks.title')}>
+                <PermRow label={t('admin.permissions.sections.dbLinks.view')}>
                   <ScopeSelector value={perms.db_link.view} options={VIEW_DB_SCOPE_OPTS}
                     onChange={(v) => update('db_link', 'view', v)} disabled={isSuperAdmin || isReadOnly} />
                 </PermRow>
-                <PermRow label="Add links to folders">
+                <PermRow label={t('admin.permissions.sections.dbLinks.addLink')}>
                   <Toggle checked={perms.db_link.addLink} onChange={(v) => update('db_link', 'addLink', v)}
                     disabled={isSuperAdmin || isReadOnly} />
                 </PermRow>
-                <PermRow label="Manage folders (create/edit/delete)">
+                <PermRow label={t('admin.permissions.sections.dbLinks.manageFolder')}>
                   <Toggle checked={perms.db_link.manageFolder} onChange={(v) => update('db_link', 'manageFolder', v)}
                     disabled={isSuperAdmin || isReadOnly} />
                 </PermRow>
-                <PermRow label="Share folders with other divisions">
+                <PermRow label={t('admin.permissions.sections.dbLinks.shareFolder')}>
                   <Toggle checked={perms.db_link.shareFolder} onChange={(v) => update('db_link', 'shareFolder', v)}
                     disabled={isSuperAdmin || isReadOnly} />
                 </PermRow>
               </Section>
 
-              <Section title="Notes">
-                <PermRow label="View notes">
+              <Section title={t('admin.permissions.sections.notes.title')}>
+                <PermRow label={t('admin.permissions.sections.notes.view')}>
                   <ScopeSelector value={perms.note?.view ?? 'own'} options={TASK_SCOPE_OPTS}
                     onChange={(v) => update('note', 'view', v)} disabled={isSuperAdmin || isReadOnly} />
                 </PermRow>
-                <PermRow label="Create notes">
+                <PermRow label={t('admin.permissions.sections.notes.create')}>
                   <Toggle checked={perms.note?.create ?? true} onChange={(v) => update('note', 'create', v)}
                     disabled={isSuperAdmin || isReadOnly} />
                 </PermRow>
-                <PermRow label="Edit notes">
+                <PermRow label={t('admin.permissions.sections.notes.edit')}>
                   <ScopeSelector value={perms.note?.edit ?? 'own'} options={EDIT_SCOPE_OPTS}
                     onChange={(v) => update('note', 'edit', v)} disabled={isSuperAdmin || isReadOnly} />
                 </PermRow>
-                <PermRow label="Delete notes">
+                <PermRow label={t('admin.permissions.sections.notes.delete')}>
                   <ScopeSelector value={perms.note?.delete ?? 'own'} options={EDIT_SCOPE_OPTS}
                     onChange={(v) => update('note', 'delete', v)} disabled={isSuperAdmin || isReadOnly} />
                 </PermRow>
               </Section>
 
-              <Section title="Analytics">
-                <PermRow label="View analytics">
+              <Section title={t('admin.permissions.sections.analytics.title')}>
+                <PermRow label={t('admin.permissions.sections.analytics.view')}>
                   <ScopeSelector value={perms.analytics?.view ?? 'none'} options={VIEW_SCOPE_OPTS}
                     onChange={(v) => update('analytics', 'view', v)} disabled={isSuperAdmin || isReadOnly} />
                 </PermRow>
               </Section>
 
-              <Section title="Audit Log">
-                <PermRow label="View audit log">
+              <Section title={t('admin.permissions.sections.auditLog.title')}>
+                <PermRow label={t('admin.permissions.sections.auditLog.view')}>
                   <ScopeSelector value={perms.audit_log?.view ?? 'none'} options={VIEW_SCOPE_OPTS}
                     onChange={(v) => update('audit_log', 'view', v)} disabled={isSuperAdmin || isReadOnly} />
                 </PermRow>
               </Section>
 
-              <Section title="HRIS">
-                <PermRow label="Review leave requests">
+              <Section title={t('admin.permissions.sections.hris.title')}>
+                <PermRow label={t('admin.permissions.sections.hris.reviewLeave')}>
                   <ScopeSelector value={perms.hris?.reviewLeave ?? 'none'} options={VIEW_DB_SCOPE_OPTS}
                     onChange={(v) => update('hris', 'reviewLeave', v)} disabled={isSuperAdmin || isReadOnly} />
                 </PermRow>
-                <PermRow label="Edit attendance records">
+                <PermRow label={t('admin.permissions.sections.hris.editAttendance')}>
                   <ScopeSelector value={perms.hris?.editAttendance ?? 'none'} options={VIEW_DB_SCOPE_OPTS}
                     onChange={(v) => update('hris', 'editAttendance', v)} disabled={isSuperAdmin || isReadOnly} />
                 </PermRow>
-                <PermRow label="Manage shifts">
+                <PermRow label={t('admin.permissions.sections.hris.manageShifts')}>
                   <Toggle checked={perms.hris?.manageShifts ?? false} onChange={(v) => update('hris', 'manageShifts', v)}
                     disabled={isSuperAdmin || isReadOnly} />
                 </PermRow>
-                <PermRow label="Manage office locations">
+                <PermRow label={t('admin.permissions.sections.hris.manageLocations')}>
                   <Toggle checked={perms.hris?.manageLocations ?? false} onChange={(v) => update('hris', 'manageLocations', v)}
                     disabled={isSuperAdmin || isReadOnly} />
                 </PermRow>
-                <PermRow label="View attendance reports">
+                <PermRow label={t('admin.permissions.sections.hris.viewReports')}>
                   <ScopeSelector value={perms.hris?.viewReports ?? 'none'} options={VIEW_SCOPE_OPTS}
                     onChange={(v) => update('hris', 'viewReports', v)} disabled={isSuperAdmin || isReadOnly} />
                 </PermRow>
               </Section>
 
-              <Section title="Work Orders">
-                <PermRow label="View work orders">
+              <Section title={t('admin.permissions.sections.workOrder.title')}>
+                <PermRow label={t('admin.permissions.sections.workOrder.view')}>
                   <ScopeSelector value={perms.work_order?.view ?? 'own'} options={TASK_SCOPE_OPTS}
                     onChange={(v) => update('work_order', 'view', v)} disabled={isSuperAdmin || isReadOnly} />
                 </PermRow>
-                <PermRow label="Create work orders">
+                <PermRow label={t('admin.permissions.sections.workOrder.create')}>
                   <Toggle checked={perms.work_order?.create ?? true} onChange={(v) => update('work_order', 'create', v)}
                     disabled={isSuperAdmin || isReadOnly} />
                 </PermRow>
-                <PermRow label="Edit work orders">
+                <PermRow label={t('admin.permissions.sections.workOrder.edit')}>
                   <ScopeSelector value={perms.work_order?.edit ?? 'own'} options={EDIT_SCOPE_OPTS}
                     onChange={(v) => update('work_order', 'edit', v)} disabled={isSuperAdmin || isReadOnly} />
                 </PermRow>
-                <PermRow label="Delete work orders">
+                <PermRow label={t('admin.permissions.sections.workOrder.delete')}>
                   <ScopeSelector value={perms.work_order?.delete ?? 'own'} options={EDIT_SCOPE_OPTS}
                     onChange={(v) => update('work_order', 'delete', v)} disabled={isSuperAdmin || isReadOnly} />
                 </PermRow>
-                <PermRow label="Can be assigned as technician/executor">
+                <PermRow label={t('admin.permissions.sections.workOrder.canBeAssignee')}>
                   <Toggle checked={perms.work_order?.canBeAssignee ?? true} onChange={(v) => update('work_order', 'canBeAssignee', v)}
                     disabled={isSuperAdmin || isReadOnly} />
                 </PermRow>
               </Section>
 
-              <Section title="User Management">
-                <PermRow label="Create users">
+              <Section title={t('admin.permissions.sections.userMgmt.title')}>
+                <PermRow label={t('admin.permissions.sections.userMgmt.create')}>
                   <Toggle checked={perms.user_mgmt?.create ?? false} onChange={(v) => update('user_mgmt', 'create', v)}
                     disabled={isSuperAdmin || isReadOnly} />
                 </PermRow>
-                <PermRow label="Edit users">
+                <PermRow label={t('admin.permissions.sections.userMgmt.edit')}>
                   <ScopeSelector value={perms.user_mgmt?.edit ?? 'none'} options={VIEW_DB_SCOPE_OPTS}
                     onChange={(v) => update('user_mgmt', 'edit', v)} disabled={isSuperAdmin || isReadOnly} />
                 </PermRow>
-                <PermRow label="Activate / deactivate users">
+                <PermRow label={t('admin.permissions.sections.userMgmt.toggleStatus')}>
                   <ScopeSelector value={perms.user_mgmt?.toggleStatus ?? 'none'} options={VIEW_DB_SCOPE_OPTS}
                     onChange={(v) => update('user_mgmt', 'toggleStatus', v)} disabled={isSuperAdmin || isReadOnly} />
                 </PermRow>
-                <PermRow label="Delete users">
+                <PermRow label={t('admin.permissions.sections.userMgmt.delete')}>
                   <ScopeSelector value={perms.user_mgmt?.delete ?? 'none'} options={VIEW_DB_SCOPE_OPTS}
                     onChange={(v) => update('user_mgmt', 'delete', v)} disabled={isSuperAdmin || isReadOnly} />
                 </PermRow>
               </Section>
 
-              <Section title="Role Management">
-                <PermRow label="Create roles">
+              <Section title={t('admin.permissions.sections.roleMgmt.title')}>
+                <PermRow label={t('admin.permissions.sections.roleMgmt.create')}>
                   <Toggle checked={perms.role_mgmt?.create ?? false} onChange={(v) => update('role_mgmt', 'create', v)}
                     disabled={isSuperAdmin || isReadOnly} />
                 </PermRow>
-                <PermRow label="Edit roles">
+                <PermRow label={t('admin.permissions.sections.roleMgmt.edit')}>
                   <ScopeSelector value={perms.role_mgmt?.edit ?? 'none'} options={VIEW_DB_SCOPE_OPTS}
                     onChange={(v) => update('role_mgmt', 'edit', v)} disabled={isSuperAdmin || isReadOnly} />
                 </PermRow>
-                <PermRow label="Delete roles">
+                <PermRow label={t('admin.permissions.sections.roleMgmt.delete')}>
                   <ScopeSelector value={perms.role_mgmt?.delete ?? 'none'} options={VIEW_DB_SCOPE_OPTS}
                     onChange={(v) => update('role_mgmt', 'delete', v)} disabled={isSuperAdmin || isReadOnly} />
                 </PermRow>
               </Section>
 
-              <Section title="Division Management">
-                <PermRow label="Create divisions">
+              <Section title={t('admin.permissions.sections.divisionMgmt.title')}>
+                <PermRow label={t('admin.permissions.sections.divisionMgmt.create')}>
                   <Toggle checked={perms.division_mgmt?.create ?? false} onChange={(v) => update('division_mgmt', 'create', v)}
                     disabled={isSuperAdmin || isReadOnly} />
                 </PermRow>
-                <PermRow label="Edit divisions">
+                <PermRow label={t('admin.permissions.sections.divisionMgmt.edit')}>
                   <ScopeSelector value={perms.division_mgmt?.edit ?? 'none'} options={VIEW_DB_SCOPE_OPTS}
                     onChange={(v) => update('division_mgmt', 'edit', v)} disabled={isSuperAdmin || isReadOnly} />
                 </PermRow>
-                <PermRow label="Delete divisions">
+                <PermRow label={t('admin.permissions.sections.divisionMgmt.delete')}>
                   <ScopeSelector value={perms.division_mgmt?.delete ?? 'none'} options={VIEW_DB_SCOPE_OPTS}
                     onChange={(v) => update('division_mgmt', 'delete', v)} disabled={isSuperAdmin || isReadOnly} />
                 </PermRow>
@@ -893,7 +910,7 @@ export default function PermissionPage() {
         ) : (
           <div className="flex flex-col items-center justify-center h-full text-center p-8">
             <ShieldCheck size={40} className="text-gray-300 mb-3" />
-            <p className="text-sm font-medium text-gray-600">Select a role to configure permissions</p>
+            <p className="text-sm font-medium text-gray-600">{t('admin.permissions.editor.selectRolePrompt')}</p>
           </div>
         )}
       </div>

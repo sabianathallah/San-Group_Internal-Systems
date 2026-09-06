@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import {
   DndContext, DragOverlay, PointerSensor, useSensor, useSensors,
   useDraggable, useDroppable, type DragEndEvent, type DragStartEvent,
@@ -181,20 +182,25 @@ export function extractErr(err: unknown): string {
   return 'Something went wrong';
 }
 
-export function formatDate(d: string | null) {
-  if (!d) return null;
-  return new Date(d).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' });
+/** Locale for date formatting — mirrors i18next's active language. */
+function dateLocale(language: string): string {
+  return language === 'id' ? 'id-ID' : 'en-US';
 }
 
-function formatRelative(d: string) {
+export function formatDate(d: string | null, language = 'en') {
+  if (!d) return null;
+  return new Date(d).toLocaleDateString(dateLocale(language), { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+function formatRelative(d: string, t: (key: string, opts?: Record<string, unknown>) => string) {
   const diff = Date.now() - new Date(d).getTime();
   const mins = Math.floor(diff / 60000);
-  if (mins < 1)   return 'just now';
-  if (mins < 60)  return `${mins}m ago`;
+  if (mins < 1)   return t('workOrder.relative.justNow');
+  if (mins < 60)  return t('workOrder.relative.minsAgo', { count: mins });
   const hrs = Math.floor(mins / 60);
-  if (hrs < 24)   return `${hrs}h ago`;
+  if (hrs < 24)   return t('workOrder.relative.hrsAgo', { count: hrs });
   const days = Math.floor(hrs / 24);
-  return `${days}d ago`;
+  return t('workOrder.relative.daysAgo', { count: days });
 }
 
 export function isOverdue(wo: WorkOrder) {
@@ -212,12 +218,15 @@ export function woAgeMinutes(wo: Pick<WorkOrder, 'createdAt' | 'closedAt' | 'com
   return Math.max(0, Math.round((endMs - new Date(wo.createdAt).getTime()) / 60000));
 }
 
-export function formatAge(mins: number): string {
+export function formatAge(mins: number, t?: (key: string) => string): string {
+  const dayUnit    = t ? t('workOrder.units.day')    : 'd';
+  const hourUnit    = t ? t('workOrder.units.hour')   : 'h';
+  const minuteUnit = t ? t('workOrder.units.minute') : 'm';
   const days = Math.floor(mins / (60 * 24));
   const hrs  = Math.floor((mins % (60 * 24)) / 60);
-  if (days > 0)  return hrs > 0 ? `${days}d ${hrs}h` : `${days}d`;
-  if (hrs > 0)   return `${hrs}h`;
-  return `${Math.max(1, mins)}m`;
+  if (days > 0)  return hrs > 0 ? `${days}${dayUnit} ${hrs}${hourUnit}` : `${days}${dayUnit}`;
+  if (hrs > 0)   return `${hrs}${hourUnit}`;
+  return `${Math.max(1, mins)}${minuteUnit}`;
 }
 
 // Green under 2 days, amber 2–7 days, red past 7 days. Closed WOs show a
@@ -231,14 +240,15 @@ function ageTone(wo: WorkOrder, mins: number): string {
 }
 
 export function AgeBadge({ wo }: { wo: WorkOrder }) {
+  const { t } = useTranslation();
   const mins = woAgeMinutes(wo);
   return (
     <span
       className={cn('inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-full whitespace-nowrap', ageTone(wo, mins))}
-      title={wo.status === 'DONE' || wo.status === 'CANCELLED' ? 'Total duration from open to closed' : 'Open for'}
+      title={wo.status === 'DONE' || wo.status === 'CANCELLED' ? t('workOrder.age.totalDurationTitle') : t('workOrder.age.openForTitle')}
     >
       <Clock size={10} />
-      {formatAge(mins)}
+      {formatAge(mins, t)}
     </span>
   );
 }
@@ -250,8 +260,12 @@ function csvCell(v: string) {
   return `"${safe.replace(/"/g, '""')}"`;
 }
 
-function exportWorkOrdersCSV(workOrders: WorkOrder[]) {
-  const header = ['Code', 'Title', 'Status', 'Priority', 'Category', 'Location', 'Reported By', 'Assignee', 'Due Date', 'Created At', 'Closed At', 'Age / Duration'];
+function exportWorkOrdersCSV(workOrders: WorkOrder[], t: (key: string) => string) {
+  const header = [
+    t('workOrder.csv.code'), t('workOrder.csv.title'), t('workOrder.csv.status'), t('workOrder.csv.priority'),
+    t('workOrder.csv.category'), t('workOrder.csv.location'), t('workOrder.csv.reportedBy'), t('workOrder.csv.assignee'),
+    t('workOrder.csv.dueDate'), t('workOrder.csv.createdAt'), t('workOrder.csv.closedAt'), t('workOrder.csv.ageDuration'),
+  ];
   const rows = workOrders.map((wo) => [
     wo.code, wo.title, STATUS_CONFIG[wo.status].label, PRIORITY_CONFIG[wo.priority].label,
     CATEGORY_CONFIG[wo.category].label, wo.location ?? '', wo.reportedBy.fullName,
@@ -360,6 +374,7 @@ function WorkOrderModal({
   // own-scope reporters never see the field (and the server rejects it anyway).
   canAssign: boolean;
 }) {
+  const { t } = useTranslation();
   const [form, setForm] = useState<FormData>(DEFAULT_FORM);
   const [saving, setSaving] = useState(false);
   // Once the user touches the due date, stop auto-adjusting it on priority change.
@@ -399,7 +414,7 @@ function WorkOrderModal({
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!form.title.trim()) { toast.error('Title is required'); return; }
+    if (!form.title.trim()) { toast.error(t('workOrder.modal.titleRequired')); return; }
     setSaving(true);
     try {
       const payload: Record<string, unknown> = {
@@ -418,48 +433,50 @@ function WorkOrderModal({
         ? await api.patch(`/work-orders/${editItem.id}`, payload)
         : await api.post('/work-orders', payload);
       onSaved(res.data.data);
-      toast.success(editItem ? 'Work order updated' : 'Work order created');
+      toast.success(editItem ? t('workOrder.modal.updated') : t('workOrder.modal.created'));
       onClose();
     } catch (err) { toast.error(extractErr(err)); } finally { setSaving(false); }
   }
 
+  const modalTitle = editItem ? t('workOrder.modal.editTitle', { code: editItem.code }) : t('workOrder.modal.createTitle');
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4" onClick={onClose}>
       <div
-        role="dialog" aria-modal="true" aria-label={editItem ? `Edit ${editItem.code}` : 'Create Work Order'}
+        role="dialog" aria-modal="true" aria-label={modalTitle}
         className="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
           <h2 className="font-semibold text-gray-900">
-            {editItem ? `Edit ${editItem.code}` : 'Create Work Order'}
+            {modalTitle}
           </h2>
-          <button onClick={onClose} aria-label="Close" className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
+          <button onClick={onClose} aria-label={t('workOrder.common.close')} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
         </div>
 
         <form onSubmit={handleSubmit} className="p-5 space-y-4">
           <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">Title *</label>
+            <label className="block text-xs font-medium text-gray-700 mb-1">{t('workOrder.modal.titleLabel')}</label>
             <input
               value={form.title} onChange={(e) => set('title', e.target.value)}
               className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-navy/30"
-              placeholder="Short description of the issue..."
+              placeholder={t('workOrder.modal.titlePlaceholder')}
             />
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">Description</label>
+            <label className="block text-xs font-medium text-gray-700 mb-1">{t('workOrder.modal.descriptionLabel')}</label>
             <textarea
               value={form.description} onChange={(e) => set('description', e.target.value)}
               rows={3}
               className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-navy/30 resize-none"
-              placeholder="More detail about the issue..."
+              placeholder={t('workOrder.modal.descriptionPlaceholder')}
             />
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Priority</label>
+              <label className="block text-xs font-medium text-gray-700 mb-1">{t('workOrder.modal.priorityLabel')}</label>
               <select
                 value={form.priority} onChange={(e) => handlePriorityChange(e.target.value as WOPriority)}
                 className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-navy/30"
@@ -470,7 +487,7 @@ function WorkOrderModal({
               </select>
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Category</label>
+              <label className="block text-xs font-medium text-gray-700 mb-1">{t('workOrder.modal.categoryLabel')}</label>
               <select
                 value={form.category} onChange={(e) => set('category', e.target.value as WOCategory)}
                 className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-navy/30"
@@ -484,34 +501,34 @@ function WorkOrderModal({
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Location</label>
+              <label className="block text-xs font-medium text-gray-700 mb-1">{t('workOrder.modal.locationLabel')}</label>
               <input
                 value={form.location} onChange={(e) => set('location', e.target.value)}
                 className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-navy/30"
-                placeholder="Building / floor / room"
+                placeholder={t('workOrder.modal.locationPlaceholder')}
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Due Date (SLA)</label>
+              <label className="block text-xs font-medium text-gray-700 mb-1">{t('workOrder.modal.dueDateLabel')}</label>
               <input
                 type="datetime-local" value={form.dueDate}
                 onChange={(e) => { setDueTouched(true); set('dueDate', e.target.value); }}
                 className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-navy/30"
               />
               {!editItem && !dueTouched && (
-                <p className="text-[10px] text-gray-400 mt-1">Auto-set by priority — adjust if needed</p>
+                <p className="text-[10px] text-gray-400 mt-1">{t('workOrder.modal.dueDateAutoHint')}</p>
               )}
             </div>
           </div>
 
           {canAssign && (
             <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Assign to Technician</label>
+              <label className="block text-xs font-medium text-gray-700 mb-1">{t('workOrder.modal.assignLabel')}</label>
               <select
                 value={form.assignedToId} onChange={(e) => set('assignedToId', e.target.value)}
                 className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-navy/30"
               >
-                <option value="">— Unassigned —</option>
+                <option value="">{t('workOrder.modal.unassignedOption')}</option>
                 {users.map((u) => (
                   <option key={u.id} value={u.id}>{u.fullName}</option>
                 ))}
@@ -521,26 +538,26 @@ function WorkOrderModal({
 
           {editItem && (
             <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Technician Notes</label>
+              <label className="block text-xs font-medium text-gray-700 mb-1">{t('workOrder.modal.technicianNotesLabel')}</label>
               <textarea
                 value={form.notes} onChange={(e) => set('notes', e.target.value)}
                 rows={2}
                 className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-navy/30 resize-none"
-                placeholder="Internal notes for the technician..."
+                placeholder={t('workOrder.modal.technicianNotesPlaceholder')}
               />
             </div>
           )}
 
           <div className="flex gap-2 pt-1">
             <button type="button" onClick={onClose} className="flex-1 px-4 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50">
-              Cancel
+              {t('workOrder.common.cancel')}
             </button>
             <button
               type="submit" disabled={saving}
               className="flex-1 px-4 py-2 text-sm bg-navy text-white rounded-lg hover:bg-navy/90 disabled:opacity-60 flex items-center justify-center gap-2"
             >
               {saving ? <Loader2 size={14} className="animate-spin" /> : null}
-              {editItem ? 'Save' : 'Create WO'}
+              {editItem ? t('workOrder.common.save') : t('workOrder.createBtn')}
             </button>
           </div>
         </form>
@@ -555,6 +572,7 @@ function StatusModal({
 }: {
   open: boolean; onClose: () => void; wo: WorkOrder; onChanged: (updated: WorkOrder) => void;
 }) {
+  const { t } = useTranslation();
   const [selected, setSelected] = useState<WOStatus | null>(null);
   const [note, setNote]         = useState('');
   const [saving, setSaving]     = useState(false);
@@ -571,21 +589,21 @@ function StatusModal({
     try {
       const res = await api.patch(`/work-orders/${wo.id}/status`, { status: selected, note: note.trim() || null });
       onChanged(res.data.data);
-      toast.success('Status updated');
+      toast.success(t('workOrder.statusModal.updated'));
       onClose();
     } catch (err) { toast.error(extractErr(err)); } finally { setSaving(false); }
   }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4" onClick={onClose}>
-      <div role="dialog" aria-modal="true" aria-label="Change Status" className="bg-white rounded-xl shadow-xl w-full max-w-sm" onClick={(e) => e.stopPropagation()}>
+      <div role="dialog" aria-modal="true" aria-label={t('workOrder.statusModal.title')} className="bg-white rounded-xl shadow-xl w-full max-w-sm" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
-          <h2 className="font-semibold text-gray-900">Change Status</h2>
-          <button onClick={onClose} aria-label="Close" className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
+          <h2 className="font-semibold text-gray-900">{t('workOrder.statusModal.title')}</h2>
+          <button onClick={onClose} aria-label={t('workOrder.common.close')} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
         </div>
         <div className="p-5 space-y-4">
           {transitions.length === 0 && (
-            <p className="text-sm text-gray-500 text-center py-2">This status is final.</p>
+            <p className="text-sm text-gray-500 text-center py-2">{t('workOrder.statusModal.finalStatus')}</p>
           )}
           <div className="space-y-2">
             {transitions.map((s) => {
@@ -608,8 +626,8 @@ function StatusModal({
                     {s === 'PENDING_REVIEW' && (
                       <p className="text-[10px] text-gray-400">
                         {wo.reviewedAt
-                          ? 'Requires a new "after" photo uploaded after the rejection'
-                          : 'Requires at least 1 "after" photo'}
+                          ? t('workOrder.statusModal.afterPhotoRequiredAgain')
+                          : t('workOrder.statusModal.afterPhotoRequired')}
                       </p>
                     )}
                   </div>
@@ -620,25 +638,25 @@ function StatusModal({
           </div>
           {selected && (
             <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Note (optional)</label>
+              <label className="block text-xs font-medium text-gray-700 mb-1">{t('workOrder.statusModal.noteLabel')}</label>
               <textarea
                 value={note} onChange={(e) => setNote(e.target.value)}
                 rows={2}
                 className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-navy/30 resize-none"
-                placeholder="Reason for the status change..."
+                placeholder={t('workOrder.statusModal.notePlaceholder')}
               />
             </div>
           )}
           <div className="flex gap-2">
             <button onClick={onClose} className="flex-1 px-4 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50">
-              Cancel
+              {t('workOrder.common.cancel')}
             </button>
             <button
               onClick={handleSave} disabled={!selected || saving}
               className="flex-1 px-4 py-2 text-sm bg-navy text-white rounded-lg hover:bg-navy/90 disabled:opacity-60 flex items-center justify-center gap-2"
             >
               {saving ? <Loader2 size={14} className="animate-spin" /> : null}
-              Save
+              {t('workOrder.common.save')}
             </button>
           </div>
         </div>
@@ -653,6 +671,7 @@ function ReviewModal({
 }: {
   open: boolean; onClose: () => void; wo: WorkOrder; onReviewed: (updated: WorkOrder) => void;
 }) {
+  const { t } = useTranslation();
   const [decision, setDecision] = useState<'APPROVED' | 'REJECTED' | null>(null);
   const [reviewNotes, setReviewNotes] = useState('');
   const [saving, setSaving] = useState(false);
@@ -666,32 +685,32 @@ function ReviewModal({
   async function handleSave() {
     if (!decision) return;
     if (decision === 'REJECTED' && !reviewNotes.trim()) {
-      toast.error('A rejection reason is required');
+      toast.error(t('workOrder.reviewModal.rejectionRequired'));
       return;
     }
     setSaving(true);
     try {
       const res = await api.patch(`/work-orders/${wo.id}/review`, { decision, reviewNotes: reviewNotes.trim() || null });
       onReviewed(res.data.data);
-      toast.success(decision === 'APPROVED' ? 'Work order approved and closed' : 'Work order sent back for revision');
+      toast.success(decision === 'APPROVED' ? t('workOrder.reviewModal.approved') : t('workOrder.reviewModal.rejected'));
       onClose();
     } catch (err) { toast.error(extractErr(err)); } finally { setSaving(false); }
   }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4" onClick={onClose}>
-      <div role="dialog" aria-modal="true" aria-label="Review Completed Work" className="bg-white rounded-xl shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+      <div role="dialog" aria-modal="true" aria-label={t('workOrder.reviewModal.title')} className="bg-white rounded-xl shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
-          <h2 className="font-semibold text-gray-900">Review Completed Work</h2>
-          <button onClick={onClose} aria-label="Close" className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
+          <h2 className="font-semibold text-gray-900">{t('workOrder.reviewModal.title')}</h2>
+          <button onClick={onClose} aria-label={t('workOrder.common.close')} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
         </div>
         <div className="p-5 space-y-4">
           <p className="text-sm text-gray-600">{wo.code} — {wo.title}</p>
 
           <div>
-            <p className="text-xs font-medium text-gray-700 mb-1.5">After-work Photos</p>
+            <p className="text-xs font-medium text-gray-700 mb-1.5">{t('workOrder.reviewModal.afterPhotosLabel')}</p>
             {afterPhotos.length === 0 ? (
-              <p className="text-xs text-gray-400 flex items-center gap-1.5"><ImageOff size={13} /> No photos</p>
+              <p className="text-xs text-gray-400 flex items-center gap-1.5"><ImageOff size={13} /> {t('workOrder.reviewModal.noPhotos')}</p>
             ) : (
               <div className="grid grid-cols-3 gap-2">
                 {afterPhotos.map((a) => (
@@ -711,7 +730,7 @@ function ReviewModal({
                 decision === 'APPROVED' ? 'border-green-500 bg-green-50 text-green-700' : 'border-gray-200 text-gray-600 hover:bg-gray-50',
               )}
             >
-              <ThumbsUp size={14} /> Approve
+              <ThumbsUp size={14} /> {t('workOrder.reviewModal.approve')}
             </button>
             <button
               onClick={() => setDecision('REJECTED')}
@@ -720,27 +739,27 @@ function ReviewModal({
                 decision === 'REJECTED' ? 'border-red-500 bg-red-50 text-red-700' : 'border-gray-200 text-gray-600 hover:bg-gray-50',
               )}
             >
-              <ThumbsDown size={14} /> Reject
+              <ThumbsDown size={14} /> {t('workOrder.reviewModal.reject')}
             </button>
           </div>
 
           {decision && (
             <div>
               <label className="block text-xs font-medium text-gray-700 mb-1">
-                {decision === 'REJECTED' ? 'Rejection reason *' : 'Note (optional)'}
+                {decision === 'REJECTED' ? t('workOrder.reviewModal.rejectionReasonLabel') : t('workOrder.reviewModal.noteLabel')}
               </label>
               <textarea
                 value={reviewNotes} onChange={(e) => setReviewNotes(e.target.value)}
                 rows={3}
                 className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-navy/30 resize-none"
-                placeholder={decision === 'REJECTED' ? 'Explain what needs to be fixed...' : 'Additional notes...'}
+                placeholder={decision === 'REJECTED' ? t('workOrder.reviewModal.rejectionPlaceholder') : t('workOrder.reviewModal.notePlaceholder')}
               />
             </div>
           )}
 
           <div className="flex gap-2 pt-1">
             <button onClick={onClose} className="flex-1 px-4 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50">
-              Cancel
+              {t('workOrder.common.cancel')}
             </button>
             <button
               onClick={handleSave} disabled={!decision || saving}
@@ -750,7 +769,7 @@ function ReviewModal({
               )}
             >
               {saving ? <Loader2 size={14} className="animate-spin" /> : null}
-              {decision === 'REJECTED' ? 'Send Rejection' : 'Approve & Close WO'}
+              {decision === 'REJECTED' ? t('workOrder.reviewModal.sendRejection') : t('workOrder.reviewModal.approveAndClose')}
             </button>
           </div>
         </div>
@@ -765,6 +784,7 @@ function AssigneePickerModal({
 }: {
   wo: WorkOrder | null; users: WOUser[]; onClose: () => void; onAssigned: (userId: string) => void;
 }) {
+  const { t } = useTranslation();
   const [search, setSearch] = useState('');
   useEffect(() => { if (wo) setSearch(''); }, [wo]);
   useEscapeClose(!!wo, onClose);
@@ -777,18 +797,18 @@ function AssigneePickerModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4" onClick={onClose}>
-      <div role="dialog" aria-modal="true" aria-label="Assign Work Order" className="bg-white rounded-xl shadow-xl w-full max-w-sm max-h-[80vh] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
+      <div role="dialog" aria-modal="true" aria-label={t('workOrder.assignModal.title')} className="bg-white rounded-xl shadow-xl w-full max-w-sm max-h-[80vh] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 flex-shrink-0">
-          <h2 className="font-semibold text-gray-900">Assign Work Order</h2>
-          <button onClick={onClose} aria-label="Close" className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
+          <h2 className="font-semibold text-gray-900">{t('workOrder.assignModal.title')}</h2>
+          <button onClick={onClose} aria-label={t('workOrder.common.close')} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
         </div>
-        <p className="px-5 pt-3 text-xs text-gray-500">Pick a technician for &quot;{wo.title}&quot;</p>
+        <p className="px-5 pt-3 text-xs text-gray-500">{t('workOrder.assignModal.pickTechnicianFor', { title: wo.title })}</p>
         <div className="px-5 pt-3 flex-shrink-0">
           <input
             autoFocus
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search name..."
+            placeholder={t('workOrder.assignModal.searchPlaceholder')}
             className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-navy/30"
           />
         </div>
@@ -804,7 +824,7 @@ function AssigneePickerModal({
             </button>
           ))}
           {filtered.length === 0 && (
-            <p className="text-center text-xs text-gray-400 py-6">No matching employee</p>
+            <p className="text-center text-xs text-gray-400 py-6">{t('workOrder.noMatchingEmployee')}</p>
           )}
         </div>
       </div>
@@ -818,6 +838,7 @@ function WOCard({
 }: {
   wo: WorkOrder; selected: boolean; draggable: boolean; onSelect: () => void; overlay?: boolean; large?: boolean;
 }) {
+  const { t, i18n } = useTranslation();
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: overlay ? `overlay-${wo.id}` : wo.id, disabled: !draggable || overlay,
   });
@@ -858,10 +879,10 @@ function WOCard({
         <AgeBadge wo={wo} />
         {wo.dueDate && (
           <span className={cn('flex items-center gap-0.5 text-[10px]', overdue ? 'text-red-500 font-medium' : 'text-gray-400')}>
-            <Calendar size={10} /> {formatDate(wo.dueDate)}
+            <Calendar size={10} /> {formatDate(wo.dueDate, i18n.language)}
           </span>
         )}
-        <span className="text-[10px] text-gray-400 truncate">by {wo.reportedBy.fullName}</span>
+        <span className="text-[10px] text-gray-400 truncate">{t('workOrder.card.reportedByPrefix', { name: wo.reportedBy.fullName })}</span>
         {wo.assignee && <div className="ml-auto flex-shrink-0"><Avatar user={wo.assignee} size={5} /></div>}
       </div>
     </div>
@@ -875,6 +896,7 @@ function WOColumn({
   status: WOStatus; workOrders: WorkOrder[]; selectedId: string | null; onSelect: (id: string) => void;
   canDragWO: (wo: WorkOrder) => boolean;
 }) {
+  const { t } = useTranslation();
   const { setNodeRef, isOver } = useDroppable({ id: status });
   const cfg  = STATUS_CONFIG[status];
   const Icon = cfg.icon;
@@ -897,7 +919,7 @@ function WOColumn({
           <WOCard key={wo.id} wo={wo} selected={selectedId === wo.id} draggable={canDragWO(wo)} onSelect={() => onSelect(wo.id)} />
         ))}
         {workOrders.length === 0 && (
-          <p className="text-center text-[11px] text-gray-300 py-6">Empty</p>
+          <p className="text-center text-[11px] text-gray-300 py-6">{t('workOrder.empty')}</p>
         )}
       </div>
     </div>
@@ -912,19 +934,20 @@ export function WOTable({
   // History page: swap the Due column for Closed date, and label age as Duration.
   showClosed?: boolean;
 }) {
+  const { t, i18n } = useTranslation();
   return (
     <div className="flex-1 overflow-auto">
       <table className="w-full text-sm">
         <thead className="sticky top-0 bg-gray-50 z-10">
           <tr className="text-left text-[11px] font-medium text-gray-500 uppercase tracking-wide">
-            <th className="px-4 py-2.5">Code</th>
-            <th className="px-4 py-2.5">Title</th>
-            <th className="px-4 py-2.5">Category</th>
-            <th className="px-4 py-2.5">Priority</th>
-            <th className="px-4 py-2.5">Status</th>
-            <th className="px-4 py-2.5">Technician</th>
-            <th className="px-4 py-2.5">{showClosed ? 'Closed' : 'Due'}</th>
-            <th className="px-4 py-2.5">{showClosed ? 'Duration' : 'Age'}</th>
+            <th className="px-4 py-2.5">{t('workOrder.table.code')}</th>
+            <th className="px-4 py-2.5">{t('workOrder.table.title')}</th>
+            <th className="px-4 py-2.5">{t('workOrder.table.category')}</th>
+            <th className="px-4 py-2.5">{t('workOrder.table.priority')}</th>
+            <th className="px-4 py-2.5">{t('workOrder.table.status')}</th>
+            <th className="px-4 py-2.5">{t('workOrder.table.technician')}</th>
+            <th className="px-4 py-2.5">{showClosed ? t('workOrder.table.closed') : t('workOrder.table.due')}</th>
+            <th className="px-4 py-2.5">{showClosed ? t('workOrder.table.duration') : t('workOrder.table.age')}</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-100">
@@ -951,11 +974,11 @@ export function WOTable({
                 </td>
                 {showClosed ? (
                   <td className="px-4 py-2.5 text-xs whitespace-nowrap text-gray-500">
-                    {wo.closedAt ? formatDate(wo.closedAt) : '—'}
+                    {wo.closedAt ? formatDate(wo.closedAt, i18n.language) : '—'}
                   </td>
                 ) : (
                   <td className={cn('px-4 py-2.5 text-xs whitespace-nowrap', overdue ? 'text-red-500 font-medium' : 'text-gray-500')}>
-                    {wo.dueDate ? formatDate(wo.dueDate) : '—'}
+                    {wo.dueDate ? formatDate(wo.dueDate, i18n.language) : '—'}
                   </td>
                 )}
                 <td className="px-4 py-2.5 whitespace-nowrap"><AgeBadge wo={wo} /></td>
@@ -963,7 +986,7 @@ export function WOTable({
             );
           })}
           {workOrders.length === 0 && (
-            <tr><td colSpan={8} className="text-center text-gray-400 text-sm py-12">No work orders</td></tr>
+            <tr><td colSpan={8} className="text-center text-gray-400 text-sm py-12">{t('workOrder.noWorkOrders')}</td></tr>
           )}
         </tbody>
       </table>
@@ -977,6 +1000,7 @@ function PhotoSection({
 }: {
   wo: WorkOrder; canUpload: boolean; onUploaded: (updated: WorkOrder) => void;
 }) {
+  const { t } = useTranslation();
   const [uploading, setUploading] = useState<WOAttachmentType | null>(null);
   const beforeInputRef = useRef<HTMLInputElement>(null);
   const afterInputRef  = useRef<HTMLInputElement>(null);
@@ -995,7 +1019,7 @@ function PhotoSection({
         attachments: [...(wo.attachments ?? []), res.data.data],
         _count: { ...wo._count, attachments: wo._count.attachments + 1 },
       });
-      toast.success(file.type.startsWith('video/') ? 'Video uploaded' : 'Photo uploaded');
+      toast.success(file.type.startsWith('video/') ? t('workOrder.photos.videoUploaded') : t('workOrder.photos.photoUploaded'));
     } catch (err) { toast.error(extractErr(err)); } finally { setUploading(null); }
   }
 
@@ -1020,19 +1044,19 @@ function PhotoSection({
     <div className="grid grid-cols-2 gap-4">
       <div>
         <div className="flex items-center justify-between mb-1.5">
-          <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wide">Before</p>
+          <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wide">{t('workOrder.photos.before')}</p>
           {canUpload && (
             <button
               onClick={() => beforeInputRef.current?.click()}
               disabled={uploading === 'BEFORE'}
-              aria-label="Upload before photo"
+              aria-label={t('workOrder.photos.uploadBeforeAriaLabel')}
               className="text-navy hover:text-navy/70 disabled:opacity-50"
             >
               {uploading === 'BEFORE' ? <Loader2 size={14} className="animate-spin" /> : <Camera size={14} />}
             </button>
           )}
         </div>
-        <PhotoGrid photos={before} emptyLabel="No photo yet" />
+        <PhotoGrid photos={before} emptyLabel={t('workOrder.photos.noPhotoYet')} />
         <input
           ref={beforeInputRef} type="file" accept="image/*,video/*" capture="environment" className="hidden"
           onChange={(e) => handleFile('BEFORE', e.target.files?.[0])}
@@ -1040,19 +1064,19 @@ function PhotoSection({
       </div>
       <div>
         <div className="flex items-center justify-between mb-1.5">
-          <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wide">After</p>
+          <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wide">{t('workOrder.photos.after')}</p>
           {canUpload && (
             <button
               onClick={() => afterInputRef.current?.click()}
               disabled={uploading === 'AFTER'}
-              aria-label="Upload after photo"
+              aria-label={t('workOrder.photos.uploadAfterAriaLabel')}
               className="text-navy hover:text-navy/70 disabled:opacity-50"
             >
               {uploading === 'AFTER' ? <Loader2 size={14} className="animate-spin" /> : <Camera size={14} />}
             </button>
           )}
         </div>
-        <PhotoGrid photos={after} emptyLabel="Required before submitting for review" />
+        <PhotoGrid photos={after} emptyLabel={t('workOrder.photos.afterRequiredHint')} />
         <input
           ref={afterInputRef} type="file" accept="image/*" capture="environment" className="hidden"
           onChange={(e) => handleFile('AFTER', e.target.files?.[0])}
@@ -1066,21 +1090,22 @@ function PhotoSection({
 // Answers "when did each step happen and how long did it take" at a glance,
 // without expanding the raw history log. Built purely from timestamps that
 // already exist on the WO + its history entries.
-function formatDateTime(d: string) {
-  return new Date(d).toLocaleString('en-US', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false });
+function formatDateTime(d: string, language = 'en') {
+  return new Date(d).toLocaleString(dateLocale(language), { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false });
 }
 
 function DurationTimeline({ wo }: { wo: WorkOrder }) {
+  const { t, i18n } = useTranslation();
   const chrono = [...(wo.history ?? [])].reverse(); // history arrives newest-first
   const started = chrono.find((h) => h.toStatus === 'IN_PROGRESS');
   const review  = chrono.find((h) => h.toStatus === 'PENDING_REVIEW');
 
-  const steps: { label: string; at: string }[] = [{ label: 'Created', at: wo.createdAt }];
-  if (wo.assignedAt) steps.push({ label: 'Assigned', at: wo.assignedAt });
-  if (started)       steps.push({ label: 'Work started', at: started.createdAt });
-  if (review)        steps.push({ label: 'Submitted for review', at: review.createdAt });
-  if (wo.status === 'CANCELLED')  steps.push({ label: 'Cancelled', at: wo.closedAt ?? wo.updatedAt });
-  else if (wo.closedAt)           steps.push({ label: 'Closed', at: wo.closedAt });
+  const steps: { label: string; at: string }[] = [{ label: t('workOrder.timeline.created'), at: wo.createdAt }];
+  if (wo.assignedAt) steps.push({ label: t('workOrder.timeline.assigned'), at: wo.assignedAt });
+  if (started)       steps.push({ label: t('workOrder.timeline.workStarted'), at: started.createdAt });
+  if (review)        steps.push({ label: t('workOrder.timeline.submittedForReview'), at: review.createdAt });
+  if (wo.status === 'CANCELLED')  steps.push({ label: t('workOrder.timeline.cancelled'), at: wo.closedAt ?? wo.updatedAt });
+  else if (wo.closedAt)           steps.push({ label: t('workOrder.timeline.closed'), at: wo.closedAt });
 
   steps.sort((a, b) => new Date(a.at).getTime() - new Date(b.at).getTime());
 
@@ -1089,7 +1114,7 @@ function DurationTimeline({ wo }: { wo: WorkOrder }) {
 
   return (
     <div>
-      <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wide mb-2">Timeline</p>
+      <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wide mb-2">{t('workOrder.timeline.title')}</p>
       <div className="space-y-0">
         {steps.map((s, i) => {
           const gapMins = i === 0 ? 0 : Math.round((new Date(s.at).getTime() - new Date(steps[i - 1].at).getTime()) / 60000);
@@ -1103,9 +1128,9 @@ function DurationTimeline({ wo }: { wo: WorkOrder }) {
               <div className={cn('flex-1 min-w-0', !last && 'pb-2.5')}>
                 <div className="flex items-baseline justify-between gap-2">
                   <span className="text-xs font-medium text-gray-700">{s.label}</span>
-                  {i > 0 && <span className="text-[10px] text-gray-400 whitespace-nowrap">+{formatAge(gapMins)}</span>}
+                  {i > 0 && <span className="text-[10px] text-gray-400 whitespace-nowrap">+{formatAge(gapMins, t)}</span>}
                 </div>
-                <p className="text-[11px] text-gray-400">{formatDateTime(s.at)}</p>
+                <p className="text-[11px] text-gray-400">{formatDateTime(s.at, i18n.language)}</p>
               </div>
             </div>
           );
@@ -1117,8 +1142,8 @@ function DurationTimeline({ wo }: { wo: WorkOrder }) {
       )}>
         <Clock size={12} />
         {isFinal
-          ? `Total time open → closed: ${formatAge(totalMins)}`
-          : `Open for ${formatAge(totalMins)}`}
+          ? t('workOrder.timeline.totalDuration', { duration: formatAge(totalMins, t) })
+          : t('workOrder.timeline.openFor', { duration: formatAge(totalMins, t) })}
       </div>
     </div>
   );
@@ -1133,6 +1158,7 @@ export function WODetail({
   onStatusChange: () => void; onReview: () => void; onDeleted: () => void; onUpdated: (wo: WorkOrder) => void;
   currentUserId: string; currentDivisionId: string; editScope: Scope; deleteScope: Scope;
 }) {
+  const { t, i18n } = useTranslation();
   const [showHistory, setShowHistory] = useState(false);
   const [deleting, setDeleting]       = useState(false);
   const [confirmDel, setConfirmDel]   = useState(false);
@@ -1160,7 +1186,7 @@ export function WODetail({
     setDeleting(true);
     try {
       await api.delete(`/work-orders/${wo.id}`);
-      toast.success('Work order deleted');
+      toast.success(t('workOrder.detail.deleted'));
       onDeleted();
     } catch (err) { toast.error(extractErr(err)); } finally { setDeleting(false); setConfirmDel(false); }
   }
@@ -1178,7 +1204,7 @@ export function WODetail({
             <CategoryBadge category={wo.category} />
           </div>
         </div>
-        <button onClick={onClose} aria-label="Close" className="text-gray-400 hover:text-gray-600 flex-shrink-0">
+        <button onClick={onClose} aria-label={t('workOrder.common.close')} className="text-gray-400 hover:text-gray-600 flex-shrink-0">
           <X size={18} />
         </button>
       </div>
@@ -1188,51 +1214,51 @@ export function WODetail({
         {/* Meta grid */}
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1">
-            <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wide">Reported by</p>
+            <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wide">{t('workOrder.detail.reportedBy')}</p>
             <div className="flex items-center gap-2">
               <Avatar user={wo.reportedBy} size={6} />
               <span className="text-xs text-gray-700">{wo.reportedBy.fullName}</span>
             </div>
           </div>
           <div className="space-y-1">
-            <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wide">Assigned to</p>
+            <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wide">{t('workOrder.detail.assignedTo')}</p>
             {wo.assignee ? (
               <div className="flex items-center gap-2">
                 <Avatar user={wo.assignee} size={6} />
                 <span className="text-xs text-gray-700">{wo.assignee.fullName}</span>
               </div>
-            ) : <span className="text-xs text-gray-400">Unassigned</span>}
+            ) : <span className="text-xs text-gray-400">{t('workOrder.detail.unassigned')}</span>}
           </div>
           {wo.assignedBy && (
             <div className="space-y-1">
-              <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wide">Assigned by</p>
+              <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wide">{t('workOrder.detail.assignedBy')}</p>
               <span className="text-xs text-gray-700">{wo.assignedBy.fullName}</span>
             </div>
           )}
           {wo.location && (
             <div className="space-y-1 col-span-2">
-              <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wide">Location</p>
+              <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wide">{t('workOrder.detail.location')}</p>
               <div className="flex items-center gap-1.5 text-xs text-gray-700">
                 <MapPin size={12} className="text-gray-400" /> {wo.location}
               </div>
             </div>
           )}
           <div className="space-y-1">
-            <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wide">Created</p>
-            <p className="text-xs text-gray-700">{formatDate(wo.createdAt)}</p>
+            <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wide">{t('workOrder.detail.created')}</p>
+            <p className="text-xs text-gray-700">{formatDate(wo.createdAt, i18n.language)}</p>
           </div>
           {wo.dueDate && (
             <div className="space-y-1">
-              <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wide">Due Date</p>
+              <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wide">{t('workOrder.detail.dueDate')}</p>
               <p className={cn('text-xs', isOverdue(wo) ? 'text-red-500 font-medium' : 'text-gray-700')}>
-                {formatDate(wo.dueDate)} {isOverdue(wo) && '⚠️'}
+                {formatDate(wo.dueDate, i18n.language)} {isOverdue(wo) && '⚠️'}
               </p>
             </div>
           )}
           {wo.closedAt && (
             <div className="space-y-1">
-              <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wide">Closed</p>
-              <p className="text-xs text-green-600 font-medium">{formatDate(wo.closedAt)}</p>
+              <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wide">{t('workOrder.detail.closed')}</p>
+              <p className="text-xs text-green-600 font-medium">{formatDate(wo.closedAt, i18n.language)}</p>
             </div>
           )}
         </div>
@@ -1243,7 +1269,7 @@ export function WODetail({
         {/* Description */}
         {wo.description && (
           <div>
-            <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wide mb-1.5">Description</p>
+            <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wide mb-1.5">{t('workOrder.detail.description')}</p>
             <p className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">{wo.description}</p>
           </div>
         )}
@@ -1251,7 +1277,7 @@ export function WODetail({
         {/* Notes */}
         {wo.notes && (
           <div className="bg-amber-50 border border-amber-100 rounded-lg p-3">
-            <p className="text-[10px] font-medium text-amber-700 uppercase tracking-wide mb-1">Technician Notes</p>
+            <p className="text-[10px] font-medium text-amber-700 uppercase tracking-wide mb-1">{t('workOrder.detail.technicianNotes')}</p>
             <p className="text-sm text-amber-900 whitespace-pre-wrap">{wo.notes}</p>
           </div>
         )}
@@ -1259,7 +1285,7 @@ export function WODetail({
         {wo.reviewNotes && (
           <div className={cn('rounded-lg p-3 border', wo.status === 'DONE' ? 'bg-green-50 border-green-100' : 'bg-red-50 border-red-100')}>
             <p className={cn('text-[10px] font-medium uppercase tracking-wide mb-1', wo.status === 'DONE' ? 'text-green-700' : 'text-red-700')}>
-              Review Note {wo.reviewedBy && `— ${wo.reviewedBy.fullName}`}
+              {wo.reviewedBy ? t('workOrder.detail.reviewNoteBy', { name: wo.reviewedBy.fullName }) : t('workOrder.detail.reviewNote')}
             </p>
             <p className="text-sm whitespace-pre-wrap text-gray-800">{wo.reviewNotes}</p>
           </div>
@@ -1268,13 +1294,13 @@ export function WODetail({
         {/* Photo evidence */}
         {!isFinal && wo.status !== 'OPEN' && wo.status !== 'VALIDATED' && (
           <div>
-            <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wide mb-2">Photo Evidence</p>
+            <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wide mb-2">{t('workOrder.detail.photoEvidence')}</p>
             <PhotoSection wo={wo} canUpload={canStatus && !isPendingReview} onUploaded={onUpdated} />
           </div>
         )}
         {(isFinal || isPendingReview) && wo.attachments && wo.attachments.length > 0 && (
           <div>
-            <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wide mb-2">Photo Evidence</p>
+            <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wide mb-2">{t('workOrder.detail.photoEvidence')}</p>
             <PhotoSection wo={wo} canUpload={false} onUploaded={onUpdated} />
           </div>
         )}
@@ -1287,7 +1313,7 @@ export function WODetail({
               className="flex items-center gap-1.5 text-[10px] font-medium text-gray-400 uppercase tracking-wide hover:text-gray-600 w-full"
             >
               <History size={12} />
-              History ({wo.history.length})
+              {t('workOrder.detail.history', { count: wo.history.length })}
               {showHistory ? <ChevronUp size={12} className="ml-auto" /> : <ChevronDown size={12} className="ml-auto" />}
             </button>
             {showHistory && (
@@ -1300,7 +1326,7 @@ export function WODetail({
                         <span className="font-medium text-gray-700">{h.changedBy.fullName}</span>
                         {h.fromStatus && (
                           <>
-                            <span className="text-gray-400">changed from</span>
+                            <span className="text-gray-400">{t('workOrder.detail.changedFrom')}</span>
                             <StatusBadge status={h.fromStatus} />
                             <ArrowRight size={10} className="text-gray-300" />
                           </>
@@ -1308,7 +1334,7 @@ export function WODetail({
                         <StatusBadge status={h.toStatus} />
                       </div>
                       {h.note && <p className="text-gray-500 mt-0.5">{h.note}</p>}
-                      <p className="text-gray-400 mt-0.5">{formatRelative(h.createdAt)}</p>
+                      <p className="text-gray-400 mt-0.5">{formatRelative(h.createdAt, t)}</p>
                     </div>
                   </div>
                 ))}
@@ -1325,7 +1351,7 @@ export function WODetail({
             onClick={onReview}
             className="flex items-center gap-1.5 px-3 py-2 text-xs bg-purple-600 text-white rounded-lg hover:bg-purple-700"
           >
-            <ClipboardCheck size={12} /> Review Work
+            <ClipboardCheck size={12} /> {t('workOrder.detail.reviewWorkBtn')}
           </button>
         )}
         {canStatus && !isFinal && !isPendingReview && (
@@ -1333,7 +1359,7 @@ export function WODetail({
             onClick={onStatusChange}
             className="flex items-center gap-1.5 px-3 py-2 text-xs bg-navy text-white rounded-lg hover:bg-navy/90"
           >
-            <RefreshCw size={12} /> Change Status
+            <RefreshCw size={12} /> {t('workOrder.detail.changeStatusBtn')}
           </button>
         )}
         {canEdit && !isFinal && (
@@ -1341,7 +1367,7 @@ export function WODetail({
             onClick={onEdit}
             className="flex items-center gap-1.5 px-3 py-2 text-xs border border-gray-200 rounded-lg hover:bg-gray-50"
           >
-            Edit
+            {t('workOrder.detail.editBtn')}
           </button>
         )}
         {canDelete && (
@@ -1353,7 +1379,7 @@ export function WODetail({
             )}
           >
             {deleting ? <Loader2 size={12} className="animate-spin" /> : null}
-            {confirmDel ? 'Click again to delete' : 'Delete'}
+            {confirmDel ? t('workOrder.detail.confirmDelete') : t('workOrder.detail.deleteBtn')}
           </button>
         )}
       </div>
@@ -1369,6 +1395,7 @@ function StatsBar({ stats }: {
     overdue: number;
   } | null;
 }) {
+  const { t } = useTranslation();
   if (!stats) return null;
 
   const openCount = stats.byStatus.filter((s) => s.status !== 'DONE' && s.status !== 'CANCELLED').reduce((a, b) => a + b._count, 0);
@@ -1380,27 +1407,27 @@ function StatsBar({ stats }: {
       <div className="flex items-center gap-1.5 text-xs whitespace-nowrap">
         <Wrench size={12} className="text-navy" />
         <span className="font-semibold text-navy">{openCount}</span>
-        <span className="text-gray-500">Active</span>
+        <span className="text-gray-500">{t('workOrder.stats.active')}</span>
       </div>
       {pendingReviewCount > 0 && (
         <div className="flex items-center gap-1.5 text-xs whitespace-nowrap">
           <ClipboardCheck size={12} className="text-purple-500" />
           <span className="font-semibold text-purple-600">{pendingReviewCount}</span>
-          <span className="text-gray-500">Pending Review</span>
+          <span className="text-gray-500">{t('workOrder.stats.pendingReview')}</span>
         </div>
       )}
       {stats.overdue > 0 && (
         <div className="flex items-center gap-1.5 text-xs whitespace-nowrap">
           <AlertCircle size={12} className="text-red-500" />
           <span className="font-semibold text-red-600">{stats.overdue}</span>
-          <span className="text-gray-500">Overdue</span>
+          <span className="text-gray-500">{t('workOrder.stats.overdue')}</span>
         </div>
       )}
       {urgentCount > 0 && (
         <div className="flex items-center gap-1.5 text-xs whitespace-nowrap">
           <Zap size={12} className="text-red-500" />
           <span className="font-semibold text-red-600">{urgentCount}</span>
-          <span className="text-gray-500">Urgent</span>
+          <span className="text-gray-500">{t('workOrder.stats.urgent')}</span>
         </div>
       )}
     </div>
@@ -1409,6 +1436,7 @@ function StatsBar({ stats }: {
 
 // ── Main Page ──────────────────────────────────────────────
 export default function WorkOrderPage() {
+  const { t } = useTranslation();
   const user      = useAuthStore((s) => s.user);
   const perms     = usePermStore((s) => s.perms);
   const woPerms   = perms.work_order;
@@ -1510,10 +1538,10 @@ export default function WorkOrderPage() {
         const total = res.data.meta?.total ?? all.length;
         if (all.length >= total || res.data.data.length < PAGE) break;
       }
-      exportWorkOrdersCSV(all);
+      exportWorkOrdersCSV(all, t);
     } catch (err) { toast.error(extractErr(err)); }
     finally { setExporting(false); }
-  }, [buildParams]);
+  }, [buildParams, t]);
 
   const fetchStats = useCallback(async () => {
     try {
@@ -1623,7 +1651,7 @@ export default function WorkOrderPage() {
     try {
       const res = await api.patch(`/work-orders/${wo.id}/status`, { status, note: null });
       handleSaved(res.data.data);
-      toast.success('Status updated');
+      toast.success(t('workOrder.statusModal.updated'));
     } catch (err) {
       setWorkOrders((prev) => prev.map((w) => (w.id === wo.id ? { ...w, status: prevStatus } : w)));
       toast.error(extractErr(err));
@@ -1635,7 +1663,7 @@ export default function WorkOrderPage() {
     try {
       const res = await api.patch(`/work-orders/${assignPickerWO.id}`, { assignedToId: userId });
       handleSaved(res.data.data);
-      toast.success('Work order assigned');
+      toast.success(t('workOrder.assignModal.assigned'));
     } catch (err) { toast.error(extractErr(err)); } finally { setAssignPickerWO(null); }
   }
 
@@ -1664,7 +1692,7 @@ export default function WorkOrderPage() {
     }
 
     if (!STATUS_TRANSITIONS[wo.status].includes(targetStatus)) {
-      toast.error('This status transition is not allowed');
+      toast.error(t('workOrder.errors.transitionNotAllowed'));
       return;
     }
 
@@ -1684,18 +1712,18 @@ export default function WorkOrderPage() {
   // first group (labels are hidden when just one group is visible).
   const VIEW_SECTIONS: { label: string; views: { id: ViewFilter; label: string }[] }[] = [
     {
-      label: 'My Work',
+      label: t('workOrder.sections.myWork'),
       views: [
-        { id: 'mine',     label: 'My Tasks'       },
-        { id: 'reported', label: 'Reported by Me' },
+        { id: 'mine',     label: t('workOrder.views.mine')     },
+        { id: 'reported', label: t('workOrder.views.reported') },
       ],
     },
     {
-      label: 'Management',
+      label: t('workOrder.sections.management'),
       views: [
-        { id: 'all',           label: 'All Work Orders' },
-        { id: 'unassigned',    label: 'Unassigned'      },
-        { id: 'pendingReview', label: 'Pending Review'  },
+        { id: 'all',           label: t('workOrder.views.all')           },
+        { id: 'unassigned',    label: t('workOrder.views.unassigned')    },
+        { id: 'pendingReview', label: t('workOrder.views.pendingReview') },
       ],
     },
   ];
@@ -1721,7 +1749,7 @@ export default function WorkOrderPage() {
         <div className="px-4 py-4 border-b border-gray-100">
           <div className="flex items-center gap-2">
             <Wrench size={18} className="text-navy" />
-            <h1 className="font-semibold text-gray-900 text-sm">Work Orders</h1>
+            <h1 className="font-semibold text-gray-900 text-sm">{t('workOrder.title')}</h1>
           </div>
         </div>
 
@@ -1769,7 +1797,7 @@ export default function WorkOrderPage() {
               onClick={() => { setEditItem(null); setModalOpen(true); }}
               className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-navy text-white text-sm rounded-lg hover:bg-navy/90"
             >
-              <Plus size={16} /> Create WO
+              <Plus size={16} /> {t('workOrder.createBtn')}
             </button>
           </div>
         )}
@@ -1781,14 +1809,14 @@ export default function WorkOrderPage() {
         <div className="lg:hidden flex items-center justify-between px-4 py-3 border-b border-gray-100 bg-white flex-shrink-0">
           <div className="flex items-center gap-2">
             <Wrench size={18} className="text-navy" />
-            <h1 className="font-semibold text-gray-900 text-sm">Work Orders</h1>
+            <h1 className="font-semibold text-gray-900 text-sm">{t('workOrder.title')}</h1>
           </div>
           {woPerms.create && (
             <button
               onClick={() => { setEditItem(null); setModalOpen(true); }}
               className="flex items-center justify-center gap-1.5 px-3 py-2 bg-navy text-white text-sm rounded-lg"
             >
-              <Plus size={16} /> Create
+              <Plus size={16} /> {t('workOrder.createBtnShort')}
             </button>
           )}
         </div>
@@ -1816,25 +1844,25 @@ export default function WorkOrderPage() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter') setSearchQuery(search); }}
-            placeholder="Search code / title..."
-            aria-label="Search work orders"
+            placeholder={t('workOrder.toolbar.searchPlaceholder')}
+            aria-label={t('workOrder.toolbar.searchAriaLabel')}
             className="flex-1 min-w-[140px] max-w-xs text-sm border border-gray-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-navy/30"
           />
           <button
             onClick={() => setShowFilters((v) => !v)}
-            aria-label="Toggle filters"
+            aria-label={t('workOrder.toolbar.toggleFiltersAriaLabel')}
             className={cn('p-1.5 rounded-lg border transition-colors', showFilters ? 'border-navy bg-navy/5 text-navy' : 'border-gray-200 text-gray-500 hover:bg-gray-50')}
           >
             <Filter size={14} />
           </button>
-          <button onClick={() => fetchWOs()} aria-label="Refresh" className="p-1.5 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50">
+          <button onClick={() => fetchWOs()} aria-label={t('workOrder.toolbar.refreshAriaLabel')} className="p-1.5 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50">
             <RefreshCw size={14} />
           </button>
           <button
             onClick={handleExport}
             disabled={workOrders.length === 0 || exporting}
-            title="Export all filtered work orders to CSV"
-            aria-label="Export CSV"
+            title={t('workOrder.toolbar.exportCsvTitle')}
+            aria-label={t('workOrder.toolbar.exportCsvAriaLabel')}
             className="p-1.5 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
           >
             {exporting ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
@@ -1846,14 +1874,14 @@ export default function WorkOrderPage() {
             <button
               onClick={() => setBoardMode('kanban')}
               className={cn('p-1.5', boardMode === 'kanban' ? 'bg-navy text-white' : 'text-gray-500 hover:bg-gray-50')}
-              title="Kanban" aria-label="Kanban view"
+              title={t('workOrder.toolbar.kanbanView')} aria-label={t('workOrder.toolbar.kanbanView')}
             >
               <LayoutGrid size={14} />
             </button>
             <button
               onClick={() => setBoardMode('table')}
               className={cn('p-1.5', boardMode === 'table' ? 'bg-navy text-white' : 'text-gray-500 hover:bg-gray-50')}
-              title="Table" aria-label="Table view"
+              title={t('workOrder.toolbar.tableView')} aria-label={t('workOrder.toolbar.tableView')}
             >
               <Table2 size={14} />
             </button>
@@ -1866,7 +1894,7 @@ export default function WorkOrderPage() {
                 onChange={(e) => setPriorityFilter(e.target.value as WOPriority | '')}
                 className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white focus:outline-none"
               >
-                <option value="">All Priorities</option>
+                <option value="">{t('workOrder.toolbar.allPriorities')}</option>
                 {(Object.keys(PRIORITY_CONFIG) as WOPriority[]).map((p) => (
                   <option key={p} value={p}>{PRIORITY_CONFIG[p].label}</option>
                 ))}
@@ -1876,7 +1904,7 @@ export default function WorkOrderPage() {
                 onChange={(e) => setCategoryFilter(e.target.value as WOCategory | '')}
                 className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white focus:outline-none"
               >
-                <option value="">All Categories</option>
+                <option value="">{t('workOrder.toolbar.allCategories')}</option>
                 {(Object.keys(CATEGORY_CONFIG) as WOCategory[]).map((c) => (
                   <option key={c} value={c}>{CATEGORY_CONFIG[c].icon} {CATEGORY_CONFIG[c].label}</option>
                 ))}
@@ -1886,7 +1914,7 @@ export default function WorkOrderPage() {
                 onChange={(e) => setAssigneeFilter(e.target.value)}
                 className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white focus:outline-none"
               >
-                <option value="">All Technicians</option>
+                <option value="">{t('workOrder.toolbar.allTechnicians')}</option>
                 {users.map((u) => (
                   <option key={u.id} value={u.id}>{u.fullName}</option>
                 ))}
@@ -1895,7 +1923,7 @@ export default function WorkOrderPage() {
                 type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)}
                 className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white focus:outline-none"
               />
-              <span className="text-xs text-gray-400">to</span>
+              <span className="text-xs text-gray-400">{t('workOrder.toolbar.dateTo')}</span>
               <input
                 type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)}
                 className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white focus:outline-none"
@@ -1907,14 +1935,14 @@ export default function WorkOrderPage() {
         {totalCount > workOrders.length && (
           <div className="flex items-center gap-2 px-4 py-1.5 text-[11px] text-gray-500 bg-gray-50 border-b border-gray-100 flex-shrink-0">
             <Info size={11} />
-            <span>Showing {workOrders.length} of {totalCount} work orders.</span>
+            <span>{t('workOrder.loadMore.showing', { shown: workOrders.length, total: totalCount })}</span>
             <button
               onClick={() => fetchWOs(boardPage + 1, true)}
               disabled={loadingMore}
               className="ml-auto flex items-center gap-1 font-medium text-navy hover:underline disabled:opacity-60"
             >
               {loadingMore ? <Loader2 size={11} className="animate-spin" /> : null}
-              Load more
+              {t('workOrder.loadMore.button')}
             </button>
           </div>
         )}
@@ -1929,7 +1957,7 @@ export default function WorkOrderPage() {
             {/* Mobile: flat stacked list, large tap targets, no drag */}
             <div className="lg:hidden flex-1 overflow-y-auto p-3 space-y-2.5">
               {workOrders.length === 0 ? (
-                <p className="text-center text-sm text-gray-400 py-12">No work orders</p>
+                <p className="text-center text-sm text-gray-400 py-12">{t('workOrder.noWorkOrders')}</p>
               ) : workOrders.map((wo) => (
                 <WOCard key={wo.id} wo={wo} selected={selectedId === wo.id} draggable={false} large onSelect={() => handleSelect(wo.id)} />
               ))}

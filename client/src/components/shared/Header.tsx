@@ -3,11 +3,13 @@ import { useLocation, useNavigate, Link } from 'react-router-dom';
 import {
   Menu, Bell, ChevronDown, LogOut, KeyRound, ChevronRight,
   Loader2, Clock, Megaphone, ShieldAlert, Info, CheckCircle2, User, Search, ArrowRight,
-  AlertTriangle, ClipboardList, Timer,
+  AlertTriangle, ClipboardList, Timer, Globe,
 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { useUiStore } from '@/stores/uiStore';
 import { useAuthStore } from '@/stores/authStore';
 import { useNotificationStore } from '@/stores/notificationStore';
+import { useLanguageStore, type Language } from '@/stores/languageStore';
 import { useClickOutside } from '@/hooks/useClickOutside';
 import ChangePasswordModal from '@/components/shared/ChangePasswordModal';
 import { ROUTES } from '@/lib/constants';
@@ -15,37 +17,40 @@ import { cn } from '@/lib/cn';
 import api from '@/lib/api';
 import { toast } from '@/stores/toastStore';
 
-const BREADCRUMB_MAP: Record<string, string> = {
-  '/dashboard':          'Dashboard',
-  '/tasks':              'Tasks',
-  '/bulletin':           'Bulletin',
-  '/notes':              'Notes',
-  '/database':           'DB Links',
-  '/profile':            'My Profile',
-  '/analytics':          'Analytics',
-  '/notifications':      'Notifications',
-  '/work-orders':        'Work Orders',
-  '/hris':                  'HRIS',
-  '/hris/attendance':       'Attendance',
-  '/hris/leave':            'Leave',
-  '/hris/requests':         'Requests',
-  '/hris/admin/holidays':   'Holidays',
-  '/hris/reports':          'Attendance Report',
-  '/hris/admin/shifts':     'Manage Shifts',
-  '/hris/admin/locations':  'Office Locations',
-  '/admin/users':        'Manage Users',
-  '/admin/permissions':  'Roles & Permissions',
-  '/admin/audit-log':    'Audit Log',
-};
+function useBreadcrumbMap(t: (key: string) => string): Record<string, string> {
+  return {
+    '/dashboard':          t('shared.header.breadcrumbs.dashboard'),
+    '/tasks':              t('shared.header.breadcrumbs.tasks'),
+    '/bulletin':           t('shared.header.breadcrumbs.bulletin'),
+    '/notes':              t('shared.header.breadcrumbs.notes'),
+    '/database':           t('shared.header.breadcrumbs.dbLinks'),
+    '/profile':            t('shared.header.breadcrumbs.myProfile'),
+    '/analytics':          t('shared.header.breadcrumbs.analytics'),
+    '/notifications':      t('shared.header.breadcrumbs.notifications'),
+    '/work-orders':        t('shared.header.breadcrumbs.workOrders'),
+    '/hris':                  t('shared.header.breadcrumbs.hris'),
+    '/hris/attendance':       t('shared.header.breadcrumbs.attendance'),
+    '/hris/leave':            t('shared.header.breadcrumbs.leave'),
+    '/hris/requests':         t('shared.header.breadcrumbs.requests'),
+    '/hris/admin/holidays':   t('shared.header.breadcrumbs.holidays'),
+    '/hris/reports':          t('shared.header.breadcrumbs.attendanceReport'),
+    '/hris/admin/shifts':     t('shared.header.breadcrumbs.manageShifts'),
+    '/hris/admin/locations':  t('shared.header.breadcrumbs.officeLocations'),
+    '/admin/users':        t('shared.header.breadcrumbs.manageUsers'),
+    '/admin/permissions':  t('shared.header.breadcrumbs.rolesPermissions'),
+    '/admin/audit-log':    t('shared.header.breadcrumbs.auditLog'),
+  };
+}
 
-function useBreadcrumbs() {
+function useBreadcrumbs(t: (key: string) => string) {
   const { pathname } = useLocation();
+  const breadcrumbMap = useBreadcrumbMap(t);
   const segments = pathname.split('/').filter(Boolean);
   const crumbs: { label: string; to: string }[] = [];
   let path = '';
   for (const seg of segments) {
     path += `/${seg}`;
-    const label = BREADCRUMB_MAP[path];
+    const label = breadcrumbMap[path];
     if (label) crumbs.push({ label, to: path });
   }
   return crumbs;
@@ -66,16 +71,17 @@ export function NotifIcon({ type }: { type: string }) {
   }
 }
 
-function notifAge(iso: string) {
+function notifAge(iso: string, t: (key: string, opts?: Record<string, unknown>) => string) {
   const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
-  if (diff < 1)  return 'Just now';
-  if (diff < 60) return `${diff} minutes ago`;
+  if (diff < 1)  return t('shared.header.time.justNow');
+  if (diff < 60) return t('shared.header.time.minutesAgo', { count: diff });
   const h = Math.floor(diff / 60);
-  if (h < 24)   return `${h} hours ago`;
-  return `${Math.floor(h / 24)} days ago`;
+  if (h < 24)   return t('shared.header.time.hoursAgo', { count: h });
+  return t('shared.header.time.daysAgo', { count: Math.floor(h / 24) });
 }
 
 export default function Header({ onSearchClick }: { onSearchClick?: () => void }) {
+  const { t } = useTranslation();
   const toggle  = useUiStore((s) => s.toggleSidebar);
   const user    = useAuthStore((s) => s.user);
   const logout  = useAuthStore((s) => s.logout);
@@ -87,17 +93,23 @@ export default function Header({ onSearchClick }: { onSearchClick?: () => void }
   const markRead      = useNotificationStore((s) => s.markRead);
   const markAllRead   = useNotificationStore((s) => s.markAllRead);
   const navigate = useNavigate();
-  const crumbs   = useBreadcrumbs();
+  const crumbs   = useBreadcrumbs(t);
+
+  const language    = useLanguageStore((s) => s.language);
+  const setLanguage = useLanguageStore((s) => s.setLanguage);
 
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [notifOpen, setNotifOpen]       = useState(false);
+  const [langOpen, setLangOpen]         = useState(false);
   const [changePwOpen, setChangePwOpen] = useState(false);
 
   const userMenuRef = useRef<HTMLDivElement>(null);
   const notifRef    = useRef<HTMLDivElement>(null);
+  const langRef     = useRef<HTMLDivElement>(null);
 
   useClickOutside(userMenuRef, () => setUserMenuOpen(false));
   useClickOutside(notifRef,    () => setNotifOpen(false));
+  useClickOutside(langRef,     () => setLangOpen(false));
 
   useEffect(() => { fetchNotifs(); }, [fetchNotifs]);
 
@@ -112,7 +124,7 @@ export default function Header({ onSearchClick }: { onSearchClick?: () => void }
       });
     });
     if (newNotifs.length > 3) {
-      toast.info(`+${newNotifs.length - 3} notifikasi lainnya`);
+      toast.info(t('shared.header.notifications.moreNotifications', { count: newNotifs.length - 3 }));
     }
     // BulletinPage fetches once on mount and won't otherwise notice a bulletin
     // published while it's already open — nudge it to refetch so "new
@@ -120,7 +132,7 @@ export default function Header({ onSearchClick }: { onSearchClick?: () => void }
     if (newNotifs.some((n) => n.type === 'BULLETIN_NEW' || n.type === 'BULLETIN_URGENT')) {
       window.dispatchEvent(new Event('bulletin:new'));
     }
-  }, [pollNotifs, markRead, navigate]);
+  }, [pollNotifs, markRead, navigate, t]);
 
   useEffect(() => {
     const id = setInterval(handlePoll, 60_000);
@@ -140,7 +152,7 @@ export default function Header({ onSearchClick }: { onSearchClick?: () => void }
         <div className="flex items-center gap-3">
           <button onClick={toggle}
             className="w-8 h-8 flex items-center justify-center rounded hover:bg-gray-100 transition-colors text-gray-500"
-            aria-label="Toggle sidebar">
+            aria-label={t('shared.header.toggleSidebar')}>
             <Menu size={20} />
           </button>
           <nav className="flex items-center gap-1 text-sm text-gray-500" aria-label="Breadcrumb">
@@ -164,7 +176,7 @@ export default function Header({ onSearchClick }: { onSearchClick?: () => void }
             className="hidden sm:flex items-center gap-2 px-3 py-1.5 text-sm text-gray-400 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors mr-1"
           >
             <Search size={13} />
-            <span>Search...</span>
+            <span>{t('shared.header.search')}</span>
             <kbd className="text-xs bg-white px-1.5 py-0.5 rounded border border-gray-200 font-mono ml-2">⌘K</kbd>
           </button>
           <button
@@ -178,7 +190,7 @@ export default function Header({ onSearchClick }: { onSearchClick?: () => void }
           <div ref={notifRef} className="relative">
             <button onClick={() => { setNotifOpen((p) => !p); setUserMenuOpen(false); }}
               className="relative w-8 h-8 flex items-center justify-center rounded hover:bg-gray-100 transition-colors text-gray-500"
-              aria-label="Notifications">
+              aria-label={t('shared.header.notifications.label')}>
               <Bell size={18} />
               {unreadCount > 0 && (
                 <span className="absolute top-1 right-1 w-4 h-4 rounded-full bg-danger text-white text-[10px] font-semibold flex items-center justify-center leading-none">
@@ -191,13 +203,13 @@ export default function Header({ onSearchClick }: { onSearchClick?: () => void }
               <div className="absolute right-0 top-10 w-80 bg-white border border-gray-200 rounded-lg shadow-md z-50">
                 <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
                   <span className="text-sm font-semibold text-gray-800">
-                    Notifications
+                    {t('shared.header.notifications.title')}
                     {unreadCount > 0 && (
                       <span className="ml-1.5 text-xs bg-danger text-white px-1.5 py-0.5 rounded-full">{unreadCount}</span>
                     )}
                   </span>
                   {unreadCount > 0 && (
-                    <button onClick={markAllRead} className="text-xs text-info hover:underline">Mark all as read</button>
+                    <button onClick={markAllRead} className="text-xs text-info hover:underline">{t('shared.header.notifications.markAllRead')}</button>
                   )}
                 </div>
                 <div className="max-h-72 overflow-y-auto">
@@ -208,7 +220,7 @@ export default function Header({ onSearchClick }: { onSearchClick?: () => void }
                   ) : notifications.length === 0 ? (
                     <div className="py-8 text-center">
                       <Bell size={24} className="text-gray-200 mx-auto mb-2" />
-                      <p className="text-sm text-gray-400">No notifications yet</p>
+                      <p className="text-sm text-gray-400">{t('shared.header.notifications.empty')}</p>
                     </div>
                   ) : notifications.map((n) => (
                     <button key={n.id}
@@ -228,7 +240,7 @@ export default function Header({ onSearchClick }: { onSearchClick?: () => void }
                         </p>
                         <p className="text-xs text-gray-500 mt-0.5 leading-snug line-clamp-2">{n.message}</p>
                         <p className="text-xs text-gray-400 mt-1 flex items-center gap-1">
-                          <Clock size={10} /> {notifAge(n.createdAt)}
+                          <Clock size={10} /> {notifAge(n.createdAt, t)}
                         </p>
                       </div>
                       {!n.isRead && <span className="w-2 h-2 rounded-full bg-info flex-shrink-0 mt-1" />}
@@ -240,8 +252,37 @@ export default function Header({ onSearchClick }: { onSearchClick?: () => void }
                   onClick={() => setNotifOpen(false)}
                   className="flex items-center justify-center gap-1.5 w-full py-2.5 text-xs font-medium text-navy hover:bg-gray-50 border-t border-gray-100 transition-colors"
                 >
-                  See all notifications <ArrowRight size={12} />
+                  {t('shared.header.notifications.seeAll')} <ArrowRight size={12} />
                 </Link>
+              </div>
+            )}
+          </div>
+
+          {/* Language switcher */}
+          <div ref={langRef} className="relative">
+            <button onClick={() => { setLangOpen((p) => !p); setUserMenuOpen(false); setNotifOpen(false); }}
+              className="flex items-center gap-1 px-2 py-1.5 rounded hover:bg-gray-100 transition-colors text-gray-500"
+              aria-label={t('shared.header.language.changeLabel')}>
+              <Globe size={16} />
+              <span className="hidden sm:inline text-xs font-medium uppercase">{language}</span>
+              <ChevronDown size={12} className="text-gray-400" />
+            </button>
+
+            {langOpen && (
+              <div className="absolute right-0 top-10 w-44 bg-white border border-gray-200 rounded-lg shadow-md z-50 py-1">
+                {(['en', 'id'] as Language[]).map((lng) => (
+                  <button
+                    key={lng}
+                    onClick={() => { setLanguage(lng); setLangOpen(false); }}
+                    className={cn(
+                      'w-full flex items-center justify-between gap-2 px-3.5 py-2 text-sm text-left hover:bg-gray-50 transition-colors',
+                      language === lng ? 'text-navy font-medium' : 'text-gray-700',
+                    )}
+                  >
+                    {t(`shared.header.language.${lng}`)}
+                    {language === lng && <CheckCircle2 size={13} className="text-navy" />}
+                  </button>
+                ))}
               </div>
             )}
           </div>
@@ -273,20 +314,20 @@ export default function Header({ onSearchClick }: { onSearchClick?: () => void }
                   onClick={() => setUserMenuOpen(false)}
                   className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors">
                   <User size={15} className="text-gray-400" />
-                  My Profile
+                  {t('shared.header.userMenu.myProfile')}
                 </Link>
 
                 <button onClick={() => { setUserMenuOpen(false); setChangePwOpen(true); }}
                   className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors">
                   <KeyRound size={15} className="text-gray-400" />
-                  Change Password
+                  {t('shared.header.userMenu.changePassword')}
                 </button>
 
                 <div className="border-t border-gray-100 mt-1 pt-1">
                   <button onClick={handleLogout}
                     className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-danger hover:bg-danger/10 transition-colors">
                     <LogOut size={15} />
-                    Logout
+                    {t('shared.header.userMenu.logout')}
                   </button>
                 </div>
               </div>

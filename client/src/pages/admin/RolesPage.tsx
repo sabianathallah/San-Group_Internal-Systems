@@ -2,6 +2,8 @@ import { useEffect, useState, useRef, FormEvent } from 'react';
 import {
   Shield, Edit2, Check, Loader2, AlertCircle, Users, ChevronRight, Plus, Trash2, X,
 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import api from '@/lib/api';
 import { cn } from '@/lib/cn';
 
@@ -17,14 +19,23 @@ interface Role {
 }
 
 // ── Constants ─────────────────────────────────────────────────
-const LEVEL_META: Record<number, { label: string; desc: string; bg: string; text: string }> = {
-  1: { label: 'L1', desc: 'Full system access',          bg: 'bg-slate-100',   text: 'text-slate-700'   },
-  2: { label: 'L2', desc: 'Organization leadership',    bg: 'bg-purple-100',  text: 'text-purple-700'  },
-  3: { label: 'L3', desc: 'Operational management',     bg: 'bg-blue-100',    text: 'text-blue-700'    },
-  4: { label: 'L4', desc: 'Division / department head', bg: 'bg-cyan-100',    text: 'text-cyan-700'    },
-  5: { label: 'L5', desc: 'Unit / sub-division head',   bg: 'bg-emerald-100', text: 'text-emerald-700' },
-  6: { label: 'L6', desc: 'Team member / staff',        bg: 'bg-gray-100',    text: 'text-gray-600'    },
+const LEVEL_META_STYLE: Record<number, { bg: string; text: string }> = {
+  1: { bg: 'bg-slate-100',   text: 'text-slate-700'   },
+  2: { bg: 'bg-purple-100',  text: 'text-purple-700'  },
+  3: { bg: 'bg-blue-100',    text: 'text-blue-700'    },
+  4: { bg: 'bg-cyan-100',    text: 'text-cyan-700'    },
+  5: { bg: 'bg-emerald-100', text: 'text-emerald-700' },
+  6: { bg: 'bg-gray-100',    text: 'text-gray-600'    },
 };
+
+function levelMeta(t: TFunction, level: number): { label: string; desc: string; bg: string; text: string } {
+  const style = LEVEL_META_STYLE[level] ?? LEVEL_META_STYLE[6];
+  return {
+    label: t(`admin.roles.levels.l${level}.label`),
+    desc: t(`admin.roles.levels.l${level}.desc`),
+    ...style,
+  };
+}
 
 const CUSTOM_LEVELS = [3, 4, 5, 6] as const;
 
@@ -38,8 +49,8 @@ function toSlug(name: string) {
   return name.trim().toUpperCase().replace(/[^A-Z0-9]+/g, '_').replace(/^_|_$/g, '');
 }
 
-function extractErr(err: unknown) {
-  return (err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'An error occurred';
+function extractErr(err: unknown, fallback: string) {
+  return (err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? fallback;
 }
 
 // ── Color Picker ──────────────────────────────────────────────
@@ -81,6 +92,7 @@ function ColorPicker({ value, onChange, onClose }: {
 function AddRoleModal({ onClose, onCreated }: {
   onClose: () => void; onCreated: (r: Role) => void;
 }) {
+  const { t } = useTranslation();
   const [name,    setName]    = useState('');
   const [level,   setLevel]   = useState<number>(6);
   const [color,   setColor]   = useState('#6366f1');
@@ -93,8 +105,8 @@ function AddRoleModal({ onClose, onCreated }: {
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    if (!name.trim()) { setError('Role name is required'); return; }
-    if (!slug)        { setError('Name must contain at least one letter or number'); return; }
+    if (!name.trim()) { setError(t('admin.roles.addModal.errors.nameRequired')); return; }
+    if (!slug)        { setError(t('admin.roles.addModal.errors.invalidName')); return; }
     setSaving(true); setError('');
     try {
       const res = await api.post('/roles', {
@@ -107,7 +119,7 @@ function AddRoleModal({ onClose, onCreated }: {
       onCreated(res.data.data);
       onClose();
     } catch (err) {
-      setError(extractErr(err));
+      setError(extractErr(err, t('admin.roles.addModal.errors.generic')));
     } finally {
       setSaving(false);
     }
@@ -118,14 +130,14 @@ function AddRoleModal({ onClose, onCreated }: {
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
       <div className="relative bg-white rounded-xl shadow-xl w-full max-w-sm">
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
-          <h2 className="text-sm font-semibold text-gray-800">Add Custom Role</h2>
+          <h2 className="text-sm font-semibold text-gray-800">{t('admin.roles.addModal.title')}</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={16} /></button>
         </div>
 
         <form onSubmit={handleSubmit} className="p-5 space-y-4">
           {/* Name + Color */}
           <div>
-            <label className="block text-xs text-gray-500 mb-1.5">Role name</label>
+            <label className="block text-xs text-gray-500 mb-1.5">{t('admin.roles.addModal.roleNameLabel')}</label>
             <div className="flex items-center gap-2">
               <div className="relative flex-shrink-0">
                 <button type="button" onClick={() => setShowPicker((v) => !v)}
@@ -137,21 +149,21 @@ function AddRoleModal({ onClose, onCreated }: {
               </div>
               <input
                 autoFocus type="text" value={name} onChange={(e) => setName(e.target.value)}
-                placeholder="e.g. Senior Engineer"
+                placeholder={t('admin.roles.addModal.namePlaceholder')}
                 className="flex-1 text-sm border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-navy"
               />
             </div>
             {slug && (
-              <p className="text-[11px] text-gray-400 mt-1 ml-10 font-mono">slug: {slug}</p>
+              <p className="text-[11px] text-gray-400 mt-1 ml-10 font-mono">{t('admin.roles.addModal.slugPrefix', { slug })}</p>
             )}
           </div>
 
           {/* Level */}
           <div>
-            <label className="block text-xs text-gray-500 mb-1.5">Hierarchy level</label>
+            <label className="block text-xs text-gray-500 mb-1.5">{t('admin.roles.addModal.hierarchyLevelLabel')}</label>
             <div className="grid grid-cols-4 gap-2">
               {CUSTOM_LEVELS.map((l) => {
-                const m = LEVEL_META[l];
+                const m = levelMeta(t, l);
                 return (
                   <button
                     key={l} type="button"
@@ -176,10 +188,10 @@ function AddRoleModal({ onClose, onCreated }: {
           {/* Description */}
           <div>
             <label className="block text-xs text-gray-500 mb-1.5">
-              Description <span className="text-gray-400 font-normal">(optional)</span>
+              {t('admin.roles.addModal.descriptionLabel')} <span className="text-gray-400 font-normal">{t('admin.roles.addModal.optional')}</span>
             </label>
             <input type="text" value={desc} onChange={(e) => setDesc(e.target.value)}
-              placeholder="Brief description of this role…"
+              placeholder={t('admin.roles.addModal.descriptionPlaceholder')}
               className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-navy"
             />
           </div>
@@ -193,12 +205,12 @@ function AddRoleModal({ onClose, onCreated }: {
           <div className="flex justify-end gap-2 pt-1">
             <button type="button" onClick={onClose}
               className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50">
-              Cancel
+              {t('admin.roles.addModal.cancel')}
             </button>
             <button type="submit" disabled={saving || !name.trim()}
               className="flex items-center gap-1.5 px-4 py-2 text-sm text-white bg-navy rounded-lg hover:bg-navy-light disabled:opacity-50">
               {saving && <Loader2 size={13} className="animate-spin" />}
-              Create Role
+              {t('admin.roles.addModal.create')}
             </button>
           </div>
         </form>
@@ -211,6 +223,7 @@ function AddRoleModal({ onClose, onCreated }: {
 function RoleCard({ role, onUpdated, onDeleted }: {
   role: Role; onUpdated: (r: Role) => void; onDeleted: (id: string) => void;
 }) {
+  const { t } = useTranslation();
   const [editing,    setEditing]    = useState(false);
   const [nameVal,    setNameVal]    = useState(role.name);
   const [colorVal,   setColorVal]   = useState(role.color);
@@ -219,7 +232,7 @@ function RoleCard({ role, onUpdated, onDeleted }: {
   const [deleting,   setDeleting]   = useState(false);
   const [error,      setError]      = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
-  const meta = LEVEL_META[role.level] ?? LEVEL_META[6];
+  const meta = levelMeta(t, role.level);
   const userCount = role._count?.users ?? 0;
 
   // L1 (SuperAdmin) is protected — cannot be deleted
@@ -241,7 +254,7 @@ function RoleCard({ role, onUpdated, onDeleted }: {
 
   async function save(e: FormEvent) {
     e.preventDefault();
-    if (!nameVal.trim()) { setError('Name cannot be empty'); return; }
+    if (!nameVal.trim()) { setError(t('admin.roles.nameEmptyError')); return; }
     setSaving(true); setError('');
     try {
       const res = await api.patch(`/roles/${role.id}`, { name: nameVal.trim(), color: colorVal });
@@ -249,20 +262,20 @@ function RoleCard({ role, onUpdated, onDeleted }: {
       setEditing(false);
       setShowPicker(false);
     } catch (err) {
-      setError(extractErr(err));
+      setError(extractErr(err, t('admin.roles.addModal.errors.generic')));
     } finally {
       setSaving(false);
     }
   }
 
   async function handleDelete() {
-    if (!confirm(`Delete role "${role.name}"? This cannot be undone.`)) return;
+    if (!confirm(t('admin.roles.confirmDelete', { name: role.name }))) return;
     setDeleting(true);
     try {
       await api.delete(`/roles/${role.id}`);
       onDeleted(role.id);
     } catch (err) {
-      alert(extractErr(err));
+      alert(extractErr(err, t('admin.roles.addModal.errors.generic')));
       setDeleting(false);
     }
   }
@@ -279,7 +292,7 @@ function RoleCard({ role, onUpdated, onDeleted }: {
           </span>
           <span className="flex items-center gap-1 text-xs text-gray-400">
             <Users size={11} />
-            {userCount} user
+            {t('admin.roles.userCount', { count: userCount })}
           </span>
         </div>
 
@@ -308,11 +321,11 @@ function RoleCard({ role, onUpdated, onDeleted }: {
               <button type="submit" disabled={saving}
                 className="flex items-center gap-1 px-2.5 py-1 text-xs text-white bg-navy hover:bg-navy-light rounded disabled:opacity-50">
                 {saving ? <Loader2 size={11} className="animate-spin" /> : <Check size={11} />}
-                Save
+                {t('admin.roles.save')}
               </button>
               <button type="button" onClick={cancelEdit}
                 className="px-2.5 py-1 text-xs text-gray-500 border border-gray-200 rounded hover:bg-gray-50">
-                Cancel
+                {t('admin.roles.cancel')}
               </button>
             </div>
           </form>
@@ -325,13 +338,13 @@ function RoleCard({ role, onUpdated, onDeleted }: {
             <div className="flex items-center gap-0.5 flex-shrink-0">
               <button onClick={startEdit}
                 className="w-6 h-6 flex items-center justify-center rounded text-gray-300 hover:text-navy hover:bg-navy/5 transition-colors"
-                title="Edit name & color">
+                title={t('admin.roles.editTitle')}>
                 <Edit2 size={12} />
               </button>
               {isDeletable && (
                 <button onClick={handleDelete} disabled={deleting}
                   className="w-6 h-6 flex items-center justify-center rounded text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors disabled:opacity-40"
-                  title={userCount > 0 ? `Cannot delete — ${userCount} user(s) assigned` : 'Delete role'}>
+                  title={userCount > 0 ? t('admin.roles.cannotDeleteTitle', { count: userCount }) : t('admin.roles.deleteTitle')}>
                   {deleting ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
                 </button>
               )}
@@ -375,6 +388,7 @@ function HierarchyLine({ roles }: { roles: Role[] }) {
 
 // ── Main Page ─────────────────────────────────────────────────
 export default function RolesPage() {
+  const { t } = useTranslation();
   const [roles,    setRoles]    = useState<Role[]>([]);
   const [loading,  setLoading]  = useState(true);
   const [error,    setError]    = useState('');
@@ -386,7 +400,7 @@ export default function RolesPage() {
       const res = await api.get('/roles');
       setRoles(res.data.data ?? []);
     } catch {
-      setError('Failed to load roles.');
+      setError(t('admin.roles.loadError'));
     } finally {
       setLoading(false);
     }
@@ -413,23 +427,23 @@ export default function RolesPage() {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-xl font-semibold text-gray-800">Role Management</h1>
+          <h1 className="text-xl font-semibold text-gray-800">{t('admin.roles.pageTitle')}</h1>
           <p className="text-sm text-gray-500 mt-0.5">
-            Manage hierarchy roles — edit name/color, or add custom roles
+            {t('admin.roles.pageSubtitle')}
           </p>
         </div>
         <button
           onClick={() => setAddOpen(true)}
           className="flex items-center gap-1.5 px-3 py-2 text-sm text-white bg-navy hover:bg-navy-light rounded-lg transition-colors"
         >
-          <Plus size={15} /> Add Role
+          <Plus size={15} /> {t('admin.roles.addRole')}
         </button>
       </div>
 
       {/* Hierarchy strip */}
       {!loading && roles.length > 0 && (
         <div className="bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 mb-6">
-          <p className="text-xs text-gray-400 font-medium mb-2 uppercase tracking-wider">Hierarchy</p>
+          <p className="text-xs text-gray-400 font-medium mb-2 uppercase tracking-wider">{t('admin.roles.hierarchyTitle')}</p>
           <HierarchyLine roles={roles} />
         </div>
       )}
@@ -444,13 +458,13 @@ export default function RolesPage() {
           <AlertCircle size={32} className="text-red-400 mb-3" />
           <p className="text-sm text-gray-600">{error}</p>
           <button onClick={load} className="mt-3 px-4 py-1.5 text-sm text-navy border border-navy rounded">
-            Try again
+            {t('admin.roles.tryAgain')}
           </button>
         </div>
       ) : sorted.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20">
           <Shield size={40} className="text-gray-200 mb-3" />
-          <p className="text-sm text-gray-500">No roles yet</p>
+          <p className="text-sm text-gray-500">{t('admin.roles.noRolesYet')}</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -461,8 +475,7 @@ export default function RolesPage() {
       )}
 
       <p className="mt-6 text-xs text-gray-400">
-        System roles (L1–L2) can only have their name and color changed.
-        Custom roles can be deleted as long as no users are assigned to them.
+        {t('admin.roles.footerNote')}
       </p>
 
       {addOpen && (

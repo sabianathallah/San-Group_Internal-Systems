@@ -1,4 +1,5 @@
 import { NavLink, useLocation } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import {
   LayoutDashboard,
   CheckSquare2,
@@ -50,7 +51,6 @@ type ModuleId = 'internal' | 'work-orders' | 'hris' | 'admin';
 
 interface Module {
   id: ModuleId;
-  label: string;
   icon: React.ElementType;
   color: string;
   adminOnly?: boolean;
@@ -59,10 +59,10 @@ interface Module {
 }
 
 const MODULES: Module[] = [
-  { id: 'internal',     label: 'Internal',     icon: LayoutDashboard, color: 'text-blue-300'  },
-  { id: 'work-orders',  label: 'Work Orders',  icon: Wrench,          color: 'text-orange-300' },
-  { id: 'hris',         label: 'HRIS',         icon: HardHat,         color: 'text-green-300' },
-  { id: 'admin',        label: 'Admin',        icon: UserCog,         color: 'text-purple-300', adminOnly: true },
+  { id: 'internal',     icon: LayoutDashboard, color: 'text-blue-300'  },
+  { id: 'work-orders',  icon: Wrench,          color: 'text-orange-300' },
+  { id: 'hris',         icon: HardHat,         color: 'text-green-300' },
+  { id: 'admin',        icon: UserCog,         color: 'text-purple-300', adminOnly: true },
 ];
 
 /** Derive active module from current pathname */
@@ -75,6 +75,7 @@ function useActiveModule(): ModuleId {
 }
 
 export default function Sidebar() {
+  const { t } = useTranslation();
   const open   = useUiStore((s) => s.sidebarOpen);
   const toggle = useUiStore((s) => s.toggleSidebar);
   const user   = useAuthStore((s) => s.user);
@@ -88,21 +89,28 @@ export default function Sidebar() {
   const isHRAdmin    = perms.hris?.manageShifts || perms.hris?.manageLocations;
   const activeModule = useActiveModule();
 
+  const MODULE_LABELS: Record<ModuleId, string> = {
+    'internal':    t('shared.sidebar.modules.internal'),
+    'work-orders': t('shared.sidebar.modules.workOrders'),
+    'hris':        t('shared.sidebar.modules.hris'),
+    'admin':       t('shared.sidebar.modules.admin'),
+  };
+
   const internalNav: NavSection[] = [
     {
       label: null,
       items: [
-        { label: 'Dashboard',     to: ROUTES.DASHBOARD,     icon: LayoutDashboard },
-        { label: 'Tasks',         to: ROUTES.TASKS,         icon: CheckSquare2    },
-        { label: 'Bulletin',      to: ROUTES.BULLETIN,      icon: Bell            },
-        { label: 'Notifications', to: ROUTES.NOTIFICATIONS, icon: Inbox           },
-        { label: 'Notes',         to: ROUTES.NOTES,         icon: StickyNote      },
-        { label: 'DB Links',      to: ROUTES.DATABASE,      icon: Database        },
+        { label: t('shared.sidebar.nav.dashboard'),     to: ROUTES.DASHBOARD,     icon: LayoutDashboard },
+        { label: t('shared.sidebar.nav.tasks'),         to: ROUTES.TASKS,         icon: CheckSquare2    },
+        { label: t('shared.sidebar.nav.bulletin'),      to: ROUTES.BULLETIN,      icon: Bell            },
+        { label: t('shared.sidebar.nav.notifications'), to: ROUTES.NOTIFICATIONS, icon: Inbox           },
+        { label: t('shared.sidebar.nav.notes'),         to: ROUTES.NOTES,         icon: StickyNote      },
+        { label: t('shared.sidebar.nav.dbLinks'),       to: ROUTES.DATABASE,      icon: Database        },
       ],
     },
     ...(canAnalytics ? [{
-      label: 'Administration',
-      items: [{ label: 'Analytics', to: ROUTES.ANALYTICS, icon: BarChart3 }],
+      label: t('shared.sidebar.sections.administration'),
+      items: [{ label: t('shared.sidebar.nav.analytics'), to: ROUTES.ANALYTICS, icon: BarChart3 }],
     }] : []),
   ];
 
@@ -113,38 +121,38 @@ export default function Sidebar() {
     {
       label: null,
       items: [
-        { label: 'Work Orders', to: ROUTES.WORK_ORDERS,         icon: Wrench  },
-        { label: 'History',     to: ROUTES.WORK_ORDERS_HISTORY, icon: Archive },
+        { label: t('shared.sidebar.nav.workOrders'), to: ROUTES.WORK_ORDERS,         icon: Wrench  },
+        { label: t('shared.sidebar.nav.history'),    to: ROUTES.WORK_ORDERS_HISTORY, icon: Archive },
       ],
     },
     ...(canWorkOrderReports ? [{
-      label: 'Administration',
-      items: [{ label: 'Reports', to: ROUTES.WORK_ORDERS_REPORTS, icon: BarChart3 }],
+      label: t('shared.sidebar.sections.administration'),
+      items: [{ label: t('shared.sidebar.nav.reports'), to: ROUTES.WORK_ORDERS_REPORTS, icon: BarChart3 }],
     }] : []),
   ];
 
   // Everyday HRIS items for everyone; management tooling in its own
   // labelled section so daily use and configuration don't blend together.
   const hrisAdminItems: NavItem[] = [
-    ...(canReports ? [{ label: 'Reports', to: ROUTES.HRIS_REPORTS, icon: BarChart3 }] : []),
+    ...(canReports ? [{ label: t('shared.sidebar.nav.reports'), to: ROUTES.HRIS_REPORTS, icon: BarChart3 }] : []),
     ...(isHRAdmin ? [
-      { label: 'Shifts',      to: ROUTES.HRIS_ADMIN_SHIFTS,      icon: CalendarClock },
-      { label: 'Locations',   to: ROUTES.HRIS_ADMIN_LOCATIONS,   icon: MapPin        },
-      { label: 'Holidays',    to: ROUTES.HRIS_ADMIN_HOLIDAYS,    icon: CalendarOff   },
-      { label: 'Leave Types', to: ROUTES.HRIS_ADMIN_LEAVE_TYPES, icon: CalendarRange },
+      { label: t('shared.sidebar.nav.shifts'),     to: ROUTES.HRIS_ADMIN_SHIFTS,      icon: CalendarClock },
+      { label: t('shared.sidebar.nav.locations'),  to: ROUTES.HRIS_ADMIN_LOCATIONS,   icon: MapPin        },
+      { label: t('shared.sidebar.nav.holidays'),   to: ROUTES.HRIS_ADMIN_HOLIDAYS,    icon: CalendarOff   },
+      { label: t('shared.sidebar.nav.leaveTypes'), to: ROUTES.HRIS_ADMIN_LEAVE_TYPES, icon: CalendarRange },
     ] : []),
   ];
   const hrisNav: NavSection[] = [
     {
       label: null,
       items: [
-        { label: 'Overview',   to: ROUTES.HRIS,            icon: HardHat       },
-        { label: 'Attendance', to: ROUTES.HRIS_ATTENDANCE, icon: Clock         },
-        { label: 'Leave',      to: ROUTES.HRIS_LEAVE,      icon: CalendarRange },
-        { label: 'Requests',   to: ROUTES.HRIS_REQUESTS,   icon: ClipboardEdit },
+        { label: t('shared.sidebar.nav.overview'),   to: ROUTES.HRIS,            icon: HardHat       },
+        { label: t('shared.sidebar.nav.attendance'), to: ROUTES.HRIS_ATTENDANCE, icon: Clock         },
+        { label: t('shared.sidebar.nav.leave'),      to: ROUTES.HRIS_LEAVE,      icon: CalendarRange },
+        { label: t('shared.sidebar.nav.requests'),   to: ROUTES.HRIS_REQUESTS,   icon: ClipboardEdit },
       ],
     },
-    ...(hrisAdminItems.length > 0 ? [{ label: 'Administration', items: hrisAdminItems }] : []),
+    ...(hrisAdminItems.length > 0 ? [{ label: t('shared.sidebar.sections.administration'), items: hrisAdminItems }] : []),
   ];
 
   // Management (things you change) vs Monitoring (things you inspect).
@@ -152,13 +160,13 @@ export default function Sidebar() {
     {
       label: null,
       items: [
-        { label: 'Manage Users',        to: ROUTES.ADMIN_USERS,       icon: Users  },
-        { label: 'Roles & Permissions', to: ROUTES.ADMIN_PERMISSIONS, icon: Shield },
+        { label: t('shared.sidebar.nav.manageUsers'),       to: ROUTES.ADMIN_USERS,       icon: Users  },
+        { label: t('shared.sidebar.nav.rolesPermissions'),  to: ROUTES.ADMIN_PERMISSIONS, icon: Shield },
       ],
     },
     {
-      label: 'Monitoring',
-      items: [{ label: 'Audit Log', to: ROUTES.ADMIN_AUDIT_LOG, icon: ClipboardList }],
+      label: t('shared.sidebar.sections.monitoring'),
+      items: [{ label: t('shared.sidebar.nav.auditLog'), to: ROUTES.ADMIN_AUDIT_LOG, icon: ClipboardList }],
     },
   ];
 
@@ -202,14 +210,14 @@ export default function Sidebar() {
               return (
                 <div
                   key={mod.id}
-                  title={`${mod.label} (${mod.disabledLabel})`}
+                  title={`${MODULE_LABELS[mod.id]} (${mod.disabledLabel})`}
                   className={cn(
                     'flex items-center justify-center cursor-not-allowed opacity-40',
                     open ? 'flex-1 flex-col gap-1 py-2 rounded-lg' : 'px-0 w-10 py-1.5 rounded',
                   )}
                 >
                   <Icon size={16} className="text-white/40 flex-shrink-0" />
-                  {open && <span className="text-[9px] text-white/40 truncate">{mod.label}</span>}
+                  {open && <span className="text-[9px] text-white/40 truncate">{MODULE_LABELS[mod.id]}</span>}
                 </div>
               );
             }
@@ -224,7 +232,7 @@ export default function Sidebar() {
                   mod.id === 'admin'       ? ROUTES.ADMIN_USERS :
                   ROUTES.DASHBOARD
                 }
-                title={mod.label}
+                title={MODULE_LABELS[mod.id]}
                 className={cn(
                   'flex items-center justify-center transition-colors duration-150',
                   isActive
@@ -234,7 +242,7 @@ export default function Sidebar() {
                 )}
               >
                 <Icon size={16} className={cn('flex-shrink-0', isActive ? mod.color : '')} />
-                {open && <span className="text-[9px] font-medium truncate">{mod.label}</span>}
+                {open && <span className="text-[9px] font-medium truncate">{MODULE_LABELS[mod.id]}</span>}
               </NavLink>
             );
           })}
@@ -245,9 +253,9 @@ export default function Sidebar() {
       <nav className="flex-1 overflow-y-auto overflow-x-hidden py-3 space-y-0.5 px-2">
         {open && (
           <p className="px-2 mb-1 text-[10px] font-semibold text-white/30 uppercase tracking-wider">
-            {activeModule === 'work-orders' ? 'Work Orders' :
-             activeModule === 'hris'        ? 'HRIS' :
-             activeModule === 'admin'       ? 'Admin' : 'Menu'}
+            {activeModule === 'work-orders' ? MODULE_LABELS['work-orders'] :
+             activeModule === 'hris'        ? MODULE_LABELS['hris'] :
+             activeModule === 'admin'       ? MODULE_LABELS['admin'] : t('shared.sidebar.sections.menu')}
           </p>
         )}
 
@@ -297,7 +305,7 @@ export default function Sidebar() {
       <button
         onClick={toggle}
         className="absolute -right-3.5 top-[68px] w-7 h-7 rounded-full bg-navy-light border-2 border-navy flex items-center justify-center shadow-md hover:bg-navy-lighter transition-colors z-10"
-        aria-label={open ? 'Collapse sidebar' : 'Expand sidebar'}
+        aria-label={open ? t('shared.sidebar.collapseSidebar') : t('shared.sidebar.expandSidebar')}
       >
         {open ? <ChevronLeft size={14} className="text-white" /> : <ChevronRight size={14} className="text-white" />}
       </button>
