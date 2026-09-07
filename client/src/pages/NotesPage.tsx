@@ -66,6 +66,18 @@ function NoteFormModal({
     setTimeout(() => textRef.current?.focus(), 80);
   }, [open, note]);
 
+  // Esc closes the modal even while focus sits in the title/content input —
+  // a page-level shortcut handler would normally ignore keydowns from
+  // inputs, so this modal needs its own listener instead of relying on one.
+  useEffect(() => {
+    if (!open) return;
+    function onKeyDown(e: globalThis.KeyboardEvent) {
+      if (e.key === 'Escape') onClose();
+    }
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [open, onClose]);
+
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     if (!form.content.trim()) { setError(t('notes.modal.contentRequired')); return; }

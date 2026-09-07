@@ -12,6 +12,7 @@ import { usePermStore } from '@/stores/permStore';
 import { useToastStore } from '@/stores/toastStore';
 import { cn } from '@/lib/cn';
 import { PageSizeSelect } from '@/components/shared/PageSizeSelect';
+import { useEscapeClose } from '@/hooks/useEscapeClose';
 
 /** Locale for date formatting — mirrors i18next's active language. */
 function dateLocale(language: string): string {
@@ -561,6 +562,7 @@ function BulletinFormModal({ bulletin, onClose, onSaved }: {
 }) {
   const { t } = useTranslation();
   const isEdit = !!bulletin;
+  useEscapeClose(onClose);
   const [loading,          setLoading]          = useState(false);
   const [error,            setError]            = useState<string | null>(null);
   const [title,            setTitle]            = useState(bulletin?.title      ?? '');
@@ -824,6 +826,7 @@ function ScheduledAnnouncementFormModal({ item, onClose, onSaved }: {
   onSaved: () => void;
 }) {
   const { t } = useTranslation();
+  useEscapeClose(onClose);
   const [title,        setTitle]        = useState(item?.title ?? '');
   const [content,      setContent]      = useState(item?.content ?? '');
   const [audienceType, setAudienceType] = useState<AudienceType>(item?.audienceType ?? 'ALL');

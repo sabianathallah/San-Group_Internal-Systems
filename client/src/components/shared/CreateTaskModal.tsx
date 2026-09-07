@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { X, AlertCircle, Loader2 } from 'lucide-react';
 import api from '@/lib/api';
 import UserSearchInput from '@/components/shared/UserSearchInput';
+import { useEscapeClose } from '@/hooks/useEscapeClose';
 
 // ── Shared task-related types ───────────────────────────────
 export type TaskStatus     = 'TODO' | 'IN_PROGRESS' | 'DONE';
@@ -91,13 +92,7 @@ export default function CreateTaskModal({
   // Esc closes the modal even while focus sits in the title input — the
   // page-level shortcut handler deliberately ignores keydowns from inputs
   // so it doesn't interfere with typing, so this modal needs its own.
-  useEffect(() => {
-    function onKeyDown(e: KeyboardEvent) {
-      if (e.key === 'Escape') onClose();
-    }
-    document.addEventListener('keydown', onKeyDown);
-    return () => document.removeEventListener('keydown', onKeyDown);
-  }, [onClose]);
+  useEscapeClose(onClose);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();

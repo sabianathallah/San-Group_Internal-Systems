@@ -26,6 +26,7 @@ import { cn } from '@/lib/cn';
 import { PageSizeSelect } from '@/components/shared/PageSizeSelect';
 import UserSearchInput from '@/components/shared/UserSearchInput';
 import CreateTaskModal from '@/components/shared/CreateTaskModal';
+import { useEscapeClose } from '@/hooks/useEscapeClose';
 
 // ── Types ──────────────────────────────────────────────────
 type AssignmentStatus = 'PENDING' | 'ACCEPTED' | 'REJECTED';
@@ -2056,13 +2057,7 @@ function NewListModal({ onClose, onCreated }: {
 
   // Esc closes the modal even while focus sits in the name input — the
   // page-level shortcut handler deliberately ignores keydowns from inputs.
-  useEffect(() => {
-    function onKeyDown(e: globalThis.KeyboardEvent) {
-      if (e.key === 'Escape') onClose();
-    }
-    document.addEventListener('keydown', onKeyDown);
-    return () => document.removeEventListener('keydown', onKeyDown);
-  }, [onClose]);
+  useEscapeClose(onClose);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();

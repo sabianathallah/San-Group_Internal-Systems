@@ -9,6 +9,7 @@ import api from '@/lib/api';
 import { useAuthStore } from '@/stores/authStore';
 import { usePermStore } from '@/stores/permStore';
 import { cn } from '@/lib/cn';
+import { useEscapeClose } from '@/hooks/useEscapeClose';
 
 // ── Types ──────────────────────────────────────────────────
 interface DbFolder {
@@ -61,6 +62,7 @@ function FolderModal({ folder, onClose, onSaved }: {
   const [desc,  setDesc]  = useState(folder?.description ?? '');
   const [saving, setSaving] = useState(false);
   const [error,  setError]  = useState('');
+  useEscapeClose(onClose);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -131,6 +133,7 @@ function LinkModal({ link, folderId, onClose, onSaved }: {
   const [desc,  setDesc]  = useState(link?.description ?? '');
   const [saving, setSaving] = useState(false);
   const [error,  setError]  = useState('');
+  useEscapeClose(onClose);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -201,6 +204,7 @@ function ShareFolderModal({ folderId, folderName, onClose }: {
   const [loading,   setLoading]   = useState(true);
   const [adding,    setAdding]    = useState(false);
   const [error,     setError]     = useState('');
+  useEscapeClose(onClose);
 
   useEffect(() => {
     Promise.all([
