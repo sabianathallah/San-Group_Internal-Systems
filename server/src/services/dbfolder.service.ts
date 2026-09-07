@@ -89,20 +89,22 @@ export async function createFolderService(userId: string, data: {
   });
 }
 
+// Authorization for both of these is already enforced by the
+// `checkPerm('db_link', 'manageFolder')` route middleware — a role only
+// reaches this service once it's confirmed to hold that permission (or is
+// SuperAdmin). Re-deriving access here from a hardcoded roleLevel <= 2
+// used to silently override that grant: any non-admin role given
+// manageFolder (e.g. Director, level 3, has it by default) would see the
+// edit/delete buttons but get a 403 on any folder it didn't create itself.
 export async function updateFolderService(
   id: string,
-  userId: string,
-  roleLevel: number,
   data: {
     name?: string; icon?: string | null; color?: string;
     description?: string | null; divisionId?: string | null;
   },
 ) {
-  const folder = await prisma.databaseFolder.findUnique({ where: { id }, select: { id: true, createdById: true } });
+  const folder = await prisma.databaseFolder.findUnique({ where: { id }, select: { id: true } });
   if (!folder) throw new AppError('Folder tidak ditemukan', 404);
-
-  const canManage = roleLevel <= 2 || folder.createdById === userId;
-  if (!canManage) throw new AppError('Tidak diizinkan', 403);
 
   return prisma.databaseFolder.update({
     where: { id },
@@ -117,12 +119,9 @@ export async function updateFolderService(
   });
 }
 
-export async function deleteFolderService(id: string, userId: string, roleLevel: number) {
-  const folder = await prisma.databaseFolder.findUnique({ where: { id }, select: { id: true, createdById: true } });
+export async function deleteFolderService(id: string) {
+  const folder = await prisma.databaseFolder.findUnique({ where: { id }, select: { id: true } });
   if (!folder) throw new AppError('Folder tidak ditemukan', 404);
-
-  const canManage = roleLevel <= 2 || folder.createdById === userId;
-  if (!canManage) throw new AppError('Tidak diizinkan', 403);
   await prisma.databaseFolder.delete({ where: { id } });
 }
 

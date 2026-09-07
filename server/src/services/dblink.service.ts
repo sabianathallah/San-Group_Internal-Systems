@@ -50,15 +50,19 @@ export async function createDatabaseLinkService(
   });
 }
 
+// canManageFolder mirrors the frontend's edit/delete gate (perms.db_link.manageFolder
+// || own) — previously hardcoded to roleLevel <= 2 instead, so a role explicitly
+// granted manageFolder (e.g. Director, level 3, has it by default) saw the edit/
+// delete buttons but got a 403 on any link it didn't create itself.
 export async function updateDatabaseLinkService(
   id: string,
   userId: string,
-  roleLevel: number,
+  canManageFolder: boolean,
   data: { title?: string; url?: string; description?: string | null },
 ) {
   const link = await prisma.databaseLink.findUnique({ where: { id }, select: { id: true, createdById: true } });
   if (!link) throw new AppError('Link tidak ditemukan', 404);
-  if (!isAdmin(roleLevel) && link.createdById !== userId) throw new AppError('Tidak diizinkan', 403);
+  if (!canManageFolder && link.createdById !== userId) throw new AppError('Tidak diizinkan', 403);
 
   return prisma.databaseLink.update({
     where: { id },
@@ -71,9 +75,9 @@ export async function updateDatabaseLinkService(
   });
 }
 
-export async function deleteDatabaseLinkService(id: string, userId: string, roleLevel: number) {
+export async function deleteDatabaseLinkService(id: string, userId: string, canManageFolder: boolean) {
   const link = await prisma.databaseLink.findUnique({ where: { id }, select: { id: true, createdById: true } });
   if (!link) throw new AppError('Link tidak ditemukan', 404);
-  if (!isAdmin(roleLevel) && link.createdById !== userId) throw new AppError('Tidak diizinkan', 403);
+  if (!canManageFolder && link.createdById !== userId) throw new AppError('Tidak diizinkan', 403);
   await prisma.databaseLink.delete({ where: { id } });
 }

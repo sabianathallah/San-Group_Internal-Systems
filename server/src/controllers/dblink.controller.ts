@@ -1,6 +1,7 @@
 import { Response, NextFunction } from 'express';
 import { AuthRequest } from '@/types';
 import { successResponse } from '@/helpers/response';
+import { getPermissionsForRole } from '@/services/permission.service';
 import {
   createDatabaseLinkService, updateDatabaseLinkService, deleteDatabaseLinkService,
 } from '@/services/dblink.service';
@@ -15,14 +16,18 @@ export async function createDatabaseLink(req: AuthRequest, res: Response, next: 
 
 export async function updateDatabaseLink(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
-    const link = await updateDatabaseLinkService(String(req.params.id), req.user!.userId, req.user!.roleLevel, req.body);
+    const { userId, roleId, roleLevel } = req.user!;
+    const perms = await getPermissionsForRole(roleId, roleLevel);
+    const link = await updateDatabaseLinkService(String(req.params.id), userId, perms.db_link.manageFolder, req.body);
     successResponse(res, link, 'Link berhasil diperbarui');
   } catch (err) { next(err); }
 }
 
 export async function deleteDatabaseLink(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
-    await deleteDatabaseLinkService(String(req.params.id), req.user!.userId, req.user!.roleLevel);
+    const { userId, roleId, roleLevel } = req.user!;
+    const perms = await getPermissionsForRole(roleId, roleLevel);
+    await deleteDatabaseLinkService(String(req.params.id), userId, perms.db_link.manageFolder);
     successResponse(res, null, 'Link berhasil dihapus');
   } catch (err) { next(err); }
 }
