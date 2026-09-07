@@ -185,17 +185,19 @@ export default function BulletinPage() {
   useEffect(() => { fetchBulletins(); }, [fetchBulletins]);
 
   // Full content now renders directly in the feed (no click-to-open pane),
-  // so being on this page already counts as "read" — mark each unread,
-  // published item as read as soon as it's fetched instead of waiting for
-  // a click that no longer exists.
+  // so being on this page already counts as "read" — but marking it read
+  // the instant the list loads meant the unread dot/bold title flipped off
+  // before anyone could actually see which items were new. Give it a few
+  // seconds on screen first, so the indicator has a chance to do its job.
   useEffect(() => {
     const unread = bulletins.filter((b) => b.isPublished && !b.isRead);
     if (unread.length === 0) return;
-    unread.forEach((b) => {
+    const timers = unread.map((b) => setTimeout(() => {
       api.get(`/bulletins/${b.id}`)
         .then(() => setBulletins((prev) => prev.map((x) => x.id === b.id ? { ...x, isRead: true } : x)))
         .catch(() => {});
-    });
+    }, 3000));
+    return () => timers.forEach(clearTimeout);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bulletins.map((b) => b.id).join(',')]);
 
