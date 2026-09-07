@@ -276,24 +276,28 @@ function TasksSidebar({
   onNewList: () => void; loadingLists: boolean;
 }) {
   const { t } = useTranslation();
-  type Item = { id: SidebarView; icon: React.ElementType; label: string; badge?: number };
+  type Item = { id: SidebarView; icon: React.ElementType; label: string; hint: string; badge?: number };
   const personalItems: Item[] = [
-    { id: 'my_day',    icon: Sun,           label: t('tasks.sidebar.myDay')                              },
-    { id: 'important', icon: Star,          label: t('tasks.sidebar.important')                          },
-    { id: 'planned',   icon: CalendarDays,  label: t('tasks.sidebar.planned')                            },
-    { id: 'assigned',  icon: ClipboardList, label: t('tasks.sidebar.assigned'), badge: pendingCount       },
-    { id: 'my_tasks',  icon: LayoutList,    label: t('tasks.sidebar.myTasks')                            },
-    { id: 'completed', icon: CheckCircle2,  label: t('tasks.sidebar.completed')                          },
+    { id: 'my_day',    icon: Sun,           label: t('tasks.sidebar.myDay'),    hint: t('tasks.sidebar.myDayHint')                            },
+    { id: 'important', icon: Star,          label: t('tasks.sidebar.important'), hint: t('tasks.sidebar.importantHint')                        },
+    { id: 'planned',   icon: CalendarDays,  label: t('tasks.sidebar.planned'),  hint: t('tasks.sidebar.plannedHint')                            },
+    { id: 'assigned',  icon: ClipboardList, label: t('tasks.sidebar.assigned'), hint: t('tasks.sidebar.assignedHint'), badge: pendingCount       },
+    { id: 'my_tasks',  icon: LayoutList,    label: t('tasks.sidebar.myTasks'),  hint: t('tasks.sidebar.myTasksHint')                            },
+    { id: 'completed', icon: CheckCircle2,  label: t('tasks.sidebar.completed'), hint: t('tasks.sidebar.completedHint')                         },
   ];
   const workspaceItems: Item[] = [
-    { id: 'browse', icon: Globe, label: t('tasks.sidebar.allTasks') },
-    ...(canSeeTeam ? [{ id: 'team' as SidebarView, icon: Users, label: t('tasks.sidebar.teamTasks') }] : []),
+    { id: 'browse', icon: Globe, label: t('tasks.sidebar.allTasks'), hint: t('tasks.sidebar.allTasksHint') },
+    ...(canSeeTeam ? [{ id: 'team' as SidebarView, icon: Users, label: t('tasks.sidebar.teamTasks'), hint: t('tasks.sidebar.teamTasksHint') }] : []),
   ];
 
-  const renderItem = ({ id, icon: Icon, label, badge }: Item) => (
+  // Short hint on hover — these views (My Day / Planned / My Tasks / All
+  // Tasks) sound interchangeable to a first-time user, so a one-line
+  // explanation on hover beats making everyone guess from the label alone.
+  const renderItem = ({ id, icon: Icon, label, hint, badge }: Item) => (
     <button
       key={id}
       onClick={() => onSelect(id)}
+      title={hint}
       className={cn(
         'flex items-center gap-2.5 w-full px-3 py-2 rounded-lg text-sm transition-colors',
         active === id
