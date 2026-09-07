@@ -710,23 +710,63 @@
       "inProgress": "In Progress",
       "overdue": "Overdue",
       "newThisWeek": "New this week",
+      "newInRange": "New tasks",
       "todo": "Todo",
       "activeUsers": "Active users",
       "ofTotal": "of {{total}} total",
-      "completionRate": "Completion rate"
+      "completionRate": "Completion rate",
+      "avgCompletionTime": "Avg. Completion Time",
+      "days": "{{count}} days",
+      "noAvgData": "No completed tasks yet"
     },
     "charts": {
-      "completionTrend": "Tasks Completed — Last 7 Days",
+      "completionTrend": "Tasks Completed",
       "priorityDistribution": "Priority Distribution",
       "noData": "No data yet",
       "perDivision": "Productivity per Division",
-      "doneOfTotal": "{{done}}/{{total}} done ({{rate}}%)"
+      "doneOfTotal": "{{done}}/{{total}} done ({{rate}}%)",
+      "leaderboard": "Top Contributors",
+      "leaderboardSub": "By tasks completed",
+      "leaderboardEmpty": "No tasks assigned yet",
+      "overdueAging": "Overdue Aging",
+      "overdueAgingSub": "Open tasks past due, grouped by how late",
+      "agingBucketDays": "{{bucket}} days",
+      "tasksCompleted": "{{count}} tasks completed",
+      "tasksAssigned": "{{count}} tasks"
     },
     "priority": {
       "urgent": "Urgent",
       "high": "High",
       "medium": "Medium",
       "low": "Low"
+    },
+    "filters": {
+      "range7": "7 days",
+      "range30": "30 days",
+      "range90": "90 days",
+      "allDivisions": "All Divisions",
+      "division": "Division",
+      "allPriorities": "All Priorities",
+      "priority": "Priority",
+      "allAssignees": "All Assignees",
+      "assignee": "Assignee",
+      "reset": "Reset Filters",
+      "export": "Export CSV",
+      "active": "{{count}} active filters"
+    },
+    "customize": {
+      "button": "Customize",
+      "title": "Customize Dashboard",
+      "subtitle": "Choose which widgets to show",
+      "reset": "Reset to Default",
+      "done": "Done",
+      "widgets": {
+        "trend": "Completion Trend",
+        "priority": "Priority Distribution",
+        "division": "Productivity per Division",
+        "leaderboard": "Top Contributors",
+        "aging": "Overdue Aging"
+      }
     }
   },
   "notifications": {

@@ -710,23 +710,63 @@
       "inProgress": "Sedang Berjalan",
       "overdue": "Terlambat",
       "newThisWeek": "Baru minggu ini",
+      "newInRange": "Task baru",
       "todo": "To Do",
       "activeUsers": "Pengguna aktif",
       "ofTotal": "dari {{total}} total",
-      "completionRate": "Tingkat penyelesaian"
+      "completionRate": "Tingkat penyelesaian",
+      "avgCompletionTime": "Rata-rata Waktu Selesai",
+      "days": "{{count}} hari",
+      "noAvgData": "Belum ada task selesai"
     },
     "charts": {
-      "completionTrend": "Task Selesai — 7 Hari Terakhir",
+      "completionTrend": "Task Selesai",
       "priorityDistribution": "Distribusi Prioritas",
       "noData": "Belum ada data",
       "perDivision": "Produktivitas per Divisi",
-      "doneOfTotal": "{{done}}/{{total}} selesai ({{rate}}%)"
+      "doneOfTotal": "{{done}}/{{total}} selesai ({{rate}}%)",
+      "leaderboard": "Top Kontributor",
+      "leaderboardSub": "Berdasarkan task selesai",
+      "leaderboardEmpty": "Belum ada task yang ditugaskan",
+      "overdueAging": "Usia Keterlambatan",
+      "overdueAgingSub": "Task yang lewat tenggat, dikelompokkan per lama telat",
+      "agingBucketDays": "{{bucket}} hari",
+      "tasksCompleted": "{{count}} task selesai",
+      "tasksAssigned": "{{count}} task"
     },
     "priority": {
       "urgent": "Mendesak",
       "high": "Tinggi",
       "medium": "Sedang",
       "low": "Rendah"
+    },
+    "filters": {
+      "range7": "7 hari",
+      "range30": "30 hari",
+      "range90": "90 hari",
+      "allDivisions": "Semua Divisi",
+      "division": "Divisi",
+      "allPriorities": "Semua Prioritas",
+      "priority": "Prioritas",
+      "allAssignees": "Semua Assignee",
+      "assignee": "Assignee",
+      "reset": "Reset Filter",
+      "export": "Ekspor CSV",
+      "active": "{{count}} filter aktif"
+    },
+    "customize": {
+      "button": "Kustomisasi",
+      "title": "Kustomisasi Dashboard",
+      "subtitle": "Pilih widget yang ingin ditampilkan",
+      "reset": "Kembalikan Default",
+      "done": "Selesai",
+      "widgets": {
+        "trend": "Tren Penyelesaian",
+        "priority": "Distribusi Prioritas",
+        "division": "Produktivitas per Divisi",
+        "leaderboard": "Top Kontributor",
+        "aging": "Usia Keterlambatan"
+      }
     }
   },
   "notifications": {

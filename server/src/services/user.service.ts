@@ -78,8 +78,15 @@ export async function listUsersService(query: ParsedQs) {
     }
   }
 
-  if (query.isActive !== undefined) {
-    where.isActive = query.isActive === 'true';
+  // Same coercion caveat as workOrderAssignee above: the validate middleware
+  // already turned this into a real boolean (or undefined), so comparing
+  // against the string 'true' here always failed and silently filtered to
+  // isActive:false — every isActive=true caller (this page's assignee list,
+  // Leave/Work Order assignee pickers, the Dashboard active-user count) was
+  // getting zero results instead of active users.
+  const isActiveFilter = query.isActive as unknown;
+  if (isActiveFilter !== undefined) {
+    where.isActive = isActiveFilter === true;
   }
 
   const [users, total] = await prisma.$transaction([
