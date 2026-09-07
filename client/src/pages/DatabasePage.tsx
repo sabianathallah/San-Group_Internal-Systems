@@ -444,7 +444,7 @@ export default function DatabasePage() {
                     {folder.description && (
                       <p className="text-[11px] text-gray-400 truncate">{folder.description}</p>
                     )}
-                    <p className="text-[11px] text-gray-300">{t('database.folder.itemCount', { count: folder._count.links })}</p>
+                    <p className="text-[11px] text-gray-400">{t('database.folder.itemCount', { count: folder._count.links })}</p>
                   </div>
                 </button>
                 {(perms.db_link.manageFolder || perms.db_link.shareFolder) && (
@@ -577,7 +577,7 @@ export default function DatabasePage() {
 
                 {/* Actions */}
                 <div className="flex items-center gap-1.5 flex-shrink-0">
-                  <span className="text-[10px] text-gray-300 hidden sm:block">{link.createdBy.fullName}</span>
+                  <span className="text-[10px] text-gray-400 hidden sm:block">{link.createdBy.fullName}</span>
                   <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                     {(perms.db_link.manageFolder || link.createdBy.id === user?.id) && (
                       <button onClick={() => setLinkModal({ open: true, link })}

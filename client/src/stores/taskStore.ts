@@ -15,6 +15,17 @@ export function isInMyDay(t: { myDayDate: string | null }): boolean {
   return !!t.myDayDate && t.myDayDate.slice(0, 10) === localToday();
 }
 
+/**
+ * Local YYYY-MM-DD (WIB) for an ISO datetime string. `dueDate`/`startDate`
+ * are stored as UTC instants (e.g. midnight WIB = 17:00 UTC the day before),
+ * so naive `.slice(0, 10)` reads the UTC calendar day and is off by one for
+ * any positive-offset timezone like WIB — always convert through Date first.
+ */
+export function toLocalDateStr(iso: string | null | undefined): string {
+  if (!iso) return '';
+  return new Date(iso).toLocaleDateString('en-CA');
+}
+
 export interface TaskUser {
   id: string; fullName: string; avatar: string | null;
 }

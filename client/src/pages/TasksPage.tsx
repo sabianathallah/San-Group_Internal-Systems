@@ -21,7 +21,7 @@ import api from '@/lib/api';
 import { useAuthStore } from '@/stores/authStore';
 import { usePermStore } from '@/stores/permStore';
 import { toast } from '@/stores/toastStore';
-import { isInMyDay, localToday } from '@/stores/taskStore';
+import { isInMyDay, localToday, toLocalDateStr } from '@/stores/taskStore';
 import { cn } from '@/lib/cn';
 import { PageSizeSelect } from '@/components/shared/PageSizeSelect';
 import UserSearchInput from '@/components/shared/UserSearchInput';
@@ -1115,18 +1115,18 @@ function CalendarView({ tasks, onSelect, onCreate, onReschedule }: {
 
   const byDate = pointTasks.reduce<Record<string, Task[]>>((acc, t) => {
     if (!t.dueDate) return acc;
-    const k = t.dueDate.slice(0, 10);
+    const k = toLocalDateStr(t.dueDate);
     (acc[k] = acc[k] ?? []).push(t);
     return acc;
   }, {});
 
   const rangeByDate = rangeTasks.reduce<Record<string, RangeSegment[]>>((acc, t) => {
-    const start = t.startDate!.slice(0, 10);
-    const end   = t.dueDate!.slice(0, 10);
+    const start = toLocalDateStr(t.startDate);
+    const end   = toLocalDateStr(t.dueDate);
     let cur = new Date(`${start}T00:00:00`);
     const last = new Date(`${end}T00:00:00`);
     while (cur <= last) {
-      const k = cur.toISOString().slice(0, 10);
+      const k = cur.toLocaleDateString('en-CA');
       (acc[k] = acc[k] ?? []).push({ task: t, isStart: k === start, isEnd: k === end });
       cur = new Date(cur.getTime() + 86_400_000);
     }
@@ -1141,7 +1141,7 @@ function CalendarView({ tasks, onSelect, onCreate, onReschedule }: {
     if (!over || !String(over.id).startsWith('day:')) return;
     const ds = String(over.id).slice(4);
     const task = tasks.find((t) => t.id === active.id);
-    if (!task || task.dueDate?.slice(0, 10) === ds) return;
+    if (!task || toLocalDateStr(task.dueDate) === ds) return;
     onReschedule(task, ds);
   }
 
@@ -1657,10 +1657,10 @@ function TaskDetailPanel({
                 <Calendar size={13} className="text-gray-400" />
                 <span className="text-xs text-gray-400">{t('tasks.detailPanel.startDate')}</span>
               </div>
-              <input type="date" value={task.startDate ? task.startDate.slice(0, 10) : ''}
-                max={task.dueDate ? task.dueDate.slice(0, 10) : undefined}
+              <input type="date" value={toLocalDateStr(task.startDate)}
+                max={task.dueDate ? toLocalDateStr(task.dueDate) : undefined}
                 onChange={(e) => {
-                  if (e.target.value && task.dueDate && e.target.value > task.dueDate.slice(0, 10)) {
+                  if (e.target.value && task.dueDate && e.target.value > toLocalDateStr(task.dueDate)) {
                     toast.error(t('tasks.detailPanel.startDateError'));
                     return;
                   }
@@ -1674,10 +1674,10 @@ function TaskDetailPanel({
                 <Calendar size={13} className="text-gray-400" />
                 <span className="text-xs text-gray-400">{t('tasks.detailPanel.dueDate')}</span>
               </div>
-              <input type="date" value={task.dueDate ? task.dueDate.slice(0, 10) : ''}
-                min={task.startDate ? task.startDate.slice(0, 10) : undefined}
+              <input type="date" value={toLocalDateStr(task.dueDate)}
+                min={task.startDate ? toLocalDateStr(task.startDate) : undefined}
                 onChange={(e) => {
-                  if (e.target.value && task.startDate && e.target.value < task.startDate.slice(0, 10)) {
+                  if (e.target.value && task.startDate && e.target.value < toLocalDateStr(task.startDate)) {
                     toast.error(t('tasks.detailPanel.dueDateError'));
                     return;
                   }
@@ -2049,6 +2049,16 @@ function NewListModal({ onClose, onCreated }: {
   const [icon,  setIcon]    = useState('');
   const [saving, setSaving] = useState(false);
   const COLORS = ['#6366f1','#10b981','#f59e0b','#ef4444','#3b82f6','#8b5cf6','#ec4899','#14b8a6'];
+
+  // Esc closes the modal even while focus sits in the name input — the
+  // page-level shortcut handler deliberately ignores keydowns from inputs.
+  useEffect(() => {
+    function onKeyDown(e: globalThis.KeyboardEvent) {
+      if (e.key === 'Escape') onClose();
+    }
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [onClose]);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();

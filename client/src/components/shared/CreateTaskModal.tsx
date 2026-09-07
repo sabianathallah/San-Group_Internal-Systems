@@ -88,6 +88,17 @@ export default function CreateTaskModal({
       .catch(() => {});
   }, []);
 
+  // Esc closes the modal even while focus sits in the title input — the
+  // page-level shortcut handler deliberately ignores keydowns from inputs
+  // so it doesn't interfere with typing, so this modal needs its own.
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') onClose();
+    }
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [onClose]);
+
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     if (!title.trim()) { setError(t('shared.createTaskModal.errors.titleRequired')); return; }
