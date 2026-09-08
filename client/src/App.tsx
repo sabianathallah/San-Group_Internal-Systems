@@ -10,6 +10,7 @@ import TasksPage from '@/pages/TasksPage';
 import BulletinPage from '@/pages/BulletinPage';
 import NotesPage from '@/pages/NotesPage';
 import DatabasePage from '@/pages/DatabasePage';
+import HelpPage from '@/pages/HelpPage';
 import ProfilePage from '@/pages/ProfilePage';
 import AnalyticsPage from '@/pages/AnalyticsPage';
 import UsersPage from '@/pages/admin/UsersPage';
@@ -73,6 +74,7 @@ export default function App() {
           <Route path={ROUTES.BULLETIN}    element={<BulletinPage />}  />
           <Route path={ROUTES.NOTES}       element={<NotesPage />}     />
           <Route path={ROUTES.DATABASE}    element={<DatabasePage />}  />
+          <Route path={ROUTES.HELP}        element={<HelpPage />}      />
           <Route path={ROUTES.PROFILE}     element={<ProfilePage />}   />
           <Route path={ROUTES.ANALYTICS}      element={<AnalyticsPage />}      />
           <Route path={ROUTES.NOTIFICATIONS} element={<NotificationsPage />} />

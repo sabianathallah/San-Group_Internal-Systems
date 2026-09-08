@@ -24,6 +24,7 @@ function useBreadcrumbMap(t: (key: string) => string): Record<string, string> {
     '/bulletin':           t('shared.header.breadcrumbs.bulletin'),
     '/notes':              t('shared.header.breadcrumbs.notes'),
     '/database':           t('shared.header.breadcrumbs.dbLinks'),
+    '/help':               t('shared.header.breadcrumbs.help'),
     '/profile':            t('shared.header.breadcrumbs.myProfile'),
     '/analytics':          t('shared.header.breadcrumbs.analytics'),
     '/notifications':      t('shared.header.breadcrumbs.notifications'),

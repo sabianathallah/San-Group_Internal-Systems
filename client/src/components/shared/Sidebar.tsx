@@ -23,6 +23,7 @@ import {
   CalendarOff,
   ClipboardEdit,
   Archive,
+  HelpCircle,
 } from 'lucide-react';
 import { useUiStore } from '@/stores/uiStore';
 import { useAuthStore } from '@/stores/authStore';
@@ -112,6 +113,10 @@ export default function Sidebar() {
       label: t('shared.sidebar.sections.administration'),
       items: [{ label: t('shared.sidebar.nav.analytics'), to: ROUTES.ANALYTICS, icon: BarChart3 }],
     }] : []),
+    {
+      label: t('shared.sidebar.sections.support'),
+      items: [{ label: t('shared.sidebar.nav.help'), to: ROUTES.HELP, icon: HelpCircle }],
+    },
   ];
 
   // Same everyday/Administration split as HRIS: one visual rule app-wide —

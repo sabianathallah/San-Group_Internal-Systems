@@ -5,6 +5,7 @@ export const ROUTES = {
   BULLETIN:    '/bulletin',
   NOTES:       '/notes',
   DATABASE:    '/database',
+  HELP:        '/help',
   PROFILE:     '/profile',
   ADMIN_USERS:        '/admin/users',
   ADMIN_DIVISIONS:    '/admin/divisions',
