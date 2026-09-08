@@ -1511,6 +1511,7 @@
         "header": { "title": "Hari Libur", "subtitle": "Kalender hari libur perusahaan — dikecualikan dari perhitungan hari cuti, penandaan alpa otomatis, dan tingkat kehadiran" },
         "form": { "namePlaceholder": "Nama hari libur, cth. Idul Fitri", "add": "Tambah" },
         "empty": "Belum ada hari libur terdaftar untuk {{year}}",
+        "deleteConfirm": "Hapus hari libur \"{{name}}\"?",
         "toast": {
           "added": "Hari libur ditambahkan",
           "addFailed": "Gagal menambahkan hari libur",
@@ -2003,6 +2004,7 @@
         "attendanceReport": "Laporan Absensi",
         "manageShifts": "Kelola Shift",
         "officeLocations": "Lokasi Kantor",
+        "leaveTypes": "Jenis Cuti",
         "manageUsers": "Kelola Pengguna",
         "rolesPermissions": "Peran & Izin",
         "auditLog": "Log Audit"
@@ -2105,6 +2107,7 @@
         "dbLinks": "DB Links",
         "analytics": "Analytics",
         "help": "Panduan",
+        "hrisHelp": "Panduan HRIS",
         "workOrders": "Work Orders",
         "history": "Riwayat",
         "reports": "Laporan",

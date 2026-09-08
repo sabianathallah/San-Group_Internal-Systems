@@ -295,7 +295,11 @@ function ReviewModal({
             </div>
             <p className="text-sm text-gray-700">
               <span className="font-medium" style={{ color: request.leaveType.color }}>{request.leaveType.name}</span>
-              {' · '}{fmtDate(request.startDate, i18n.language)} — {fmtDate(request.endDate, i18n.language)} ({request.totalDays} days)
+              {' · '}{t('hris.leave.list.dateRange', {
+                start: fmtDate(request.startDate, i18n.language),
+                end: fmtDate(request.endDate, i18n.language),
+                count: request.totalDays,
+              })}
             </p>
             <p className="text-xs text-gray-500">{request.reason}</p>
             {reqBalance !== 'loading' && reqBalance && !request.isUnpaid && (

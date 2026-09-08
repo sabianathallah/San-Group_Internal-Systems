@@ -7,6 +7,7 @@ import { useTranslation } from 'react-i18next';
 import api from '@/lib/api';
 import { cn } from '@/lib/cn';
 import { toast } from '@/stores/toastStore';
+import { useEscapeClose } from '@/hooks/useEscapeClose';
 
 // ── Types ──────────────────────────────────────────────────────
 interface OfficeLocation {
@@ -39,6 +40,7 @@ function LocationFormModal({ initial, onClose, onSaved }: LocationFormProps) {
   });
   const [saving, setSaving] = useState(false);
   const [gettingLocation, setGettingLocation] = useState(false);
+  useEscapeClose(onClose);
 
   function set(k: string, v: unknown) { setForm((f) => ({ ...f, [k]: v })); }
 

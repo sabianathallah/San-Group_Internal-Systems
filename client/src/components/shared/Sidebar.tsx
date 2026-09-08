@@ -158,6 +158,10 @@ export default function Sidebar() {
       ],
     },
     ...(hrisAdminItems.length > 0 ? [{ label: t('shared.sidebar.sections.administration'), items: hrisAdminItems }] : []),
+    {
+      label: t('shared.sidebar.sections.support'),
+      items: [{ label: t('shared.sidebar.nav.hrisHelp'), to: `${ROUTES.HELP}#help-hris-overview`, icon: HelpCircle }],
+    },
   ];
 
   // Management (things you change) vs Monitoring (things you inspect).

@@ -1511,6 +1511,7 @@
         "header": { "title": "Holidays", "subtitle": "Company holiday calendar — excluded from leave-day counting, auto-absent marking, and attendance rate" },
         "form": { "namePlaceholder": "Holiday name, e.g. Idul Fitri", "add": "Add" },
         "empty": "No holidays registered for {{year}}",
+        "deleteConfirm": "Remove holiday \"{{name}}\"?",
         "toast": {
           "added": "Holiday added",
           "addFailed": "Failed to add holiday",
@@ -2003,6 +2004,7 @@
         "attendanceReport": "Attendance Report",
         "manageShifts": "Manage Shifts",
         "officeLocations": "Office Locations",
+        "leaveTypes": "Leave Types",
         "manageUsers": "Manage Users",
         "rolesPermissions": "Roles & Permissions",
         "auditLog": "Audit Log"
@@ -2105,6 +2107,7 @@
         "dbLinks": "DB Links",
         "analytics": "Analytics",
         "help": "Help",
+        "hrisHelp": "HRIS Guide",
         "workOrders": "Work Orders",
         "history": "History",
         "reports": "Reports",

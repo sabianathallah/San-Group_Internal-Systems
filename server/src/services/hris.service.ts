@@ -713,6 +713,10 @@ export async function checkOutService(userId: string, body: { note?: string | nu
   return prisma.attendance.update({
     where: { userId_date: { userId, date: targetDate } },
     data:  { checkOut: now, workMinutes, note: body.note ?? target.note },
+    include: {
+      shift:          { select: { name: true, startTime: true, color: true } },
+      officeLocation: { select: { name: true } },
+    },
   });
 }
 

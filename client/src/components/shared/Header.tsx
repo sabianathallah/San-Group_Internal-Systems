@@ -37,6 +37,7 @@ function useBreadcrumbMap(t: (key: string) => string): Record<string, string> {
     '/hris/reports':          t('shared.header.breadcrumbs.attendanceReport'),
     '/hris/admin/shifts':     t('shared.header.breadcrumbs.manageShifts'),
     '/hris/admin/locations':  t('shared.header.breadcrumbs.officeLocations'),
+    '/hris/admin/leave-types': t('shared.header.breadcrumbs.leaveTypes'),
     '/admin/users':        t('shared.header.breadcrumbs.manageUsers'),
     '/admin/permissions':  t('shared.header.breadcrumbs.rolesPermissions'),
     '/admin/audit-log':    t('shared.header.breadcrumbs.auditLog'),

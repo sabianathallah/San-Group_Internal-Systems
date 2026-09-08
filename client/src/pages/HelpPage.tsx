@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   LayoutDashboard, CheckSquare2, Bell, StickyNote, Database, BarChart3, Inbox,
-  Lightbulb, ChevronRight,
+  Lightbulb, ChevronRight, Building2, Clock, CalendarDays, ClipboardList,
+  FileBarChart2, CalendarClock, MapPin, CalendarOff, Tags,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/cn';
@@ -159,6 +160,133 @@ const CONTENT: Record<'id' | 'en', { pageTitle: string; pageSubtitle: string; ti
           'Notifikasi baru juga muncul sebagai pop-up kecil (toast) di pojok layar — klik untuk langsung buka.',
         ],
       },
+      {
+        id: 'hris-overview',
+        icon: Building2,
+        title: 'HRIS — Ringkasan',
+        intro: 'Halaman pertama modul HRIS. Menampilkan status kehadiran hari ini, tombol Check In/Check Out, saldo cuti tahun berjalan, dan daftar pengajuan cuti terbaru.',
+        image: '/help/hris-overview.jpg',
+        imageAlt: 'Tampilan halaman Ringkasan HRIS',
+        tips: [
+          'Tombol **Check In**/**Check Out** ada di kartu biru gelap paling atas — status berubah otomatis begitu kamu absen.',
+          'Kartu "Saldo Cuti" menampilkan sisa kuota per jenis cuti (Annual Leave, WFH Special, dst) — beberapa jenis seperti Sick Leave tidak punya kuota tetap ("Sesuai kebutuhan").',
+          'Panel "Pengajuan Cuti" menunjukkan 4 status: Menunggu, Disetujui, Ditolak, Dibatalkan.',
+          'Ringkasan angka Hadir/Terlambat/WFH/Cuti/Tidak Hadir di bagian atas mengikuti bulan berjalan.',
+        ],
+      },
+      {
+        id: 'hris-attendance',
+        icon: Clock,
+        title: 'HRIS — Absensi',
+        intro: 'Rekap absensi bulanan dalam bentuk kalender, lengkap dengan log harian (jam check-in/out, durasi kerja, lokasi, dan foto absen).',
+        image: '/help/hris-attendance.jpg',
+        imageAlt: 'Tampilan halaman Absensi HRIS',
+        tips: [
+          'Toggle **Saya** / **Tim — Semua** di kanan atas untuk beralih antara absensimu sendiri dan absensi tim (khusus atasan/HR).',
+          'Klik tanggal apapun di kalender untuk lihat detail absensi hari itu — status ditandai warna (Alpa = merah, dst).',
+          'Gunakan panah `<` `>` di sebelah nama bulan untuk pindah ke bulan lain.',
+          'Tabel "Log Absensi" di bawah kalender berisi rincian per hari: Check In, Check Out, Durasi, Lokasi, dan foto (kalau perusahaan mewajibkan foto saat absen).',
+        ],
+      },
+      {
+        id: 'hris-leave',
+        icon: CalendarDays,
+        title: 'HRIS — Cuti',
+        intro: 'Ajukan cuti baru dan pantau saldo tiap jenis cuti (Annual Leave, Sick Leave, Emergency Leave, WFH Special, Special Leave, Comp Off).',
+        image: '/help/hris-leave.jpg',
+        imageAlt: 'Tampilan halaman Cuti HRIS',
+        tips: [
+          'Klik **"Ajukan Cuti"** di kanan atas untuk buka form pengajuan — pilih jenis cuti, tanggal mulai/selesai, dan alasan.',
+          'Tombol **"Comp Off"** khusus untuk mengajukan cuti pengganti dari lembur/kerja di hari libur.',
+          'Filter status (Semua, Menunggu, Disetujui, Ditolak, Dibatalkan) ada di bawah kartu saldo — pakai ini untuk cari pengajuan tertentu.',
+          'Jenis cuti yang perlu dokumen (misal Sick Leave) akan minta lampiran file saat pengajuan — muncul sebagai tautan di kartu riwayat.',
+          'Toggle **Saya** / **Tim** di kanan atas dipakai atasan/HR untuk melihat & menyetujui pengajuan cuti anak buahnya.',
+        ],
+      },
+      {
+        id: 'hris-requests',
+        icon: ClipboardList,
+        title: 'HRIS — Pengajuan',
+        intro: 'Tempat mengajukan izin keterlambatan dan pengajuan perubahan shift — dua hal yang beda dari pengajuan cuti biasa.',
+        image: '/help/hris-requests.jpg',
+        imageAlt: 'Tampilan halaman Pengajuan HRIS',
+        tips: [
+          'Tab **"Izin Terlambat"**: laporkan lebih dulu kalau kamu tahu bakal telat, lengkap dengan estimasi jam kedatangan dan alasannya.',
+          'Tab **"Perubahan Shift"**: ajukan pertukaran atau perubahan jadwal shift kerja.',
+          'Filter status (Menunggu, Disetujui, Ditolak, Dibatalkan) sama seperti di halaman Cuti.',
+          'Pengajuan yang masih "Menunggu" bisa dibatalkan sendiri lewat tombol di kartu pengajuan.',
+        ],
+      },
+      {
+        id: 'hris-reports',
+        icon: FileBarChart2,
+        title: 'HRIS — Laporan Absensi',
+        intro: 'Rekap absensi seluruh karyawan dalam satu bulan, dengan ringkasan Hadir/Terlambat/Alpa/WFH/Di Luar Area serta rata-rata tingkat kehadiran. Hanya bisa diakses role tertentu (HR/manajemen).',
+        image: '/help/hris-reports.jpg',
+        imageAlt: 'Tampilan halaman Laporan Absensi HRIS',
+        tips: [
+          'Filter **"Semua Divisi"** di kanan atas untuk mempersempit laporan ke divisi tertentu.',
+          'Kolom pencarian "Cari karyawan..." langsung memfilter tabel di bawahnya.',
+          'Tombol **"Ekspor CSV"** mengunduh laporan bulan yang sedang ditampilkan sesuai filter aktif.',
+          'Kolom H/T/WFH/A di tabel adalah singkatan dari Hadir/Terlambat/WFH/Alpa untuk tiap karyawan.',
+        ],
+      },
+      {
+        id: 'hris-admin-shifts',
+        icon: CalendarClock,
+        title: 'HRIS — Kelola Shift (Admin)',
+        intro: 'Halaman admin untuk membuat jenis shift kerja (jam masuk-pulang, toleransi keterlambatan) dan menetapkan shift ke tiap karyawan.',
+        image: '/help/hris-admin-shifts.jpg',
+        imageAlt: 'Tampilan halaman Kelola Shift HRIS',
+        tips: [
+          'Klik **"+ Shift Baru"** untuk buat jenis shift baru — atur jam kerja dan toleransi keterlambatan dalam menit.',
+          'Shift bertanda **"Default"** otomatis dipakai untuk karyawan baru yang belum ditetapkan shift-nya.',
+          'Gunakan dropdown di samping tiap nama karyawan pada bagian "Tetapkan Shift Karyawan" untuk pindahkan orang ke shift lain.',
+          'Kolom pencarian karyawan di kanan atas panel penugasan mempercepat pencarian di tim besar.',
+        ],
+      },
+      {
+        id: 'hris-admin-locations',
+        icon: MapPin,
+        title: 'HRIS — Lokasi Kantor (Admin)',
+        intro: 'Atur titik geofencing tempat karyawan boleh absen — tiap lokasi punya koordinat dan radius sendiri.',
+        image: '/help/hris-admin-locations.jpg',
+        imageAlt: 'Tampilan halaman Lokasi Kantor HRIS',
+        tips: [
+          'Klik **"+ Tambah Lokasi"** untuk daftarkan kantor/site baru beserta radius geofence-nya (dalam meter).',
+          'Klik koordinat pada kartu lokasi untuk membuka titik tersebut langsung di Google Maps.',
+          'Karyawan bisa absen dari lokasi aktif mana pun — kalau berada di luar semua radius, sistem akan tampilkan peringatan dengan opsi "absen paksa".',
+          'Ikon pensil dan tempat sampah di pojok kartu dipakai untuk edit atau hapus lokasi.',
+        ],
+      },
+      {
+        id: 'hris-admin-holidays',
+        icon: CalendarOff,
+        title: 'HRIS — Hari Libur (Admin)',
+        intro: 'Kalender hari libur nasional/perusahaan untuk satu tahun — dipakai sistem untuk mengecualikan hari tersebut dari perhitungan cuti dan penandaan alpa otomatis.',
+        image: '/help/hris-admin-holidays.jpg',
+        imageAlt: 'Tampilan halaman Hari Libur HRIS',
+        tips: [
+          'Isi tanggal dan nama hari libur di kolom atas, lalu klik **"+ Tambah"**.',
+          'Gunakan panah `<` `>` di samping tahun untuk kelola hari libur tahun sebelumnya/berikutnya.',
+          'Hari yang sudah didaftarkan di sini otomatis dikecualikan dari perhitungan kuota cuti dan tidak akan ditandai "Alpa" meski karyawan tidak check-in.',
+          'Ikon tempat sampah di tiap baris menghapus hari libur tersebut.',
+        ],
+      },
+      {
+        id: 'hris-admin-leave-types',
+        icon: Tags,
+        title: 'HRIS — Jenis Cuti (Admin)',
+        intro: 'Kelola semua jenis cuti yang tersedia beserta kebijakannya: kuota tahunan, kewajiban lampiran dokumen, aturan carry-over, dan syarat masa kerja minimum.',
+        image: '/help/hris-admin-leave-types.jpg',
+        imageAlt: 'Tampilan halaman Jenis Cuti HRIS',
+        tips: [
+          'Klik **"+ Jenis Baru"** untuk membuat kategori cuti baru selain 6 yang sudah ada secara default.',
+          'Badge seperti **"Carry-over"** atau **"Masa kerja 12 bln"** di bawah nama jenis cuti menandakan aturan khusus yang berlaku.',
+          'Ikon power di pojok kartu menonaktifkan jenis cuti tanpa menghapus riwayatnya — jenis yang dinonaktifkan hilang dari form pengajuan tapi data lama tetap tersimpan.',
+          'Perubahan kuota langsung berlaku ke saldo tahun berjalan; hari carry-over yang sudah ada tetap dipertahankan.',
+        ],
+      },
     ],
   },
   en: {
@@ -298,6 +426,133 @@ const CONTENT: Record<'id' | 'en', { pageTitle: string; pageSubtitle: string; ti
           'New notifications also pop up as a small toast in the corner of the screen — click it to open right away.',
         ],
       },
+      {
+        id: 'hris-overview',
+        icon: Building2,
+        title: 'HRIS — Overview',
+        intro: 'The first page of the HRIS module. Shows today\'s attendance status, the Check In/Check Out button, your current-year leave balance, and your recent leave requests.',
+        image: '/help/hris-overview.jpg',
+        imageAlt: 'HRIS Overview page view',
+        tips: [
+          'The **Check In**/**Check Out** button sits in the dark blue card at the top — its status updates automatically once you clock in.',
+          'The "Leave Balance" card shows what\'s left of each leave type (Annual Leave, WFH Special, etc) — some types like Sick Leave have no fixed quota ("as needed").',
+          'The "Leave Requests" panel shows 4 statuses: Pending, Approved, Rejected, Cancelled.',
+          'The Present/Late/WFH/Leave/Absent counters at the top follow the current month.',
+        ],
+      },
+      {
+        id: 'hris-attendance',
+        icon: Clock,
+        title: 'HRIS — Attendance',
+        intro: 'A monthly attendance recap shown as a calendar, plus a daily log with check-in/out times, worked hours, location, and the clock-in photo.',
+        image: '/help/hris-attendance.jpg',
+        imageAlt: 'HRIS Attendance page view',
+        tips: [
+          'Toggle **Me** / **Team — All** in the top right to switch between your own attendance and your team\'s (managers/HR only).',
+          'Click any date on the calendar to see that day\'s attendance detail — status is color-coded (Absent = red, etc).',
+          'Use the `<` `>` arrows next to the month name to move to another month.',
+          'The "Attendance Log" table below the calendar breaks down each day: Check In, Check Out, Duration, Location, and photo (if the company requires a photo on clock-in).',
+        ],
+      },
+      {
+        id: 'hris-leave',
+        icon: CalendarDays,
+        title: 'HRIS — Leave',
+        intro: 'Submit new leave requests and track the balance of every leave type (Annual Leave, Sick Leave, Emergency Leave, WFH Special, Special Leave, Comp Off).',
+        image: '/help/hris-leave.jpg',
+        imageAlt: 'HRIS Leave page view',
+        tips: [
+          'Click **"Request Leave"** in the top right to open the request form — pick a leave type, start/end date, and reason.',
+          'The **"Comp Off"** button is specifically for claiming compensatory leave earned from overtime or working a holiday.',
+          'Status filters (All, Pending, Approved, Rejected, Cancelled) sit below the balance cards — use them to find a specific request.',
+          'Leave types that require documentation (e.g. Sick Leave) prompt for a file attachment at request time — it shows up as a link in the history card.',
+          'The **Me** / **Team** toggle in the top right is what managers/HR use to view and approve their reports\' leave requests.',
+        ],
+      },
+      {
+        id: 'hris-requests',
+        icon: ClipboardList,
+        title: 'HRIS — Requests',
+        intro: 'Where you file a late-arrival notice or a shift-change request — both distinct from a regular leave request.',
+        image: '/help/hris-requests.jpg',
+        imageAlt: 'HRIS Requests page view',
+        tips: [
+          '**"Late Arrival"** tab: report ahead of time that you\'ll be late, with an estimated arrival time and a reason.',
+          '**"Shift Change"** tab: request a swap or change to your work shift schedule.',
+          'Status filters (Pending, Approved, Rejected, Cancelled) work the same way as on the Leave page.',
+          'A request still "Pending" can be cancelled by yourself from the button on its card.',
+        ],
+      },
+      {
+        id: 'hris-reports',
+        icon: FileBarChart2,
+        title: 'HRIS — Attendance Report',
+        intro: 'A company-wide attendance recap for one month, with Present/Late/Absent/WFH/Off-site totals and an average attendance rate. Restricted to certain roles (HR/management).',
+        image: '/help/hris-reports.jpg',
+        imageAlt: 'HRIS Attendance Report page view',
+        tips: [
+          'Use the **"All Divisions"** filter in the top right to narrow the report to one division.',
+          'The "Search employee..." box filters the table below it instantly.',
+          'The **"Export CSV"** button downloads the currently shown month\'s report with the active filters applied.',
+          'The H/T/WFH/A columns in the table are short for Present/Late/WFH/Absent for each employee.',
+        ],
+      },
+      {
+        id: 'hris-admin-shifts',
+        icon: CalendarClock,
+        title: 'HRIS — Manage Shifts (Admin)',
+        intro: 'The admin page for creating work shift types (start/end time, late tolerance) and assigning a shift to each employee.',
+        image: '/help/hris-admin-shifts.jpg',
+        imageAlt: 'HRIS Manage Shifts page view',
+        tips: [
+          'Click **"+ New Shift"** to create a shift type — set its working hours and late-tolerance minutes.',
+          'A shift marked **"Default"** is automatically applied to new employees who haven\'t been assigned one yet.',
+          'Use the dropdown next to each employee\'s name in the "Assign Employee Shift" panel to move them to a different shift.',
+          'The employee search box in the top right of the assignment panel speeds up finding someone in a large team.',
+        ],
+      },
+      {
+        id: 'hris-admin-locations',
+        icon: MapPin,
+        title: 'HRIS — Office Locations (Admin)',
+        intro: 'Configure the geofenced points where employees are allowed to clock in — each location has its own coordinates and radius.',
+        image: '/help/hris-admin-locations.jpg',
+        imageAlt: 'HRIS Office Locations page view',
+        tips: [
+          'Click **"+ Add Location"** to register a new office/site along with its geofence radius (in meters).',
+          'Click a location card\'s coordinates to open that exact point in Google Maps.',
+          'Employees can check in from any active location — if they\'re outside every radius, the system shows a warning with a "force clock-in" option.',
+          'The pencil and trash icons on a card let you edit or delete that location.',
+        ],
+      },
+      {
+        id: 'hris-admin-holidays',
+        icon: CalendarOff,
+        title: 'HRIS — Holidays (Admin)',
+        intro: 'The company/national holiday calendar for a given year — the system uses it to exclude those days from leave calculations and automatic absent-marking.',
+        image: '/help/hris-admin-holidays.jpg',
+        imageAlt: 'HRIS Holidays page view',
+        tips: [
+          'Fill in the date and holiday name in the top row, then click **"+ Add"**.',
+          'Use the `<` `>` arrows next to the year to manage holidays for the previous/next year.',
+          'A day listed here is automatically excluded from leave-quota calculations and won\'t be marked "Absent" even if the employee didn\'t clock in.',
+          'The trash icon on each row removes that holiday.',
+        ],
+      },
+      {
+        id: 'hris-admin-leave-types',
+        icon: Tags,
+        title: 'HRIS — Leave Types (Admin)',
+        intro: 'Manage every available leave type and its policy: annual quota, whether documentation is required, carry-over rules, and minimum tenure requirements.',
+        image: '/help/hris-admin-leave-types.jpg',
+        imageAlt: 'HRIS Leave Types page view',
+        tips: [
+          'Click **"+ New Type"** to create a leave category beyond the 6 that exist by default.',
+          'Badges like **"Carry-over"** or **"12mo tenure"** under a leave type\'s name flag a special rule that applies to it.',
+          'The power icon on a card deactivates a leave type without deleting its history — a deactivated type disappears from the request form but old data stays intact.',
+          'A quota change takes effect on the current year\'s balance immediately; existing carry-over days are preserved.',
+        ],
+      },
     ],
   },
 };
@@ -320,12 +575,22 @@ export default function HelpPage() {
   const { i18n } = useTranslation();
   const lang = i18n.language === 'id' ? 'id' : 'en';
   const { pageTitle, pageSubtitle, tipsLabel, sections } = CONTENT[lang];
-  const [active, setActive] = useState(sections[0].id);
+  const hashId = window.location.hash.replace('#help-', '');
+  const [active, setActive] = useState(sections.some((s) => s.id === hashId) ? hashId : sections[0].id);
 
   function scrollTo(id: string) {
     setActive(id);
     document.getElementById(`help-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
+
+  // Deep-links from other modules (e.g. sidebar "HRIS Guide") land with a
+  // #help-{id} hash — jump straight to that section instead of the top.
+  useEffect(() => {
+    if (hashId) {
+      document.getElementById(`help-${hashId}`)?.scrollIntoView({ block: 'start' });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <div className="max-w-6xl">

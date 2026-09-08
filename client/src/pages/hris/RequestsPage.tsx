@@ -357,7 +357,7 @@ export default function RequestsPage() {
             { v: 'late'  as const, label: t('hris.requests.kind.lateTabs'),  icon: AlarmClock    },
             { v: 'shift' as const, label: t('hris.requests.kind.shiftTabs'), icon: CalendarClock },
           ]).map(({ v, label, icon: Icon }) => (
-            <button key={v} onClick={() => { setKind(v); setStatusTab(''); setPage(1); }}
+            <button key={v} onClick={() => { setKind(v); setStatusTab(''); setPage(1); setItems([]); }}
               className={cn('flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors',
                 kind === v ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700')}>
               <Icon size={13} /> {label}

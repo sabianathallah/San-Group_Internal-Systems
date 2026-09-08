@@ -10,6 +10,7 @@ import { cn } from '@/lib/cn';
 import { getHolidaySet } from '@/lib/holidays';
 import { useAuthStore } from '@/stores/authStore';
 import { usePermStore } from '@/stores/permStore';
+import { useEscapeClose } from '@/hooks/useEscapeClose';
 
 /** Locale for date formatting — mirrors i18next's active language. */
 function dateLocale(language: string): string {
@@ -76,6 +77,7 @@ function getFirstDayOfMonth(year: number, month: number) {
 // ── Photo Lightbox ─────────────────────────────────────────────
 function PhotoLightbox({ url, onClose }: { url: string; onClose: () => void }) {
   const { t } = useTranslation();
+  useEscapeClose(onClose);
   return (
     <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4" onClick={onClose}>
       <button onClick={onClose} className="absolute top-4 right-4 w-9 h-9 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 text-white">

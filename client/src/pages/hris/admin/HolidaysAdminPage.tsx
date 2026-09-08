@@ -48,7 +48,8 @@ export default function HolidaysAdminPage() {
     } finally { setSubmitting(false); }
   }
 
-  async function handleDelete(id: string) {
+  async function handleDelete(id: string, name: string) {
+    if (!confirm(t('hris.admin.holidays.deleteConfirm', { name }))) return;
     setDeletingId(id);
     try {
       await api.delete(`/hris/holidays/${id}`);
@@ -114,7 +115,7 @@ export default function HolidaysAdminPage() {
                 <p className="text-sm font-medium text-gray-800">{h.name}</p>
                 <p className="text-xs text-gray-500 mt-0.5">{fmtDate(h.date, i18n.language)}</p>
               </div>
-              <button onClick={() => handleDelete(h.id)} disabled={deletingId === h.id}
+              <button onClick={() => handleDelete(h.id, h.name)} disabled={deletingId === h.id}
                 className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-40">
                 {deletingId === h.id ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
               </button>

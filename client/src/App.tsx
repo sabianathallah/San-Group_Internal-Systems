@@ -38,19 +38,30 @@ function AdminRoute() {
 }
 
 function HrisAdminRoute() {
-  const perms = usePermStore((s) => s.perms);
+  const perms  = usePermStore((s) => s.perms);
+  const loaded = usePermStore((s) => s.loaded);
+  // Perms start at the all-'none' default and load asynchronously after mount —
+  // deciding before `loaded` flips true means every hard refresh/direct link to
+  // a gated route reads the safe default and bounces even a fully-authorized
+  // user, and <Navigate replace> has already changed the URL by the time the
+  // real permissions arrive, so it doesn't self-correct.
+  if (!loaded) return null;
   if (!perms.hris.manageShifts && !perms.hris.manageLocations) return <Navigate to={ROUTES.HRIS} replace />;
   return <Outlet />;
 }
 
 function HrisReportsRoute() {
-  const perms = usePermStore((s) => s.perms);
+  const perms  = usePermStore((s) => s.perms);
+  const loaded = usePermStore((s) => s.loaded);
+  if (!loaded) return null;
   if (perms.hris.viewReports === 'none') return <Navigate to={ROUTES.HRIS} replace />;
   return <Outlet />;
 }
 
 function WorkOrderReportsRoute() {
-  const perms = usePermStore((s) => s.perms);
+  const perms  = usePermStore((s) => s.perms);
+  const loaded = usePermStore((s) => s.loaded);
+  if (!loaded) return null;
   // The /reports endpoint gates on the 'view' permission server-side (not 'edit'),
   // so the client-side guard has to check the same scope or the two can disagree
   // (e.g. a division-scoped editor who only has 'own' view would wrongly pass here).
