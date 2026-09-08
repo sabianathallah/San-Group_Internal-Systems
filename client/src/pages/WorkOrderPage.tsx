@@ -19,6 +19,7 @@ import { useAuthStore } from '@/stores/authStore';
 import { usePermStore } from '@/stores/permStore';
 import type { Scope, WorkOrderPerms } from '@/types/permissions';
 import { PageSizeSelect } from '@/components/shared/PageSizeSelect';
+import UserSearchInput from '@/components/shared/UserSearchInput';
 
 // ── Permission helper ──────────────────────────────────────
 // Mirrors the server-side scope check in work-order.service.ts: 'all' always
@@ -524,15 +525,12 @@ function WorkOrderModal({
           {canAssign && (
             <div>
               <label className="block text-xs font-medium text-gray-700 mb-1">{t('workOrder.modal.assignLabel')}</label>
-              <select
-                value={form.assignedToId} onChange={(e) => set('assignedToId', e.target.value)}
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-navy/30"
-              >
-                <option value="">{t('workOrder.modal.unassignedOption')}</option>
-                {users.map((u) => (
-                  <option key={u.id} value={u.id}>{u.fullName}</option>
-                ))}
-              </select>
+              <UserSearchInput
+                users={users}
+                value={form.assignedToId}
+                onChange={(id) => set('assignedToId', id)}
+                clearLabel={t('workOrder.modal.unassignedOption')}
+              />
             </div>
           )}
 
@@ -1292,16 +1290,11 @@ export function WODetail({
         )}
 
         {/* Photo evidence */}
-        {!isFinal && wo.status !== 'OPEN' && wo.status !== 'VALIDATED' && (
+        {((!isFinal && wo.status !== 'OPEN' && wo.status !== 'VALIDATED')
+          || (isFinal && wo.attachments && wo.attachments.length > 0)) && (
           <div>
             <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wide mb-2">{t('workOrder.detail.photoEvidence')}</p>
-            <PhotoSection wo={wo} canUpload={canStatus && !isPendingReview} onUploaded={onUpdated} />
-          </div>
-        )}
-        {(isFinal || isPendingReview) && wo.attachments && wo.attachments.length > 0 && (
-          <div>
-            <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wide mb-2">{t('workOrder.detail.photoEvidence')}</p>
-            <PhotoSection wo={wo} canUpload={false} onUploaded={onUpdated} />
+            <PhotoSection wo={wo} canUpload={canStatus && !isPendingReview && !isFinal} onUploaded={onUpdated} />
           </div>
         )}
 

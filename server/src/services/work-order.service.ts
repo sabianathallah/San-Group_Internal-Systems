@@ -287,6 +287,11 @@ export async function createWorkOrderService(userId: string, body: Record<string
   // vetted it — skip straight past OPEN/VALIDATED to ASSIGNED.
   const initialStatus = assignedToId ? WorkOrderStatus.ASSIGNED : WorkOrderStatus.OPEN;
   const effectivePriority = priority ?? WorkOrderPriority.MEDIUM;
+  // Stamp createdAt from the same JS clock as assignedAt (rather than letting
+  // createdAt fall back to the DB's own now() at INSERT time) so the two can
+  // never invert — the timeline sorts by these and a later-than-created
+  // assignedAt would render "Assigned" before "Created".
+  const now = new Date();
 
   const wo = await prisma.workOrder.create({
     data: {
@@ -298,15 +303,17 @@ export async function createWorkOrderService(userId: string, body: Record<string
       location:    location   ?? null,
       dueDate:     dueDate    ? new Date(dueDate) : defaultDueDate(effectivePriority),
       status:      initialStatus,
+      createdAt:   now,
       reportedById: userId,
       assignedToId: assignedToId ?? null,
       assignedById: assignedToId ? userId : null,
-      assignedAt:   assignedToId ? new Date() : null,
+      assignedAt:   assignedToId ? now : null,
       history: {
         create: {
           toStatus:   initialStatus,
           note:       'Work order created',
           changedById: userId,
+          createdAt:  now,
         },
       },
     },
@@ -721,6 +728,10 @@ export async function getWorkOrderReportsService(viewScope: string, divisionId: 
   for (const w of completed) {
     if (!w.completedAt) continue;
     const minutes = Math.round((w.completedAt.getTime() - w.createdAt.getTime()) / 60000);
+    // A negative gap means completedAt precedes createdAt — a data
+    // inconsistency, not a real resolution time. Drop it rather than
+    // letting it drag the category average toward (or past) zero.
+    if (minutes < 0) continue;
     const entry = resByCategory.get(w.category) ?? { count: 0, totalMinutes: 0 };
     entry.count += 1;
     entry.totalMinutes += minutes;

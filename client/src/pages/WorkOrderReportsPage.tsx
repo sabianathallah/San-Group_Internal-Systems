@@ -42,6 +42,10 @@ interface Report {
 }
 
 function fmtDuration(mins: number) {
+  // A negative value means completedAt landed before createdAt — a data
+  // inconsistency, not a real duration. Surface it plainly rather than
+  // letting the day/hour math silently fold it into something like "0h 0m".
+  if (mins < 0) return '—';
   const days = Math.floor(mins / (60 * 24));
   const hrs  = Math.floor((mins % (60 * 24)) / 60);
   if (days > 0) return `${days}d ${hrs}h`;

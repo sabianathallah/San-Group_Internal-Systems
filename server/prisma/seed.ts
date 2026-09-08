@@ -883,6 +883,7 @@ async function main() {
     notes: 'Kapasitor kompresor diganti. Unit berjalan normal kembali.',
     reportedById: admin.id,
     assignedToId: engineer.id,
+    createdAt: days(-3),
     history: { create: [
       { fromStatus: null,                      toStatus: WorkOrderStatus.OPEN,        note: 'Work order dibuat',                                        changedById: admin.id,    createdAt: days(-3) },
       { fromStatus: WorkOrderStatus.OPEN,      toStatus: WorkOrderStatus.ASSIGNED,    note: 'Ditugaskan ke Chief Engineer',                             changedById: admin.id,    createdAt: days(-3) },
@@ -905,6 +906,7 @@ async function main() {
     dueDate: days(1),
     reportedById: pm.id,
     assignedToId: engineer.id,
+    createdAt: days(-1),
     history: { create: [
       { fromStatus: null,                      toStatus: WorkOrderStatus.OPEN,        note: 'Work order dibuat',                      changedById: pm.id,       createdAt: days(-1) },
       { fromStatus: WorkOrderStatus.OPEN,      toStatus: WorkOrderStatus.ASSIGNED,    note: 'Ditugaskan ke Chief Engineer',            changedById: admin.id,    createdAt: days(-1) },
@@ -925,6 +927,7 @@ async function main() {
     notes: 'Menunggu pengiriman filter HEPA ukuran 24x24x4. PO sudah diajukan ke procurement.',
     reportedById: engineer.id,
     assignedToId: engineer.id,
+    createdAt: days(-4),
     history: { create: [
       { fromStatus: null,                      toStatus: WorkOrderStatus.OPEN,            note: 'Work order dibuat',                                  changedById: engineer.id, createdAt: days(-4) },
       { fromStatus: WorkOrderStatus.OPEN,      toStatus: WorkOrderStatus.ASSIGNED,        note: 'Self-assigned untuk pengecekan',                     changedById: engineer.id, createdAt: days(-4) },
@@ -945,6 +948,7 @@ async function main() {
     dueDate: days(2),
     reportedById: admin.id,
     assignedToId: engineer.id,
+    createdAt: days(-1),
     history: { create: [
       { fromStatus: null,                 toStatus: WorkOrderStatus.OPEN,     note: 'Work order dibuat',        changedById: admin.id, createdAt: days(-1) },
       { fromStatus: WorkOrderStatus.OPEN, toStatus: WorkOrderStatus.ASSIGNED, note: 'Ditugaskan ke Chief Engineer', changedById: admin.id, createdAt: days(-1) },
@@ -963,6 +967,7 @@ async function main() {
     dueDate: days(1),
     reportedById: pm.id,
     assignedToId: null,
+    createdAt: days(0),
     history: { create: [
       { fromStatus: null, toStatus: WorkOrderStatus.OPEN, note: 'Work order dibuat, menunggu assignment teknisi', changedById: pm.id, createdAt: days(0) },
     ]},
@@ -980,6 +985,7 @@ async function main() {
     dueDate: days(7),
     reportedById: pm.id,
     assignedToId: null,
+    createdAt: days(0),
     history: { create: [
       { fromStatus: null, toStatus: WorkOrderStatus.OPEN, note: 'Work order dibuat', changedById: pm.id, createdAt: days(0) },
     ]},
@@ -999,6 +1005,7 @@ async function main() {
     notes: 'Kunci diganti dengan model mortise lock baru. Kunci cadangan diserahkan ke admin dan GM.',
     reportedById: admin.id,
     assignedToId: engineer.id,
+    createdAt: days(-7),
     history: { create: [
       { fromStatus: null,                      toStatus: WorkOrderStatus.OPEN,        note: 'Work order dibuat',                            changedById: admin.id,    createdAt: days(-7) },
       { fromStatus: WorkOrderStatus.OPEN,      toStatus: WorkOrderStatus.ASSIGNED,    note: 'Ditugaskan ke Chief Engineer',                 changedById: admin.id,    createdAt: days(-7) },
@@ -1020,6 +1027,7 @@ async function main() {
     notes: 'Dibatalkan — pengecatan dijadwalkan ulang bersamaan dengan proyek renovasi Tower A bulan depan agar lebih efisien.',
     reportedById: pm.id,
     assignedToId: null,
+    createdAt: days(-10),
     history: { create: [
       { fromStatus: null,                 toStatus: WorkOrderStatus.OPEN,      note: 'Work order dibuat',                                    changedById: pm.id,    createdAt: days(-10) },
       { fromStatus: WorkOrderStatus.OPEN, toStatus: WorkOrderStatus.CANCELLED, note: 'Dijadwalkan ulang ke proyek renovasi Tower A bulan depan', changedById: admin.id, createdAt: days(-8) },
@@ -1038,6 +1046,7 @@ async function main() {
     dueDate: days(0),
     reportedById: hr.id,
     assignedToId: null,
+    createdAt: days(0),
     history: { create: [
       { fromStatus: null,                    toStatus: WorkOrderStatus.OPEN,      note: 'Work order dibuat',                                                          changedById: hr.id, createdAt: days(0) },
       { fromStatus: WorkOrderStatus.OPEN,    toStatus: WorkOrderStatus.VALIDATED, note: 'Dikonfirmasi valid oleh Property Manager, menunggu penugasan teknisi.', changedById: pm.id, createdAt: days(0) },
@@ -1056,6 +1065,7 @@ async function main() {
     dueDate: days(-1),
     reportedById: admin.id,
     assignedToId: engineer.id,
+    createdAt: days(-2),
     attachments: { create: [
       { type: 'BEFORE', fileName: 'panel-before.jpg', filePath: 'https://picsum.photos/seed/wo010-before/800/600', fileSize: 245678, mimeType: 'image/jpeg', uploadedById: admin.id,    createdAt: days(-2) },
       { type: 'AFTER',  fileName: 'panel-after.jpg',  filePath: 'https://picsum.photos/seed/wo010-after/800/600',  fileSize: 268123, mimeType: 'image/jpeg', uploadedById: engineer.id, createdAt: days(0)  },
@@ -1085,6 +1095,7 @@ async function main() {
     reviewedById: admin.id,
     reviewedAt: days(-1),
     reviewNotes: 'Sudah diuji coba manual dan otomatis, genset menyala normal saat simulasi pemadaman. Approved.',
+    createdAt: days(-5),
     attachments: { create: [
       { type: 'BEFORE', fileName: 'genset-before.mp4', filePath: 'https://www.w3schools.com/html/mov_bbb.mp4',       fileSize: 1583231, mimeType: 'video/mp4',  uploadedById: pm.id,       createdAt: days(-5) },
       { type: 'AFTER',  fileName: 'genset-after.jpg',   filePath: 'https://picsum.photos/seed/wo011-after/800/600', fileSize: 301245,  mimeType: 'image/jpeg', uploadedById: engineer.id, createdAt: days(-2) },
@@ -1113,6 +1124,7 @@ async function main() {
     reviewedById: admin.id,
     reviewedAt: days(-1),
     reviewNotes: 'Suhu masih di atas standar 22°C setelah pengecekan awal. Tolong cek ulang thermostat dan tambahan unit pendingin cadangan.',
+    createdAt: days(-3),
     attachments: { create: [
       { type: 'BEFORE', fileName: 'server-room-before.jpg',    filePath: 'https://picsum.photos/seed/wo012-before/800/600', fileSize: 212345, mimeType: 'image/jpeg', uploadedById: admin.id,    createdAt: days(-3) },
       { type: 'AFTER',  fileName: 'server-room-after-v1.jpg',  filePath: 'https://picsum.photos/seed/wo012-after1/800/600', fileSize: 198765, mimeType: 'image/jpeg', uploadedById: engineer.id, createdAt: days(-1) },
