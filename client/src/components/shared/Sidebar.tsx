@@ -134,6 +134,10 @@ export default function Sidebar() {
       label: t('shared.sidebar.sections.administration'),
       items: [{ label: t('shared.sidebar.nav.reports'), to: ROUTES.WORK_ORDERS_REPORTS, icon: BarChart3 }],
     }] : []),
+    {
+      label: t('shared.sidebar.sections.support'),
+      items: [{ label: t('shared.sidebar.nav.woHelp'), to: `${ROUTES.HELP}#help-wo-board`, icon: HelpCircle }],
+    },
   ];
 
   // Everyday HRIS items for everyone; management tooling in its own
