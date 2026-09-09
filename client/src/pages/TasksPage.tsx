@@ -191,7 +191,10 @@ const VISIBILITY_LABEL_KEY: Record<TaskVisibility, string> = {
   PRIVATE: 'tasks.visibility.onlyMe', DIVISION: 'tasks.visibility.myDivision',
   DIVISION_SELECT: 'tasks.visibility.selectDivisions', PUBLIC: 'tasks.visibility.allStaff',
 };
-function visibilityLabel(t: TFunc, v: TaskVisibility): string { return t(VISIBILITY_LABEL_KEY[v]); }
+function visibilityLabel(t: TFunc, v: TaskVisibility, divisionName?: string): string {
+  if (v === 'DIVISION' && divisionName) return divisionName;
+  return t(VISIBILITY_LABEL_KEY[v]);
+}
 
 // ── Markdown renderer ──────────────────────────────────────
 function renderMarkdown(text: string): string {
@@ -1389,6 +1392,7 @@ function TaskDetailPanel({
 }) {
   const { t, i18n } = useTranslation();
   const { perms } = usePermStore();
+  const { user } = useAuthStore();
   // Render instantly from the list's copy; hydrate subtasks/links in the background
   const [task,    setTask]    = useState<Task | null>(initialTask ?? null);
   const [loading, setLoading] = useState(!initialTask);
@@ -1423,6 +1427,7 @@ function TaskDetailPanel({
   const [panelDivisions, setPanelDivisions] = useState<Division[]>([]);
   const [tab,            setTab]            = useState<'subtasks' | 'links' | 'files' | 'comments'>('subtasks');
   const [uploadingFile,  setUploadingFile]  = useState(false);
+  const [showAdvanced,   setShowAdvanced]   = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const load = useCallback(async () => {
@@ -1836,80 +1841,96 @@ function TaskDetailPanel({
               </div>
             </div>
 
-            <div className="flex items-center gap-3 px-1 py-2 rounded hover:bg-gray-50">
-              <div className="flex items-center gap-2 w-24 flex-shrink-0">
-                {(() => { const Icon = VISIBILITY_CONFIG[task.visibility].icon; return <Icon size={13} className="text-gray-400" />; })()}
-                <span className="text-xs text-gray-400">{t('tasks.detailPanel.shareWith')}</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                {(Object.entries(VISIBILITY_CONFIG) as [TaskVisibility, (typeof VISIBILITY_CONFIG)[TaskVisibility]][]).map(([v, cfg]) => (
-                  <button
-                    key={v}
-                    onClick={() => patch({ visibility: v, ...(v !== 'DIVISION_SELECT' && { divisionIds: [] }) })}
-                    disabled={!canEditFully}
-                    className={cn(
-                      'flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-medium border transition-colors disabled:opacity-40',
-                      task.visibility === v
-                        ? 'bg-navy/10 text-navy border-navy/30'
-                        : 'text-gray-400 border-gray-200 hover:text-navy hover:border-navy/30',
-                    )}
-                  >
-                    <cfg.icon size={11} /> {visibilityLabel(t, v)}
-                  </button>
-                ))}
-              </div>
-            </div>
+            <button
+              type="button"
+              onClick={() => setShowAdvanced((v) => !v)}
+              className="flex items-center gap-2 px-1 py-2 w-full text-left rounded hover:bg-gray-50"
+            >
+              {showAdvanced ? <ChevronDown size={13} className="text-gray-400" /> : <ChevronRight size={13} className="text-gray-400" />}
+              <span className="text-xs text-gray-400">{t('tasks.detailPanel.advancedSettings')}</span>
+              {(() => { const Icon = VISIBILITY_CONFIG[task.visibility].icon; return <Icon size={11} className="text-gray-300 ml-1" />; })()}
+              <span className="text-[11px] text-gray-400">{visibilityLabel(t, task.visibility, user?.division?.name)}</span>
+              {task.isPrivate && <Lock size={10} className="text-gray-300" />}
+            </button>
 
-            <div className="flex items-center gap-3 px-1 py-2 rounded hover:bg-gray-50">
-              <div className="flex items-center gap-2 w-24 flex-shrink-0">
-                {task.isPrivate ? <EyeOff size={13} className="text-gray-400" /> : <Eye size={13} className="text-gray-400" />}
-                <span className="text-xs text-gray-400">{t('tasks.detailPanel.toSupervisor')}</span>
-              </div>
-              <button
-                onClick={() => patch({ isPrivate: !task.isPrivate })}
-                disabled={!canEditFully}
-                className={cn(
-                  'flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-medium border transition-colors disabled:opacity-40 disabled:cursor-not-allowed',
-                  task.isPrivate
-                    ? 'bg-gray-100 text-gray-500 border-gray-300'
-                    : 'bg-emerald-50 text-emerald-600 border-emerald-200',
-                )}
-              >
-                {task.isPrivate ? <><EyeOff size={11} /> {t('tasks.detailPanel.hiddenFromSupervisor')}</> : <><Eye size={11} /> {t('tasks.detailPanel.visibleToSupervisor')}</>}
-              </button>
-            </div>
-
-            {task.visibility === 'DIVISION_SELECT' && (
-              <div className="flex items-start gap-3 px-1 py-2">
-                <div className="flex items-center gap-2 w-24 flex-shrink-0 pt-1">
-                  <Building2 size={13} className="text-gray-400" />
-                  <span className="text-xs text-gray-400">{t('tasks.detailPanel.division')}</span>
-                </div>
-                <div className="flex flex-wrap gap-1.5">
-                  {panelDivisions.map((div) => {
-                    const selected = task.divisionAccess?.some((a) => a.divisionId === div.id) ?? false;
-                    const newIds = selected
-                      ? (task.divisionAccess ?? []).filter((a) => a.divisionId !== div.id).map((a) => a.divisionId)
-                      : [...(task.divisionAccess ?? []).map((a) => a.divisionId), div.id];
-                    return (
+            {showAdvanced && (
+              <>
+                <div className="flex items-center gap-3 px-1 py-2 rounded hover:bg-gray-50">
+                  <div className="flex items-center gap-2 w-24 flex-shrink-0">
+                    {(() => { const Icon = VISIBILITY_CONFIG[task.visibility].icon; return <Icon size={13} className="text-gray-400" />; })()}
+                    <span className="text-xs text-gray-400">{t('tasks.detailPanel.shareWith')}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    {(Object.entries(VISIBILITY_CONFIG) as [TaskVisibility, (typeof VISIBILITY_CONFIG)[TaskVisibility]][]).map(([v, cfg]) => (
                       <button
-                        key={div.id}
-                        onClick={() => patch({ visibility: 'DIVISION_SELECT', divisionIds: newIds })}
+                        key={v}
+                        onClick={() => patch({ visibility: v, ...(v !== 'DIVISION_SELECT' && { divisionIds: [] }) })}
                         disabled={!canEditFully}
                         className={cn(
-                          'flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] border transition-colors disabled:opacity-40 disabled:cursor-not-allowed',
-                          selected
-                            ? 'bg-navy/10 text-navy border-navy/30 font-medium'
-                            : 'text-gray-400 border-gray-200 hover:border-navy/30 hover:text-navy',
+                          'flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-medium border transition-colors disabled:opacity-40',
+                          task.visibility === v
+                            ? 'bg-navy/10 text-navy border-navy/30'
+                            : 'text-gray-400 border-gray-200 hover:text-navy hover:border-navy/30',
                         )}
                       >
-                        <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: div.color }} />
-                        {div.name}
+                        <cfg.icon size={11} /> {visibilityLabel(t, v, user?.division?.name)}
                       </button>
-                    );
-                  })}
+                    ))}
+                  </div>
                 </div>
-              </div>
+
+                <div className="flex items-center gap-3 px-1 py-2 rounded hover:bg-gray-50">
+                  <div className="flex items-center gap-2 w-24 flex-shrink-0">
+                    {task.isPrivate ? <EyeOff size={13} className="text-gray-400" /> : <Eye size={13} className="text-gray-400" />}
+                    <span className="text-xs text-gray-400">{t('tasks.detailPanel.toSupervisor')}</span>
+                  </div>
+                  <button
+                    onClick={() => patch({ isPrivate: !task.isPrivate })}
+                    disabled={!canEditFully}
+                    className={cn(
+                      'flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-medium border transition-colors disabled:opacity-40 disabled:cursor-not-allowed',
+                      task.isPrivate
+                        ? 'bg-gray-100 text-gray-500 border-gray-300'
+                        : 'bg-emerald-50 text-emerald-600 border-emerald-200',
+                    )}
+                  >
+                    {task.isPrivate ? <><EyeOff size={11} /> {t('tasks.detailPanel.hiddenFromSupervisor')}</> : <><Eye size={11} /> {t('tasks.detailPanel.visibleToSupervisor')}</>}
+                  </button>
+                </div>
+
+                {task.visibility === 'DIVISION_SELECT' && (
+                  <div className="flex items-start gap-3 px-1 py-2">
+                    <div className="flex items-center gap-2 w-24 flex-shrink-0 pt-1">
+                      <Building2 size={13} className="text-gray-400" />
+                      <span className="text-xs text-gray-400">{t('tasks.detailPanel.division')}</span>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {panelDivisions.map((div) => {
+                        const selected = task.divisionAccess?.some((a) => a.divisionId === div.id) ?? false;
+                        const newIds = selected
+                          ? (task.divisionAccess ?? []).filter((a) => a.divisionId !== div.id).map((a) => a.divisionId)
+                          : [...(task.divisionAccess ?? []).map((a) => a.divisionId), div.id];
+                        return (
+                          <button
+                            key={div.id}
+                            onClick={() => patch({ visibility: 'DIVISION_SELECT', divisionIds: newIds })}
+                            disabled={!canEditFully}
+                            className={cn(
+                              'flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] border transition-colors disabled:opacity-40 disabled:cursor-not-allowed',
+                              selected
+                                ? 'bg-navy/10 text-navy border-navy/30 font-medium'
+                                : 'text-gray-400 border-gray-200 hover:border-navy/30 hover:text-navy',
+                            )}
+                          >
+                            <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: div.color }} />
+                            {div.name}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </>
             )}
 
             <div className="flex items-center gap-3 px-1 py-2 rounded hover:bg-gray-50">

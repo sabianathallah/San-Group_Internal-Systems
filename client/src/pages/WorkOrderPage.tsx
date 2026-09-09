@@ -10,7 +10,7 @@ import {
   MapPin, User, Calendar, List, Filter, RefreshCw, Loader2,
   CheckCircle2, Circle, ArrowRight, Camera, History, ChevronUp,
   Zap, AlertCircle, Ban, LayoutGrid, Table2, ImageOff, ThumbsUp, ThumbsDown,
-  ShieldCheck, ClipboardCheck, Download, Info,
+  ShieldCheck, ClipboardCheck, Download, Info, Phone,
 } from 'lucide-react';
 import api from '@/lib/api';
 import { cn } from '@/lib/cn';
@@ -61,7 +61,7 @@ type ViewFilter = 'all' | 'mine' | 'reported' | 'unassigned' | 'pendingReview';
 type BoardMode = 'kanban' | 'table';
 
 export interface WOUser {
-  id: string; fullName: string; username: string; avatar: string | null; divisionId: string;
+  id: string; fullName: string; username: string; avatar: string | null; divisionId: string; phone?: string | null;
 }
 
 interface WOHistory {
@@ -1268,6 +1268,14 @@ export function WODetail({
               <Avatar user={wo.reportedBy} size={6} />
               <span className="text-xs text-gray-700">{wo.reportedBy.fullName}</span>
             </div>
+            {wo.reportedBy.phone && (
+              <a
+                href={`tel:${wo.reportedBy.phone}`}
+                className="inline-flex items-center gap-1 text-[11px] text-gray-400 hover:text-navy"
+              >
+                <Phone size={11} /> {wo.reportedBy.phone}
+              </a>
+            )}
           </div>
           <div className="space-y-1">
             <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wide">{t('workOrder.detail.assignedTo')}</p>

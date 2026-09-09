@@ -8,7 +8,7 @@ import { parsePagination, buildMeta } from '@/helpers/pagination';
 import { AppError } from '@/middlewares/errorHandler.middleware';
 import { getPermissionsForRole } from '@/services/permission.service';
 
-const USER_SELECT = { id: true, fullName: true, username: true, avatar: true, divisionId: true } as const;
+const USER_SELECT = { id: true, fullName: true, username: true, avatar: true, divisionId: true, phone: true } as const;
 
 // Defense in depth: the assignee picker already only lists eligible users, but
 // this re-checks server-side so a direct API call can't assign a work order to
