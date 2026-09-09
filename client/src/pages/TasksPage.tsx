@@ -1,5 +1,5 @@
 import {
-  useEffect, useState, useRef, useCallback, FormEvent, KeyboardEvent, useMemo,
+  useEffect, useState, useRef, useCallback, FormEvent, KeyboardEvent, useMemo, Fragment,
 } from 'react';
 import {
   Sun, Star, ClipboardList, CalendarDays, LayoutList, Users, Table2,
@@ -545,20 +545,54 @@ function groupTasks(tasks: Task[], groupBy: GroupBy, t: TFunc): { label: string;
 
 // ── List View ──────────────────────────────────────────────
 function ListView({
-  tasks, selectedId, onSelect, onToggle, onDelete, onCreated, onToggleMyDay, onToggleImportant,
-  listId, showUser, groupBy, showDone, extraPayload,
+  tasks, selectedId, onSelect, onToggle, onDelete, onToggleMyDay, onToggleImportant, onStatusChange,
+  listId, showUser, groupBy, showDone,
 }: {
   tasks: Task[]; selectedId: string | null; onSelect: (id: string) => void;
   onToggle: (t: Task) => void; onDelete: (id: string) => void; onCreated: (t: Task) => void;
   onToggleMyDay: (t: Task) => void; onToggleImportant: (t: Task) => void;
+  onStatusChange: (t: Task, status: TaskStatus) => void;
   listId?: string | null; showUser?: boolean; groupBy: GroupBy; showDone?: boolean;
   extraPayload?: Record<string, unknown>;
 }) {
   const { t, i18n } = useTranslation();
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({ DONE: true });
-  const [addingTo,  setAddingTo]  = useState<string | null>(null);
-  const [newTitle,  setNewTitle]  = useState('');
-  const [adding,    setAdding]    = useState(false);
+
+  // Inline subtask expansion — lets people peek at (and check off) subtasks
+  // right in the list, instead of always having to open the detail panel
+  // and click into its Subtasks tab first.
+  const [expandedIds,  setExpandedIds]  = useState<Record<string, boolean>>({});
+  const [subtaskCache, setSubtaskCache] = useState<Record<string, Task[]>>({});
+  const [subtaskLoading, setSubtaskLoading] = useState<Record<string, boolean>>({});
+
+  async function toggleExpand(task: Task) {
+    const next = !expandedIds[task.id];
+    setExpandedIds((p) => ({ ...p, [task.id]: next }));
+    if (next && !subtaskCache[task.id]) {
+      setSubtaskLoading((p) => ({ ...p, [task.id]: true }));
+      try {
+        const res = await api.get(`/tasks/${task.id}`);
+        setSubtaskCache((p) => ({ ...p, [task.id]: res.data.data.subTasks ?? [] }));
+      } catch (err) { toast.error(extractErr(err, t)); }
+      finally { setSubtaskLoading((p) => ({ ...p, [task.id]: false })); }
+    }
+  }
+
+  async function toggleInlineSubtask(sub: Task, parentId: string) {
+    const next: TaskStatus = sub.status === 'DONE' ? 'TODO' : 'DONE';
+    setSubtaskCache((p) => ({
+      ...p,
+      [parentId]: (p[parentId] ?? []).map((s) => s.id === sub.id ? { ...s, status: next } : s),
+    }));
+    try { await api.patch(`/tasks/${sub.id}`, { status: next }); }
+    catch (err) {
+      toast.error(extractErr(err, t));
+      setSubtaskCache((p) => ({
+        ...p,
+        [parentId]: (p[parentId] ?? []).map((s) => s.id === sub.id ? { ...s, status: sub.status } : s),
+      }));
+    }
+  }
 
   const allDoneCount = tasks.filter((t) => t.status === 'DONE').length;
   const doneCount    = allDoneCount;
@@ -566,23 +600,6 @@ function ListView({
   const progress     = tasks.length > 0 ? Math.round((doneCount / tasks.length) * 100) : 0;
 
   const groups = groupTasks(visibleTasks, groupBy, t);
-
-  async function quickAdd(status: string) {
-    if (!newTitle.trim()) { setAddingTo(null); return; }
-    setAdding(true);
-    try {
-      const payload: Record<string, unknown> = {
-        title: newTitle.trim(),
-        status: status === 'DONE' ? 'DONE' : status === 'IN_PROGRESS' ? 'IN_PROGRESS' : 'TODO',
-        priority: 'MEDIUM',
-        ...extraPayload,
-      };
-      if (listId) payload.listId = listId;
-      const res = await api.post('/tasks', payload);
-      onCreated(res.data.data);
-      setNewTitle(''); setAddingTo(null);
-    } catch (err) { toast.error(extractErr(err, t)); } finally { setAdding(false); }
-  }
 
   return (
     <div className="flex-1 overflow-y-auto">
@@ -622,7 +639,8 @@ function ListView({
             {!isCollapsed && (
               <>
                 {group.tasks.map((task) => (
-                  <div key={task.id} className="group grid grid-cols-[1fr_110px_100px_80px] gap-2 items-center">
+                  <Fragment key={task.id}>
+                  <div className="group grid grid-cols-[1fr_110px_100px_80px] gap-2 items-center">
                     <div className={cn(
                       'flex items-center gap-2 px-4 py-2.5 border-b border-gray-50 cursor-pointer hover:bg-gray-50 transition-colors border-l-2',
                       selectedId === task.id ? 'bg-navy/5 border-l-navy' : PRIORITY_CONFIG[task.priority].border,
@@ -638,10 +656,19 @@ function ListView({
                         {task.title}
                       </span>
                       {task.assignmentStatus && <AssignBadge status={task.assignmentStatus} />}
-                      {(task._count.subTasks > 0 || task._count.comments > 0) && (
+                      {task._count.subTasks > 0 && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); toggleExpand(task); }}
+                          title={t('tasks.listView.toggleSubtasks')}
+                          className="text-[10px] text-gray-400 hover:text-navy flex items-center gap-0.5 flex-shrink-0"
+                        >
+                          {expandedIds[task.id] ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
+                          <GripVertical size={10} />{task._count.subTasks}
+                        </button>
+                      )}
+                      {task._count.comments > 0 && (
                         <span className="text-[10px] text-gray-400 flex items-center gap-1 flex-shrink-0">
-                          {task._count.subTasks > 0 && <><GripVertical size={10} />{task._count.subTasks}</>}
-                          {task._count.comments > 0 && <><MessageSquare size={10} />{task._count.comments}</>}
+                          <MessageSquare size={10} />{task._count.comments}
                         </span>
                       )}
                       {showUser && <p className="text-[10px] text-gray-400 truncate">{task.creator.fullName}</p>}
@@ -657,7 +684,18 @@ function ListView({
                       </button>
                     </div>
                     <div className="py-2.5 border-b border-gray-50">
-                      {(() => { const ds = displayStatus(task, t); return <span className={cn('text-[10px] font-medium px-1.5 py-0.5 rounded-full', ds.bg, ds.color)}>{ds.label}</span>; })()}
+                      {task.assignmentStatus === 'PENDING' ? (
+                        (() => { const ds = displayStatus(task, t); return <span className={cn('text-[10px] font-medium px-1.5 py-0.5 rounded-full', ds.bg, ds.color)}>{ds.label}</span>; })()
+                      ) : (
+                        <select
+                          value={task.status === 'IN_PROGRESS' ? 'TODO' : task.status}
+                          onClick={(e) => e.stopPropagation()}
+                          onChange={(e) => onStatusChange(task, e.target.value as TaskStatus)}
+                          className={cn('text-[11px] font-medium rounded-full pl-1.5 pr-0.5 py-0.5 outline-none cursor-pointer border-0', displayStatus(task, t).bg, displayStatus(task, t).color)}
+                        >
+                          {VISIBLE_STATUS_ENTRIES.map(([k]) => <option key={k} value={k}>{statusLabel(t, k)}</option>)}
+                        </select>
+                      )}
                     </div>
                     <div className="flex items-center gap-1.5 py-2.5 border-b border-gray-50">
                       <PriorityDot priority={task.priority} />
@@ -671,26 +709,32 @@ function ListView({
                       </button>
                     </div>
                   </div>
-                ))}
 
-                {addingTo === group.key ? (
-                  <div className="flex items-center gap-2 px-4 py-2 border-b border-gray-50 bg-blue-50/20">
-                    <div className="w-4" />
-                    <Circle size={14} className="text-gray-300" />
-                    <input autoFocus value={newTitle} onChange={(e) => setNewTitle(e.target.value)}
-                      onKeyDown={(e) => { if (e.key === 'Enter') quickAdd(group.key); if (e.key === 'Escape') { setAddingTo(null); setNewTitle(''); } }}
-                      onBlur={() => { if (!newTitle.trim()) setAddingTo(null); }}
-                      placeholder={t('tasks.listView.newTaskPlaceholder')}
-                      className="flex-1 text-sm outline-none bg-transparent" />
-                    {adding ? <Loader2 size={13} className="animate-spin text-gray-400" /> :
-                      <button onClick={() => quickAdd(group.key)} className="text-[11px] text-white bg-navy px-2 py-0.5 rounded">{t('tasks.listView.ok')}</button>}
-                  </div>
-                ) : (
-                  <button onClick={() => { setAddingTo(group.key); setNewTitle(''); }}
-                    className="flex items-center gap-2 w-full px-4 py-2 text-xs text-gray-400 hover:text-navy hover:bg-gray-50 transition-colors border-b border-gray-50">
-                    <Plus size={12} /> {t('tasks.listView.addTask')}
-                  </button>
-                )}
+                  {expandedIds[task.id] && (
+                    <div className="pl-9 pr-4 py-1.5 border-b border-gray-50 bg-gray-50/50 space-y-1">
+                      {subtaskLoading[task.id] ? (
+                        <div className="flex items-center gap-1.5 py-1 text-[11px] text-gray-400">
+                          <Loader2 size={11} className="animate-spin" /> {t('tasks.listView.loadingSubtasks')}
+                        </div>
+                      ) : (
+                        (subtaskCache[task.id] ?? []).map((sub) => (
+                          <div key={sub.id} className="flex items-center gap-2 py-0.5">
+                            <button onClick={() => toggleInlineSubtask(sub, task.id)}
+                              className={cn('w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center flex-shrink-0',
+                                sub.status === 'DONE' ? 'border-green-500 bg-green-500' : 'border-gray-300 hover:border-navy')}>
+                              {sub.status === 'DONE' && <CheckCircle2 size={8} className="text-white" strokeWidth={3} />}
+                            </button>
+                            <button onClick={() => onSelect(sub.id)}
+                              className={cn('text-xs text-left truncate hover:text-navy', sub.status === 'DONE' && 'line-through text-gray-400')}>
+                              {sub.title}
+                            </button>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  )}
+                  </Fragment>
+                ))}
               </>
             )}
           </div>
@@ -784,7 +828,7 @@ function BoardColumn({ group, groupBy, children }: {
   );
 }
 
-function BoardView({ tasks, selectedId, onSelect, onToggle, onDelete, onCreated, onToggleMyDay, onToggleImportant, groupBy, onMove, extraPayload }: {
+function BoardView({ tasks, selectedId, onSelect, onToggle, onDelete, onToggleMyDay, onToggleImportant, groupBy, onMove }: {
   tasks: Task[]; selectedId: string | null; onSelect: (id: string) => void;
   onToggle: (t: Task) => void; onDelete: (id: string) => void; onCreated: (t: Task) => void;
   onToggleMyDay: (t: Task) => void; onToggleImportant: (t: Task) => void;
@@ -792,9 +836,6 @@ function BoardView({ tasks, selectedId, onSelect, onToggle, onDelete, onCreated,
   extraPayload?: Record<string, unknown>;
 }) {
   const { t } = useTranslation();
-  const [addingTo, setAddingTo] = useState<string | null>(null);
-  const [newTitle, setNewTitle] = useState('');
-  const [adding,   setAdding]   = useState(false);
   const [dragTask, setDragTask] = useState<Task | null>(null);
 
   // Require a small movement before drag starts so plain clicks still select
@@ -821,22 +862,6 @@ function BoardView({ tasks, selectedId, onSelect, onToggle, onDelete, onCreated,
     onMove(task, String(over.id));
   }
 
-  async function quickAdd(groupKey: string) {
-    if (!newTitle.trim()) { setAddingTo(null); return; }
-    setAdding(true);
-    try {
-      const payload: Record<string, unknown> = { title: newTitle.trim(), priority: 'MEDIUM', status: 'TODO', ...extraPayload };
-      if (groupBy === 'status') {
-        payload.status = groupKey as TaskStatus;
-      } else if (groupBy === 'priority') {
-        payload.priority = groupKey;
-      }
-      const res = await api.post('/tasks', payload);
-      onCreated(res.data.data);
-      setNewTitle(''); setAddingTo(null);
-    } catch (err) { toast.error(extractErr(err, t)); } finally { setAdding(false); }
-  }
-
   return (
     <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
       <div className="flex-1 overflow-x-auto">
@@ -848,24 +873,6 @@ function BoardView({ tasks, selectedId, onSelect, onToggle, onDelete, onCreated,
                   onSelect={onSelect} onToggle={onToggle} onDelete={onDelete}
                   onToggleMyDay={onToggleMyDay} onToggleImportant={onToggleImportant} />
               ))}
-
-              {addingTo === group.key ? (
-                <div className="bg-white rounded-lg border border-navy/30 p-3 shadow-sm">
-                  <input autoFocus value={newTitle} onChange={(e) => setNewTitle(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === 'Enter') quickAdd(group.key); if (e.key === 'Escape') { setAddingTo(null); setNewTitle(''); } }}
-                    placeholder={t('tasks.boardView.taskTitlePlaceholder')} className="w-full text-sm outline-none placeholder:text-gray-300 mb-2" />
-                  <div className="flex gap-1">
-                    {adding ? <Loader2 size={13} className="animate-spin text-gray-400" /> :
-                      <><button onClick={() => quickAdd(group.key)} className="text-[11px] text-white bg-navy px-2 py-1 rounded">{t('tasks.boardView.ok')}</button>
-                        <button onClick={() => { setAddingTo(null); setNewTitle(''); }} className="text-[11px] text-gray-500 px-2 py-1 rounded hover:bg-gray-100">{t('tasks.boardView.cancel')}</button></>}
-                  </div>
-                </div>
-              ) : (
-                <button onClick={() => { setAddingTo(group.key); setNewTitle(''); }}
-                  className="flex items-center gap-1.5 w-full px-3 py-2 text-xs text-gray-400 hover:text-navy rounded-lg hover:bg-white border border-dashed border-gray-200 hover:border-navy transition-colors">
-                  <Plus size={12} /> {t('tasks.boardView.addTask')}
-                </button>
-              )}
             </BoardColumn>
           ))}
         </div>
@@ -2715,6 +2722,21 @@ export default function TasksPage() {
     }
   }, [sidebarView, t]);
 
+  // Inline status change from a List row — lets people move a task along
+  // without opening the detail panel just to flip its status.
+  const handleStatusChange = useCallback(async (task: Task, status: TaskStatus) => {
+    if (status === task.status) return;
+    const prevStatus = task.status;
+    setTasks((prev) => prev.map((t) => t.id === task.id ? { ...t, status } : t));
+    try {
+      const res = await api.patch(`/tasks/${task.id}`, { status });
+      setTasks((prev) => prev.map((t) => t.id === task.id ? { ...t, ...res.data.data } : t));
+    } catch (err) {
+      setTasks((prev) => prev.map((t) => t.id === task.id ? { ...t, status: prevStatus } : t));
+      toast.error(extractErr(err, t));
+    }
+  }, [t]);
+
   // Board drag & drop → patch status/priority
   const handleBoardMove = useCallback(async (task: Task, groupKey: string) => {
     const patch: Partial<Task> = groupBy === 'priority'
@@ -2905,21 +2927,16 @@ export default function TasksPage() {
             </div>
           )}
 
+          {/* Search — kept near the title on the left, per feedback that it
+              was too easy to miss buried among the view/group/sort controls. */}
           {sidebarView !== 'completed' && (
-          <div className="flex items-center gap-0.5 bg-gray-100 rounded-lg p-0.5">
-            {([
-              { v: 'list'     as const, icon: LayoutList,   label: t('tasks.toolbar.viewList')  },
-              { v: 'board'    as const, icon: Columns3,     label: t('tasks.toolbar.viewBoard') },
-              { v: 'calendar' as const, icon: CalendarDays, label: t('tasks.toolbar.viewCal')   },
-              { v: 'table'    as const, icon: Table2,       label: t('tasks.toolbar.viewTable') },
-            ]).map(({ v, icon: Icon, label }) => (
-              <button key={v} onClick={() => setViewMode(v)}
-                className={cn('flex items-center gap-1 px-2 py-1.5 rounded-md text-xs font-medium transition-colors',
-                  viewMode === v ? 'bg-white text-navy shadow-sm' : 'text-gray-500 hover:text-gray-700')}>
-                <Icon size={12} />{label}
-              </button>
-            ))}
-          </div>)}
+            <div className="relative">
+              <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+              <input type="text" placeholder={t('tasks.toolbar.searchPlaceholder')} value={search} onChange={(e) => setSearch(e.target.value)}
+                className="pl-7 pr-6 py-1.5 text-xs border border-gray-200 rounded-lg outline-none focus:border-navy w-36" />
+              {search && <button onClick={() => setSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400"><X size={11} /></button>}
+            </div>
+          )}
 
           {/* Group by (not for table/calendar) */}
           {sidebarView !== 'completed' && (viewMode === 'list' || viewMode === 'board') && (
@@ -2947,15 +2964,25 @@ export default function TasksPage() {
             </div>
           )}
 
-          {sidebarView !== 'completed' && <>
-          {/* Search */}
-          <div className="relative">
-            <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
-            <input type="text" placeholder={t('tasks.toolbar.searchPlaceholder')} value={search} onChange={(e) => setSearch(e.target.value)}
-              className="pl-7 pr-6 py-1.5 text-xs border border-gray-200 rounded-lg outline-none focus:border-navy w-36" />
-            {search && <button onClick={() => setSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400"><X size={11} /></button>}
-          </div>
+          {/* View switcher — moved to the right side of the toolbar, next to
+              Filter, instead of up front next to the title. */}
+          {sidebarView !== 'completed' && (
+          <div className="flex items-center gap-0.5 bg-gray-100 rounded-lg p-0.5">
+            {([
+              { v: 'list'     as const, icon: LayoutList,   label: t('tasks.toolbar.viewList')  },
+              { v: 'board'    as const, icon: Columns3,     label: t('tasks.toolbar.viewBoard') },
+              { v: 'calendar' as const, icon: CalendarDays, label: t('tasks.toolbar.viewCal')   },
+              { v: 'table'    as const, icon: Table2,       label: t('tasks.toolbar.viewTable') },
+            ]).map(({ v, icon: Icon, label }) => (
+              <button key={v} onClick={() => setViewMode(v)}
+                className={cn('flex items-center gap-1 px-2 py-1.5 rounded-md text-xs font-medium transition-colors',
+                  viewMode === v ? 'bg-white text-navy shadow-sm' : 'text-gray-500 hover:text-gray-700')}>
+                <Icon size={12} />{label}
+              </button>
+            ))}
+          </div>)}
 
+          {sidebarView !== 'completed' && <>
           {/* Filter button */}
           <button
             onClick={() => setShowFilters((f) => !f)}
@@ -3151,6 +3178,7 @@ export default function TasksPage() {
                 onCreated={handleTaskCreated}
                 onToggleMyDay={handleToggleMyDay}
                 onToggleImportant={handleToggleImportant}
+                onStatusChange={handleStatusChange}
                 listId={activeListId}
                 showUser={sidebarView === 'team'}
                 groupBy={groupBy}

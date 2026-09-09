@@ -154,21 +154,14 @@
       "colPriority": "Prioritas",
       "colDue": "Tenggat",
       "doneOf": "{{done}}/{{total}} selesai",
-      "newTaskPlaceholder": "Judul task baru...",
-      "addTask": "Tambah task",
-      "ok": "OK",
       "clickToggle": "Klik: To Do → Selesai",
       "removeFromMyDay": "Hapus dari My Day",
       "addToMyDay": "Tambah ke My Day",
       "removeFromImportant": "Hapus dari Penting",
       "markImportant": "Tandai sebagai penting",
-      "unassigned": "Belum ditugaskan"
-    },
-    "boardView": {
-      "taskTitlePlaceholder": "Judul task...",
-      "addTask": "Tambah task",
-      "ok": "OK",
-      "cancel": "Batal"
+      "unassigned": "Belum ditugaskan",
+      "toggleSubtasks": "Tampilkan/sembunyikan subtask",
+      "loadingSubtasks": "Memuat subtask..."
     },
     "tableView": {
       "colTitle": "Judul",

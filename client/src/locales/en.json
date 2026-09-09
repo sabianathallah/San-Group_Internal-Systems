@@ -154,21 +154,14 @@
       "colPriority": "Priority",
       "colDue": "Due",
       "doneOf": "{{done}}/{{total}} done",
-      "newTaskPlaceholder": "New task title...",
-      "addTask": "Add task",
-      "ok": "OK",
       "clickToggle": "Click: To Do → Done",
       "removeFromMyDay": "Remove from My Day",
       "addToMyDay": "Add to My Day",
       "removeFromImportant": "Remove from Important",
       "markImportant": "Mark as important",
-      "unassigned": "Unassigned"
-    },
-    "boardView": {
-      "taskTitlePlaceholder": "Task title...",
-      "addTask": "Add task",
-      "ok": "OK",
-      "cancel": "Cancel"
+      "unassigned": "Unassigned",
+      "toggleSubtasks": "Show/hide subtasks",
+      "loadingSubtasks": "Loading subtasks..."
     },
     "tableView": {
       "colTitle": "Title",
