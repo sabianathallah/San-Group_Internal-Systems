@@ -246,12 +246,16 @@
       "description": "Deskripsi",
       "subtasksTab": "Subtask",
       "linksTab": "Link",
+      "filesTab": "File",
       "notesTab": "Catatan",
       "add": "Tambah",
       "subtaskPlaceholder": "Nama subtask...",
       "linkUrlPlaceholder": "https://…",
       "linkTitlePlaceholder": "Nama link (opsional)",
       "addLink": "Tambah link",
+      "attachFile": "Lampirkan file",
+      "attachFileHint": "JPG, PNG, PDF, Word, atau Excel — maksimal 10MB",
+      "attachmentTooLarge": "Ukuran file maksimal 10MB",
       "noNotesYet": "Belum ada catatan",
       "notePlaceholder": "Tulis catatan... (Enter untuk kirim, Shift+Enter untuk baris baru)",
       "send": "Kirim"
@@ -421,6 +425,9 @@
       "dueDateAutoHint": "Otomatis diatur berdasarkan prioritas — sesuaikan jika perlu",
       "assignLabel": "Tugaskan ke Teknisi",
       "unassignedOption": "— Belum Ditugaskan —",
+      "attachPhotosLabel": "Lampirkan Foto/Video (opsional)",
+      "attachPhotosBtn": "Ambil / Pilih Foto atau Video",
+      "attachmentUploadFailed": "Gagal mengunggah {{name}}",
       "technicianNotesLabel": "Catatan Teknisi",
       "technicianNotesPlaceholder": "Catatan internal untuk teknisi...",
       "titleRequired": "Judul wajib diisi",
@@ -861,7 +868,8 @@
           "create": "Buat task",
           "edit": "Edit task",
           "delete": "Hapus task",
-          "viewPrivate": "Lihat task privat milik orang lain"
+          "viewPrivate": "Lihat task privat milik orang lain",
+          "editAssignedFully": "Edit penuh task yang di-assign (bukan pembuatnya)"
         },
         "bulletin": {
           "title": "Bulletin",

@@ -5,6 +5,7 @@ import {
   acceptTask, rejectTask,
   listComments, addComment, deleteComment,
   addLink, deleteLink,
+  addAttachment, deleteAttachment,
   getCompletedTasks, setPersonalList,
 } from '@/controllers/task.controller';
 import { authenticate } from '@/middlewares/auth.middleware';
@@ -13,7 +14,7 @@ import { validate } from '@/middlewares/validate.middleware';
 import { uuidParamSchema } from '@/validations/common.validation';
 import {
   createTaskSchema, updateTaskSchema, taskFilterSchema,
-  rejectTaskSchema, addCommentSchema, addLinkSchema,
+  rejectTaskSchema, addCommentSchema, addLinkSchema, addAttachmentSchema,
 } from '@/validations/task.validation';
 
 const router = Router();
@@ -43,5 +44,8 @@ router.delete('/:id/comments/:commentId', checkPerm('task', 'edit'),   deleteCom
 
 router.post('/:id/links',          checkPerm('task', 'edit'),   validate(uuidParamSchema, ['params']), validate(addLinkSchema), addLink);
 router.delete('/:id/links/:linkId', checkPerm('task', 'edit'),   deleteLink);
+
+router.post('/:id/attachments',                 checkPerm('task', 'edit'), validate(uuidParamSchema, ['params']), validate(addAttachmentSchema), addAttachment);
+router.delete('/:id/attachments/:attachmentId', checkPerm('task', 'edit'), deleteAttachment);
 
 export default router;

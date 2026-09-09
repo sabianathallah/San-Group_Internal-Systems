@@ -380,6 +380,10 @@ function WorkOrderModal({
   const [saving, setSaving] = useState(false);
   // Once the user touches the due date, stop auto-adjusting it on priority change.
   const [dueTouched, setDueTouched] = useState(false);
+  // Photos/videos picked before the WO exists yet — uploaded right after
+  // creation succeeds and we get back a real id (create mode only).
+  const [stagedFiles, setStagedFiles] = useState<File[]>([]);
+  const stagedInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (open) {
@@ -394,6 +398,7 @@ function WorkOrderModal({
         notes:        editItem.notes ?? '',
       } : { ...DEFAULT_FORM, dueDate: slaDueDateInput(DEFAULT_FORM.priority) });
       setDueTouched(!!editItem);
+      setStagedFiles([]);
     }
   }, [open, editItem]);
 
@@ -433,7 +438,23 @@ function WorkOrderModal({
       const res = editItem
         ? await api.patch(`/work-orders/${editItem.id}`, payload)
         : await api.post('/work-orders', payload);
-      onSaved(res.data.data);
+      let wo = res.data.data;
+
+      // Upload any photos/videos staged before the WO existed — one request
+      // per file against the same endpoint PhotoSection uses post-creation.
+      if (!editItem && stagedFiles.length > 0) {
+        for (const file of stagedFiles) {
+          try {
+            const photoBase64 = await fileToBase64(file);
+            const attRes = await api.post(`/work-orders/${wo.id}/attachments`, { photoBase64, type: 'BEFORE' });
+            wo = { ...wo, attachments: [...(wo.attachments ?? []), attRes.data.data], _count: { ...wo._count, attachments: wo._count.attachments + 1 } };
+          } catch {
+            toast.error(t('workOrder.modal.attachmentUploadFailed', { name: file.name }));
+          }
+        }
+      }
+
+      onSaved(wo);
       toast.success(editItem ? t('workOrder.modal.updated') : t('workOrder.modal.created'));
       onClose();
     } catch (err) { toast.error(extractErr(err)); } finally { setSaving(false); }
@@ -531,6 +552,36 @@ function WorkOrderModal({
                 onChange={(id) => set('assignedToId', id)}
                 clearLabel={t('workOrder.modal.unassignedOption')}
               />
+            </div>
+          )}
+
+          {!editItem && (
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">{t('workOrder.modal.attachPhotosLabel')}</label>
+              <input ref={stagedInputRef} type="file" multiple className="hidden"
+                accept="image/*,video/*"
+                onChange={(e) => {
+                  const files = Array.from(e.target.files ?? []);
+                  e.target.value = '';
+                  if (files.length > 0) setStagedFiles((f) => [...f, ...files]);
+                }} />
+              <button type="button" onClick={() => stagedInputRef.current?.click()}
+                className="w-full flex items-center justify-center gap-2 border border-dashed border-gray-300 rounded-lg px-3 py-2.5 text-xs text-gray-500 hover:border-navy hover:text-navy transition-colors">
+                <Camera size={14} /> {t('workOrder.modal.attachPhotosBtn')}
+              </button>
+              {stagedFiles.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 mt-2">
+                  {stagedFiles.map((file, i) => (
+                    <span key={i} className="flex items-center gap-1 text-[11px] bg-gray-100 text-gray-600 rounded-full pl-2 pr-1 py-0.5">
+                      {file.name}
+                      <button type="button" onClick={() => setStagedFiles((f) => f.filter((_, j) => j !== i))}
+                        className="text-gray-400 hover:text-red-500">
+                        <X size={10} />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 

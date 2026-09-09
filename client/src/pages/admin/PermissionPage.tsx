@@ -733,6 +733,10 @@ export default function PermissionPage() {
                   <Toggle checked={perms.task.viewPrivate} onChange={(v) => update('task', 'viewPrivate', v)}
                     disabled={isSuperAdmin || isReadOnly} />
                 </PermRow>
+                <PermRow label={t('admin.permissions.sections.task.editAssignedFully')}>
+                  <Toggle checked={perms.task.editAssignedFully} onChange={(v) => update('task', 'editAssignedFully', v)}
+                    disabled={isSuperAdmin || isReadOnly} />
+                </PermRow>
               </Section>
 
               <Section title={t('admin.permissions.sections.bulletin.title')}>

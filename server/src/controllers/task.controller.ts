@@ -1,6 +1,10 @@
 import { Response, NextFunction } from 'express';
+import { v2 as cloudinary } from 'cloudinary';
+import '@/config/cloudinary';
 import { AuthRequest } from '@/types';
 import { successResponse } from '@/helpers/response';
+import { AppError } from '@/middlewares/errorHandler.middleware';
+import { deleteFromCloudinary } from '@/middlewares/upload.middleware';
 import { logAction } from '@/services/audit.service';
 import {
   listTasksService, listTeamTasksService,
@@ -9,7 +13,18 @@ import {
   listCommentsService, addCommentService, deleteCommentService,
   addLinkService, deleteLinkService, pendingCountService, getTaskStatsService,
   myDaySuggestionsService, getCompletedTasksService, setPersonalListService,
+  addAttachmentService, deleteAttachmentService,
 } from '@/services/task.service';
+
+const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024; // 10MB
+const ALLOWED_ATTACHMENT_MIME = new Set([
+  'image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp',
+  'application/pdf',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+]);
 
 export async function getCompletedTasks(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
@@ -85,7 +100,8 @@ export async function updateTask(req: AuthRequest, res: Response, next: NextFunc
   try {
     const { userId } = req.user!;
     const permScope = req.permScope ?? 'own';
-    const task = await updateTaskService(String(req.params.id), userId, permScope, req.body);
+    const editAssignedFully = req.editAssignedFully ?? false;
+    const task = await updateTaskService(String(req.params.id), userId, permScope, req.body, editAssignedFully);
     logAction({ action: 'UPDATE', entity: 'task', entityId: task.id, detail: { title: task.title }, userId });
     successResponse(res, task, 'Task berhasil diperbarui');
   } catch (err) { next(err); }
@@ -158,5 +174,48 @@ export async function deleteLink(req: AuthRequest, res: Response, next: NextFunc
     const permScope = req.permScope ?? 'own';
     await deleteLinkService(String(req.params.linkId), String(req.params.id), userId, permScope);
     successResponse(res, null, 'Link berhasil dihapus');
+  } catch (err) { next(err); }
+}
+
+export async function addAttachment(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { userId } = req.user!;
+    const permScope = req.permScope ?? 'own';
+    const { fileBase64, fileName, mimeType, fileSize } = req.body as {
+      fileBase64: string; fileName: string; mimeType: string; fileSize: number;
+    };
+
+    if (!ALLOWED_ATTACHMENT_MIME.has(mimeType)) {
+      throw new AppError('Tipe file tidak didukung', 400);
+    }
+    if (fileSize > MAX_ATTACHMENT_BYTES) {
+      throw new AppError('Ukuran file maksimal 10MB', 400);
+    }
+
+    const result = await cloudinary.uploader.upload(fileBase64, {
+      folder:        'san-group/task-attachments',
+      resource_type: 'auto',
+      public_id:     `task_${req.params.id}_${Date.now()}`,
+    });
+
+    const attachment = await addAttachmentService(String(req.params.id), userId, permScope, {
+      fileName,
+      filePath: result.secure_url,
+      fileSize: result.bytes ?? fileSize,
+      mimeType,
+    });
+    successResponse(res, attachment, 'File berhasil dilampirkan', 201);
+  } catch (err) { next(err); }
+}
+
+export async function deleteAttachment(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { userId } = req.user!;
+    const permScope = req.permScope ?? 'own';
+    const attachment = await deleteAttachmentService(
+      String(req.params.attachmentId), String(req.params.id), userId, permScope,
+    );
+    deleteFromCloudinary(attachment.filePath).catch(() => {});
+    successResponse(res, null, 'Lampiran berhasil dihapus');
   } catch (err) { next(err); }
 }

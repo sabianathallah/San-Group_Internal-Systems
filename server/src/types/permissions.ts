@@ -7,6 +7,10 @@ export interface TaskPermissions {
   edit: Scope;
   delete: Scope;
   viewPrivate: boolean;
+  /** When edit scope is 'own' and the user is only the assignee (not the
+   *  creator): true lets them edit every field like before; false restricts
+   *  them to status/myDay/isImportant only — the creator keeps full edit. */
+  editAssignedFully: boolean;
 }
 
 export interface BulletinPermissions {
@@ -100,7 +104,7 @@ export interface PermissionConfig {
 // Default permissions per level — matches previous hardcoded behaviour
 export const DEFAULT_PERMISSIONS: Record<number, PermissionConfig> = {
   1: {
-    task:       { view: 'all',      create: true,  edit: 'all',      delete: 'all',      viewPrivate: true },
+    task:       { view: 'all',      create: true,  edit: 'all',      delete: 'all',      viewPrivate: true, editAssignedFully: true },
     bulletin:   { view: true,       create: true,  audienceScope: 'all',      edit: 'all',  delete: 'all' },
     db_link:    { view: 'all',      addLink: true, manageFolder: true, shareFolder: true },
     note:       { view: 'all',      create: true,  edit: 'all',      delete: 'all' },
@@ -113,7 +117,7 @@ export const DEFAULT_PERMISSIONS: Record<number, PermissionConfig> = {
     division_mgmt: { create: true, edit: 'all', delete: 'all' },
   },
   2: {
-    task:       { view: 'all',      create: true,  edit: 'all',      delete: 'all',      viewPrivate: true },
+    task:       { view: 'all',      create: true,  edit: 'all',      delete: 'all',      viewPrivate: true, editAssignedFully: true },
     bulletin:   { view: true,       create: true,  audienceScope: 'all',      edit: 'all',  delete: 'all' },
     db_link:    { view: 'all',      addLink: true, manageFolder: true, shareFolder: true },
     note:       { view: 'all',      create: true,  edit: 'all',      delete: 'all' },
@@ -128,7 +132,7 @@ export const DEFAULT_PERMISSIONS: Record<number, PermissionConfig> = {
     division_mgmt: { create: true, edit: 'all', delete: 'all' },
   },
   3: {
-    task:       { view: 'division', create: true,  edit: 'division', delete: 'division', viewPrivate: true },
+    task:       { view: 'division', create: true,  edit: 'division', delete: 'division', viewPrivate: true, editAssignedFully: true },
     bulletin:   { view: true,       create: true,  audienceScope: 'all',      edit: 'own',  delete: 'own' },
     db_link:    { view: 'division', addLink: true, manageFolder: true, shareFolder: true },
     note:       { view: 'division', create: true,  edit: 'own',      delete: 'own' },
@@ -141,7 +145,7 @@ export const DEFAULT_PERMISSIONS: Record<number, PermissionConfig> = {
     division_mgmt: { create: false, edit: 'none', delete: 'none' },
   },
   4: {
-    task:       { view: 'division', create: true,  edit: 'own',      delete: 'own',      viewPrivate: false },
+    task:       { view: 'division', create: true,  edit: 'own',      delete: 'own',      viewPrivate: false, editAssignedFully: false },
     bulletin:   { view: true,       create: true,  audienceScope: 'division', edit: 'own',  delete: 'own' },
     db_link:    { view: 'division', addLink: true, manageFolder: false, shareFolder: false },
     note:       { view: 'division', create: true,  edit: 'own',      delete: 'own' },
@@ -154,7 +158,7 @@ export const DEFAULT_PERMISSIONS: Record<number, PermissionConfig> = {
     division_mgmt: { create: false, edit: 'none', delete: 'none' },
   },
   5: {
-    task:       { view: 'division', create: true,  edit: 'own',      delete: 'own',      viewPrivate: false },
+    task:       { view: 'division', create: true,  edit: 'own',      delete: 'own',      viewPrivate: false, editAssignedFully: false },
     bulletin:   { view: true,       create: false, audienceScope: 'none',     edit: 'none', delete: 'none' },
     db_link:    { view: 'division', addLink: false, manageFolder: false, shareFolder: false },
     note:       { view: 'own',      create: true,  edit: 'own',      delete: 'own' },
@@ -167,7 +171,7 @@ export const DEFAULT_PERMISSIONS: Record<number, PermissionConfig> = {
     division_mgmt: { create: false, edit: 'none', delete: 'none' },
   },
   6: {
-    task:       { view: 'division', create: true,  edit: 'own',      delete: 'own',      viewPrivate: false },
+    task:       { view: 'division', create: true,  edit: 'own',      delete: 'own',      viewPrivate: false, editAssignedFully: false },
     bulletin:   { view: true,       create: false, audienceScope: 'none',     edit: 'none', delete: 'none' },
     db_link:    { view: 'division', addLink: false, manageFolder: false, shareFolder: false },
     note:       { view: 'own',      create: true,  edit: 'own',      delete: 'own' },

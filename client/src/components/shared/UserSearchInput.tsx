@@ -16,7 +16,7 @@ export interface UserSearchOption {
  * just enough for the task assignee use-case (single select + clear).
  */
 export default function UserSearchInput({
-  users, value, onChange, placeholder, clearLabel, className,
+  users, value, onChange, placeholder, clearLabel, className, disabled,
 }: {
   users: UserSearchOption[];
   value: string;
@@ -24,6 +24,7 @@ export default function UserSearchInput({
   placeholder?: string;
   clearLabel?: string;
   className?: string;
+  disabled?: boolean;
 }) {
   const { t } = useTranslation();
   const resolvedPlaceholder = placeholder ?? t('shared.userSearchInput.placeholder');
@@ -55,12 +56,13 @@ export default function UserSearchInput({
         <input
           type="text"
           value={open ? query : (selected?.fullName ?? '')}
-          onFocus={() => { setOpen(true); setQuery(''); }}
+          disabled={disabled}
+          onFocus={() => { if (!disabled) { setOpen(true); setQuery(''); } }}
           onChange={(e) => { setQuery(e.target.value); setOpen(true); }}
           placeholder={selected ? selected.fullName : resolvedPlaceholder}
-          className="w-full text-sm border border-gray-200 rounded pl-7 pr-6 py-1.5 outline-none focus:border-navy"
+          className="w-full text-sm border border-gray-200 rounded pl-7 pr-6 py-1.5 outline-none focus:border-navy disabled:bg-gray-50 disabled:text-gray-400 disabled:cursor-not-allowed"
         />
-        {selected && !open && (
+        {selected && !open && !disabled && (
           <button
             type="button"
             onClick={() => onChange('')}

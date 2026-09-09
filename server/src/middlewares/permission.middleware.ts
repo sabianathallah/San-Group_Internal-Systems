@@ -24,16 +24,18 @@ export function checkPerm(feature: keyof PermissionConfig, action: string) {
 
       // SuperAdmin bypasses all checks
       if (roleLevel <= 1) {
-        req.permScope   = 'all';
-        req.viewPrivate = true;
+        req.permScope         = 'all';
+        req.viewPrivate       = true;
+        req.editAssignedFully = true;
         return next();
       }
 
       const perms = await getPermissionsForRole(roleId, roleLevel);
 
-      // Load task.viewPrivate for task routes
+      // Load task.viewPrivate / editAssignedFully for task routes
       if (perms.task) {
-        req.viewPrivate = perms.task.viewPrivate;
+        req.viewPrivate       = perms.task.viewPrivate;
+        req.editAssignedFully = perms.task.editAssignedFully ?? false;
       }
 
       const featurePerms = perms[feature] as unknown as Record<string, unknown>;

@@ -68,3 +68,12 @@ export const addLinkSchema = z.object({
     title: z.string().max(200).optional(),
   }),
 });
+
+export const addAttachmentSchema = z.object({
+  body: z.object({
+    fileBase64: z.string().min(1, 'File wajib diisi'),
+    fileName:   z.string().min(1).max(255),
+    mimeType:   z.string().min(1),
+    fileSize:   z.number().int().positive(),
+  }),
+});

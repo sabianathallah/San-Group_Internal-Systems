@@ -9,7 +9,7 @@ import {
   Calendar, User, Loader2, Trash2, FileText,
   ChevronsRight, GripVertical, ChevronLeft, Columns3,
   Filter, SortDesc, Lock, Link2, ExternalLink, MessageSquare,
-  Check, XCircle, Eye, EyeOff, Download, Lightbulb, Globe,
+  Check, XCircle, Eye, EyeOff, Download, Lightbulb, Globe, Paperclip,
 } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
 import {
@@ -43,12 +43,33 @@ const PRIORITY_RANK: Record<TaskPriority, number> = { URGENT: 0, HIGH: 1, MEDIUM
 
 interface TaskUser { id: string; fullName: string; avatar: string | null }
 interface TaskLink { id: string; url: string; title: string | null; createdAt: string }
+interface TaskAttachment {
+  id: string; fileName: string; filePath: string; fileSize: number; mimeType: string;
+  createdAt: string; uploadedBy: TaskUser;
+}
 interface Comment   { id: string; content: string; createdAt: string; user: TaskUser }
 
 interface ListMembership {
   userId: string;
   listId: string;
   taskList: { id: string; name: string; color: string };
+}
+
+const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024; // 10MB, matches server-side cap
+
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload  = () => resolve(reader.result as string);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 // Human duration for the task detail panel ("2d 4h", "35m").
@@ -74,6 +95,7 @@ interface Task {
   taskList: { id: string; name: string; color: string } | null;
   listMemberships?: ListMembership[];
   links: TaskLink[];
+  attachments?: TaskAttachment[];
   _count: { subTasks: number; attachments: number; comments: number };
   divisionAccess?: DivisionAccess[];
   subTasks?: Task[];
@@ -1302,11 +1324,12 @@ function PlannedView({ tasks, selectedId, onSelect, onToggle, onDelete, onToggle
 
 // ── Markdown Description Editor ────────────────────────────
 function DescriptionEditor({
-  value, onChange, onBlur,
+  value, onChange, onBlur, readOnly,
 }: {
   value: string;
   onChange: (v: string) => void;
   onBlur: () => void;
+  readOnly?: boolean;
 }) {
   const { t } = useTranslation();
   const [tab, setTab] = useState<'write' | 'preview'>('write');
@@ -1335,8 +1358,9 @@ function DescriptionEditor({
           onChange={(e) => onChange(e.target.value)}
           onBlur={onBlur}
           rows={5}
+          readOnly={readOnly}
           placeholder={t('tasks.descriptionEditor.placeholder')}
-          className="w-full p-3 text-sm text-gray-700 placeholder:text-gray-300 outline-none resize-none leading-relaxed"
+          className="w-full p-3 text-sm text-gray-700 placeholder:text-gray-300 outline-none resize-none leading-relaxed disabled:bg-gray-50 read-only:bg-gray-50 read-only:text-gray-400"
         />
       ) : (
         <div
@@ -1357,6 +1381,7 @@ function TaskDetailPanel({
   taskLists: TaskList[]; onNavigate: (id: string) => void;
 }) {
   const { t, i18n } = useTranslation();
+  const { perms } = usePermStore();
   // Render instantly from the list's copy; hydrate subtasks/links in the background
   const [task,    setTask]    = useState<Task | null>(initialTask ?? null);
   const [loading, setLoading] = useState(!initialTask);
@@ -1389,7 +1414,9 @@ function TaskDetailPanel({
 
   const [users,          setUsers]          = useState<UserOption[]>([]);
   const [panelDivisions, setPanelDivisions] = useState<Division[]>([]);
-  const [tab,            setTab]            = useState<'subtasks' | 'links' | 'comments'>('subtasks');
+  const [tab,            setTab]            = useState<'subtasks' | 'links' | 'files' | 'comments'>('subtasks');
+  const [uploadingFile,  setUploadingFile]  = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const load = useCallback(async () => {
     try {
@@ -1538,6 +1565,32 @@ function TaskDetailPanel({
     } catch (err) { toast.error(extractErr(err, t)); }
   }
 
+  async function handleFileSelected(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file || !task) return;
+    if (file.size > MAX_ATTACHMENT_BYTES) {
+      toast.error(t('tasks.detailPanel.attachmentTooLarge'));
+      return;
+    }
+    setUploadingFile(true);
+    try {
+      const fileBase64 = await fileToBase64(file);
+      const res = await api.post(`/tasks/${task.id}/attachments`, {
+        fileBase64, fileName: file.name, mimeType: file.type, fileSize: file.size,
+      });
+      setTask((p) => p ? { ...p, attachments: [...(p.attachments ?? []), res.data.data] } : p);
+    } catch (err) { toast.error(extractErr(err, t)); } finally { setUploadingFile(false); }
+  }
+
+  async function deleteAttachment(attachmentId: string) {
+    if (!task) return;
+    try {
+      await api.delete(`/tasks/${task.id}/attachments/${attachmentId}`);
+      setTask((p) => p ? { ...p, attachments: (p.attachments ?? []).filter((a) => a.id !== attachmentId) } : p);
+    } catch (err) { toast.error(extractErr(err, t)); }
+  }
+
   if (loading) return <div className="flex items-center justify-center h-full"><Loader2 size={20} className="animate-spin text-gray-300" /></div>;
   if (!task)   return <div className="flex items-center justify-center h-full"><p className="text-sm text-gray-400">{t('tasks.detailPanel.taskNotFound')}</p></div>;
 
@@ -1548,6 +1601,10 @@ function TaskDetailPanel({
   const isAssignee   = task.assignee?.id === currentUserId;
   const isPending    = task.assignmentStatus === 'PENDING' && isAssignee;
   const myMembership = task.listMemberships?.find((m) => m.userId === currentUserId) ?? null;
+  // Assignee-only editors (not the creator) are limited to status/flags unless
+  // their role's "edit fully assigned tasks" permission is on — everything
+  // else in this panel stays locked to whoever created the task.
+  const canEditFully = isOwner || perms.task.editAssignedFully;
 
   return (
     <div className="flex flex-col h-full overflow-hidden bg-white">
@@ -1626,8 +1683,11 @@ function TaskDetailPanel({
                 }}
                 className="w-full text-xl font-semibold text-gray-900 outline-none border-b-2 border-navy pb-1 bg-transparent" />
             ) : (
-              <h1 onClick={() => setEditTitle(true)}
-                className="text-xl font-semibold text-gray-900 cursor-text hover:text-gray-700 leading-snug">
+              <h1 onClick={() => canEditFully && setEditTitle(true)}
+                className={cn(
+                  'text-xl font-semibold text-gray-900 leading-snug',
+                  canEditFully ? 'cursor-text hover:text-gray-700' : 'cursor-default',
+                )}>
                 {task.title}
               </h1>
             )}
@@ -1652,7 +1712,8 @@ function TaskDetailPanel({
                 <span className="text-xs text-gray-400">{t('tasks.detailPanel.priority')}</span>
               </div>
               <select value={task.priority} onChange={(e) => patch({ priority: e.target.value })}
-                className="text-xs bg-transparent outline-none cursor-pointer text-gray-700 hover:text-navy">
+                disabled={!canEditFully}
+                className="text-xs bg-transparent outline-none cursor-pointer text-gray-700 hover:text-navy disabled:cursor-not-allowed disabled:text-gray-400 disabled:hover:text-gray-400">
                 {Object.keys(PRIORITY_CONFIG).map((k) => <option key={k} value={k}>{priorityLabel(t, k as TaskPriority)}</option>)}
               </select>
             </div>
@@ -1664,6 +1725,7 @@ function TaskDetailPanel({
               </div>
               <input type="date" value={toLocalDateStr(task.startDate)}
                 max={task.dueDate ? toLocalDateStr(task.dueDate) : undefined}
+                disabled={!canEditFully}
                 onChange={(e) => {
                   if (e.target.value && task.dueDate && e.target.value > toLocalDateStr(task.dueDate)) {
                     toast.error(t('tasks.detailPanel.startDateError'));
@@ -1671,7 +1733,7 @@ function TaskDetailPanel({
                   }
                   patch({ startDate: e.target.value ? toLocalISO(e.target.value) : null });
                 }}
-                className="text-xs bg-transparent outline-none cursor-pointer text-gray-700 hover:text-navy" />
+                className="text-xs bg-transparent outline-none cursor-pointer text-gray-700 hover:text-navy disabled:cursor-not-allowed disabled:text-gray-400 disabled:hover:text-gray-400" />
             </div>
 
             <div className="flex items-center gap-3 px-1 py-2 rounded hover:bg-gray-50">
@@ -1681,6 +1743,7 @@ function TaskDetailPanel({
               </div>
               <input type="date" value={toLocalDateStr(task.dueDate)}
                 min={task.startDate ? toLocalDateStr(task.startDate) : undefined}
+                disabled={!canEditFully}
                 onChange={(e) => {
                   if (e.target.value && task.startDate && e.target.value < toLocalDateStr(task.startDate)) {
                     toast.error(t('tasks.detailPanel.dueDateError'));
@@ -1688,7 +1751,7 @@ function TaskDetailPanel({
                   }
                   patch({ dueDate: e.target.value ? toLocalISO(e.target.value) : null });
                 }}
-                className="text-xs bg-transparent outline-none cursor-pointer text-gray-700 hover:text-navy" />
+                className="text-xs bg-transparent outline-none cursor-pointer text-gray-700 hover:text-navy disabled:cursor-not-allowed disabled:text-gray-400 disabled:hover:text-gray-400" />
             </div>
 
             <div className="flex items-center gap-3 px-1 py-2 rounded hover:bg-gray-50">
@@ -1703,6 +1766,7 @@ function TaskDetailPanel({
                 placeholder={t('tasks.detailPanel.searchPeoplePlaceholder')}
                 clearLabel={t('tasks.detailPanel.unassigned')}
                 className="max-w-[200px]"
+                disabled={!canEditFully}
               />
             </div>
 
@@ -1775,7 +1839,7 @@ function TaskDetailPanel({
                   <button
                     key={v}
                     onClick={() => patch({ visibility: v, ...(v !== 'DIVISION_SELECT' && { divisionIds: [] }) })}
-                    disabled={false}
+                    disabled={!canEditFully}
                     className={cn(
                       'flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-medium border transition-colors disabled:opacity-40',
                       task.visibility === v
@@ -1796,8 +1860,9 @@ function TaskDetailPanel({
               </div>
               <button
                 onClick={() => patch({ isPrivate: !task.isPrivate })}
+                disabled={!canEditFully}
                 className={cn(
-                  'flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-medium border transition-colors',
+                  'flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-medium border transition-colors disabled:opacity-40 disabled:cursor-not-allowed',
                   task.isPrivate
                     ? 'bg-gray-100 text-gray-500 border-gray-300'
                     : 'bg-emerald-50 text-emerald-600 border-emerald-200',
@@ -1823,8 +1888,9 @@ function TaskDetailPanel({
                       <button
                         key={div.id}
                         onClick={() => patch({ visibility: 'DIVISION_SELECT', divisionIds: newIds })}
+                        disabled={!canEditFully}
                         className={cn(
-                          'flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] border transition-colors',
+                          'flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] border transition-colors disabled:opacity-40 disabled:cursor-not-allowed',
                           selected
                             ? 'bg-navy/10 text-navy border-navy/30 font-medium'
                             : 'text-gray-400 border-gray-200 hover:border-navy/30 hover:text-navy',
@@ -1877,8 +1943,9 @@ function TaskDetailPanel({
             <DescriptionEditor
               value={descVal}
               onChange={setDescVal}
+              readOnly={!canEditFully}
               onBlur={() => {
-                if (!task) return;
+                if (!task || !canEditFully) return;
                 const val = descVal.trim() || null;
                 if (val !== (task.description ?? null)) patch({ description: val });
               }}
@@ -1893,6 +1960,7 @@ function TaskDetailPanel({
               {([
                 { k: 'subtasks' as const, label: `${t('tasks.detailPanel.subtasksTab')}${totalSub > 0 ? ` (${totalSub})` : ''}` },
                 { k: 'links'    as const, label: `${t('tasks.detailPanel.linksTab')}${task.links.length > 0 ? ` (${task.links.length})` : ''}` },
+                { k: 'files'    as const, label: `${t('tasks.detailPanel.filesTab')}${(task.attachments?.length ?? 0) > 0 ? ` (${task.attachments!.length})` : ''}` },
                 { k: 'comments' as const, label: `${t('tasks.detailPanel.notesTab')}${task._count.comments > 0 ? ` (${task._count.comments})` : ''}` },
               ]).map(({ k, label }) => (
                 <button key={k} onClick={() => setTab(k)}
@@ -1996,6 +2064,34 @@ function TaskDetailPanel({
                     </div>
                   </form>
                 )}
+              </div>
+            )}
+
+            {tab === 'files' && (
+              <div className="space-y-2">
+                {(task.attachments ?? []).map((file) => (
+                  <div key={file.id} className="group flex items-center gap-2 p-2 bg-gray-50 rounded-lg">
+                    <Paperclip size={13} className="text-gray-400 flex-shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <a href={file.filePath} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}
+                        className="text-xs font-medium text-gray-700 hover:text-navy hover:underline truncate block">
+                        {file.fileName}
+                      </a>
+                      <p className="text-[11px] text-gray-400">{formatFileSize(file.fileSize)} · {file.uploadedBy.fullName}</p>
+                    </div>
+                    <button onClick={() => deleteAttachment(file.id)} className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-400">
+                      <X size={12} />
+                    </button>
+                  </div>
+                ))}
+                <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileSelected}
+                  accept="image/jpeg,image/png,image/gif,image/webp,application/pdf,.doc,.docx,.xls,.xlsx" />
+                <button onClick={() => fileInputRef.current?.click()} disabled={uploadingFile}
+                  className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-navy transition-colors disabled:opacity-50">
+                  {uploadingFile ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />}
+                  {t('tasks.detailPanel.attachFile')}
+                </button>
+                <p className="text-[11px] text-gray-300">{t('tasks.detailPanel.attachFileHint')}</p>
               </div>
             )}
 

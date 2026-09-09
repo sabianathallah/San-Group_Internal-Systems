@@ -37,6 +37,11 @@ const TASK_SELECT = {
   taskList: { select: { id: true, name: true, color: true } },
   listMemberships: { select: { userId: true, listId: true, taskList: { select: { id: true, name: true, color: true } } } },
   links:    { select: { id: true, url: true, title: true, createdAt: true }, orderBy: { createdAt: 'asc' as const } },
+  attachments: {
+    select: { id: true, fileName: true, filePath: true, fileSize: true, mimeType: true, createdAt: true,
+      uploadedBy: { select: USER_MINI } },
+    orderBy: { createdAt: 'asc' as const },
+  },
   _count:   { select: { subTasks: true, attachments: true, comments: true } },
   divisionAccess: { select: { divisionId: true, division: { select: { id: true, name: true, color: true } } } },
 } as const;
@@ -380,21 +385,38 @@ export async function createTaskService(userId: string, data: {
 }
 
 // ── Update task ────────────────────────────────────────────
+// Fields an assignee-only editor (not the creator, editAssignedFully=false) may
+// still change — everything else stays locked to the task's creator.
+const ASSIGNEE_ONLY_FIELDS = new Set(['status', 'myDay', 'isImportant']);
+
 export async function updateTaskService(id: string, userId: string, permScope: string, data: {
   title?: string; description?: string | null; status?: TaskStatus;
   priority?: TaskPriority; isImportant?: boolean; myDay?: boolean;
   startDate?: string | null; dueDate?: string | null; assignedToId?: string | null;
   listId?: string | null; parentTaskId?: string | null;
   visibility?: TaskVisibility; divisionIds?: string[]; isPrivate?: boolean;
-}) {
+}, editAssignedFully = false) {
   const task = await prisma.task.findUnique({
     where: { id },
     select: { userId: true, assignedToId: true, title: true, visibility: true, startedAt: true },
   });
   if (!task) throw new AppError('Task tidak ditemukan', 404);
 
-  const isOwner = task.userId === userId || task.assignedToId === userId;
+  const isCreator = task.userId === userId;
+  const isAssignee = task.assignedToId === userId;
+  const isOwner = isCreator || isAssignee;
   if (permScope === 'own' && !isOwner) throw new AppError('Akses ditolak', 403);
+
+  // Assignee (not creator) with edit scope 'own' and editAssignedFully off:
+  // only status/myDay/isImportant may be touched — reject the whole update
+  // if it reaches for anything else, so a locked field fails loudly instead
+  // of silently no-op-ing.
+  if (permScope === 'own' && isAssignee && !isCreator && !editAssignedFully) {
+    const disallowed = Object.keys(data).filter((key) => !ASSIGNEE_ONLY_FIELDS.has(key));
+    if (disallowed.length > 0) {
+      throw new AppError('Hanya pembuat task yang bisa mengubah field ini', 403);
+    }
+  }
 
   // Block marking as DONE if subtasks are not all done
   if (data.status === TaskStatus.DONE) {
@@ -663,6 +685,44 @@ export async function deleteLinkService(linkId: string, taskId: string, userId: 
   if (permScope === 'own' && !isOwner) throw new AppError('Akses ditolak', 403);
 
   await prisma.taskLink.delete({ where: { id: linkId } });
+}
+
+// ── Attachments ────────────────────────────────────────────
+export async function addAttachmentService(taskId: string, userId: string, permScope: string, data: {
+  fileName: string; filePath: string; fileSize: number; mimeType: string;
+}) {
+  const task = await prisma.task.findUnique({
+    where: { id: taskId },
+    select: { userId: true, assignedToId: true },
+  });
+  if (!task) throw new AppError('Task tidak ditemukan', 404);
+
+  const isOwner = task.userId === userId || task.assignedToId === userId;
+  if (permScope === 'own' && !isOwner) throw new AppError('Akses ditolak', 403);
+
+  return prisma.taskAttachment.create({
+    data: { ...data, taskId, uploadedById: userId },
+    select: { id: true, fileName: true, filePath: true, fileSize: true, mimeType: true, createdAt: true,
+      uploadedBy: { select: USER_MINI } },
+  });
+}
+
+export async function deleteAttachmentService(attachmentId: string, taskId: string, userId: string, permScope: string) {
+  const attachment = await prisma.taskAttachment.findFirst({
+    where: { id: attachmentId, taskId },
+    select: { id: true, filePath: true },
+  });
+  if (!attachment) throw new AppError('Lampiran tidak ditemukan', 404);
+
+  const task = await prisma.task.findUnique({
+    where: { id: taskId },
+    select: { userId: true, assignedToId: true },
+  });
+  const isOwner = task?.userId === userId || task?.assignedToId === userId;
+  if (permScope === 'own' && !isOwner) throw new AppError('Akses ditolak', 403);
+
+  await prisma.taskAttachment.delete({ where: { id: attachmentId } });
+  return attachment;
 }
 
 // ── My Day suggestions ─────────────────────────────────────

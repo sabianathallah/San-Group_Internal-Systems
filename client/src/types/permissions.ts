@@ -3,6 +3,7 @@ export type AudienceScope = 'none' | 'division' | 'all';
 
 export interface TaskPerms {
   view: Scope; create: boolean; edit: Scope; delete: Scope; viewPrivate: boolean;
+  editAssignedFully: boolean;
 }
 export interface BulletinPerms {
   view: boolean; create: boolean; audienceScope: AudienceScope; edit: Scope; delete: Scope;
@@ -66,7 +67,7 @@ export interface PermissionConfig {
 }
 
 export const DEFAULT_PERMS: PermissionConfig = {
-  task:       { view: 'own', create: true, edit: 'own', delete: 'own', viewPrivate: false },
+  task:       { view: 'own', create: true, edit: 'own', delete: 'own', viewPrivate: false, editAssignedFully: false },
   bulletin:   { view: true, create: false, audienceScope: 'none', edit: 'none', delete: 'none' },
   db_link:    { view: 'own', addLink: false, manageFolder: false, shareFolder: false },
   note:       { view: 'own', create: true, edit: 'own', delete: 'own' },

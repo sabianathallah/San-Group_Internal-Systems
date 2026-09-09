@@ -17,6 +17,7 @@ export interface AuthRequest extends Request {
   user?: JwtPayload;
   permScope?: string;
   viewPrivate?: boolean;
+  editAssignedFully?: boolean;
 }
 
 export interface ApiResponse<T = unknown> {
