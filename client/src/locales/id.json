@@ -2008,7 +2008,8 @@
         "manageUsers": "Kelola Pengguna",
         "rolesPermissions": "Peran & Izin",
         "auditLog": "Log Audit"
-      }
+      },
+      "contextualHelp": "Panduan untuk halaman ini"
     },
     "changePasswordModal": {
       "title": "Ubah Kata Sandi",
@@ -2109,6 +2110,7 @@
         "help": "Panduan",
         "hrisHelp": "Panduan HRIS",
         "woHelp": "Panduan Work Order",
+        "adminHelp": "Panduan Admin",
         "workOrders": "Work Orders",
         "history": "Riwayat",
         "reports": "Laporan",

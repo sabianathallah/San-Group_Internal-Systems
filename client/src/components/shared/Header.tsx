@@ -3,7 +3,7 @@ import { useLocation, useNavigate, Link } from 'react-router-dom';
 import {
   Menu, Bell, ChevronDown, LogOut, KeyRound, ChevronRight,
   Loader2, Clock, Megaphone, ShieldAlert, Info, CheckCircle2, User, Search, ArrowRight,
-  AlertTriangle, ClipboardList, Timer, Globe,
+  AlertTriangle, ClipboardList, Timer, Globe, HelpCircle,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useUiStore } from '@/stores/uiStore';
@@ -58,6 +58,43 @@ function useBreadcrumbs(t: (key: string) => string) {
   return crumbs;
 }
 
+// Maps a route to the matching section id in the in-app Guide (HelpPage.tsx)
+// so the header's "?" button can deep-link straight to it via #help-{id}.
+const HELP_ROUTE_MAP: Record<string, string> = {
+  '/dashboard': 'dashboard',
+  '/tasks': 'tasks',
+  '/bulletin': 'bulletin',
+  '/notes': 'notes',
+  '/database': 'dblinks',
+  '/analytics': 'analytics',
+  '/notifications': 'notifications',
+  '/work-orders/history': 'wo-history',
+  '/work-orders/reports': 'wo-reports',
+  '/work-orders': 'wo-board',
+  '/hris/attendance': 'hris-attendance',
+  '/hris/leave': 'hris-leave',
+  '/hris/requests': 'hris-requests',
+  '/hris/reports': 'hris-reports',
+  '/hris/admin/shifts': 'hris-admin-shifts',
+  '/hris/admin/locations': 'hris-admin-locations',
+  '/hris/admin/holidays': 'hris-admin-holidays',
+  '/hris/admin/leave-types': 'hris-admin-leave-types',
+  '/hris': 'hris-overview',
+  '/profile': 'profile',
+  '/admin/users': 'admin-users',
+  '/admin/permissions': 'admin-permissions',
+  '/admin/audit-log': 'admin-audit-log',
+};
+
+/** Longest-prefix match against HELP_ROUTE_MAP, e.g. "/hris/leave" beats "/hris". */
+function useHelpTarget(): string | null {
+  const { pathname } = useLocation();
+  const match = Object.keys(HELP_ROUTE_MAP)
+    .filter((p) => pathname === p || pathname.startsWith(`${p}/`))
+    .sort((a, b) => b.length - a.length)[0];
+  return match ? HELP_ROUTE_MAP[match] : null;
+}
+
 export function NotifIcon({ type }: { type: string }) {
   const cls = 'flex-shrink-0 mt-0.5';
   switch (type) {
@@ -96,6 +133,7 @@ export default function Header({ onSearchClick }: { onSearchClick?: () => void }
   const markAllRead   = useNotificationStore((s) => s.markAllRead);
   const navigate = useNavigate();
   const crumbs   = useBreadcrumbs(t);
+  const helpTarget = useHelpTarget();
 
   const language    = useLanguageStore((s) => s.language);
   const setLanguage = useLanguageStore((s) => s.setLanguage);
@@ -172,6 +210,18 @@ export default function Header({ onSearchClick }: { onSearchClick?: () => void }
 
         {/* Right */}
         <div className="flex items-center gap-1">
+          {/* Contextual help — deep-links to the matching section in the Guide */}
+          {helpTarget && (
+            <Link
+              to={`${ROUTES.HELP}#help-${helpTarget}`}
+              className="w-8 h-8 flex items-center justify-center rounded hover:bg-gray-100 transition-colors text-gray-500"
+              aria-label={t('shared.header.contextualHelp')}
+              title={t('shared.header.contextualHelp')}
+            >
+              <HelpCircle size={18} />
+            </Link>
+          )}
+
           {/* Search trigger */}
           <button
             onClick={onSearchClick}

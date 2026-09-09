@@ -1,12 +1,14 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   LayoutDashboard, CheckSquare2, Bell, StickyNote, Database, BarChart3, Inbox,
   Lightbulb, ChevronRight, Building2, Clock, CalendarDays, ClipboardList,
   FileBarChart2, CalendarClock, MapPin, CalendarOff, Tags,
-  Wrench, Plus, RefreshCw, ClipboardCheck, Archive,
+  Wrench, Plus, RefreshCw, ClipboardCheck, Archive, HardHat,
+  Search, X, ShieldCheck, Users, Shield, User, UserCog,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/cn';
+import { useClickOutside } from '@/hooks/useClickOutside';
 
 // ── Bilingual content ───────────────────────────────────────
 // Kept inline (rather than sprawled across hundreds of individual i18n
@@ -65,8 +67,8 @@ const CONTENT: Record<'id' | 'en', { pageTitle: string; pageSubtitle: string; ti
         icon: CheckSquare2,
         title: 'Tasks — Board, Kalender, Tabel',
         intro: 'Selain List, task bisa ditampilkan sebagai papan Kanban (Board), kalender bulanan, atau tabel yang bisa diurutkan.',
-        image: '/help/tasks-board.jpg',
-        imageAlt: 'Tampilan Board (Kanban) di halaman Tasks',
+        image: '/help/tasks-board-drag.gif',
+        imageAlt: 'Animasi drag & drop kartu task antar kolom di Board',
         tips: [
           'Di **Board**, drag & drop kartu antar kolom untuk ubah status task (To Do → Selesai, dst).',
           'Di **Kalender**, drag chip task ke tanggal untuk atur/ubah tenggat waktu — atau klik tanggal kosong untuk buat task baru langsung di hari itu.',
@@ -293,8 +295,8 @@ const CONTENT: Record<'id' | 'en', { pageTitle: string; pageSubtitle: string; ti
         icon: Wrench,
         title: 'Work Order — Papan Kerja',
         intro: 'Halaman utama modul Work Order. Semua tiket perbaikan/perawatan tampil sebagai papan Kanban per status atau tabel yang bisa diurutkan — sidebar kiri punya beberapa filter siap pakai untuk mempersempit daftarnya.',
-        image: '/help/wo-board.jpg',
-        imageAlt: 'Tampilan papan Kanban Work Order',
+        image: '/help/wo-board-drag.gif',
+        imageAlt: 'Animasi drag & drop kartu Work Order antar kolom status',
         tips: [
           '**My Tasks**: work order yang ditugaskan ke kamu sebagai teknisi.',
           '**Reported by Me**: work order yang kamu laporkan sendiri, apapun statusnya.',
@@ -377,6 +379,63 @@ const CONTENT: Record<'id' | 'en', { pageTitle: string; pageSubtitle: string; ti
           'Tombol **"Export CSV"** mengunduh seluruh data laporan bulan yang sedang ditampilkan.',
         ],
       },
+      {
+        id: 'profile',
+        icon: User,
+        title: 'Profil Saya',
+        intro: 'Halaman akun pribadi — ubah nama, nomor telepon, foto profil, dan kata sandi. Bisa diakses siapa saja yang login, apapun rolenya.',
+        image: '/help/profile.jpg',
+        imageAlt: 'Tampilan halaman Profil Saya',
+        tips: [
+          'Klik ikon kamera di foto profil untuk unggah avatar baru — format JPG/PNG/WebP, maksimal 2MB (ditolak otomatis kalau lebih besar, tanpa perlu upload dulu).',
+          'Hanya **Nama Lengkap** dan **Nomor Telepon** yang bisa diubah sendiri di sini — Email, Username, Role, dan Divisi bersifat baca-saja dan hanya bisa diubah admin lewat Kelola Pengguna.',
+          'Tombol **"Ubah Kata Sandi"** membuka form terpisah untuk ganti password.',
+          'Perubahan nama/foto langsung terlihat di header dan sidebar tanpa perlu refresh halaman.',
+        ],
+      },
+      {
+        id: 'admin-users',
+        icon: Users,
+        title: 'Admin — Kelola Pengguna',
+        intro: 'Konsol admin untuk kelola akun pengguna, divisi, dan role — dibagi 3 tab: Pengguna, Divisi, dan Role. Hanya bisa diakses admin (level ≤ 2).',
+        image: '/help/admin-users.jpg',
+        imageAlt: 'Tampilan halaman Kelola Pengguna dengan tab Pengguna, Divisi, dan Role',
+        tips: [
+          'Tab **Pengguna**: cari/filter berdasarkan role, divisi, atau status, lalu klik **"Tambah Pengguna"** untuk buat akun baru (nama, email, username, password, role, dan divisi wajib diisi).',
+          'Ikon pensil untuk edit data pengguna, ikon power untuk aktifkan/nonaktifkan akun, ikon tempat sampah untuk hapus — dua aksi terakhir hanya muncul untuk Super Admin, dan tidak bisa dipakai ke akun sendiri atau sesama role level 1.',
+          'Tab **Divisi**: klik **"Tambah Divisi"** untuk buat divisi baru (nama, warna, deskripsi) — tombol hapus otomatis nonaktif kalau divisi itu masih punya anggota, supaya nggak ada user yang "kehilangan" divisi.',
+          'Tab **Role**: hanya bisa ubah nama dan warna lewat ikon pensil — level hierarki dan permission role diatur dari halaman **Peran & Izin**, bukan di sini.',
+        ],
+      },
+      {
+        id: 'admin-permissions',
+        icon: Shield,
+        title: 'Admin — Peran & Izin',
+        intro: 'Editor matriks permission per role — pilih role di kiri, atur akses tiap modul (Task, Bulletin, HRIS, Work Order, dst) di kanan lewat toggle atau pilihan cakupan (Tidak Ada/Milik Sendiri/Divisi/Semua).',
+        image: '/help/admin-permissions.jpg',
+        imageAlt: 'Tampilan halaman Peran & Izin dengan matriks permission Super Admin',
+        tips: [
+          'Role **Super Admin** selalu punya akses penuh dan tidak bisa dikonfigurasi — semua kontrolnya sengaja dikunci.',
+          'Hanya Super Admin yang bisa mengubah permission role apapun — admin biasa (level 2) yang buka halaman ini cuma bisa lihat matriksnya (read-only), tidak bisa menyimpan perubahan.',
+          'Tombol **"+"** di atas daftar role untuk buat role kustom baru (hanya level 3–6 yang bisa dipilih — level 1–2 dikunci sistem).',
+          'Role dengan pengaturan permission yang sudah disesuaikan (bukan default) ditandai titik biru kecil di sebelah namanya.',
+          'Ganti role sebelum klik "Simpan" akan memicu konfirmasi kalau ada perubahan belum tersimpan — supaya nggak ke-skip tanpa sadar.',
+        ],
+      },
+      {
+        id: 'admin-audit-log',
+        icon: ClipboardList,
+        title: 'Admin — Log Audit',
+        intro: 'Riwayat aktivitas sistem — siapa mengubah apa, kapan. Bisa difilter berdasarkan jenis entitas (Task, User, atau Permission).',
+        image: '/help/admin-audit-log.jpg',
+        imageAlt: 'Tampilan halaman Log Audit',
+        tips: [
+          'Setiap baris menampilkan waktu, pelaku (lengkap dengan divisinya), jenis aksi berwarna (hijau = dibuat, biru = diperbarui, merah = dihapus), dan detail perubahan.',
+          'Filter **"Semua jenis"** di kanan atas mempersempit log ke satu jenis entitas saja.',
+          'Halaman ini punya izin akses sendiri di luar akses admin biasa — kalau role kamu diset "Tidak Ada" untuk Log Audit di halaman Peran & Izin, halaman ini akan terkunci meski kamu tetap bisa masuk ke modul Admin lainnya.',
+          'Cakupannya saat ini terbatas ke 3 jenis entitas (Task, User, Permission) — perubahan di modul lain (Bulletin, Work Order, dst) belum tercatat di sini.',
+        ],
+      },
     ],
   },
   en: {
@@ -420,8 +479,8 @@ const CONTENT: Record<'id' | 'en', { pageTitle: string; pageSubtitle: string; ti
         icon: CheckSquare2,
         title: 'Tasks — Board, Calendar, Table',
         intro: 'Besides List, tasks can be shown as a Kanban board, a monthly calendar, or a sortable table.',
-        image: '/help/tasks-board.jpg',
-        imageAlt: 'Board (Kanban) view on the Tasks page',
+        image: '/help/tasks-board-drag.gif',
+        imageAlt: 'Animation of dragging a task card between Board columns',
         tips: [
           'On **Board**, drag & drop cards between columns to change task status (To Do → Done, etc).',
           'On **Calendar**, drag a task chip onto a date to set/change its due date — or click an empty date to create a new task right there.',
@@ -648,8 +707,8 @@ const CONTENT: Record<'id' | 'en', { pageTitle: string; pageSubtitle: string; ti
         icon: Wrench,
         title: 'Work Order — Board',
         intro: 'The main page of the Work Order module. Every maintenance/repair ticket shows up as a Kanban board grouped by status, or as a sortable table — the left sidebar has a few ready-made filters to narrow the list.',
-        image: '/help/wo-board.jpg',
-        imageAlt: 'Work Order Kanban board view',
+        image: '/help/wo-board-drag.gif',
+        imageAlt: 'Animation of dragging a Work Order card between status columns',
         tips: [
           '**My Tasks**: work orders assigned to you as the technician.',
           '**Reported by Me**: work orders you personally reported, regardless of status.',
@@ -732,6 +791,63 @@ const CONTENT: Record<'id' | 'en', { pageTitle: string; pageSubtitle: string; ti
           'The **"Export CSV"** button downloads the full report data for the month currently shown.',
         ],
       },
+      {
+        id: 'profile',
+        icon: User,
+        title: 'My Profile',
+        intro: 'Your personal account page — update your name, phone number, profile photo, and password. Available to every logged-in user, regardless of role.',
+        image: '/help/profile.jpg',
+        imageAlt: 'My Profile page view',
+        tips: [
+          'Click the camera icon on your profile photo to upload a new avatar — JPG/PNG/WebP, max 2MB (rejected instantly if it\'s too big, no upload attempt needed).',
+          'Only **Full Name** and **Phone Number** can be edited here — Email, Username, Role, and Division are read-only and can only be changed by an admin via Manage Users.',
+          'The **"Change Password"** button opens a separate form to update your password.',
+          'Name/photo changes reflect instantly in the header and sidebar — no page reload needed.',
+        ],
+      },
+      {
+        id: 'admin-users',
+        icon: Users,
+        title: 'Admin — Manage Users',
+        intro: 'The admin console for managing user accounts, divisions, and roles — split into 3 tabs: Users, Divisions, and Roles. Restricted to admins (level ≤ 2).',
+        image: '/help/admin-users.jpg',
+        imageAlt: 'Manage Users page with Users, Divisions, and Roles tabs',
+        tips: [
+          '**Users** tab: search/filter by role, division, or status, then click **"Add User"** to create a new account (name, email, username, password, role, and division are required).',
+          'The pencil icon edits a user, the power icon activates/deactivates an account, and the trash icon deletes it — the last two only appear for a SuperAdmin, and never apply to your own account or a fellow level-1 role.',
+          '**Divisions** tab: click **"Add Division"** to create one (name, color, description) — the delete button is automatically disabled while the division still has members, so no user ever loses its division silently.',
+          '**Roles** tab: only lets you change a role\'s name and color via the pencil icon — hierarchy level and permissions are configured on the **Roles & Permissions** page instead, not here.',
+        ],
+      },
+      {
+        id: 'admin-permissions',
+        icon: Shield,
+        title: 'Admin — Roles & Permissions',
+        intro: 'The per-role permission matrix editor — pick a role on the left, then set access for every module (Task, Bulletin, HRIS, Work Order, etc) on the right via toggles or scope choices (None/Own/Division/All).',
+        image: '/help/admin-permissions.jpg',
+        imageAlt: 'Roles & Permissions page showing the Super Admin permission matrix',
+        tips: [
+          'The **Super Admin** role always has full access and can\'t be configured — every control is intentionally locked.',
+          'Only a SuperAdmin can change any role\'s permissions — a regular admin (level 2) who opens this page only sees a read-only matrix and can\'t save changes.',
+          'The **"+"** button above the role list creates a new custom role (only levels 3–6 are selectable — levels 1–2 are reserved by the system).',
+          'A role whose permissions have been customized away from the default shows a small blue dot next to its name.',
+          'Switching roles while you have unsaved changes triggers a confirmation prompt — so edits don\'t get silently discarded.',
+        ],
+      },
+      {
+        id: 'admin-audit-log',
+        icon: ClipboardList,
+        title: 'Admin — Audit Log',
+        intro: 'A history of system activity — who changed what, and when. Filterable by entity type (Task, User, or Permission).',
+        image: '/help/admin-audit-log.jpg',
+        imageAlt: 'Audit Log page view',
+        tips: [
+          'Each row shows the timestamp, the acting user (with their division), a color-coded action badge (green = created, blue = updated, red = deleted), and a detail of what changed.',
+          'The **"All types"** filter in the top right narrows the log to a single entity type.',
+          'This page has its own access permission separate from general admin access — if your role\'s Audit Log permission is set to "None" on the Roles & Permissions page, this page stays locked even though you can still reach the rest of the Admin module.',
+          'Coverage is currently limited to 3 entity types (Task, User, Permission) — changes in other modules (Bulletin, Work Order, etc) aren\'t logged here yet.',
+        ],
+      },
     ],
   },
 };
@@ -750,94 +866,345 @@ function FormattedTip({ text }: { text: string }) {
   );
 }
 
+type CategoryId = 'internal' | 'hris' | 'wo' | 'admin';
+
+/** Section id prefix decides its category — keeps CONTENT free of a redundant field. */
+function categoryOf(id: string): CategoryId {
+  if (id.startsWith('hris-')) return 'hris';
+  if (id.startsWith('wo-')) return 'wo';
+  if (id.startsWith('admin-')) return 'admin';
+  return 'internal';
+}
+
+const CATEGORIES: { id: CategoryId; icon: React.ElementType }[] = [
+  { id: 'internal', icon: LayoutDashboard },
+  { id: 'hris', icon: HardHat },
+  { id: 'wo', icon: Wrench },
+  { id: 'admin', icon: UserCog },
+];
+
+const CATEGORY_LABELS: Record<'id' | 'en', Record<CategoryId, string>> = {
+  id: { internal: 'Internal', hris: 'HRIS', wo: 'Work Orders', admin: 'Admin' },
+  en: { internal: 'Internal', hris: 'HRIS', wo: 'Work Orders', admin: 'Admin' },
+};
+
+/** Sections whose title carries an explicit "(Admin)" suffix get grouped
+ *  apart from regular-staff sections in the TOC and content list. */
+function isAdminSection(s: Section): boolean {
+  return s.title.includes('(Admin)');
+}
+
+const UI_TEXT: Record<'id' | 'en', {
+  searchPlaceholder: string;
+  searchNoResults: string;
+  staffGroup: string;
+  adminGroup: string;
+}> = {
+  id: {
+    searchPlaceholder: 'Cari di semua panduan...',
+    searchNoResults: 'Tidak ada hasil untuk',
+    staffGroup: 'Untuk Semua Staff',
+    adminGroup: 'Khusus Admin / HR',
+  },
+  en: {
+    searchPlaceholder: 'Search the whole guide...',
+    searchNoResults: 'No results for',
+    staffGroup: 'For All Staff',
+    adminGroup: 'Admin / HR Only',
+  },
+};
+
 export default function HelpPage() {
   const { i18n } = useTranslation();
   const lang = i18n.language === 'id' ? 'id' : 'en';
   const { pageTitle, pageSubtitle, tipsLabel, sections } = CONTENT[lang];
+  const ui = UI_TEXT[lang];
   const hashId = window.location.hash.replace('#help-', '');
-  const [active, setActive] = useState(sections.some((s) => s.id === hashId) ? hashId : sections[0].id);
+  const hasHashSection = sections.some((s) => s.id === hashId);
+  const initialCategory = hasHashSection ? categoryOf(hashId) : 'internal';
+
+  const [activeCategory, setActiveCategory] = useState<CategoryId>(initialCategory);
+  const [active, setActive] = useState(hasHashSection ? hashId : sections.find((s) => categoryOf(s.id) === initialCategory)!.id);
+  const [query, setQuery] = useState('');
+  const [searchFocused, setSearchFocused] = useState(false);
+  const [pendingScrollId, setPendingScrollId] = useState<string | null>(null);
+  const searchRef = useRef<HTMLDivElement>(null);
+
+  const visibleSections = sections.filter((s) => categoryOf(s.id) === activeCategory);
+  const staffSections = visibleSections.filter((s) => !isAdminSection(s));
+  const adminSections = visibleSections.filter((s) => isAdminSection(s));
+  const hasGroups = staffSections.length > 0 && adminSections.length > 0;
+
+  const trimmedQuery = query.trim();
+  const searchResults = trimmedQuery.length >= 2
+    ? sections.filter((s) => {
+      const haystack = `${s.title} ${s.intro} ${s.tips.join(' ')}`.toLowerCase();
+      return haystack.includes(trimmedQuery.toLowerCase());
+    }).slice(0, 8)
+    : [];
+
+  useClickOutside(searchRef, () => setSearchFocused(false));
+
+  function selectCategory(cat: CategoryId) {
+    setActiveCategory(cat);
+    const first = sections.find((s) => categoryOf(s.id) === cat);
+    if (first) {
+      setActive(first.id);
+      document.getElementById(`help-${first.id}`)?.scrollIntoView({ block: 'start' });
+    }
+  }
 
   function scrollTo(id: string) {
     setActive(id);
     document.getElementById(`help-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
-  // Deep-links from other modules (e.g. sidebar "HRIS Guide") land with a
-  // #help-{id} hash — jump straight to that section instead of the top.
+  /** Used by search results: jumps to a section that may live in a
+   *  different category tab, switching tabs first if needed. */
+  function goToSection(id: string) {
+    const cat = categoryOf(id);
+    setQuery('');
+    setSearchFocused(false);
+    if (cat !== activeCategory) {
+      setActiveCategory(cat);
+      setPendingScrollId(id);
+    } else {
+      scrollTo(id);
+    }
+  }
+
+  // Finishes a cross-category jump from search once the target category's
+  // sections have rendered into the DOM. Jumps instantly rather than
+  // smooth-scrolling — the tab switch already changed the whole page's
+  // content, so animating a long scroll on top of that reads as laggy
+  // (and can visibly stall partway on a long list).
   useEffect(() => {
-    if (hashId) {
+    if (!pendingScrollId) return;
+    document.getElementById(`help-${pendingScrollId}`)?.scrollIntoView({ block: 'start' });
+    setActive(pendingScrollId);
+    setPendingScrollId(null);
+  }, [activeCategory, pendingScrollId]);
+
+  // Deep-links from other modules (e.g. sidebar "HRIS Guide") land with a
+  // #help-{id} hash — the category tab above already opens on the right
+  // tab (via initialCategory), so this just jumps to the section itself.
+  useEffect(() => {
+    if (hasHashSection) {
       document.getElementById(`help-${hashId}`)?.scrollIntoView({ block: 'start' });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Scroll-spy: keeps the sidebar highlight in sync while scrolling, not
+  // just on click — watches a thin band near the top of the viewport and
+  // activates whichever section is currently under it.
+  useEffect(() => {
+    const targets = visibleSections
+      .map((s) => document.getElementById(`help-${s.id}`))
+      .filter((el): el is HTMLElement => el !== null);
+    if (targets.length === 0) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visible = entries.filter((e) => e.isIntersecting);
+        if (visible.length === 0) return;
+        const topMost = visible.reduce((a, b) => (a.boundingClientRect.top < b.boundingClientRect.top ? a : b));
+        setActive(topMost.target.id.replace('help-', ''));
+      },
+      { rootMargin: '-96px 0px -65% 0px', threshold: 0 },
+    );
+    targets.forEach((el) => observer.observe(el));
+    return () => observer.disconnect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeCategory, lang]);
+
+  function renderTocButton(s: Section) {
+    const Icon = s.icon;
+    return (
+      <button
+        key={s.id}
+        onClick={() => scrollTo(s.id)}
+        className={cn(
+          'flex items-center gap-2.5 w-full px-3 py-2 rounded-lg text-sm text-left transition-colors',
+          active === s.id ? 'bg-navy/10 text-navy font-semibold' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900',
+        )}
+      >
+        <Icon size={15} className="flex-shrink-0" />
+        <span className="flex-1 truncate">{s.title}</span>
+        <ChevronRight size={13} className="flex-shrink-0 opacity-40" />
+      </button>
+    );
+  }
+
+  function renderSection(s: Section) {
+    const Icon = s.icon;
+    return (
+      <section key={s.id} id={`help-${s.id}`} className="bg-white border border-gray-200 rounded-xl p-6 scroll-mt-4">
+        <div className="flex items-center gap-3 mb-3">
+          <div className="w-9 h-9 rounded-lg bg-navy/5 flex items-center justify-center flex-shrink-0">
+            <Icon size={18} className="text-navy" />
+          </div>
+          <h2 className="text-base font-semibold text-gray-800">{s.title}</h2>
+        </div>
+        <p className="text-sm text-gray-600 leading-relaxed mb-4">{s.intro}</p>
+
+        <img
+          src={s.image}
+          alt={s.imageAlt}
+          className="w-full rounded-lg border border-gray-200 shadow-sm mb-4"
+          loading="lazy"
+        />
+
+        <div className="bg-amber-50 border border-amber-100 rounded-lg p-4">
+          <div className="flex items-center gap-1.5 mb-2">
+            <Lightbulb size={13} className="text-amber-500" />
+            <span className="text-xs font-semibold text-amber-700 uppercase tracking-wide">{tipsLabel}</span>
+          </div>
+          <ul className="space-y-1.5">
+            {s.tips.map((tip, i) => (
+              <li key={i} className="text-sm text-gray-700 leading-relaxed flex gap-2">
+                <span className="text-amber-400 flex-shrink-0">•</span>
+                <span><FormattedTip text={tip} /></span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </section>
+    );
+  }
+
   return (
     <div className="max-w-6xl">
-      <div className="mb-6">
-        <h1 className="text-xl font-semibold text-gray-800">{pageTitle}</h1>
-        <p className="text-sm text-gray-500 mt-0.5">{pageSubtitle}</p>
+      <div className="flex items-start justify-between gap-6 mb-6">
+        <div>
+          <h1 className="text-xl font-semibold text-gray-800">{pageTitle}</h1>
+          <p className="text-sm text-gray-500 mt-0.5">{pageSubtitle}</p>
+        </div>
+
+        {/* Global search — matches title/description/tips across every
+            category, so it isn't limited to whichever tab is currently open. */}
+        <div ref={searchRef} className="relative w-72 flex-shrink-0 hidden sm:block">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+          <input
+            type="text"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onFocus={() => setSearchFocused(true)}
+            onKeyDown={(e) => { if (e.key === 'Escape') { setQuery(''); setSearchFocused(false); } }}
+            placeholder={ui.searchPlaceholder}
+            className="w-full pl-9 pr-8 py-2 text-sm bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-navy/20 focus:border-navy/30 transition-colors"
+          />
+          {query && (
+            <button
+              onClick={() => setQuery('')}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+            >
+              <X size={14} />
+            </button>
+          )}
+
+          {searchFocused && trimmedQuery.length >= 2 && (
+            <div className="absolute z-20 top-full mt-1.5 w-full bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden">
+              {searchResults.length === 0 ? (
+                <p className="px-4 py-3 text-sm text-gray-400">{ui.searchNoResults} "{trimmedQuery}"</p>
+              ) : (
+                <ul className="max-h-80 overflow-y-auto py-1">
+                  {searchResults.map((s) => {
+                    const Icon = s.icon;
+                    const cat = categoryOf(s.id);
+                    return (
+                      <li key={s.id}>
+                        <button
+                          onMouseDown={() => goToSection(s.id)}
+                          className="w-full flex items-start gap-2.5 px-4 py-2.5 text-left hover:bg-gray-50 transition-colors"
+                        >
+                          <Icon size={15} className="flex-shrink-0 mt-0.5 text-navy" />
+                          <span className="min-w-0 flex-1">
+                            <span className="flex items-center gap-2">
+                              <span className="text-sm font-medium text-gray-800 truncate">{s.title}</span>
+                              <span className="text-[10px] uppercase tracking-wide text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded-full flex-shrink-0">
+                                {CATEGORY_LABELS[lang][cat]}
+                              </span>
+                            </span>
+                            <span className="block text-xs text-gray-500 truncate mt-0.5">{s.intro}</span>
+                          </span>
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Category tabs — split Internal / HRIS / Work Orders so each tab's
+          table of contents (and scroll distance) stays short. */}
+      <div className="flex gap-1 mb-6 border-b border-gray-200">
+        {CATEGORIES.map((c) => {
+          const Icon = c.icon;
+          const count = sections.filter((s) => categoryOf(s.id) === c.id).length;
+          const isActive = activeCategory === c.id;
+          return (
+            <button
+              key={c.id}
+              onClick={() => selectCategory(c.id)}
+              className={cn(
+                'flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors',
+                isActive ? 'border-navy text-navy' : 'border-transparent text-gray-500 hover:text-gray-700',
+              )}
+            >
+              <Icon size={16} />
+              {CATEGORY_LABELS[lang][c.id]}
+              <span className={cn(
+                'text-xs px-1.5 rounded-full',
+                isActive ? 'bg-navy/10 text-navy' : 'bg-gray-100 text-gray-400',
+              )}
+              >
+                {count}
+              </span>
+            </button>
+          );
+        })}
       </div>
 
       <div className="flex gap-6 items-start">
         {/* Table of contents */}
         <nav className="hidden lg:block w-52 flex-shrink-0 sticky top-4 space-y-0.5">
-          {sections.map((s) => {
-            const Icon = s.icon;
-            return (
-              <button
-                key={s.id}
-                onClick={() => scrollTo(s.id)}
-                className={cn(
-                  'flex items-center gap-2.5 w-full px-3 py-2 rounded-lg text-sm text-left transition-colors',
-                  active === s.id ? 'bg-navy/10 text-navy font-semibold' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900',
-                )}
-              >
-                <Icon size={15} className="flex-shrink-0" />
-                <span className="flex-1 truncate">{s.title}</span>
-                <ChevronRight size={13} className="flex-shrink-0 opacity-40" />
-              </button>
-            );
-          })}
+          {hasGroups ? (
+            <>
+              <p className="flex items-center gap-1.5 px-3 pt-1 pb-1.5 text-[11px] font-semibold text-gray-400 uppercase tracking-wide">
+                <Users size={11} />
+                {ui.staffGroup}
+              </p>
+              {staffSections.map(renderTocButton)}
+              <p className="flex items-center gap-1.5 px-3 pt-4 pb-1.5 text-[11px] font-semibold text-gray-400 uppercase tracking-wide">
+                <ShieldCheck size={11} />
+                {ui.adminGroup}
+              </p>
+              {adminSections.map(renderTocButton)}
+            </>
+          ) : (
+            visibleSections.map(renderTocButton)
+          )}
         </nav>
 
         {/* Sections */}
         <div className="flex-1 min-w-0 space-y-8">
-          {sections.map((s) => {
-            const Icon = s.icon;
-            return (
-              <section key={s.id} id={`help-${s.id}`} className="bg-white border border-gray-200 rounded-xl p-6 scroll-mt-4">
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="w-9 h-9 rounded-lg bg-navy/5 flex items-center justify-center flex-shrink-0">
-                    <Icon size={18} className="text-navy" />
-                  </div>
-                  <h2 className="text-base font-semibold text-gray-800">{s.title}</h2>
-                </div>
-                <p className="text-sm text-gray-600 leading-relaxed mb-4">{s.intro}</p>
-
-                <img
-                  src={s.image}
-                  alt={s.imageAlt}
-                  className="w-full rounded-lg border border-gray-200 shadow-sm mb-4"
-                  loading="lazy"
-                />
-
-                <div className="bg-amber-50 border border-amber-100 rounded-lg p-4">
-                  <div className="flex items-center gap-1.5 mb-2">
-                    <Lightbulb size={13} className="text-amber-500" />
-                    <span className="text-xs font-semibold text-amber-700 uppercase tracking-wide">{tipsLabel}</span>
-                  </div>
-                  <ul className="space-y-1.5">
-                    {s.tips.map((tip, i) => (
-                      <li key={i} className="text-sm text-gray-700 leading-relaxed flex gap-2">
-                        <span className="text-amber-400 flex-shrink-0">•</span>
-                        <span><FormattedTip text={tip} /></span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              </section>
-            );
-          })}
+          {hasGroups ? (
+            <>
+              {staffSections.map(renderSection)}
+              <div className="flex items-center gap-2 pt-2">
+                <ShieldCheck size={14} className="text-gray-400 flex-shrink-0" />
+                <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide">{ui.adminGroup}</span>
+                <div className="flex-1 h-px bg-gray-200" />
+              </div>
+              {adminSections.map(renderSection)}
+            </>
+          ) : (
+            visibleSections.map(renderSection)
+          )}
         </div>
       </div>
     </div>

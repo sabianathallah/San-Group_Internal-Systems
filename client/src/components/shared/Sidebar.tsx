@@ -181,6 +181,10 @@ export default function Sidebar() {
       label: t('shared.sidebar.sections.monitoring'),
       items: [{ label: t('shared.sidebar.nav.auditLog'), to: ROUTES.ADMIN_AUDIT_LOG, icon: ClipboardList }],
     },
+    {
+      label: t('shared.sidebar.sections.support'),
+      items: [{ label: t('shared.sidebar.nav.adminHelp'), to: `${ROUTES.HELP}#help-admin-users`, icon: HelpCircle }],
+    },
   ];
 
   const navSections: NavSection[] =

@@ -2008,7 +2008,8 @@
         "manageUsers": "Manage Users",
         "rolesPermissions": "Roles & Permissions",
         "auditLog": "Audit Log"
-      }
+      },
+      "contextualHelp": "Guide for this page"
     },
     "changePasswordModal": {
       "title": "Change Password",
@@ -2109,6 +2110,7 @@
         "help": "Help",
         "hrisHelp": "HRIS Guide",
         "woHelp": "Work Order Guide",
+        "adminHelp": "Admin Guide",
         "workOrders": "Work Orders",
         "history": "History",
         "reports": "Reports",
