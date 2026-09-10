@@ -1,33 +1,36 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { QRCodeSVG } from 'qrcode.react';
 import {
   Boxes, Plus, X, Search, Loader2, Package, MapPin, Tag,
   ArrowDownCircle, ArrowUpCircle, Check, Ban, Printer, Download,
-  CheckCircle2, XCircle, Clock, Pencil, Wallet, ChevronLeft, ChevronRight,
+  CheckCircle2, XCircle, Clock, Pencil, Wallet, ChevronLeft, ChevronRight, Scale,
 } from 'lucide-react';
 import api from '@/lib/api';
 import { cn } from '@/lib/cn';
 import { toast } from '@/stores/toastStore';
 import { usePermStore } from '@/stores/permStore';
 import { PageSizeSelect } from '@/components/shared/PageSizeSelect';
+import WarehouseSelect from '@/components/shared/WarehouseSelect';
 
 // ── Types ──────────────────────────────────────────────────
 interface MiniUser { id: string; fullName: string; username: string; avatar: string | null; divisionId: string }
 interface AssetCategory { id: string; name: string; color: string | null }
 type TxType = 'PURCHASE' | 'DISPOSAL';
+type HistoryType = TxType | 'ADJUSTMENT';
 type TxStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
+interface AssetStockRow { id: string; location: string; qty: number; updatedAt: string }
 
 interface AssetTransaction {
-  id: string; type: TxType; quantity: number; cost: string | null; note: string | null;
+  id: string; type: HistoryType; location: string; quantity: number; cost: string | null; note: string | null;
   status: TxStatus; approvedAt: string | null; createdAt: string;
   requestedBy: MiniUser; approvedBy: MiniUser | null;
 }
 
 interface Asset {
   id: string; code: string; name: string; description: string | null;
-  qty: number; unit: string | null; location: string;
+  unit: string | null; stocks: AssetStockRow[]; totalQty: number;
   category: AssetCategory; createdBy: MiniUser;
   createdAt: string; updatedAt: string;
   _count: { history: number };
@@ -65,7 +68,10 @@ function exportAssetsCSV(assets: Asset[], t: (key: string) => string) {
     t('inventory.csv.code'), t('inventory.csv.name'), t('inventory.csv.category'),
     t('inventory.csv.qty'), t('inventory.csv.unit'), t('inventory.csv.location'), t('inventory.csv.createdBy'),
   ];
-  const rows = assets.map((a) => [a.code, a.name, a.category.name, String(a.qty), a.unit ?? '', a.location, a.createdBy.fullName]);
+  const rows = assets.map((a) => [
+    a.code, a.name, a.category.name, String(a.totalQty), a.unit ?? '',
+    a.stocks.map((s) => `${s.location} (${s.qty})`).join('; '), a.createdBy.fullName,
+  ]);
   const csv = [header, ...rows].map((r) => r.map((v) => csvCell(String(v))).join(',')).join('\n');
   const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
@@ -265,11 +271,18 @@ export default function InventoryPage() {
                             {a.category.name}
                           </span>
                         </td>
-                        <td className="px-3 py-3 text-right text-gray-700 font-medium tabular-nums">{a.qty} <span className="text-gray-400 font-normal">{a.unit ?? ''}</span></td>
+                        <td className="px-3 py-3 text-right text-gray-700 font-medium tabular-nums">{a.totalQty} <span className="text-gray-400 font-normal">{a.unit ?? ''}</span></td>
                         <td className="px-3 py-3 text-gray-500">
-                          <span className="inline-flex items-center gap-1">
-                            <MapPin size={11} className="text-gray-300 flex-shrink-0" /> {a.location}
-                          </span>
+                          {a.stocks.length === 0 ? (
+                            <span className="text-gray-300">—</span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1">
+                              <MapPin size={11} className="text-gray-300 flex-shrink-0" /> {a.stocks[0].location}
+                              {a.stocks.length > 1 && (
+                                <span className="text-[10px] text-gray-400 bg-gray-50 px-1.5 py-0.5 rounded-full">+{a.stocks.length - 1}</span>
+                              )}
+                            </span>
+                          )}
                         </td>
                       </tr>
                     ))}
@@ -425,7 +438,8 @@ function CreateAssetModal({
             </Field>
           </div>
           <Field label={t('inventory.form.location')}>
-            <input value={location} onChange={(e) => setLocation(e.target.value)} className={INPUT_CLS} />
+            <div className="mt-1"><WarehouseSelect value={location} onChange={setLocation} /></div>
+            <p className="text-[11px] text-gray-400 mt-1">{t('inventory.form.locationHint')}</p>
           </Field>
           <Field label={t('inventory.form.description')}>
             <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={2} className={cn(INPUT_CLS, 'resize-none')} />
@@ -453,6 +467,101 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
+const LABEL_PRESETS = [
+  { id: '30x20', w: 30, h: 20, label: '30×20 mm' },
+  { id: '40x30', w: 40, h: 30, label: '40×30 mm' },
+  { id: '50x40', w: 50, h: 40, label: '50×40 mm' },
+  { id: '58x40', w: 58, h: 40, label: '58×40 mm (thermal)' },
+  { id: '80x50', w: 80, h: 50, label: '80×50 mm' },
+] as const;
+
+// ── Print label modal (QR + code + name, sized for thermal label printers) ──
+function PrintLabelModal({ asset, qrValue, onClose }: { asset: Asset; qrValue: string; onClose: () => void }) {
+  const { t } = useTranslation();
+  const [presetId, setPresetId] = useState<typeof LABEL_PRESETS[number]['id']>('40x30');
+  const [copies, setCopies] = useState('1');
+  const preset = LABEL_PRESETS.find((p) => p.id === presetId)!;
+
+  function handlePrint() {
+    const n = Math.min(999, Math.max(1, Number(copies) || 1));
+    const printRoot = document.createElement('div');
+    printRoot.id = 'inventory-print-root';
+    const style = document.createElement('style');
+    style.textContent = `
+      @media print {
+        body > *:not(#inventory-print-root) { display: none !important; }
+        #inventory-print-root { display: block !important; }
+        @page { size: ${preset.w}mm ${preset.h}mm; margin: 0; }
+        .label { width: ${preset.w}mm; height: ${preset.h}mm; page-break-after: always; }
+      }
+      #inventory-print-root { display: none; }
+      .label { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1mm; box-sizing: border-box; padding: 1mm; }
+      .label svg { width: auto; height: 60%; }
+      .label .code { font-family: monospace; font-size: 2.2mm; }
+      .label .name { font-size: 2.4mm; text-align: center; line-height: 1.1; max-width: 100%; overflow: hidden; }
+    `;
+    document.head.appendChild(style);
+    document.body.appendChild(printRoot);
+
+    // Render N label blocks with a fresh QR SVG markup cloned from the modal's own preview.
+    const sourceSvg = document.getElementById('inventory-label-qr-source')?.innerHTML ?? '';
+    for (let i = 0; i < n; i++) {
+      const div = document.createElement('div');
+      div.className = 'label';
+      div.innerHTML = `<div>${sourceSvg}</div><div class="code">${asset.code}</div><div class="name">${asset.name}</div>`;
+      printRoot.appendChild(div);
+    }
+
+    window.print();
+    document.body.removeChild(printRoot);
+    document.head.removeChild(style);
+  }
+
+  return (
+    <div className="fixed inset-0 bg-gray-900/40 backdrop-blur-[1px] flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm flex flex-col">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+          <h2 className="font-semibold text-gray-900">{t('inventory.detail.printLabel.title')}</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 p-1 -m-1"><X size={18} /></button>
+        </div>
+        <div className="p-5 space-y-4">
+          <div className="flex flex-col items-center gap-2 py-3 bg-gray-50 rounded-xl">
+            <div id="inventory-label-qr-source"><QRCodeSVG value={qrValue} size={80} /></div>
+            <p className="text-[10px] font-mono text-gray-400">{asset.code}</p>
+          </div>
+          <div>
+            <label className="text-xs font-medium text-gray-500">{t('inventory.detail.printLabel.size')}</label>
+            <div className="grid grid-cols-1 gap-1.5 mt-1.5">
+              {LABEL_PRESETS.map((p) => (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => setPresetId(p.id)}
+                  className={cn(
+                    'text-left px-3 py-2 text-xs rounded-lg border transition-colors',
+                    presetId === p.id ? 'border-navy bg-navy/5 text-navy font-medium' : 'border-gray-200 text-gray-600 hover:bg-gray-50',
+                  )}
+                >
+                  {p.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <Field label={t('inventory.detail.printLabel.copies')}>
+            <input type="number" min={1} max={999} value={copies} onChange={(e) => setCopies(e.target.value)} className={INPUT_CLS} />
+          </Field>
+        </div>
+        <div className="flex justify-end gap-2 px-5 py-4 border-t border-gray-100">
+          <button type="button" onClick={onClose} className="px-3.5 py-2 text-sm font-medium text-gray-500 hover:bg-gray-50 rounded-lg">{t('inventory.form.cancel')}</button>
+          <button type="button" onClick={handlePrint} className="px-4 py-2 text-sm font-medium bg-navy text-white rounded-lg hover:bg-navy-light transition-colors flex items-center gap-1.5">
+            <Printer size={14} /> {t('inventory.detail.printLabel.printN', { count: Math.min(999, Math.max(1, Number(copies) || 1)) })}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Asset detail panel ──────────────────────────────────────
 function AssetDetailPanel({
   assetId, onClose, onChanged, categories, canEdit, canDelete, refreshSignal,
@@ -464,24 +573,29 @@ function AssetDetailPanel({
   const [asset, setAsset] = useState<Asset | null>(null);
   const [loading, setLoading] = useState(true);
   const [txType, setTxType] = useState<TxType | null>(null);
+  const [txLocation, setTxLocation] = useState('');
   const [txQty, setTxQty] = useState('1');
   const [txCost, setTxCost] = useState('');
   const [txNote, setTxNote] = useState('');
   const [submitting, setSubmitting] = useState(false);
-  const printRef = useRef<HTMLDivElement>(null);
+  const [showPrintLabel, setShowPrintLabel] = useState(false);
 
   const [editing, setEditing] = useState(false);
   const [editName, setEditName] = useState('');
-  const [editLocation, setEditLocation] = useState('');
   const [editUnit, setEditUnit] = useState('');
   const [editCategoryId, setEditCategoryId] = useState('');
   const [savingEdit, setSavingEdit] = useState(false);
 
   function startEdit() {
     if (!asset) return;
-    setEditName(asset.name); setEditLocation(asset.location);
+    setEditName(asset.name);
     setEditUnit(asset.unit ?? ''); setEditCategoryId(asset.category.id);
     setEditing(true);
+  }
+
+  function openTxForm(type: TxType) {
+    setTxType(type);
+    setTxLocation(asset?.stocks[0]?.location ?? '');
   }
 
   const load = useCallback(async () => {
@@ -501,8 +615,7 @@ function AssetDetailPanel({
     setSavingEdit(true);
     try {
       await api.patch(`/inventory/${assetId}`, {
-        name: editName.trim(), location: editLocation.trim(),
-        unit: editUnit.trim() || null, categoryId: editCategoryId,
+        name: editName.trim(), unit: editUnit.trim() || null, categoryId: editCategoryId,
       });
       toast.success(t('inventory.detail.editSuccess'));
       setEditing(false);
@@ -523,10 +636,12 @@ function AssetDetailPanel({
   async function submitTransaction(e: React.FormEvent) {
     e.preventDefault();
     if (!txType) return;
+    const location = txLocation.trim();
+    if (!location) { toast.error(t('inventory.detail.locationRequired')); return; }
     setSubmitting(true);
     try {
       await api.post(`/inventory/${assetId}/transactions`, {
-        type: txType, quantity: Number(txQty) || 0,
+        type: txType, location, quantity: Number(txQty) || 0,
         cost: txType === 'PURCHASE' && txCost ? Number(txCost) : undefined,
         note: txNote.trim() || undefined,
       });
@@ -534,10 +649,6 @@ function AssetDetailPanel({
       setTxType(null); setTxQty('1'); setTxCost(''); setTxNote('');
       load(); onChanged();
     } catch (err) { toast.error(extractErr(err)); } finally { setSubmitting(false); }
-  }
-
-  function handlePrint() {
-    window.print();
   }
 
   const qrValue = `${window.location.origin}/inventory/assets/${assetId}`;
@@ -576,9 +687,6 @@ function AssetDetailPanel({
           <Field label={t('inventory.form.unit')}>
             <input value={editUnit} onChange={(e) => setEditUnit(e.target.value)} className={INPUT_CLS} />
           </Field>
-          <Field label={t('inventory.form.location')}>
-            <input value={editLocation} onChange={(e) => setEditLocation(e.target.value)} className={INPUT_CLS} />
-          </Field>
           <div className="flex justify-end gap-2 pt-2">
             <button type="button" onClick={() => setEditing(false)} className="px-3.5 py-2 text-sm font-medium text-gray-500 hover:bg-gray-50 rounded-lg">{t('inventory.form.cancel')}</button>
             <button type="submit" disabled={savingEdit} className="px-4 py-2 text-sm font-medium bg-navy text-white rounded-lg disabled:opacity-50 flex items-center gap-1.5">
@@ -594,46 +702,54 @@ function AssetDetailPanel({
             {asset.description && <p className="text-xs text-gray-500 mt-1">{asset.description}</p>}
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
-            <span
-              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium"
-              style={{ backgroundColor: tint(asset.category.color, '1A'), color: asset.category.color ?? '#475569' }}
-            >
-              <Tag size={11} /> {asset.category.name}
-            </span>
-            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-gray-50 text-gray-600">
-              <MapPin size={11} className="text-gray-400" /> {asset.location}
-            </span>
-          </div>
+          <span
+            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium"
+            style={{ backgroundColor: tint(asset.category.color, '1A'), color: asset.category.color ?? '#475569' }}
+          >
+            <Tag size={11} /> {asset.category.name}
+          </span>
 
-          <div className="flex items-center gap-2.5 p-3 rounded-xl bg-navy/[0.04] border border-navy/10">
-            <div className="w-9 h-9 rounded-lg bg-white flex items-center justify-center flex-shrink-0 shadow-sm">
-              <Package size={16} className="text-navy" />
+          {/* Per-location stock breakdown */}
+          <div className="rounded-xl border border-navy/10 bg-navy/[0.04] overflow-hidden">
+            <div className="flex items-center gap-2.5 p-3">
+              <div className="w-9 h-9 rounded-lg bg-white flex items-center justify-center flex-shrink-0 shadow-sm">
+                <Package size={16} className="text-navy" />
+              </div>
+              <div>
+                <p className="text-[11px] text-gray-400">{t('inventory.detail.totalStock')}</p>
+                <p className="text-base font-semibold text-gray-900 leading-tight">{asset.totalQty} <span className="text-xs font-normal text-gray-400">{asset.unit ?? ''}</span></p>
+              </div>
             </div>
-            <div>
-              <p className="text-[11px] text-gray-400">{t('inventory.detail.stock')}</p>
-              <p className="text-base font-semibold text-gray-900 leading-tight">{asset.qty} <span className="text-xs font-normal text-gray-400">{asset.unit ?? ''}</span></p>
-            </div>
+            {asset.stocks.length > 0 && (
+              <div className="border-t border-navy/10 divide-y divide-navy/10">
+                {asset.stocks.map((s) => (
+                  <div key={s.id} className="flex items-center justify-between px-3 py-1.5 text-xs">
+                    <span className="flex items-center gap-1 text-gray-600"><MapPin size={11} className="text-gray-400" /> {s.location}</span>
+                    <span className="font-medium text-gray-800 tabular-nums">{s.qty} {asset.unit ?? ''}</span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* QR code */}
-          <div ref={printRef} className="flex flex-col items-center gap-2 py-4 rounded-xl border border-gray-100 bg-gray-50/60 print:border-0 print:bg-white">
+          <div className="flex flex-col items-center gap-2 py-4 rounded-xl border border-gray-100 bg-gray-50/60">
             <div className="bg-white p-2.5 rounded-lg shadow-sm">
               <QRCodeSVG value={qrValue} size={116} />
             </div>
             <p className="text-[10px] text-gray-400 font-mono mt-1">{asset.code}</p>
             <p className="text-xs font-medium text-gray-700 text-center">{asset.name}</p>
           </div>
-          <button onClick={handlePrint} className="w-full flex items-center justify-center gap-1.5 py-2 text-xs font-medium border border-gray-200 rounded-lg hover:bg-gray-50 text-gray-600 transition-colors">
+          <button onClick={() => setShowPrintLabel(true)} className="w-full flex items-center justify-center gap-1.5 py-2 text-xs font-medium border border-gray-200 rounded-lg hover:bg-gray-50 text-gray-600 transition-colors">
             <Printer size={13} /> {t('inventory.detail.printQr')}
           </button>
 
           {/* Request buttons */}
           <div className="flex gap-2">
-            <button onClick={() => setTxType('PURCHASE')} className="flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-medium border border-emerald-200 bg-emerald-50 text-emerald-700 rounded-lg hover:bg-emerald-100 transition-colors">
+            <button onClick={() => openTxForm('PURCHASE')} className="flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-medium border border-emerald-200 bg-emerald-50 text-emerald-700 rounded-lg hover:bg-emerald-100 transition-colors">
               <ArrowDownCircle size={14} /> {t('inventory.detail.requestPurchase')}
             </button>
-            <button onClick={() => setTxType('DISPOSAL')} className="flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-medium border border-orange-200 bg-orange-50 text-orange-700 rounded-lg hover:bg-orange-100 transition-colors">
+            <button onClick={() => openTxForm('DISPOSAL')} className="flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-medium border border-orange-200 bg-orange-50 text-orange-700 rounded-lg hover:bg-orange-100 transition-colors">
               <ArrowUpCircle size={14} /> {t('inventory.detail.requestDisposal')}
             </button>
           </div>
@@ -643,6 +759,15 @@ function AssetDetailPanel({
               <p className="text-xs font-semibold text-gray-700">
                 {txType === 'PURCHASE' ? t('inventory.detail.requestPurchase') : t('inventory.detail.requestDisposal')}
               </p>
+              {txType === 'PURCHASE' ? (
+                <WarehouseSelect value={txLocation} onChange={setTxLocation} placeholder={t('inventory.detail.pickOrCreateLocation')} />
+              ) : (
+                <select value={txLocation} onChange={(e) => setTxLocation(e.target.value)}
+                  className="w-full px-2.5 py-2 text-xs border border-gray-200 rounded-lg outline-none bg-white">
+                  {asset.stocks.length === 0 && <option value="">{t('inventory.detail.noLocationsYet')}</option>}
+                  {asset.stocks.map((s) => <option key={s.id} value={s.location}>{s.location} ({s.qty} {asset.unit ?? ''})</option>)}
+                </select>
+              )}
               <input type="number" min={1} value={txQty} onChange={(e) => setTxQty(e.target.value)}
                 placeholder={t('inventory.form.qty')} className="w-full px-2.5 py-2 text-xs border border-gray-200 rounded-lg outline-none bg-white" />
               {txType === 'PURCHASE' && (
@@ -667,19 +792,17 @@ function AssetDetailPanel({
               <ul className="relative space-y-4 before:absolute before:left-[11px] before:top-1 before:bottom-1 before:w-px before:bg-gray-100">
                 {(asset.history ?? []).map((h) => (
                   <li key={h.id} className="relative flex items-start gap-3 pl-0">
-                    <div className={cn(
-                      'relative z-10 w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 ring-4 ring-white',
-                      h.type === 'PURCHASE' ? 'bg-emerald-100 text-emerald-600' : 'bg-orange-100 text-orange-600',
-                    )}>
-                      {h.type === 'PURCHASE' ? <ArrowDownCircle size={13} /> : <ArrowUpCircle size={13} />}
-                    </div>
+                    <HistoryIcon type={h.type} />
                     <div className="flex-1 min-w-0 pb-0.5">
                       <div className="flex items-start justify-between gap-2">
                         <p className="text-xs text-gray-700 font-medium">
-                          {h.type === 'PURCHASE' ? t('inventory.detail.purchaseOf', { count: h.quantity }) : t('inventory.detail.disposalOf', { count: h.quantity })}
+                          {h.type === 'PURCHASE' && t('inventory.detail.purchaseOf', { count: h.quantity })}
+                          {h.type === 'DISPOSAL' && t('inventory.detail.disposalOf', { count: h.quantity })}
+                          {h.type === 'ADJUSTMENT' && t('inventory.detail.adjustmentOf', { count: h.quantity })}
                         </p>
                         <StatusPill status={h.status} />
                       </div>
+                      <p className="text-[10px] text-gray-400 flex items-center gap-1"><MapPin size={9} /> {h.location}</p>
                       {h.cost && <p className="text-xs text-gray-500">{formatMoney(h.cost)}</p>}
                       <p className="text-[10px] text-gray-400 mt-0.5">{h.requestedBy.fullName} · {new Date(h.createdAt).toLocaleDateString()}</p>
                       {h.note && <p className="text-[10px] text-gray-500 italic mt-0.5">"{h.note}"</p>}
@@ -691,6 +814,28 @@ function AssetDetailPanel({
           </div>
         </div>
       )}
+
+      {showPrintLabel && asset && (
+        <PrintLabelModal asset={asset} qrValue={qrValue} onClose={() => setShowPrintLabel(false)} />
+      )}
+    </div>
+  );
+}
+
+function HistoryIcon({ type }: { type: HistoryType }) {
+  if (type === 'ADJUSTMENT') {
+    return (
+      <div className="relative z-10 w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 ring-4 ring-white bg-blue-100 text-blue-600">
+        <Scale size={12} />
+      </div>
+    );
+  }
+  return (
+    <div className={cn(
+      'relative z-10 w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 ring-4 ring-white',
+      type === 'PURCHASE' ? 'bg-emerald-100 text-emerald-600' : 'bg-orange-100 text-orange-600',
+    )}>
+      {type === 'PURCHASE' ? <ArrowDownCircle size={13} /> : <ArrowUpCircle size={13} />}
     </div>
   );
 }
@@ -771,7 +916,7 @@ function ApprovalsModal({ onClose, onDecided }: { onClose: () => void; onDecided
                       {tx.type === 'PURCHASE' ? t('inventory.detail.purchaseOf', { count: tx.quantity }) : t('inventory.detail.disposalOf', { count: tx.quantity })}
                       {tx.cost && ` — ${formatMoney(tx.cost)}`}
                     </p>
-                    <p className="text-[10px] text-gray-400 mt-0.5">{tx.requestedBy.fullName}</p>
+                    <p className="text-[10px] text-gray-400 mt-0.5 flex items-center gap-1"><MapPin size={9} /> {tx.location} · {tx.requestedBy.fullName}</p>
                   </div>
                   <div className="flex items-center gap-1.5 flex-shrink-0">
                     <button onClick={() => decide(asset.id, tx.id, 'approve')} className="p-1.5 rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-100 transition-colors">

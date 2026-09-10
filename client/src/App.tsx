@@ -21,6 +21,8 @@ import WorkOrderPage from '@/pages/WorkOrderPage';
 import WorkOrderHistoryPage from '@/pages/WorkOrderHistoryPage';
 import WorkOrderReportsPage from '@/pages/WorkOrderReportsPage';
 import InventoryPage from '@/pages/InventoryPage';
+import InventoryMovementsPage from '@/pages/InventoryMovementsPage';
+import InventoryOpnamePage from '@/pages/InventoryOpnamePage';
 import HRISOverviewPage from '@/pages/hris/HRISOverviewPage';
 import AttendancePage from '@/pages/hris/AttendancePage';
 import LeavePage from '@/pages/hris/LeavePage';
@@ -97,6 +99,8 @@ export default function App() {
           </Route>
           <Route path={ROUTES.INVENTORY}            element={<InventoryPage />} />
           <Route path={`${ROUTES.INVENTORY}/assets/:id`} element={<InventoryPage />} />
+          <Route path={ROUTES.INVENTORY_MOVEMENTS} element={<InventoryMovementsPage />} />
+          <Route path={ROUTES.INVENTORY_OPNAME}    element={<InventoryOpnamePage />} />
           <Route path={ROUTES.HRIS}                 element={<HRISOverviewPage />}    />
           <Route path={ROUTES.HRIS_ATTENDANCE}      element={<AttendancePage />}      />
           <Route path={ROUTES.HRIS_LEAVE}           element={<LeavePage />}           />

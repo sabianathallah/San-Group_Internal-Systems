@@ -25,6 +25,8 @@ import {
   Archive,
   HelpCircle,
   Boxes,
+  ArrowLeftRight,
+  ClipboardCheck,
 } from 'lucide-react';
 import { useUiStore } from '@/stores/uiStore';
 import { useAuthStore } from '@/stores/authStore';
@@ -148,7 +150,9 @@ export default function Sidebar() {
     {
       label: null,
       items: [
-        { label: t('shared.sidebar.nav.inventory'), to: ROUTES.INVENTORY, icon: Boxes },
+        { label: t('shared.sidebar.nav.inventory'),          to: ROUTES.INVENTORY,           icon: Boxes },
+        { label: t('shared.sidebar.nav.inventoryMovements'), to: ROUTES.INVENTORY_MOVEMENTS, icon: ArrowLeftRight },
+        { label: t('shared.sidebar.nav.inventoryOpname'),    to: ROUTES.INVENTORY_OPNAME,    icon: ClipboardCheck },
       ],
     },
   ];

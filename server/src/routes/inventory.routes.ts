@@ -1,19 +1,22 @@
 import { Router } from 'express';
 import {
   listAssetCategories, createAssetCategory,
+  listWarehouses, createWarehouse,
   listAssets, getAssetById, createAsset, updateAsset, deleteAsset,
   createTransaction, approveTransaction, rejectTransaction,
-  getInventoryStats,
+  getInventoryStats, listMovements, getMovementsTrend,
+  listOpnameSessions, getOpnameSession, createOpnameSession, submitOpnameCounts, finishOpnameSession,
 } from '@/controllers/inventory.controller';
 import { authenticate } from '@/middlewares/auth.middleware';
 import { checkPerm } from '@/middlewares/permission.middleware';
 import { validate } from '@/middlewares/validate.middleware';
 import { uuidParamSchema } from '@/validations/common.validation';
 import {
-  createAssetCategorySchema,
+  createAssetCategorySchema, createWarehouseSchema,
   createAssetSchema, updateAssetSchema, assetFilterSchema,
   createTransactionSchema, rejectTransactionSchema,
-  inventoryStatsFilterSchema,
+  inventoryStatsFilterSchema, movementsFilterSchema,
+  createOpnameSessionSchema, submitOpnameCountsSchema, opnameSessionFilterSchema,
 } from '@/validations/inventory.validation';
 
 const router = Router();
@@ -22,7 +25,17 @@ router.use(authenticate);
 // Static routes MUST come before /:id
 router.get('/categories',  checkPerm('inventory', 'view'),   listAssetCategories);
 router.post('/categories', checkPerm('inventory', 'create'), validate(createAssetCategorySchema), createAssetCategory);
+router.get('/warehouses',  checkPerm('inventory', 'view'),   listWarehouses);
+router.post('/warehouses', checkPerm('inventory', 'create'), validate(createWarehouseSchema), createWarehouse);
 router.get('/stats',       checkPerm('inventory', 'view'),   validate(inventoryStatsFilterSchema, ['query']), getInventoryStats);
+router.get('/movements',       checkPerm('inventory', 'view'), validate(movementsFilterSchema, ['query']), listMovements);
+router.get('/movements/trend', checkPerm('inventory', 'view'), getMovementsTrend);
+
+router.get('/opname-sessions',     checkPerm('inventory', 'view'), validate(opnameSessionFilterSchema, ['query']), listOpnameSessions);
+router.post('/opname-sessions',    checkPerm('inventory', 'edit'), validate(createOpnameSessionSchema), createOpnameSession);
+router.get('/opname-sessions/:id', checkPerm('inventory', 'view'), validate(uuidParamSchema, ['params']), getOpnameSession);
+router.patch('/opname-sessions/:id/counts', checkPerm('inventory', 'edit'), validate(uuidParamSchema, ['params']), validate(submitOpnameCountsSchema), submitOpnameCounts);
+router.post('/opname-sessions/:id/finish',  checkPerm('inventory', 'edit'), validate(uuidParamSchema, ['params']), finishOpnameSession);
 
 router.get('/',  checkPerm('inventory', 'view'),   validate(assetFilterSchema, ['query']), listAssets);
 router.post('/', checkPerm('inventory', 'create'), validate(createAssetSchema), createAsset);
