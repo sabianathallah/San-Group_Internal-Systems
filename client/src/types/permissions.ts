@@ -36,6 +36,14 @@ export interface WorkOrderPerms {
   // Enforced server-side too — this isn't just a UI toggle.
   canBeAssignee: boolean;
 }
+export interface InventoryPerms {
+  view: Scope;
+  create: boolean;
+  edit: Scope;
+  delete: Scope;
+  approvePurchase: boolean;
+  approveDisposal: boolean;
+}
 export interface UserMgmtPerms {
   create: boolean;
   edit: Scope;
@@ -61,6 +69,7 @@ export interface PermissionConfig {
   audit_log: AuditLogPerms;
   hris: HrisPerms;
   work_order: WorkOrderPerms;
+  inventory: InventoryPerms;
   user_mgmt: UserMgmtPerms;
   role_mgmt: RoleMgmtPerms;
   division_mgmt: DivisionMgmtPerms;
@@ -75,6 +84,7 @@ export const DEFAULT_PERMS: PermissionConfig = {
   audit_log:  { view: 'none' },
   hris:       { reviewLeave: 'none', editAttendance: 'none', manageShifts: false, manageLocations: false, viewReports: 'none' },
   work_order: { view: 'own', create: true, edit: 'own', delete: 'own', canBeAssignee: true },
+  inventory:  { view: 'none', create: false, edit: 'none', delete: 'none', approvePurchase: false, approveDisposal: false },
   user_mgmt:     { create: false, edit: 'none', delete: 'none', toggleStatus: 'none' },
   role_mgmt:     { create: false, edit: 'none', delete: 'none' },
   division_mgmt: { create: false, edit: 'none', delete: 'none' },

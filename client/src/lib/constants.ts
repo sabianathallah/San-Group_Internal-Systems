@@ -17,6 +17,7 @@ export const ROUTES = {
   WORK_ORDERS:         '/work-orders',
   WORK_ORDERS_HISTORY: '/work-orders/history',
   WORK_ORDERS_REPORTS: '/work-orders/reports',
+  INVENTORY:           '/inventory',
   HRIS:                  '/hris',
   HRIS_ATTENDANCE:       '/hris/attendance',
   HRIS_LEAVE:            '/hris/leave',

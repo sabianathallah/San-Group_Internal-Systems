@@ -59,6 +59,9 @@ enum NotificationType {
   LEAVE_SUBMITTED
   LEAVE_APPROVED
   LEAVE_REJECTED
+  INVENTORY_APPROVAL_NEEDED
+  INVENTORY_APPROVED
+  INVENTORY_REJECTED
   // Legacy — overtime module removed (client policy: no overtime); values kept
   // because removing PG enum values requires a type rebuild.
   OVERTIME_SUBMITTED
@@ -160,10 +163,10 @@ model Division {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  users              User[]
-  roles              Role[]
+  users                          User[]
+  roles                          Role[]
   bulletinAudiences              BulletinAudience[]
-  dbFolders                      DatabaseFolder[]       @relation("FolderDivision")
+  dbFolders                      DatabaseFolder[]                @relation("FolderDivision")
   taskDivisionAccess             TaskDivisionAccess[]
   scheduledAnnouncementAudiences ScheduledAnnouncementAudience[]
 
@@ -171,68 +174,68 @@ model Division {
 }
 
 model Role {
-  id          String    @id @default(uuid())
-  name        String    @unique
-  slug        String    @unique
-  color       String    @default("#6366f1")
-  level       Int       @default(6)
+  id          String   @id @default(uuid())
+  name        String   @unique
+  slug        String   @unique
+  color       String   @default("#6366f1")
+  level       Int      @default(6)
   description String?
-  position    Int       @default(0)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  position    Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  divisionId  String?
-  division    Division? @relation(fields: [divisionId], references: [id], onDelete: SetNull)
+  divisionId String?
+  division   Division? @relation(fields: [divisionId], references: [id], onDelete: SetNull)
 
   users          User[]
   rolePermission RolePermission?
 
-  @@map("roles")
   @@index([divisionId])
+  @@map("roles")
 }
 
 // --- User & Auth ---
 
 model User {
-  id          String    @id @default(uuid())
-  email       String    @unique
-  username    String    @unique
-  password    String
-  fullName    String
-  phone       String?
-  avatar      String?
-  wallpaperType  String?   // 'preset' | 'custom' — homepage header background
-  wallpaperValue String?   // preset key, or Cloudinary URL when wallpaperType = 'custom'
-  isActive    Boolean   @default(true)
-  joinDate    DateTime? @db.Date // tanggal mulai kerja — dasar aturan tenure cuti
-  lastLoginAt DateTime?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  id             String    @id @default(uuid())
+  email          String    @unique
+  username       String    @unique
+  password       String
+  fullName       String
+  phone          String?
+  avatar         String?
+  wallpaperType  String? // 'preset' | 'custom' — homepage header background
+  wallpaperValue String? // preset key, or Cloudinary URL when wallpaperType = 'custom'
+  isActive       Boolean   @default(true)
+  joinDate       DateTime? @db.Date // tanggal mulai kerja — dasar aturan tenure cuti
+  lastLoginAt    DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
   roleId     String
   role       Role     @relation(fields: [roleId], references: [id])
   divisionId String
   division   Division @relation(fields: [divisionId], references: [id])
 
-  shiftId    String?
-  shift      Shift?   @relation(fields: [shiftId], references: [id], onDelete: SetNull)
+  shiftId String?
+  shift   Shift?  @relation(fields: [shiftId], references: [id], onDelete: SetNull)
 
   // Relations
-  refreshTokens      RefreshToken[]
-  tasks              Task[]              @relation("TaskCreator")
-  assignedTasks      Task[]              @relation("TaskAssignee")
-  taskAttachments    TaskAttachment[]
-  stickyNotes        StickyNote[]
-  taskLists          TaskList[]
-  bulletins          Bulletin[]
-  bulletinReadStatus BulletinReadStatus[]
-  notifications      Notification[]      @relation("NotificationRecipient")
-  triggeredNotifs    Notification[]      @relation("NotificationActor")
-  databaseLinks      DatabaseLink[]
-  databaseFolders    DatabaseFolder[]
-  taskComments        TaskComment[]
-  grantedShares       ResourceShare[]
-  auditLogs           AuditLog[]
+  refreshTokens              RefreshToken[]
+  tasks                      Task[]                  @relation("TaskCreator")
+  assignedTasks              Task[]                  @relation("TaskAssignee")
+  taskAttachments            TaskAttachment[]
+  stickyNotes                StickyNote[]
+  taskLists                  TaskList[]
+  bulletins                  Bulletin[]
+  bulletinReadStatus         BulletinReadStatus[]
+  notifications              Notification[]          @relation("NotificationRecipient")
+  triggeredNotifs            Notification[]          @relation("NotificationActor")
+  databaseLinks              DatabaseLink[]
+  databaseFolders            DatabaseFolder[]
+  taskComments               TaskComment[]
+  grantedShares              ResourceShare[]
+  auditLogs                  AuditLog[]
   taskListMemberships        TaskListMembership[]
   scheduledAnnouncements     ScheduledAnnouncement[]
   reportedWorkOrders         WorkOrder[]             @relation("WOReporter")
@@ -251,6 +254,9 @@ model User {
   reviewedLateExcuses        LateExcuseRequest[]     @relation("LERReviewer")
   compOffGrants              CompOffGrant[]          @relation("COGUser")
   grantedCompOffs            CompOffGrant[]          @relation("COGGrantedBy")
+  createdAssets              Asset[]                 @relation("AssetCreator")
+  requestedAssetTransactions AssetHistory[]          @relation("AssetRequester")
+  approvedAssetTransactions  AssetHistory[]          @relation("AssetApprover")
 
   @@index([email])
   @@index([username])
@@ -291,13 +297,13 @@ model TaskList {
 }
 
 model Task {
-  id          String       @id @default(uuid())
-  title       String
-  description String?
-  status      TaskStatus   @default(TODO)
-  priority    TaskPriority @default(MEDIUM)
-  isImportant Boolean      @default(false)
-  myDayDate   DateTime?    @db.Date
+  id               String            @id @default(uuid())
+  title            String
+  description      String?
+  status           TaskStatus        @default(TODO)
+  priority         TaskPriority      @default(MEDIUM)
+  isImportant      Boolean           @default(false)
+  myDayDate        DateTime?         @db.Date
   startDate        DateTime?         @db.Date
   dueDate          DateTime?
   startedAt        DateTime? // first move to IN_PROGRESS — basis of work-duration tracking
@@ -310,8 +316,8 @@ model Task {
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
 
-  userId       String
-  creator      User   @relation("TaskCreator", fields: [userId], references: [id], onDelete: Cascade)
+  userId  String
+  creator User   @relation("TaskCreator", fields: [userId], references: [id], onDelete: Cascade)
 
   assignedToId String?
   assignee     User?   @relation("TaskAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
@@ -324,11 +330,11 @@ model Task {
   parentTask   Task?   @relation("SubTasks", fields: [parentTaskId], references: [id], onDelete: Cascade)
   subTasks     Task[]  @relation("SubTasks")
 
-  attachments        TaskAttachment[]
-  links              TaskLink[]
-  comments           TaskComment[]
-  divisionAccess     TaskDivisionAccess[]
-  listMemberships    TaskListMembership[]
+  attachments     TaskAttachment[]
+  links           TaskLink[]
+  comments        TaskComment[]
+  divisionAccess  TaskDivisionAccess[]
+  listMemberships TaskListMembership[]
 
   @@index([userId])
   @@index([assignedToId])
@@ -341,12 +347,12 @@ model Task {
 }
 
 model TaskAttachment {
-  id         String   @id @default(uuid())
-  fileName   String
-  filePath   String
-  fileSize   Int
-  mimeType   String
-  createdAt  DateTime @default(now())
+  id        String   @id @default(uuid())
+  fileName  String
+  filePath  String
+  fileSize  Int
+  mimeType  String
+  createdAt DateTime @default(now())
 
   taskId String
   task   Task   @relation(fields: [taskId], references: [id], onDelete: Cascade)
@@ -434,17 +440,17 @@ model StickyNote {
 // --- Bulletin Board ---
 
 model Bulletin {
-  id          String           @id @default(uuid())
-  title       String
-  content     String
-  category    BulletinCategory @default(GENERAL)
-  priority    BulletinPriority @default(NORMAL)
+  id           String           @id @default(uuid())
+  title        String
+  content      String
+  category     BulletinCategory @default(GENERAL)
+  priority     BulletinPriority @default(NORMAL)
   isPublished  Boolean          @default(false)
   audienceType AudienceType     @default(ALL)
   publishedAt  DateTime?
-  expiresAt   DateTime?
-  createdAt   DateTime         @default(now())
-  updatedAt   DateTime         @updatedAt
+  expiresAt    DateTime?
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
 
   authorId String
   author   User   @relation(fields: [authorId], references: [id], onDelete: Cascade)
@@ -502,11 +508,11 @@ model DatabaseFolder {
   updatedAt   DateTime @updatedAt
 
   createdById String
-  createdBy   User          @relation(fields: [createdById], references: [id], onDelete: Cascade)
+  createdBy   User           @relation(fields: [createdById], references: [id], onDelete: Cascade)
   links       DatabaseLink[]
 
-  divisionId  String?
-  division    Division?      @relation("FolderDivision", fields: [divisionId], references: [id], onDelete: SetNull)
+  divisionId String?
+  division   Division? @relation("FolderDivision", fields: [divisionId], references: [id], onDelete: SetNull)
 
   @@index([createdById])
   @@index([divisionId])
@@ -521,8 +527,8 @@ model DatabaseLink {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  folderId    String
-  folder      DatabaseFolder @relation(fields: [folderId], references: [id], onDelete: Cascade)
+  folderId String
+  folder   DatabaseFolder @relation(fields: [folderId], references: [id], onDelete: Cascade)
 
   createdById String
   createdBy   User   @relation(fields: [createdById], references: [id], onDelete: Cascade)
@@ -578,21 +584,21 @@ model BulletinAudience {
 }
 
 model ScheduledAnnouncement {
-  id          String         @id @default(uuid())
-  title       String
-  content     String
-  audienceType AudienceType  @default(ALL)
-  recurrence  RecurrenceType
-  dayOfWeek   Int?
-  sendHour    Int
-  sendMinute  Int            @default(0)
-  isActive    Boolean        @default(true)
-  lastSentAt  DateTime?
-  createdAt   DateTime       @default(now())
-  updatedAt   DateTime       @updatedAt
+  id           String         @id @default(uuid())
+  title        String
+  content      String
+  audienceType AudienceType   @default(ALL)
+  recurrence   RecurrenceType
+  dayOfWeek    Int?
+  sendHour     Int
+  sendMinute   Int            @default(0)
+  isActive     Boolean        @default(true)
+  lastSentAt   DateTime?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
 
   createdById String
-  createdBy   User                           @relation(fields: [createdById], references: [id], onDelete: Cascade)
+  createdBy   User                            @relation(fields: [createdById], references: [id], onDelete: Cascade)
   audiences   ScheduledAnnouncementAudience[]
 
   @@index([createdById])
@@ -601,11 +607,11 @@ model ScheduledAnnouncement {
 }
 
 model ScheduledAnnouncementAudience {
-  id                      String               @id @default(uuid())
+  id                      String                @id @default(uuid())
   scheduledAnnouncementId String
   scheduledAnnouncement   ScheduledAnnouncement @relation(fields: [scheduledAnnouncementId], references: [id], onDelete: Cascade)
   divisionId              String
-  division                Division             @relation(fields: [divisionId], references: [id], onDelete: Cascade)
+  division                Division              @relation(fields: [divisionId], references: [id], onDelete: Cascade)
 
   @@unique([scheduledAnnouncementId, divisionId])
   @@index([scheduledAnnouncementId])
@@ -630,14 +636,14 @@ model ResourceShare {
 }
 
 model AuditLog {
-  id         String   @id @default(uuid())
-  action     String
-  entity     String
-  entityId   String?
-  detail     Json?
-  userId     String
-  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  createdAt  DateTime @default(now())
+  id        String   @id @default(uuid())
+  action    String
+  entity    String
+  entityId  String?
+  detail    Json?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
 
   @@index([userId])
   @@index([entity])
@@ -671,9 +677,9 @@ model WorkOrder {
   reportedBy   User   @relation("WOReporter", fields: [reportedById], references: [id])
 
   assignedToId String?
-  assignee     User?   @relation("WOAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+  assignee     User?     @relation("WOAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
   assignedById String?
-  assignedBy   User?   @relation("WOAssigner", fields: [assignedById], references: [id], onDelete: SetNull)
+  assignedBy   User?     @relation("WOAssigner", fields: [assignedById], references: [id], onDelete: SetNull)
   assignedAt   DateTime?
 
   reviewedById String?
@@ -739,25 +745,25 @@ model WorkOrderAttachment {
 // --- HRIS ---
 
 model LeaveType {
-  id          String   @id @default(uuid())
-  name        String   @unique
-  slug        String   @unique
-  color       String   @default("#6366f1")
-  maxDaysPerYear Int   @default(0) // 0 = unlimited
-  isPaid      Boolean  @default(true)
-  requiresDoc Boolean  @default(false)
+  id                   String   @id @default(uuid())
+  name                 String   @unique
+  slug                 String   @unique
+  color                String   @default("#6366f1")
+  maxDaysPerYear       Int      @default(0) // 0 = unlimited
+  isPaid               Boolean  @default(true)
+  requiresDoc          Boolean  @default(false)
   // Doc only mandatory when totalDays exceeds this (SICK: 1 -> doc needed for >1 day; 0 -> always)
-  requiresDocAfterDays Int @default(0)
+  requiresDocAfterDays Int      @default(0)
   // Unused balance carries into next year, usable until March 31 then expires
-  allowCarryOver Boolean @default(false)
+  allowCarryOver       Boolean  @default(false)
   // Minimum months of tenure before this quota applies; below it requests become unpaid
-  tenureMonthsRequired Int @default(0)
+  tenureMonthsRequired Int      @default(0)
   // Balance starts at 0 and is earned via comp-off grants instead of a yearly quota
-  earnedBalance Boolean @default(false)
-  isActive    Boolean  @default(true)
-  position    Int      @default(0)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  earnedBalance        Boolean  @default(false)
+  isActive             Boolean  @default(true)
+  position             Int      @default(0)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
 
   leaveBalances LeaveBalance[]
   leaveRequests LeaveRequest[]
@@ -766,20 +772,20 @@ model LeaveType {
 }
 
 model LeaveBalance {
-  id          String    @id @default(uuid())
-  userId      String
-  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  leaveTypeId String
-  leaveType   LeaveType @relation(fields: [leaveTypeId], references: [id], onDelete: Cascade)
-  year        Int
-  totalDays   Int
-  usedDays    Int       @default(0)
-  pendingDays Int       @default(0)
+  id              String    @id @default(uuid())
+  userId          String
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  leaveTypeId     String
+  leaveType       LeaveType @relation(fields: [leaveTypeId], references: [id], onDelete: Cascade)
+  year            Int
+  totalDays       Int
+  usedDays        Int       @default(0)
+  pendingDays     Int       @default(0)
   // Portion of totalDays that came from last year's remainder; zeroed (and the
   // unused part removed from totalDays) after March 31
-  carriedOverDays Int   @default(0)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  carriedOverDays Int       @default(0)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
   @@unique([userId, leaveTypeId, year])
   @@index([userId])
@@ -788,26 +794,26 @@ model LeaveBalance {
 }
 
 model LeaveRequest {
-  id           String      @id @default(uuid())
-  userId       String
-  user         User        @relation("LRRequester", fields: [userId], references: [id])
-  leaveTypeId  String
-  leaveType    LeaveType   @relation(fields: [leaveTypeId], references: [id])
-  startDate    DateTime    @db.Date
-  endDate      DateTime    @db.Date
-  totalDays    Int
-  reason       String
-  status       LeaveStatus @default(PENDING)
+  id             String      @id @default(uuid())
+  userId         String
+  user           User        @relation("LRRequester", fields: [userId], references: [id])
+  leaveTypeId    String
+  leaveType      LeaveType   @relation(fields: [leaveTypeId], references: [id])
+  startDate      DateTime    @db.Date
+  endDate        DateTime    @db.Date
+  totalDays      Int
+  reason         String
+  status         LeaveStatus @default(PENDING)
   // Tenure below the leave type's requirement: no quota deducted, salary cut applies
-  isUnpaid     Boolean     @default(false)
+  isUnpaid       Boolean     @default(false)
   attachmentUrl  String?
   attachmentName String?
-  reviewNote   String?
-  reviewedById String?
-  reviewedBy   User?       @relation("LRReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
-  reviewedAt   DateTime?
-  createdAt    DateTime    @default(now())
-  updatedAt    DateTime    @updatedAt
+  reviewNote     String?
+  reviewedById   String?
+  reviewedBy     User?       @relation("LRReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+  reviewedAt     DateTime?
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
 
   @@index([userId])
   @@index([leaveTypeId])
@@ -843,8 +849,8 @@ model Shift {
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
 
-  users       User[]
-  attendances Attendance[]
+  users               User[]
+  attendances         Attendance[]
   shiftChangeRequests ShiftChangeRequest[] @relation("SCRRequestedShift")
 
   @@map("shifts")
@@ -890,7 +896,6 @@ model Attendance {
   photoUrl         String?
   createdAt        DateTime         @default(now())
   updatedAt        DateTime         @updatedAt
-
 
   @@unique([userId, date])
   @@index([userId])
@@ -961,15 +966,91 @@ model LateExcuseRequest {
   @@map("late_excuse_requests")
 }
 
-
 // ============================================================
 // PHASE 3 — COMMENTED OUT (uncomment saat Phase 3 dimulai)
 // ============================================================
 
 // --- Inventory & Asset Management ---
-// model AssetCategory { ... }
-// model Asset { ... }
-// model AssetHistory { ... }
+enum AssetTransactionType {
+  PURCHASE
+  DISPOSAL
+}
+
+enum AssetTransactionStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model AssetCategory {
+  id        String   @id @default(uuid())
+  name      String
+  color     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  assets Asset[]
+
+  @@map("asset_categories")
+}
+
+model Asset {
+  id          String  @id @default(uuid())
+  code        String  @unique // auto-generated, e.g. AST/2026/001
+  name        String
+  description String?
+  qty         Int     @default(0)
+  unit        String?
+  location    String
+
+  categoryId String
+  category   AssetCategory @relation(fields: [categoryId], references: [id])
+
+  createdById String
+  createdBy   User   @relation("AssetCreator", fields: [createdById], references: [id])
+
+  history AssetHistory[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([categoryId])
+  @@index([location])
+  @@map("assets")
+}
+
+// Atomic per-year counter backing Asset.code (AST/{year}/{seq}).
+model AssetSequence {
+  year    Int @id
+  counter Int @default(0)
+
+  @@map("asset_sequences")
+}
+
+model AssetHistory {
+  id       String                 @id @default(uuid())
+  assetId  String
+  asset    Asset                  @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  type     AssetTransactionType
+  quantity Int
+  cost     Decimal?               @db.Decimal(14, 2) // purchase only
+  note     String?
+  status   AssetTransactionStatus @default(PENDING)
+
+  requestedById String
+  requestedBy   User   @relation("AssetRequester", fields: [requestedById], references: [id])
+
+  approvedById String?
+  approvedBy   User?     @relation("AssetApprover", fields: [approvedById], references: [id], onDelete: SetNull)
+  approvedAt   DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([assetId])
+  @@index([status])
+  @@map("asset_history")
+}
 
 // --- Tenant Database ---
 // model Tenant { ... }

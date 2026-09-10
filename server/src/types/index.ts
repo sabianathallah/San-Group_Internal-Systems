@@ -18,6 +18,8 @@ export interface AuthRequest extends Request {
   permScope?: string;
   viewPrivate?: boolean;
   editAssignedFully?: boolean;
+  approvePurchase?: boolean;
+  approveDisposal?: boolean;
 }
 
 export interface ApiResponse<T = unknown> {

@@ -27,6 +27,8 @@ export function checkPerm(feature: keyof PermissionConfig, action: string) {
         req.permScope         = 'all';
         req.viewPrivate       = true;
         req.editAssignedFully = true;
+        req.approvePurchase   = true;
+        req.approveDisposal   = true;
         return next();
       }
 
@@ -36,6 +38,12 @@ export function checkPerm(feature: keyof PermissionConfig, action: string) {
       if (perms.task) {
         req.viewPrivate       = perms.task.viewPrivate;
         req.editAssignedFully = perms.task.editAssignedFully ?? false;
+      }
+
+      // Load inventory.approvePurchase / approveDisposal for inventory routes
+      if (perms.inventory) {
+        req.approvePurchase = perms.inventory.approvePurchase ?? false;
+        req.approveDisposal = perms.inventory.approveDisposal ?? false;
       }
 
       const featurePerms = perms[feature] as unknown as Record<string, unknown>;

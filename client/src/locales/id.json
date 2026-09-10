@@ -537,6 +537,81 @@
       "ageDuration": "Usia / Durasi"
     }
   },
+  "inventory": {
+    "title": "Inventory",
+    "newAsset": "Aset Baru",
+    "searchPlaceholder": "Cari kode, nama, lokasi...",
+    "allCategories": "Semua Kategori",
+    "pendingApprovals": "Menunggu Persetujuan",
+    "exportCsv": "Export CSV",
+    "empty": "Belum ada aset",
+    "colCode": "Kode",
+    "colName": "Nama",
+    "colCategory": "Kategori",
+    "colQty": "Stok",
+    "colLocation": "Lokasi",
+    "pageOf": "{{page}} / {{total}}",
+    "stats": {
+      "totalAssets": "Total Aset",
+      "pendingApprovals": "Menunggu Persetujuan",
+      "monthlySpend": "Pengeluaran Bulan Ini"
+    },
+    "form": {
+      "name": "Nama Aset",
+      "category": "Kategori",
+      "newCategoryPlaceholder": "Nama kategori baru",
+      "add": "Tambah",
+      "qty": "Jumlah",
+      "unit": "Satuan",
+      "location": "Lokasi",
+      "description": "Deskripsi",
+      "cancel": "Batal",
+      "save": "Simpan",
+      "submit": "Kirim",
+      "validationError": "Nama, lokasi, dan kategori wajib diisi",
+      "createSuccess": "Aset berhasil dibuat"
+    },
+    "detail": {
+      "title": "Detail Aset",
+      "edit": "Edit aset",
+      "editSuccess": "Aset berhasil diperbarui",
+      "delete": "Hapus aset",
+      "confirmDelete": "Hapus aset ini? Riwayat transaksinya akan ikut terhapus.",
+      "deleteSuccess": "Aset berhasil dihapus",
+      "stock": "Stok",
+      "printQr": "Cetak QR Code",
+      "requestPurchase": "Ajukan Pembelian",
+      "requestDisposal": "Ajukan Pengeluaran",
+      "costPlaceholder": "Estimasi biaya (opsional)",
+      "notePlaceholder": "Catatan (opsional)",
+      "requestSubmitted": "Pengajuan berhasil dikirim",
+      "history": "Riwayat Transaksi",
+      "noHistory": "Belum ada riwayat transaksi",
+      "purchaseOf": "Pembelian {{qty}} unit",
+      "disposalOf": "Pengeluaran {{qty}} unit"
+    },
+    "status": {
+      "pending": "Menunggu",
+      "approved": "Disetujui",
+      "rejected": "Ditolak"
+    },
+    "approvals": {
+      "empty": "Tidak ada pengajuan yang menunggu",
+      "approveSuccess": "Pengajuan disetujui",
+      "rejectSuccess": "Pengajuan ditolak",
+      "rejectReasonPlaceholder": "Alasan penolakan",
+      "confirmReject": "Tolak"
+    },
+    "csv": {
+      "code": "Kode",
+      "name": "Nama",
+      "category": "Kategori",
+      "qty": "Stok",
+      "unit": "Satuan",
+      "location": "Lokasi",
+      "createdBy": "Dibuat oleh"
+    }
+  },
   "language": {
     "label": "Bahasa",
     "en": "EN",
@@ -910,6 +985,15 @@
           "edit": "Edit work order",
           "delete": "Hapus work order",
           "canBeAssignee": "Dapat ditugaskan sebagai teknisi/pelaksana"
+        },
+        "inventory": {
+          "title": "Inventory",
+          "view": "Lihat aset",
+          "create": "Buat aset",
+          "edit": "Edit aset",
+          "delete": "Hapus aset",
+          "approvePurchase": "Setujui pengajuan pembelian",
+          "approveDisposal": "Setujui pengajuan pengeluaran"
         },
         "userMgmt": {
           "title": "Manajemen Pengguna",
@@ -2092,6 +2176,7 @@
       "modules": {
         "internal": "Internal",
         "workOrders": "Work Orders",
+        "inventory": "Inventory",
         "hris": "HRIS",
         "admin": "Admin"
       },
@@ -2114,6 +2199,7 @@
         "woHelp": "Panduan Work Order",
         "adminHelp": "Panduan Admin",
         "workOrders": "Work Orders",
+        "inventory": "Inventory",
         "history": "Riwayat",
         "reports": "Laporan",
         "overview": "Ringkasan",

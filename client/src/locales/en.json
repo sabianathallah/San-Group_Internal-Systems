@@ -537,6 +537,81 @@
       "ageDuration": "Age / Duration"
     }
   },
+  "inventory": {
+    "title": "Inventory",
+    "newAsset": "New Asset",
+    "searchPlaceholder": "Search code, name, location...",
+    "allCategories": "All Categories",
+    "pendingApprovals": "Pending Approvals",
+    "exportCsv": "Export CSV",
+    "empty": "No assets yet",
+    "colCode": "Code",
+    "colName": "Name",
+    "colCategory": "Category",
+    "colQty": "Stock",
+    "colLocation": "Location",
+    "pageOf": "{{page}} / {{total}}",
+    "stats": {
+      "totalAssets": "Total Assets",
+      "pendingApprovals": "Pending Approvals",
+      "monthlySpend": "Spend This Month"
+    },
+    "form": {
+      "name": "Asset Name",
+      "category": "Category",
+      "newCategoryPlaceholder": "New category name",
+      "add": "Add",
+      "qty": "Quantity",
+      "unit": "Unit",
+      "location": "Location",
+      "description": "Description",
+      "cancel": "Cancel",
+      "save": "Save",
+      "submit": "Submit",
+      "validationError": "Name, location, and category are required",
+      "createSuccess": "Asset created successfully"
+    },
+    "detail": {
+      "title": "Asset Detail",
+      "edit": "Edit asset",
+      "editSuccess": "Asset updated successfully",
+      "delete": "Delete asset",
+      "confirmDelete": "Delete this asset? Its transaction history will be deleted too.",
+      "deleteSuccess": "Asset deleted successfully",
+      "stock": "Stock",
+      "printQr": "Print QR Code",
+      "requestPurchase": "Request Purchase",
+      "requestDisposal": "Request Disposal",
+      "costPlaceholder": "Estimated cost (optional)",
+      "notePlaceholder": "Note (optional)",
+      "requestSubmitted": "Request submitted successfully",
+      "history": "Transaction History",
+      "noHistory": "No transaction history yet",
+      "purchaseOf": "Purchase of {{qty}} units",
+      "disposalOf": "Disposal of {{qty}} units"
+    },
+    "status": {
+      "pending": "Pending",
+      "approved": "Approved",
+      "rejected": "Rejected"
+    },
+    "approvals": {
+      "empty": "No pending requests",
+      "approveSuccess": "Request approved",
+      "rejectSuccess": "Request rejected",
+      "rejectReasonPlaceholder": "Rejection reason",
+      "confirmReject": "Reject"
+    },
+    "csv": {
+      "code": "Code",
+      "name": "Name",
+      "category": "Category",
+      "qty": "Stock",
+      "unit": "Unit",
+      "location": "Location",
+      "createdBy": "Created By"
+    }
+  },
   "language": {
     "label": "Language",
     "en": "EN",
@@ -910,6 +985,15 @@
           "edit": "Edit work orders",
           "delete": "Delete work orders",
           "canBeAssignee": "Can be assigned as technician/executor"
+        },
+        "inventory": {
+          "title": "Inventory",
+          "view": "View assets",
+          "create": "Create assets",
+          "edit": "Edit assets",
+          "delete": "Delete assets",
+          "approvePurchase": "Approve purchase requests",
+          "approveDisposal": "Approve disposal requests"
         },
         "userMgmt": {
           "title": "User Management",
@@ -2092,6 +2176,7 @@
       "modules": {
         "internal": "Internal",
         "workOrders": "Work Orders",
+        "inventory": "Inventory",
         "hris": "HRIS",
         "admin": "Admin"
       },
@@ -2114,6 +2199,7 @@
         "woHelp": "Work Order Guide",
         "adminHelp": "Admin Guide",
         "workOrders": "Work Orders",
+        "inventory": "Inventory",
         "history": "History",
         "reports": "Reports",
         "overview": "Overview",

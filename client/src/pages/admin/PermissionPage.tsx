@@ -30,6 +30,10 @@ interface HrisPerms {
 interface WorkOrderPerms {
   view: Scope; create: boolean; edit: Scope; delete: Scope; canBeAssignee: boolean;
 }
+interface InventoryPerms {
+  view: Scope; create: boolean; edit: Scope; delete: Scope;
+  approvePurchase: boolean; approveDisposal: boolean;
+}
 interface UserMgmtPerms {
   create: boolean; edit: Scope; delete: Scope; toggleStatus: Scope;
 }
@@ -42,7 +46,7 @@ interface DivisionMgmtPerms {
 interface PermissionConfig {
   task: TaskPerms; bulletin: BulletinPerms; db_link: DbLinkPerms;
   note: NotePerms; analytics: AnalyticsPerms; audit_log: AuditLogPerms;
-  hris: HrisPerms; work_order: WorkOrderPerms;
+  hris: HrisPerms; work_order: WorkOrderPerms; inventory: InventoryPerms;
   user_mgmt: UserMgmtPerms; role_mgmt: RoleMgmtPerms; division_mgmt: DivisionMgmtPerms;
 }
 
@@ -857,6 +861,33 @@ export default function PermissionPage() {
                 </PermRow>
                 <PermRow label={t('admin.permissions.sections.workOrder.canBeAssignee')}>
                   <Toggle checked={perms.work_order?.canBeAssignee ?? true} onChange={(v) => update('work_order', 'canBeAssignee', v)}
+                    disabled={isSuperAdmin || isReadOnly} />
+                </PermRow>
+              </Section>
+
+              <Section title={t('admin.permissions.sections.inventory.title')}>
+                <PermRow label={t('admin.permissions.sections.inventory.view')}>
+                  <ScopeSelector value={perms.inventory?.view ?? 'none'} options={VIEW_SCOPE_OPTS}
+                    onChange={(v) => update('inventory', 'view', v)} disabled={isSuperAdmin || isReadOnly} />
+                </PermRow>
+                <PermRow label={t('admin.permissions.sections.inventory.create')}>
+                  <Toggle checked={perms.inventory?.create ?? false} onChange={(v) => update('inventory', 'create', v)}
+                    disabled={isSuperAdmin || isReadOnly} />
+                </PermRow>
+                <PermRow label={t('admin.permissions.sections.inventory.edit')}>
+                  <ScopeSelector value={perms.inventory?.edit ?? 'none'} options={VIEW_DB_SCOPE_OPTS}
+                    onChange={(v) => update('inventory', 'edit', v)} disabled={isSuperAdmin || isReadOnly} />
+                </PermRow>
+                <PermRow label={t('admin.permissions.sections.inventory.delete')}>
+                  <ScopeSelector value={perms.inventory?.delete ?? 'none'} options={VIEW_DB_SCOPE_OPTS}
+                    onChange={(v) => update('inventory', 'delete', v)} disabled={isSuperAdmin || isReadOnly} />
+                </PermRow>
+                <PermRow label={t('admin.permissions.sections.inventory.approvePurchase')}>
+                  <Toggle checked={perms.inventory?.approvePurchase ?? false} onChange={(v) => update('inventory', 'approvePurchase', v)}
+                    disabled={isSuperAdmin || isReadOnly} />
+                </PermRow>
+                <PermRow label={t('admin.permissions.sections.inventory.approveDisposal')}>
+                  <Toggle checked={perms.inventory?.approveDisposal ?? false} onChange={(v) => update('inventory', 'approveDisposal', v)}
                     disabled={isSuperAdmin || isReadOnly} />
                 </PermRow>
               </Section>

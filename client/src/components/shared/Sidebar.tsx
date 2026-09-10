@@ -24,6 +24,7 @@ import {
   ClipboardEdit,
   Archive,
   HelpCircle,
+  Boxes,
 } from 'lucide-react';
 import { useUiStore } from '@/stores/uiStore';
 import { useAuthStore } from '@/stores/authStore';
@@ -48,7 +49,7 @@ interface NavSection {
   items: NavItem[];
 }
 
-type ModuleId = 'internal' | 'work-orders' | 'hris' | 'admin';
+type ModuleId = 'internal' | 'work-orders' | 'inventory' | 'hris' | 'admin';
 
 interface Module {
   id: ModuleId;
@@ -62,6 +63,7 @@ interface Module {
 const MODULES: Module[] = [
   { id: 'internal',     icon: LayoutDashboard, color: 'text-blue-300'  },
   { id: 'work-orders',  icon: Wrench,          color: 'text-orange-300' },
+  { id: 'inventory',    icon: Boxes,           color: 'text-emerald-300' },
   { id: 'hris',         icon: HardHat,         color: 'text-green-300' },
   { id: 'admin',        icon: UserCog,         color: 'text-purple-300', adminOnly: true },
 ];
@@ -70,6 +72,7 @@ const MODULES: Module[] = [
 function useActiveModule(): ModuleId {
   const { pathname } = useLocation();
   if (pathname.startsWith('/work-orders')) return 'work-orders';
+  if (pathname.startsWith('/inventory'))   return 'inventory';
   if (pathname.startsWith('/hris'))        return 'hris';
   if (pathname.startsWith('/admin'))       return 'admin';
   return 'internal';
@@ -93,6 +96,7 @@ export default function Sidebar() {
   const MODULE_LABELS: Record<ModuleId, string> = {
     'internal':    t('shared.sidebar.modules.internal'),
     'work-orders': t('shared.sidebar.modules.workOrders'),
+    'inventory':   t('shared.sidebar.modules.inventory'),
     'hris':        t('shared.sidebar.modules.hris'),
     'admin':       t('shared.sidebar.modules.admin'),
   };
@@ -137,6 +141,15 @@ export default function Sidebar() {
     {
       label: t('shared.sidebar.sections.support'),
       items: [{ label: t('shared.sidebar.nav.woHelp'), to: `${ROUTES.HELP}#help-wo-board`, icon: HelpCircle }],
+    },
+  ];
+
+  const inventoryNav: NavSection[] = [
+    {
+      label: null,
+      items: [
+        { label: t('shared.sidebar.nav.inventory'), to: ROUTES.INVENTORY, icon: Boxes },
+      ],
     },
   ];
 
@@ -189,11 +202,13 @@ export default function Sidebar() {
 
   const navSections: NavSection[] =
     activeModule === 'work-orders' ? workOrderNav :
+    activeModule === 'inventory'   ? inventoryNav :
     activeModule === 'hris'        ? hrisNav :
     activeModule === 'admin'       ? adminNav :
     internalNav;
 
-  const visibleModules = MODULES.filter((m) => !m.adminOnly || isAdmin);
+  const canInventory = perms.inventory?.view !== 'none';
+  const visibleModules = MODULES.filter((m) => (!m.adminOnly || isAdmin) && (m.id !== 'inventory' || canInventory));
 
   return (
     <aside
@@ -245,6 +260,7 @@ export default function Sidebar() {
                 to={
                   mod.id === 'internal'    ? ROUTES.DASHBOARD   :
                   mod.id === 'work-orders' ? ROUTES.WORK_ORDERS :
+                  mod.id === 'inventory'   ? ROUTES.INVENTORY   :
                   mod.id === 'hris'        ? ROUTES.HRIS :
                   mod.id === 'admin'       ? ROUTES.ADMIN_USERS :
                   ROUTES.DASHBOARD
@@ -271,6 +287,7 @@ export default function Sidebar() {
         {open && (
           <p className="px-2 mb-1 text-[10px] font-semibold text-white/30 uppercase tracking-wider">
             {activeModule === 'work-orders' ? MODULE_LABELS['work-orders'] :
+             activeModule === 'inventory'   ? MODULE_LABELS['inventory'] :
              activeModule === 'hris'        ? MODULE_LABELS['hris'] :
              activeModule === 'admin'       ? MODULE_LABELS['admin'] : t('shared.sidebar.sections.menu')}
           </p>
