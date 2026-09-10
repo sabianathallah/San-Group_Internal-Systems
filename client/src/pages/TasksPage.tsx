@@ -674,7 +674,7 @@ function ListView({
                           <MessageSquare size={10} />{task._count.comments}
                         </span>
                       )}
-                      {showUser && <p className="text-[10px] text-gray-400 truncate">{task.creator.fullName}</p>}
+                      {showUser && <p className="text-[10px] text-gray-400 truncate">{(task.assignee ?? task.creator).fullName}</p>}
                       <button onClick={(e) => { e.stopPropagation(); onToggleMyDay(task); }}
                         title={isInMyDay(task) ? t('tasks.listView.removeFromMyDay') : t('tasks.listView.addToMyDay')}
                         className={cn('flex-shrink-0 transition-colors', isInMyDay(task) ? 'text-amber-400' : 'text-gray-200 hover:text-amber-400')}>
@@ -1723,11 +1723,24 @@ function TaskDetailPanel({
                 <PriorityDot priority={task.priority} />
                 <span className="text-xs text-gray-400">{t('tasks.detailPanel.priority')}</span>
               </div>
-              <select value={task.priority} onChange={(e) => patch({ priority: e.target.value })}
-                disabled={!canEditFully}
-                className="text-xs bg-transparent outline-none cursor-pointer text-gray-700 hover:text-navy disabled:cursor-not-allowed disabled:text-gray-400 disabled:hover:text-gray-400">
-                {Object.keys(PRIORITY_CONFIG).map((k) => <option key={k} value={k}>{priorityLabel(t, k as TaskPriority)}</option>)}
-              </select>
+              <div className="flex items-center gap-1.5">
+                {(Object.keys(PRIORITY_CONFIG) as TaskPriority[]).map((k) => (
+                  <button
+                    key={k}
+                    onClick={() => patch({ priority: k })}
+                    disabled={!canEditFully}
+                    title={priorityLabel(t, k)}
+                    className={cn(
+                      'flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-medium border transition-colors disabled:opacity-40 disabled:cursor-not-allowed',
+                      task.priority === k
+                        ? 'bg-navy/10 text-navy border-navy/30'
+                        : 'text-gray-400 border-gray-200 hover:text-navy hover:border-navy/30',
+                    )}
+                  >
+                    <PriorityDot priority={k} /> {priorityLabel(t, k)}
+                  </button>
+                ))}
+              </div>
             </div>
 
             <div className="flex items-center gap-3 px-1 py-2 rounded hover:bg-gray-50">

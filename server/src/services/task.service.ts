@@ -210,21 +210,26 @@ export async function listTeamTasksService(
 
   if (!userIds.length) return { tasks: [], meta: buildMeta(0, 1, limit) };
 
-  const where: Prisma.TaskWhereInput = {
-    userId: { in: userIds },
-    parentTaskId: null,
+  // A subordinate's task can be created by someone else (e.g. the manager
+  // assigning it to them), so membership must match on either the creator
+  // or the assignee — matching creator alone hid tasks a head assigned to
+  // their own staff from the head's Team view.
+  const andConditions: Prisma.TaskWhereInput[] = [
+    { OR: [{ userId: { in: userIds } }, { assignedToId: { in: userIds } }] },
+    { parentTaskId: null },
     // isPrivate (not visibility) gates manager visibility — visibility only controls
     // sharing with division peers, a separate axis. A staff task is visible to their
     // manager by default; isPrivate:true is an explicit opt-out staff can set.
-    isPrivate: false,
-  };
-  if (query.status)   where.status   = query.status as TaskStatus;
-  if (query.priority) where.priority = query.priority as TaskPriority;
-  if (typeof query.listId === 'string') where.listId = query.listId;
+    { isPrivate: false },
+  ];
+  if (query.status)   andConditions.push({ status: query.status as TaskStatus });
+  if (query.priority) andConditions.push({ priority: query.priority as TaskPriority });
+  if (typeof query.listId === 'string') andConditions.push({ listId: query.listId });
   if (query.search && typeof query.search === 'string') {
     const s = { contains: query.search, mode: 'insensitive' as const };
-    where.OR = [{ title: s }, { description: s }];
+    andConditions.push({ OR: [{ title: s }, { description: s }] });
   }
+  const where: Prisma.TaskWhereInput = { AND: andConditions };
 
   const [tasks, total] = await prisma.$transaction([
     prisma.task.findMany({ where, select: TASK_SELECT, skip, take: limit,
