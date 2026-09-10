@@ -150,14 +150,14 @@ export default function InventoryPage() {
     <div className="flex h-full overflow-hidden -m-6 bg-gray-50">
       <div className="flex flex-col flex-1 overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between gap-4 px-6 pt-6 pb-4 flex-wrap">
-          <div className="flex items-center gap-3">
+        <div className="flex items-center justify-between gap-4 px-6 pt-6 pb-5 flex-wrap">
+          <div className="flex items-center gap-3.5">
             <div className="w-10 h-10 rounded-xl bg-navy/10 flex items-center justify-center flex-shrink-0">
               <Boxes size={19} className="text-navy" />
             </div>
             <div>
-              <h1 className="text-lg font-semibold text-gray-900 leading-tight">{t('inventory.title')}</h1>
-              <p className="text-xs text-gray-400">{t('inventory.assetCount', { count: total })}</p>
+              <h1 className="text-xl font-semibold text-gray-900 leading-tight tracking-tight">{t('inventory.title')}</h1>
+              <p className="text-xs text-gray-400 mt-0.5">{t('inventory.assetCount', { count: total })}</p>
             </div>
           </div>
 
@@ -165,7 +165,7 @@ export default function InventoryPage() {
             {canApprove && (
               <button
                 onClick={() => setShowApprovals(true)}
-                className="relative flex items-center gap-1.5 px-3.5 py-2 text-sm font-medium rounded-lg border border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100 transition-colors"
+                className="relative flex items-center gap-1.5 px-3.5 py-2 text-sm font-medium rounded-lg border border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100 hover:-translate-y-0.5 hover:shadow-sm active:translate-y-0 transition-all duration-200"
               >
                 <Clock size={14} /> {t('inventory.pendingApprovals')}
                 {stats && stats.pendingApprovals > 0 && (
@@ -177,14 +177,14 @@ export default function InventoryPage() {
             )}
             <button
               onClick={() => exportAssetsCSV(assets, t)}
-              className="flex items-center gap-1.5 px-3.5 py-2 text-sm font-medium rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 transition-colors"
+              className="flex items-center gap-1.5 px-3.5 py-2 text-sm font-medium rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 hover:-translate-y-0.5 hover:shadow-sm active:translate-y-0 transition-all duration-200"
             >
               <Download size={14} /> {t('inventory.exportCsv')}
             </button>
             {canCreate && (
               <button
                 onClick={() => setShowImport(true)}
-                className="flex items-center gap-1.5 px-3.5 py-2 text-sm font-medium rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 transition-colors"
+                className="flex items-center gap-1.5 px-3.5 py-2 text-sm font-medium rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 hover:-translate-y-0.5 hover:shadow-sm active:translate-y-0 transition-all duration-200"
               >
                 <Upload size={14} /> {t('inventory.import.action')}
               </button>
@@ -192,7 +192,7 @@ export default function InventoryPage() {
             {canCreate && (
               <button
                 onClick={() => setShowCreate(true)}
-                className="flex items-center gap-1.5 px-3.5 py-2 text-sm font-medium rounded-lg bg-navy text-white hover:bg-navy-light transition-colors shadow-sm shadow-navy/20"
+                className="flex items-center gap-1.5 px-3.5 py-2 text-sm font-medium rounded-lg bg-navy text-white hover:bg-navy-light hover:-translate-y-0.5 hover:shadow-md active:translate-y-0 transition-all duration-200 shadow-sm shadow-navy/20"
               >
                 <Plus size={15} /> {t('inventory.newAsset')}
               </button>
@@ -203,9 +203,9 @@ export default function InventoryPage() {
         {/* Stats */}
         {stats && (
           <div className="grid grid-cols-3 gap-3 px-6 pb-4">
-            <StatCard label={t('inventory.stats.totalAssets')} value={String(stats.totalAssets)} icon={Package} tone="navy" />
-            <StatCard label={t('inventory.stats.pendingApprovals')} value={String(stats.pendingApprovals)} icon={Clock} tone="amber" />
-            <StatCard label={t('inventory.stats.monthlySpend')} value={formatMoney(stats.monthlySpend)} icon={Wallet} tone="emerald" />
+            <StatCard label={t('inventory.stats.totalAssets')} value={String(stats.totalAssets)} icon={Package} tone="navy" delay={0} />
+            <StatCard label={t('inventory.stats.pendingApprovals')} value={String(stats.pendingApprovals)} icon={Clock} tone="amber" delay={60} />
+            <StatCard label={t('inventory.stats.monthlySpend')} value={formatMoney(stats.monthlySpend)} icon={Wallet} tone="emerald" delay={120} />
           </div>
         )}
 
@@ -221,7 +221,7 @@ export default function InventoryPage() {
           </div>
           <select
             value={categoryFilter} onChange={(e) => { setCategoryFilter(e.target.value); setPage(1); }}
-            className="text-sm bg-white border border-gray-200 rounded-lg px-3 py-2 outline-none text-gray-600 focus:border-navy"
+            className="text-sm bg-white border border-gray-200 rounded-lg px-3 py-2 outline-none text-gray-600 focus:border-navy transition-colors"
           >
             <option value="">{t('inventory.allCategories')}</option>
             {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
@@ -236,8 +236,8 @@ export default function InventoryPage() {
                 <div className="flex items-center justify-center h-full min-h-[240px]"><Loader2 className="animate-spin text-gray-300" size={26} /></div>
               ) : assets.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-full min-h-[280px] gap-3 text-center px-6">
-                  <div className="w-14 h-14 rounded-2xl bg-gray-50 flex items-center justify-center">
-                    <Boxes size={24} className="text-gray-300" />
+                  <div className="w-16 h-16 rounded-2xl border-2 border-dashed border-gray-200 bg-gray-50/60 flex items-center justify-center">
+                    <Boxes size={24} className="text-gray-300" strokeWidth={1.5} />
                   </div>
                   <div>
                     <p className="text-sm font-medium text-gray-600">{t('inventory.empty')}</p>
@@ -246,7 +246,7 @@ export default function InventoryPage() {
                   {canCreate && (
                     <button
                       onClick={() => setShowCreate(true)}
-                      className="mt-1 flex items-center gap-1.5 px-3.5 py-2 text-sm font-medium rounded-lg bg-navy text-white hover:bg-navy-light transition-colors"
+                      className="mt-1 flex items-center gap-1.5 px-3.5 py-2 text-sm font-medium rounded-lg bg-navy text-white hover:bg-navy-light hover:-translate-y-0.5 hover:shadow-md active:translate-y-0 transition-all duration-200"
                     >
                       <Plus size={14} /> {t('inventory.newAsset')}
                     </button>
@@ -254,8 +254,8 @@ export default function InventoryPage() {
                 </div>
               ) : (
                 <table className="w-full text-sm border-collapse">
-                  <thead className="sticky top-0 bg-white z-10">
-                    <tr className="text-left text-[11px] font-semibold text-gray-400 uppercase tracking-wide border-b border-gray-100">
+                  <thead className="sticky top-0 bg-white/95 backdrop-blur-sm z-10">
+                    <tr className="text-left text-[11px] font-semibold text-gray-400 uppercase tracking-wider border-b border-gray-100">
                       <th className="px-5 py-3">{t('inventory.colCode')}</th>
                       <th className="px-3 py-3">{t('inventory.colName')}</th>
                       <th className="px-3 py-3">{t('inventory.colCategory')}</th>
@@ -264,28 +264,30 @@ export default function InventoryPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {assets.map((a) => (
+                    {assets.map((a, i) => (
                       <tr
                         key={a.id}
                         onClick={() => setSelectedId(a.id)}
                         className={cn(
-                          'cursor-pointer border-b border-gray-50 last:border-0 transition-colors',
+                          'group cursor-pointer border-b border-gray-50 last:border-0 transition-colors duration-150 fade-in-up',
                           selectedId === a.id ? 'bg-navy/[0.04]' : 'hover:bg-gray-50/80',
                         )}
+                        style={{ animationDelay: `${Math.min(i, 12) * 25}ms` }}
                       >
-                        <td className="px-5 py-3">
-                          <span className="font-mono text-[11px] text-gray-400 bg-gray-50 px-1.5 py-0.5 rounded">{a.code}</span>
+                        <td className={cn('px-5 py-3 border-l-[3px] transition-colors duration-150', selectedId === a.id ? 'border-navy' : 'border-transparent')}>
+                          <span className="font-mono text-[11px] text-gray-400 bg-gray-50 group-hover:bg-gray-100 px-1.5 py-0.5 rounded transition-colors">{a.code}</span>
                         </td>
                         <td className="px-3 py-3 font-medium text-gray-800">{a.name}</td>
                         <td className="px-3 py-3">
                           <span
-                            className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium"
+                            className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-medium"
                             style={{ backgroundColor: tint(a.category.color, '1A'), color: a.category.color ?? '#475569' }}
                           >
+                            <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: a.category.color ?? '#475569' }} />
                             {a.category.name}
                           </span>
                         </td>
-                        <td className="px-3 py-3 text-right text-gray-700 font-medium tabular-nums">{a.totalQty} <span className="text-gray-400 font-normal">{a.unit ?? ''}</span></td>
+                        <td className="px-3 py-3 text-right text-gray-700 font-semibold tabular-nums">{a.totalQty} <span className="text-gray-400 font-normal">{a.unit ?? ''}</span></td>
                         <td className="px-3 py-3 text-gray-500">
                           {a.stocks.length === 0 ? (
                             <span className="text-gray-300">—</span>
@@ -356,21 +358,25 @@ export default function InventoryPage() {
 }
 
 const STAT_TONE = {
-  navy:    { bg: 'bg-navy/10',    icon: 'text-navy' },
-  amber:   { bg: 'bg-amber-50',   icon: 'text-amber-600' },
-  emerald: { bg: 'bg-emerald-50', icon: 'text-emerald-600' },
+  navy:    { bg: 'bg-navy/10',    icon: 'text-navy',         bar: 'bg-navy' },
+  amber:   { bg: 'bg-amber-50',   icon: 'text-amber-600',    bar: 'bg-amber-400' },
+  emerald: { bg: 'bg-emerald-50', icon: 'text-emerald-600',  bar: 'bg-emerald-400' },
 } as const;
 
-function StatCard({ label, value, icon: Icon, tone }: { label: string; value: string; icon: React.ElementType; tone: keyof typeof STAT_TONE }) {
+function StatCard({ label, value, icon: Icon, tone, delay }: { label: string; value: string; icon: React.ElementType; tone: keyof typeof STAT_TONE; delay: number }) {
   const c = STAT_TONE[tone];
   return (
-    <div className="flex items-center gap-3 px-4 py-3.5 bg-white rounded-xl border border-gray-100 shadow-sm">
-      <div className={cn('w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0', c.bg)}>
-        <Icon size={17} className={c.icon} />
+    <div
+      className="group relative flex items-center gap-3.5 px-4 py-4 bg-white rounded-xl border border-gray-100 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 overflow-hidden fade-in-up"
+      style={{ animationDelay: `${delay}ms` }}
+    >
+      <div className={cn('absolute inset-x-0 top-0 h-0.5', c.bar)} />
+      <div className={cn('w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 transition-transform duration-300 group-hover:scale-105', c.bg)}>
+        <Icon size={18} className={c.icon} strokeWidth={1.75} />
       </div>
       <div className="min-w-0">
-        <p className="text-[11px] text-gray-400 truncate">{label}</p>
-        <p className="text-base font-semibold text-gray-900 leading-tight truncate">{value}</p>
+        <p className="text-[10.5px] font-semibold text-gray-400 uppercase tracking-wide truncate">{label}</p>
+        <p className="text-lg font-semibold text-gray-900 leading-tight truncate mt-0.5">{value}</p>
       </div>
     </div>
   );
@@ -482,6 +488,29 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
       <label className="text-xs font-medium text-gray-500">{label}</label>
       {children}
     </div>
+  );
+}
+
+const ACTION_TILE_TONE = {
+  emerald: 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 hover:border-emerald-300',
+  orange:  'border-orange-200 bg-orange-50 text-orange-700 hover:bg-orange-100 hover:border-orange-300',
+  purple:  'border-purple-200 bg-purple-50 text-purple-700 hover:bg-purple-100 hover:border-purple-300',
+  indigo:  'border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 hover:border-indigo-300',
+} as const;
+
+function ActionTile({ onClick, icon: Icon, label, tone }: {
+  onClick: () => void; icon: React.ElementType; label: string; tone: keyof typeof ACTION_TILE_TONE;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={cn(
+        'flex items-center justify-center gap-1.5 py-2.5 text-xs font-medium border rounded-xl transition-all duration-200 hover:-translate-y-0.5 hover:shadow-sm active:translate-y-0',
+        ACTION_TILE_TONE[tone],
+      )}
+    >
+      <Icon size={14} /> {label}
+    </button>
   );
 }
 
@@ -727,12 +756,12 @@ function AssetDetailPanel({
         <h2 className="font-semibold text-gray-900 text-sm">{t('inventory.detail.title')}</h2>
         <div className="flex items-center gap-0.5">
           {canEdit && !editing && (
-            <button onClick={startEdit} title={t('inventory.detail.edit')} className="text-gray-400 hover:text-navy hover:bg-gray-50 p-1.5 rounded-md transition-colors">
+            <button onClick={startEdit} title={t('inventory.detail.edit')} className="text-gray-400 hover:text-navy hover:bg-gray-50 p-1.5 rounded-md transition-all duration-150 hover:scale-105">
               <Pencil size={15} />
             </button>
           )}
           {canDelete && (
-            <button onClick={handleDelete} title={t('inventory.detail.delete')} className="text-gray-400 hover:text-red-500 hover:bg-red-50 p-1.5 rounded-md transition-colors">
+            <button onClick={handleDelete} title={t('inventory.detail.delete')} className="text-gray-400 hover:text-red-500 hover:bg-red-50 p-1.5 rounded-md transition-all duration-150 hover:scale-105">
               <XCircle size={16} />
             </button>
           )}
@@ -765,13 +794,14 @@ function AssetDetailPanel({
       ) : (
         <div className="flex-1 overflow-y-auto p-5 space-y-5">
           <div>
-            <span className="font-mono text-[11px] text-gray-400 bg-gray-50 px-1.5 py-0.5 rounded">{asset.code}</span>
+            <span className="font-mono text-[11px] text-gray-400 bg-gray-50 px-1.5 py-0.5 rounded tracking-wide">{asset.code}</span>
             <h3 className="text-lg font-semibold text-gray-900 mt-1.5 leading-tight">{asset.name}</h3>
-            {asset.description && <p className="text-xs text-gray-500 mt-1">{asset.description}</p>}
+            <div className="w-8 h-px bg-gold/50 my-2" />
+            {asset.description && <p className="text-xs text-gray-500">{asset.description}</p>}
           </div>
 
           <span
-            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium"
+            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium"
             style={{ backgroundColor: tint(asset.category.color, '1A'), color: asset.category.color ?? '#475569' }}
           >
             <Tag size={11} /> {asset.category.name}
@@ -780,8 +810,8 @@ function AssetDetailPanel({
           {/* Per-location stock breakdown */}
           <div className="rounded-xl border border-navy/10 bg-navy/[0.04] overflow-hidden">
             <div className="flex items-center gap-2.5 p-3">
-              <div className="w-9 h-9 rounded-lg bg-white flex items-center justify-center flex-shrink-0 shadow-sm">
-                <Package size={16} className="text-navy" />
+              <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-navy to-navy-light flex items-center justify-center flex-shrink-0 shadow-sm">
+                <Package size={16} className="text-gold" strokeWidth={1.75} />
               </div>
               <div>
                 <p className="text-[11px] text-gray-400">{t('inventory.detail.totalStock')}</p>
@@ -800,32 +830,26 @@ function AssetDetailPanel({
             )}
           </div>
 
-          {/* QR code */}
-          <div className="flex flex-col items-center gap-2 py-4 rounded-xl border border-gray-100 bg-gray-50/60">
-            <div className="bg-white p-2.5 rounded-lg shadow-sm">
-              <QRCodeSVG value={qrValue} size={116} />
+          {/* QR code — styled as a hang tag */}
+          <div className="relative flex flex-col items-center pt-6 pb-5 px-4 rounded-2xl border-2 border-dashed border-gray-200 bg-gradient-to-b from-gray-50/80 to-white">
+            <div className="w-3 h-3 rounded-full bg-white ring-2 ring-gray-300 mb-3.5" />
+            <div className="bg-white p-3 rounded-xl shadow-sm ring-1 ring-gray-100">
+              <QRCodeSVG value={qrValue} size={112} />
             </div>
-            <p className="text-[10px] text-gray-400 font-mono mt-1">{asset.code}</p>
-            <p className="text-xs font-medium text-gray-700 text-center">{asset.name}</p>
+            <p className="text-[10px] text-gray-400 font-mono tracking-wider mt-2.5">{asset.code}</p>
+            <div className="w-8 h-px bg-gray-200 my-1.5" />
+            <p className="text-xs font-medium text-gray-700 text-center px-2">{asset.name}</p>
           </div>
-          <button onClick={() => setShowPrintLabel(true)} className="w-full flex items-center justify-center gap-1.5 py-2 text-xs font-medium border border-gray-200 rounded-lg hover:bg-gray-50 text-gray-600 transition-colors">
+          <button onClick={() => setShowPrintLabel(true)} className="w-full flex items-center justify-center gap-1.5 py-2 text-xs font-medium border border-gray-200 rounded-lg hover:bg-gray-50 hover:-translate-y-0.5 hover:shadow-sm active:translate-y-0 text-gray-600 transition-all duration-200">
             <Printer size={13} /> {t('inventory.detail.printQr')}
           </button>
 
           {/* Request buttons */}
           <div className="grid grid-cols-2 gap-2">
-            <button onClick={() => openTxForm('PURCHASE')} className="flex items-center justify-center gap-1.5 py-2 text-xs font-medium border border-emerald-200 bg-emerald-50 text-emerald-700 rounded-lg hover:bg-emerald-100 transition-colors">
-              <ArrowDownCircle size={14} /> {t('inventory.detail.requestPurchase')}
-            </button>
-            <button onClick={() => openTxForm('DISPOSAL')} className="flex items-center justify-center gap-1.5 py-2 text-xs font-medium border border-orange-200 bg-orange-50 text-orange-700 rounded-lg hover:bg-orange-100 transition-colors">
-              <ArrowUpCircle size={14} /> {t('inventory.detail.requestDisposal')}
-            </button>
-            <button onClick={() => openTxForm('TRANSFER')} className="flex items-center justify-center gap-1.5 py-2 text-xs font-medium border border-purple-200 bg-purple-50 text-purple-700 rounded-lg hover:bg-purple-100 transition-colors">
-              <ArrowLeftRight size={14} /> {t('inventory.detail.requestTransfer')}
-            </button>
-            <button onClick={openAssignForm} className="flex items-center justify-center gap-1.5 py-2 text-xs font-medium border border-indigo-200 bg-indigo-50 text-indigo-700 rounded-lg hover:bg-indigo-100 transition-colors">
-              <UserPlus size={14} /> {t('inventory.detail.assign.action')}
-            </button>
+            <ActionTile onClick={() => openTxForm('PURCHASE')} icon={ArrowDownCircle} label={t('inventory.detail.requestPurchase')} tone="emerald" />
+            <ActionTile onClick={() => openTxForm('DISPOSAL')} icon={ArrowUpCircle} label={t('inventory.detail.requestDisposal')} tone="orange" />
+            <ActionTile onClick={() => openTxForm('TRANSFER')} icon={ArrowLeftRight} label={t('inventory.detail.requestTransfer')} tone="purple" />
+            <ActionTile onClick={openAssignForm} icon={UserPlus} label={t('inventory.detail.assign.action')} tone="indigo" />
           </div>
 
           {txType && (
@@ -888,7 +912,8 @@ function AssetDetailPanel({
               <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-2">{t('inventory.detail.assign.currentlyAssigned')}</p>
               <div className="space-y-2">
                 {(asset.history ?? []).filter((h) => h.type === 'ASSIGN' && !h.returnedAt).map((h) => (
-                  <div key={h.id} className="flex items-center justify-between gap-2 p-2.5 bg-indigo-50/60 border border-indigo-100 rounded-lg">
+                  <div key={h.id} className="relative flex items-center justify-between gap-2 pl-3.5 pr-2.5 py-2.5 bg-indigo-50/60 border border-indigo-100 rounded-lg overflow-hidden">
+                    <div className="absolute inset-y-0 left-0 w-1 bg-indigo-400" />
                     <div className="min-w-0">
                       <p className="text-xs font-medium text-gray-800 truncate">{h.assignedTo?.fullName}</p>
                       <p className="text-[10px] text-gray-500">{h.quantity} {asset.unit ?? ''} · {h.location}</p>
@@ -896,7 +921,7 @@ function AssetDetailPanel({
                     <button
                       onClick={() => handleReturn(h.id)}
                       disabled={returningId === h.id}
-                      className="flex items-center gap-1 px-2 py-1 text-[11px] font-medium border border-gray-200 bg-white rounded-lg hover:bg-gray-50 disabled:opacity-50 flex-shrink-0"
+                      className="flex items-center gap-1 px-2 py-1 text-[11px] font-medium border border-gray-200 bg-white rounded-lg hover:bg-gray-50 hover:-translate-y-0.5 active:translate-y-0 transition-all duration-150 disabled:opacity-50 disabled:hover:translate-y-0 flex-shrink-0"
                     >
                       {returningId === h.id ? <Loader2 size={11} className="animate-spin" /> : <Undo2 size={11} />} {t('inventory.detail.assign.markReturned')}
                     </button>
@@ -913,8 +938,8 @@ function AssetDetailPanel({
               <p className="text-xs text-gray-400">{t('inventory.detail.noHistory')}</p>
             ) : (
               <ul className="relative space-y-4 before:absolute before:left-[11px] before:top-1 before:bottom-1 before:w-px before:bg-gray-100">
-                {(asset.history ?? []).map((h) => (
-                  <li key={h.id} className="relative flex items-start gap-3 pl-0">
+                {(asset.history ?? []).map((h, i) => (
+                  <li key={h.id} className="relative flex items-start gap-3 pl-0 fade-in-up" style={{ animationDelay: `${Math.min(i, 10) * 30}ms` }}>
                     <HistoryIcon type={h.type} />
                     <div className="flex-1 min-w-0 pb-0.5">
                       <div className="flex items-start justify-between gap-2">
@@ -976,8 +1001,8 @@ function HistoryIcon({ type }: { type: HistoryType }) {
   const cfg = HISTORY_ICON_CFG[type];
   const Icon = cfg.icon;
   return (
-    <div className={cn('relative z-10 w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 ring-4 ring-white', cfg.cls)}>
-      <Icon size={12} />
+    <div className={cn('relative z-10 w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 ring-4 ring-white shadow-sm', cfg.cls)}>
+      <Icon size={12} strokeWidth={2} />
     </div>
   );
 }

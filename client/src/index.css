@@ -98,4 +98,15 @@
     0%   { background-position: 200% 0; }
     100% { background-position: -200% 0; }
   }
+
+  /* Staggered entrance for list rows / cards — pair with an inline
+     animation-delay per index for a cascading reveal. */
+  .fade-in-up {
+    animation: fadeInUp 0.35s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+  }
+
+  @keyframes fadeInUp {
+    0%   { opacity: 0; transform: translateY(6px); }
+    100% { opacity: 1; transform: translateY(0); }
+  }
 }
