@@ -108,6 +108,10 @@ export default function InventoryPage() {
   const [showCreate, setShowCreate] = useState(false);
   const [showApprovals, setShowApprovals] = useState(false);
   const [stats, setStats] = useState<InventoryStats | null>(null);
+  // Bumped whenever a mutation happens outside the detail panel itself (e.g. an
+  // approve/reject decided from the Approvals modal) so the open panel refetches
+  // instead of showing a stale status for the asset it has selected.
+  const [detailRefreshTick, setDetailRefreshTick] = useState(0);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -300,6 +304,7 @@ export default function InventoryPage() {
           categories={categories}
           canEdit={canEdit}
           canDelete={canDelete}
+          refreshSignal={detailRefreshTick}
         />
       )}
 
@@ -313,7 +318,7 @@ export default function InventoryPage() {
       )}
 
       {showApprovals && (
-        <ApprovalsModal onClose={() => setShowApprovals(false)} onDecided={() => { load(); }} />
+        <ApprovalsModal onClose={() => setShowApprovals(false)} onDecided={() => { load(); setDetailRefreshTick((t) => t + 1); }} />
       )}
     </div>
   );
@@ -450,10 +455,10 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 
 // ── Asset detail panel ──────────────────────────────────────
 function AssetDetailPanel({
-  assetId, onClose, onChanged, categories, canEdit, canDelete,
+  assetId, onClose, onChanged, categories, canEdit, canDelete, refreshSignal,
 }: {
   assetId: string; onClose: () => void; onChanged: () => void;
-  categories: AssetCategory[]; canEdit: boolean; canDelete: boolean;
+  categories: AssetCategory[]; canEdit: boolean; canDelete: boolean; refreshSignal: number;
 }) {
   const { t } = useTranslation();
   const [asset, setAsset] = useState<Asset | null>(null);
@@ -487,7 +492,9 @@ function AssetDetailPanel({
     } catch (err) { toast.error(extractErr(err)); } finally { setLoading(false); }
   }, [assetId]);
 
-  useEffect(() => { load(); }, [load]);
+  // Also refetch when a decision made elsewhere (the Approvals modal) touches
+  // this asset's pending transactions, so the panel doesn't show a stale status.
+  useEffect(() => { load(); }, [load, refreshSignal]);
 
   async function saveEdit(e: React.FormEvent) {
     e.preventDefault();
@@ -669,7 +676,7 @@ function AssetDetailPanel({
                     <div className="flex-1 min-w-0 pb-0.5">
                       <div className="flex items-start justify-between gap-2">
                         <p className="text-xs text-gray-700 font-medium">
-                          {h.type === 'PURCHASE' ? t('inventory.detail.purchaseOf', { qty: h.quantity }) : t('inventory.detail.disposalOf', { qty: h.quantity })}
+                          {h.type === 'PURCHASE' ? t('inventory.detail.purchaseOf', { count: h.quantity }) : t('inventory.detail.disposalOf', { count: h.quantity })}
                         </p>
                         <StatusPill status={h.status} />
                       </div>
@@ -761,7 +768,7 @@ function ApprovalsModal({ onClose, onDecided }: { onClose: () => void; onDecided
                   <div className="min-w-0">
                     <p className="text-sm font-medium text-gray-800 truncate">{asset.name}</p>
                     <p className="text-xs text-gray-500">
-                      {tx.type === 'PURCHASE' ? t('inventory.detail.purchaseOf', { qty: tx.quantity }) : t('inventory.detail.disposalOf', { qty: tx.quantity })}
+                      {tx.type === 'PURCHASE' ? t('inventory.detail.purchaseOf', { count: tx.quantity }) : t('inventory.detail.disposalOf', { count: tx.quantity })}
                       {tx.cost && ` — ${formatMoney(tx.cost)}`}
                     </p>
                     <p className="text-[10px] text-gray-400 mt-0.5">{tx.requestedBy.fullName}</p>

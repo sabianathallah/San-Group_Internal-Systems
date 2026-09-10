@@ -539,7 +539,8 @@
   },
   "inventory": {
     "title": "Inventory",
-    "assetCount": "{{count}} assets",
+    "assetCount_one": "{{count}} asset",
+    "assetCount_other": "{{count}} assets",
     "newAsset": "New Asset",
     "searchPlaceholder": "Search code, name, location...",
     "allCategories": "All Categories",
@@ -589,8 +590,10 @@
       "requestSubmitted": "Request submitted successfully",
       "history": "Transaction History",
       "noHistory": "No transaction history yet",
-      "purchaseOf": "Purchase of {{qty}} units",
-      "disposalOf": "Disposal of {{qty}} units"
+      "purchaseOf_one": "Purchase of {{count}} unit",
+      "purchaseOf_other": "Purchase of {{count}} units",
+      "disposalOf_one": "Disposal of {{count}} unit",
+      "disposalOf_other": "Disposal of {{count}} units"
     },
     "status": {
       "pending": "Pending",

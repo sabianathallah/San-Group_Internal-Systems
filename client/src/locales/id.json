@@ -589,8 +589,8 @@
       "requestSubmitted": "Pengajuan berhasil dikirim",
       "history": "Riwayat Transaksi",
       "noHistory": "Belum ada riwayat transaksi",
-      "purchaseOf": "Pembelian {{qty}} unit",
-      "disposalOf": "Pengeluaran {{qty}} unit"
+      "purchaseOf": "Pembelian {{count}} unit",
+      "disposalOf": "Pengeluaran {{count}} unit"
     },
     "status": {
       "pending": "Menunggu",
