@@ -43,6 +43,7 @@ export interface InventoryPerms {
   delete: Scope;
   approvePurchase: boolean;
   approveDisposal: boolean;
+  approveTransfer: boolean;
 }
 export interface UserMgmtPerms {
   create: boolean;
@@ -84,7 +85,7 @@ export const DEFAULT_PERMS: PermissionConfig = {
   audit_log:  { view: 'none' },
   hris:       { reviewLeave: 'none', editAttendance: 'none', manageShifts: false, manageLocations: false, viewReports: 'none' },
   work_order: { view: 'own', create: true, edit: 'own', delete: 'own', canBeAssignee: true },
-  inventory:  { view: 'none', create: false, edit: 'none', delete: 'none', approvePurchase: false, approveDisposal: false },
+  inventory:  { view: 'none', create: false, edit: 'none', delete: 'none', approvePurchase: false, approveDisposal: false, approveTransfer: false },
   user_mgmt:     { create: false, edit: 'none', delete: 'none', toggleStatus: 'none' },
   role_mgmt:     { create: false, edit: 'none', delete: 'none' },
   division_mgmt: { create: false, edit: 'none', delete: 'none' },

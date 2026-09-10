@@ -62,6 +62,8 @@ enum NotificationType {
   INVENTORY_APPROVAL_NEEDED
   INVENTORY_APPROVED
   INVENTORY_REJECTED
+  INVENTORY_ASSIGNED
+  INVENTORY_RETURNED
   // Legacy — overtime module removed (client policy: no overtime); values kept
   // because removing PG enum values requires a type rebuild.
   OVERTIME_SUBMITTED
@@ -257,6 +259,8 @@ model User {
   createdAssets              Asset[]                 @relation("AssetCreator")
   requestedAssetTransactions AssetHistory[]          @relation("AssetRequester")
   approvedAssetTransactions  AssetHistory[]          @relation("AssetApprover")
+  assignedAssetHistory       AssetHistory[]          @relation("AssetAssignee")
+  returnedAssetHistory       AssetHistory[]          @relation("AssetReturner")
   createdOpnameSessions      AssetOpnameSession[]    @relation("OpnameCreator")
 
   @@index([email])
@@ -976,6 +980,8 @@ enum AssetTransactionType {
   PURCHASE
   DISPOSAL
   ADJUSTMENT // from a Stock Opname reconciliation — applied directly, no approval step
+  TRANSFER // move stock from one location to another — approval-gated like PURCHASE/DISPOSAL
+  ASSIGN // hand stock to a specific person — applied directly, no approval step
 }
 
 enum AssetTransactionStatus {
@@ -1061,15 +1067,16 @@ model AssetSequence {
 }
 
 model AssetHistory {
-  id       String                 @id @default(uuid())
-  assetId  String
-  asset    Asset                  @relation(fields: [assetId], references: [id], onDelete: Cascade)
-  type     AssetTransactionType
-  location String // which AssetStock (assetId + location) this transaction targets
-  quantity Int
-  cost     Decimal?               @db.Decimal(14, 2) // purchase only
-  note     String?
-  status   AssetTransactionStatus @default(PENDING)
+  id         String                 @id @default(uuid())
+  assetId    String
+  asset      Asset                  @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  type       AssetTransactionType
+  location   String // which AssetStock (assetId + location) this transaction targets
+  toLocation String? // TRANSFER destination only
+  quantity   Int
+  cost       Decimal?               @db.Decimal(14, 2) // purchase only
+  note       String?
+  status     AssetTransactionStatus @default(PENDING)
 
   requestedById String
   requestedBy   User   @relation("AssetRequester", fields: [requestedById], references: [id])
@@ -1078,12 +1085,20 @@ model AssetHistory {
   approvedBy   User?     @relation("AssetApprover", fields: [approvedById], references: [id], onDelete: SetNull)
   approvedAt   DateTime?
 
+  // ASSIGN only — who currently holds it, and who/when it was handed back.
+  assignedToId String?
+  assignedTo   User?     @relation("AssetAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+  returnedAt   DateTime?
+  returnedById String?
+  returnedBy   User?     @relation("AssetReturner", fields: [returnedById], references: [id], onDelete: SetNull)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([assetId])
   @@index([status])
   @@index([location])
+  @@index([assignedToId])
   @@map("asset_history")
 }
 

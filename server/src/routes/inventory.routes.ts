@@ -4,6 +4,7 @@ import {
   listWarehouses, createWarehouse,
   listAssets, getAssetById, createAsset, updateAsset, deleteAsset,
   createTransaction, approveTransaction, rejectTransaction,
+  assignAsset, returnAssignment, importAssets,
   getInventoryStats, listMovements, getMovementsTrend,
   listOpnameSessions, getOpnameSession, createOpnameSession, submitOpnameCounts, finishOpnameSession,
 } from '@/controllers/inventory.controller';
@@ -14,7 +15,7 @@ import { uuidParamSchema } from '@/validations/common.validation';
 import {
   createAssetCategorySchema, createWarehouseSchema,
   createAssetSchema, updateAssetSchema, assetFilterSchema,
-  createTransactionSchema, rejectTransactionSchema,
+  createTransactionSchema, rejectTransactionSchema, assignAssetSchema, bulkImportSchema,
   inventoryStatsFilterSchema, movementsFilterSchema,
   createOpnameSessionSchema, submitOpnameCountsSchema, opnameSessionFilterSchema,
 } from '@/validations/inventory.validation';
@@ -30,6 +31,7 @@ router.post('/warehouses', checkPerm('inventory', 'create'), validate(createWare
 router.get('/stats',       checkPerm('inventory', 'view'),   validate(inventoryStatsFilterSchema, ['query']), getInventoryStats);
 router.get('/movements',       checkPerm('inventory', 'view'), validate(movementsFilterSchema, ['query']), listMovements);
 router.get('/movements/trend', checkPerm('inventory', 'view'), getMovementsTrend);
+router.post('/import', checkPerm('inventory', 'create'), validate(bulkImportSchema), importAssets);
 
 router.get('/opname-sessions',     checkPerm('inventory', 'view'), validate(opnameSessionFilterSchema, ['query']), listOpnameSessions);
 router.post('/opname-sessions',    checkPerm('inventory', 'edit'), validate(createOpnameSessionSchema), createOpnameSession);
@@ -47,5 +49,8 @@ router.delete('/:id', checkPerm('inventory', 'delete'), validate(uuidParamSchema
 router.post('/:id/transactions', checkPerm('inventory', 'view'), validate(uuidParamSchema, ['params']), validate(createTransactionSchema), createTransaction);
 router.patch('/:id/transactions/:txId/approve', checkPerm('inventory', 'view'), approveTransaction);
 router.patch('/:id/transactions/:txId/reject',  checkPerm('inventory', 'view'), validate(rejectTransactionSchema), rejectTransaction);
+router.patch('/:id/transactions/:txId/return',  checkPerm('inventory', 'edit'), returnAssignment);
+
+router.post('/:id/assign', checkPerm('inventory', 'edit'), validate(uuidParamSchema, ['params']), validate(assignAssetSchema), assignAsset);
 
 export default router;

@@ -13,6 +13,9 @@ import {
   deleteAssetService,
   createTransactionService,
   decideTransactionService,
+  assignAssetService,
+  returnAssignmentService,
+  bulkImportAssetsService,
   getInventoryStatsService,
   listAssetHistoryService,
   getMovementsTrendService,
@@ -97,7 +100,7 @@ export async function approveTransaction(req: AuthRequest, res: Response, next: 
   try {
     const history = await decideTransactionService(
       String(req.params.txId), req.user!.userId,
-      req.approvePurchase ?? false, req.approveDisposal ?? false,
+      req.approvePurchase ?? false, req.approveDisposal ?? false, req.approveTransfer ?? false,
       'APPROVED', null,
     );
     successResponse(res, history, 'Transaction approved successfully');
@@ -108,10 +111,31 @@ export async function rejectTransaction(req: AuthRequest, res: Response, next: N
   try {
     const history = await decideTransactionService(
       String(req.params.txId), req.user!.userId,
-      req.approvePurchase ?? false, req.approveDisposal ?? false,
+      req.approvePurchase ?? false, req.approveDisposal ?? false, req.approveTransfer ?? false,
       'REJECTED', req.body.note,
     );
     successResponse(res, history, 'Transaction rejected successfully');
+  } catch (err) { next(err); }
+}
+
+export async function assignAsset(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const history = await assignAssetService(String(req.params.id), req.user!.userId, req.body);
+    successResponse(res, history, 'Asset assigned successfully', 201);
+  } catch (err) { next(err); }
+}
+
+export async function returnAssignment(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const history = await returnAssignmentService(String(req.params.txId), req.user!.userId);
+    successResponse(res, history, 'Assignment marked as returned successfully');
+  } catch (err) { next(err); }
+}
+
+export async function importAssets(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const result = await bulkImportAssetsService(req.user!.userId, req.body.rows);
+    successResponse(res, result, 'Import finished');
   } catch (err) { next(err); }
 }
 

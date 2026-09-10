@@ -594,10 +594,13 @@
       },
       "requestPurchase": "Request Purchase",
       "requestDisposal": "Request Disposal",
+      "requestTransfer": "Transfer",
       "costPlaceholder": "Estimated cost (optional)",
       "notePlaceholder": "Note (optional)",
       "requestSubmitted": "Request submitted successfully",
       "locationRequired": "A location must be selected or entered",
+      "destinationRequired": "A destination location must be selected",
+      "destinationPlaceholder": "Destination location...",
       "noLocationsYet": "No locations yet",
       "pickOrCreateLocation": "Pick or create a location...",
       "newLocationOption": "+ New location...",
@@ -608,7 +611,23 @@
       "disposalOf_one": "Disposal of {{count}} unit",
       "disposalOf_other": "Disposal of {{count}} units",
       "adjustmentOf_one": "Adjustment of {{count}} unit",
-      "adjustmentOf_other": "Adjustment of {{count}} units"
+      "adjustmentOf_other": "Adjustment of {{count}} units",
+      "transferOf_one": "Transfer of {{count}} unit",
+      "transferOf_other": "Transfer of {{count}} units",
+      "assign": {
+        "action": "Assign",
+        "assigneeRequired": "An assignee must be selected",
+        "assigneePlaceholder": "Search employee name...",
+        "success": "Asset assigned successfully",
+        "returnSuccess": "Asset returned successfully",
+        "currentlyAssigned": "Currently Assigned",
+        "markReturned": "Mark Returned",
+        "assignOf_one": "Assignment of {{count}} unit",
+        "assignOf_other": "Assignment of {{count}} units",
+        "returned": "Returned",
+        "active": "Active",
+        "assignedToLabel": "To {{name}}"
+      }
     },
     "status": {
       "pending": "Pending",
@@ -636,6 +655,8 @@
       "subtitle": "History of every stock transaction across all assets",
       "allTypes": "All Types",
       "adjustment": "Adjustment",
+      "transfer": "Transfer",
+      "assign": "Assignment",
       "filterLocation": "Filter location...",
       "allLocations": "All Locations",
       "empty": "No stock movements yet",
@@ -679,6 +700,31 @@
       "searchPlaceholder": "Search or type a new location...",
       "noMatches": "No matching locations",
       "createNew": "Create location \"{{name}}\""
+    },
+    "import": {
+      "action": "Import CSV",
+      "title": "Import Assets from CSV",
+      "downloadTemplate": "Download CSV template",
+      "dropHint": "Click to choose a CSV file",
+      "emptyFile": "The CSV file is empty or invalid",
+      "errNameRequired": "Name is required",
+      "errLocationRequired": "Location is required",
+      "errQtyInvalid": "Quantity must be a non-negative number",
+      "noValidRows": "No valid rows to import",
+      "validCount_one": "{{count}} valid row",
+      "validCount_other": "{{count}} valid rows",
+      "invalidCount_one": "{{count}} row with issues",
+      "invalidCount_other": "{{count}} rows with issues",
+      "moreRows": "+{{count}} more rows",
+      "importN_one": "Import {{count}} Asset",
+      "importN_other": "Import {{count}} Assets",
+      "createdSummary_one": "{{count}} asset created successfully",
+      "createdSummary_other": "{{count}} assets created successfully",
+      "failedSummary_one": "{{count}} row failed to import",
+      "failedSummary_other": "{{count}} rows failed to import",
+      "rowLabel": "Row {{row}}:",
+      "failed": "Import failed",
+      "done": "Done"
     }
   },
   "language": {
@@ -1062,7 +1108,8 @@
           "edit": "Edit assets",
           "delete": "Delete assets",
           "approvePurchase": "Approve purchase requests",
-          "approveDisposal": "Approve disposal requests"
+          "approveDisposal": "Approve disposal requests",
+          "approveTransfer": "Approve location transfers"
         },
         "userMgmt": {
           "title": "User Management",

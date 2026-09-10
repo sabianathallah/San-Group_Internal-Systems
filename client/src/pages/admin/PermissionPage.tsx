@@ -11,6 +11,7 @@ type AudienceScope = 'none' | 'division' | 'all';
 
 interface TaskPerms {
   view: Scope; create: boolean; edit: Scope; delete: Scope; viewPrivate: boolean;
+  editAssignedFully: boolean;
 }
 interface BulletinPerms {
   view: boolean; create: boolean; audienceScope: AudienceScope; edit: Scope; delete: Scope;
@@ -32,7 +33,7 @@ interface WorkOrderPerms {
 }
 interface InventoryPerms {
   view: Scope; create: boolean; edit: Scope; delete: Scope;
-  approvePurchase: boolean; approveDisposal: boolean;
+  approvePurchase: boolean; approveDisposal: boolean; approveTransfer: boolean;
 }
 interface UserMgmtPerms {
   create: boolean; edit: Scope; delete: Scope; toggleStatus: Scope;
@@ -888,6 +889,10 @@ export default function PermissionPage() {
                 </PermRow>
                 <PermRow label={t('admin.permissions.sections.inventory.approveDisposal')}>
                   <Toggle checked={perms.inventory?.approveDisposal ?? false} onChange={(v) => update('inventory', 'approveDisposal', v)}
+                    disabled={isSuperAdmin || isReadOnly} />
+                </PermRow>
+                <PermRow label={t('admin.permissions.sections.inventory.approveTransfer')}>
+                  <Toggle checked={perms.inventory?.approveTransfer ?? false} onChange={(v) => update('inventory', 'approveTransfer', v)}
                     disabled={isSuperAdmin || isReadOnly} />
                 </PermRow>
               </Section>

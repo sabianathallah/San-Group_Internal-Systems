@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-  ArrowLeftRight, ArrowDownCircle, ArrowUpCircle, Scale, MapPin, Loader2, ChevronLeft, ChevronRight, TrendingUp,
+  ArrowLeftRight, ArrowDownCircle, ArrowUpCircle, Scale, MapPin, Loader2, ChevronLeft, ChevronRight, TrendingUp, UserPlus,
 } from 'lucide-react';
 import api from '@/lib/api';
 import { cn } from '@/lib/cn';
@@ -10,17 +10,17 @@ import { PageSizeSelect } from '@/components/shared/PageSizeSelect';
 import type { Warehouse } from '@/components/shared/WarehouseSelect';
 
 interface MiniUser { id: string; fullName: string; username: string; avatar: string | null; divisionId: string }
-type MoveType = 'PURCHASE' | 'DISPOSAL' | 'ADJUSTMENT';
+type MoveType = 'PURCHASE' | 'DISPOSAL' | 'ADJUSTMENT' | 'TRANSFER' | 'ASSIGN';
 type MoveStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
 
 interface Movement {
-  id: string; type: MoveType; location: string; quantity: number; cost: string | null; note: string | null;
+  id: string; type: MoveType; location: string; toLocation: string | null; quantity: number; cost: string | null; note: string | null;
   status: MoveStatus; approvedAt: string | null; createdAt: string;
-  requestedBy: MiniUser; approvedBy: MiniUser | null;
+  requestedBy: MiniUser; approvedBy: MiniUser | null; assignedTo: MiniUser | null;
   asset: { id: string; code: string; name: string };
 }
 
-interface TrendDay { date: string; PURCHASE: number; DISPOSAL: number; ADJUSTMENT: number }
+interface TrendDay { date: string; PURCHASE: number; DISPOSAL: number; ADJUSTMENT: number; TRANSFER: number; ASSIGN: number }
 
 function extractErr(err: unknown): string {
   if (err && typeof err === 'object') {
@@ -45,13 +45,25 @@ const TYPE_CFG = {
   PURCHASE:   { icon: ArrowDownCircle, cls: 'bg-emerald-100 text-emerald-600', bar: '#10b981' },
   DISPOSAL:   { icon: ArrowUpCircle,   cls: 'bg-orange-100 text-orange-600', bar: '#f97316' },
   ADJUSTMENT: { icon: Scale,           cls: 'bg-blue-100 text-blue-600', bar: '#3b82f6' },
+  TRANSFER:   { icon: ArrowLeftRight,  cls: 'bg-purple-100 text-purple-600', bar: '#a855f7' },
+  ASSIGN:     { icon: UserPlus,        cls: 'bg-indigo-100 text-indigo-600', bar: '#6366f1' },
 } as const;
+
+function typeLabel(type: MoveType, t: (k: string) => string) {
+  switch (type) {
+    case 'PURCHASE': return t('inventory.detail.requestPurchase');
+    case 'DISPOSAL': return t('inventory.detail.requestDisposal');
+    case 'ADJUSTMENT': return t('inventory.movements.adjustment');
+    case 'TRANSFER': return t('inventory.movements.transfer');
+    case 'ASSIGN': return t('inventory.movements.assign');
+  }
+}
 
 // ── Trend chart — stacked bars per day, hand-rolled to match the existing
 // AnalyticsPage chart style (no charting library in this codebase). ──
 function TrendChart({ data, t }: { data: TrendDay[]; t: (k: string) => string }) {
   const [hover, setHover] = useState<number | null>(null);
-  const totals = data.map((d) => d.PURCHASE + d.DISPOSAL + d.ADJUSTMENT);
+  const totals = data.map((d) => d.PURCHASE + d.DISPOSAL + d.ADJUSTMENT + d.TRANSFER + d.ASSIGN);
   const maxValue = Math.max(...totals, 1);
   const hasData = totals.some((v) => v > 0);
   const labelStride = Math.max(1, Math.ceil(data.length / 7));
@@ -78,9 +90,13 @@ function TrendChart({ data, t }: { data: TrendDay[]; t: (k: string) => string })
                   {d.PURCHASE > 0 && <p><span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400 mr-1" />{t('inventory.detail.requestPurchase')}: {d.PURCHASE}</p>}
                   {d.DISPOSAL > 0 && <p><span className="inline-block w-1.5 h-1.5 rounded-full bg-orange-400 mr-1" />{t('inventory.detail.requestDisposal')}: {d.DISPOSAL}</p>}
                   {d.ADJUSTMENT > 0 && <p><span className="inline-block w-1.5 h-1.5 rounded-full bg-blue-400 mr-1" />{t('inventory.movements.adjustment')}: {d.ADJUSTMENT}</p>}
+                  {d.TRANSFER > 0 && <p><span className="inline-block w-1.5 h-1.5 rounded-full bg-purple-400 mr-1" />{t('inventory.movements.transfer')}: {d.TRANSFER}</p>}
+                  {d.ASSIGN > 0 && <p><span className="inline-block w-1.5 h-1.5 rounded-full bg-indigo-400 mr-1" />{t('inventory.movements.assign')}: {d.ASSIGN}</p>}
                 </div>
               )}
               <div className="w-full flex flex-col justify-end rounded-t overflow-hidden cursor-default transition-opacity" style={{ height: `${Math.max(pct, total > 0 ? 4 : 0)}%`, minHeight: total > 0 ? 3 : 0 }}>
+                {d.ASSIGN > 0 && <div style={{ height: `${(d.ASSIGN / total) * 100}%`, backgroundColor: TYPE_CFG.ASSIGN.bar }} className={cn(hover === i ? 'opacity-100' : 'opacity-80')} />}
+                {d.TRANSFER > 0 && <div style={{ height: `${(d.TRANSFER / total) * 100}%`, backgroundColor: TYPE_CFG.TRANSFER.bar }} className={cn(hover === i ? 'opacity-100' : 'opacity-80')} />}
                 {d.ADJUSTMENT > 0 && <div style={{ height: `${(d.ADJUSTMENT / total) * 100}%`, backgroundColor: TYPE_CFG.ADJUSTMENT.bar }} className={cn(hover === i ? 'opacity-100' : 'opacity-80')} />}
                 {d.DISPOSAL > 0 && <div style={{ height: `${(d.DISPOSAL / total) * 100}%`, backgroundColor: TYPE_CFG.DISPOSAL.bar }} className={cn(hover === i ? 'opacity-100' : 'opacity-80')} />}
                 {d.PURCHASE > 0 && <div style={{ height: `${(d.PURCHASE / total) * 100}%`, backgroundColor: TYPE_CFG.PURCHASE.bar }} className={cn(hover === i ? 'opacity-100' : 'opacity-80')} />}
@@ -159,12 +175,10 @@ export default function InventoryMovementsPage() {
           <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-4">{t('inventory.movements.chartTitle')}</p>
           <TrendChart data={trend.daily} t={t} />
           <div className="flex items-center gap-4 mt-4 pt-3 border-t border-gray-50">
-            {(['PURCHASE', 'DISPOSAL', 'ADJUSTMENT'] as const).map((type) => (
+            {(['PURCHASE', 'DISPOSAL', 'ADJUSTMENT', 'TRANSFER', 'ASSIGN'] as const).map((type) => (
               <span key={type} className="inline-flex items-center gap-1.5 text-[11px] text-gray-500">
                 <span className="w-2 h-2 rounded-full" style={{ backgroundColor: TYPE_CFG[type].bar }} />
-                {type === 'PURCHASE' && t('inventory.detail.requestPurchase')}
-                {type === 'DISPOSAL' && t('inventory.detail.requestDisposal')}
-                {type === 'ADJUSTMENT' && t('inventory.movements.adjustment')}
+                {typeLabel(type, t)}
               </span>
             ))}
           </div>
@@ -178,6 +192,8 @@ export default function InventoryMovementsPage() {
           <option value="PURCHASE">{t('inventory.detail.requestPurchase')}</option>
           <option value="DISPOSAL">{t('inventory.detail.requestDisposal')}</option>
           <option value="ADJUSTMENT">{t('inventory.movements.adjustment')}</option>
+          <option value="TRANSFER">{t('inventory.movements.transfer')}</option>
+          <option value="ASSIGN">{t('inventory.movements.assign')}</option>
         </select>
         <div className="relative">
           <MapPin size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
@@ -220,9 +236,7 @@ export default function InventoryMovementsPage() {
                         <td className="px-5 py-3">
                           <span className={cn('inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-[11px] font-medium', cfg.cls)}>
                             <Icon size={12} />
-                            {m.type === 'PURCHASE' && t('inventory.detail.requestPurchase')}
-                            {m.type === 'DISPOSAL' && t('inventory.detail.requestDisposal')}
-                            {m.type === 'ADJUSTMENT' && t('inventory.movements.adjustment')}
+                            {typeLabel(m.type, t)}
                           </span>
                         </td>
                         <td className="px-3 py-3">
@@ -230,10 +244,16 @@ export default function InventoryMovementsPage() {
                           <p className="text-[10px] font-mono text-gray-400">{m.asset.code}</p>
                         </td>
                         <td className="px-3 py-3 text-gray-500">
-                          <span className="inline-flex items-center gap-1"><MapPin size={11} className="text-gray-300" /> {m.location}</span>
+                          {m.type === 'TRANSFER' && m.toLocation ? (
+                            <span className="inline-flex items-center gap-1"><MapPin size={11} className="text-gray-300" /> {m.location} <ArrowLeftRight size={10} className="text-gray-300" /> {m.toLocation}</span>
+                          ) : m.type === 'ASSIGN' && m.assignedTo ? (
+                            <span className="inline-flex items-center gap-1"><UserPlus size={11} className="text-gray-300" /> {m.assignedTo.fullName}</span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1"><MapPin size={11} className="text-gray-300" /> {m.location}</span>
+                          )}
                         </td>
                         <td className="px-3 py-3 text-right font-medium text-gray-700 tabular-nums">
-                          {m.type === 'DISPOSAL' ? '-' : '+'}{m.quantity}
+                          {m.type === 'DISPOSAL' || m.type === 'ASSIGN' ? '-' : '+'}{m.quantity}
                           {m.cost && <p className="text-[10px] text-gray-400 font-normal">{formatMoney(m.cost)}</p>}
                         </td>
                         <td className="px-3 py-3 text-gray-500 text-xs">{m.requestedBy.fullName}</td>

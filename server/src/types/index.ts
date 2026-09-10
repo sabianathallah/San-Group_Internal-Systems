@@ -20,6 +20,7 @@ export interface AuthRequest extends Request {
   editAssignedFully?: boolean;
   approvePurchase?: boolean;
   approveDisposal?: boolean;
+  approveTransfer?: boolean;
 }
 
 export interface ApiResponse<T = unknown> {

@@ -6,6 +6,7 @@ import {
   Boxes, Plus, X, Search, Loader2, Package, MapPin, Tag,
   ArrowDownCircle, ArrowUpCircle, Check, Ban, Printer, Download,
   CheckCircle2, XCircle, Clock, Pencil, Wallet, ChevronLeft, ChevronRight, Scale,
+  ArrowLeftRight, UserPlus, Undo2, Upload,
 } from 'lucide-react';
 import api from '@/lib/api';
 import { cn } from '@/lib/cn';
@@ -13,19 +14,23 @@ import { toast } from '@/stores/toastStore';
 import { usePermStore } from '@/stores/permStore';
 import { PageSizeSelect } from '@/components/shared/PageSizeSelect';
 import WarehouseSelect from '@/components/shared/WarehouseSelect';
+import UserSearchInput, { type UserSearchOption } from '@/components/shared/UserSearchInput';
+import ImportAssetsModal from '@/components/shared/ImportAssetsModal';
 
 // ── Types ──────────────────────────────────────────────────
 interface MiniUser { id: string; fullName: string; username: string; avatar: string | null; divisionId: string }
 interface AssetCategory { id: string; name: string; color: string | null }
-type TxType = 'PURCHASE' | 'DISPOSAL';
-type HistoryType = TxType | 'ADJUSTMENT';
+type TxType = 'PURCHASE' | 'DISPOSAL' | 'TRANSFER';
+type HistoryType = TxType | 'ADJUSTMENT' | 'ASSIGN';
 type TxStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
 interface AssetStockRow { id: string; location: string; qty: number; updatedAt: string }
 
 interface AssetTransaction {
-  id: string; type: HistoryType; location: string; quantity: number; cost: string | null; note: string | null;
+  id: string; type: HistoryType; location: string; toLocation: string | null; quantity: number;
+  cost: string | null; note: string | null;
   status: TxStatus; approvedAt: string | null; createdAt: string;
   requestedBy: MiniUser; approvedBy: MiniUser | null;
+  assignedTo: MiniUser | null; returnedAt: string | null; returnedBy: MiniUser | null;
 }
 
 interface Asset {
@@ -112,6 +117,7 @@ export default function InventoryPage() {
   const { id: qrAssetId } = useParams<{ id: string }>();
   const [selectedId, setSelectedId] = useState<string | null>(qrAssetId ?? null);
   const [showCreate, setShowCreate] = useState(false);
+  const [showImport, setShowImport] = useState(false);
   const [showApprovals, setShowApprovals] = useState(false);
   const [stats, setStats] = useState<InventoryStats | null>(null);
   // Bumped whenever a mutation happens outside the detail panel itself (e.g. an
@@ -175,6 +181,14 @@ export default function InventoryPage() {
             >
               <Download size={14} /> {t('inventory.exportCsv')}
             </button>
+            {canCreate && (
+              <button
+                onClick={() => setShowImport(true)}
+                className="flex items-center gap-1.5 px-3.5 py-2 text-sm font-medium rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 transition-colors"
+              >
+                <Upload size={14} /> {t('inventory.import.action')}
+              </button>
+            )}
             {canCreate && (
               <button
                 onClick={() => setShowCreate(true)}
@@ -332,6 +346,10 @@ export default function InventoryPage() {
 
       {showApprovals && (
         <ApprovalsModal onClose={() => setShowApprovals(false)} onDecided={() => { load(); setDetailRefreshTick((t) => t + 1); }} />
+      )}
+
+      {showImport && (
+        <ImportAssetsModal onClose={() => setShowImport(false)} onImported={() => { setShowImport(false); load(); }} />
       )}
     </div>
   );
@@ -574,11 +592,21 @@ function AssetDetailPanel({
   const [loading, setLoading] = useState(true);
   const [txType, setTxType] = useState<TxType | null>(null);
   const [txLocation, setTxLocation] = useState('');
+  const [txToLocation, setTxToLocation] = useState('');
   const [txQty, setTxQty] = useState('1');
   const [txCost, setTxCost] = useState('');
   const [txNote, setTxNote] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [showPrintLabel, setShowPrintLabel] = useState(false);
+
+  const [showAssign, setShowAssign] = useState(false);
+  const [assignLocation, setAssignLocation] = useState('');
+  const [assignedToId, setAssignedToId] = useState('');
+  const [assignQty, setAssignQty] = useState('1');
+  const [assignNote, setAssignNote] = useState('');
+  const [assigning, setAssigning] = useState(false);
+  const [users, setUsers] = useState<UserSearchOption[]>([]);
+  const [returningId, setReturningId] = useState<string | null>(null);
 
   const [editing, setEditing] = useState(false);
   const [editName, setEditName] = useState('');
@@ -596,6 +624,13 @@ function AssetDetailPanel({
   function openTxForm(type: TxType) {
     setTxType(type);
     setTxLocation(asset?.stocks[0]?.location ?? '');
+    setTxToLocation('');
+  }
+
+  function openAssignForm() {
+    setShowAssign(true);
+    setAssignLocation(asset?.stocks[0]?.location ?? '');
+    setAssignedToId(''); setAssignQty('1'); setAssignNote('');
   }
 
   const load = useCallback(async () => {
@@ -609,6 +644,12 @@ function AssetDetailPanel({
   // Also refetch when a decision made elsewhere (the Approvals modal) touches
   // this asset's pending transactions, so the panel doesn't show a stale status.
   useEffect(() => { load(); }, [load, refreshSignal]);
+
+  useEffect(() => {
+    api.get('/users', { params: { limit: 100 } })
+      .then((r) => setUsers(r.data.data?.items ?? r.data.data ?? []))
+      .catch(() => {});
+  }, []);
 
   async function saveEdit(e: React.FormEvent) {
     e.preventDefault();
@@ -638,17 +679,44 @@ function AssetDetailPanel({
     if (!txType) return;
     const location = txLocation.trim();
     if (!location) { toast.error(t('inventory.detail.locationRequired')); return; }
+    if (txType === 'TRANSFER' && !txToLocation.trim()) { toast.error(t('inventory.detail.destinationRequired')); return; }
     setSubmitting(true);
     try {
       await api.post(`/inventory/${assetId}/transactions`, {
         type: txType, location, quantity: Number(txQty) || 0,
+        toLocation: txType === 'TRANSFER' ? txToLocation.trim() : undefined,
         cost: txType === 'PURCHASE' && txCost ? Number(txCost) : undefined,
         note: txNote.trim() || undefined,
       });
       toast.success(t('inventory.detail.requestSubmitted'));
-      setTxType(null); setTxQty('1'); setTxCost(''); setTxNote('');
+      setTxType(null); setTxQty('1'); setTxCost(''); setTxNote(''); setTxToLocation('');
       load(); onChanged();
     } catch (err) { toast.error(extractErr(err)); } finally { setSubmitting(false); }
+  }
+
+  async function submitAssign(e: React.FormEvent) {
+    e.preventDefault();
+    if (!assignLocation.trim()) { toast.error(t('inventory.detail.locationRequired')); return; }
+    if (!assignedToId) { toast.error(t('inventory.detail.assign.assigneeRequired')); return; }
+    setAssigning(true);
+    try {
+      await api.post(`/inventory/${assetId}/assign`, {
+        location: assignLocation.trim(), assignedToId, quantity: Number(assignQty) || 0,
+        note: assignNote.trim() || undefined,
+      });
+      toast.success(t('inventory.detail.assign.success'));
+      setShowAssign(false);
+      load(); onChanged();
+    } catch (err) { toast.error(extractErr(err)); } finally { setAssigning(false); }
+  }
+
+  async function handleReturn(txId: string) {
+    setReturningId(txId);
+    try {
+      await api.patch(`/inventory/${assetId}/transactions/${txId}/return`);
+      toast.success(t('inventory.detail.assign.returnSuccess'));
+      load(); onChanged();
+    } catch (err) { toast.error(extractErr(err)); } finally { setReturningId(null); }
   }
 
   const qrValue = `${window.location.origin}/inventory/assets/${assetId}`;
@@ -745,19 +813,27 @@ function AssetDetailPanel({
           </button>
 
           {/* Request buttons */}
-          <div className="flex gap-2">
-            <button onClick={() => openTxForm('PURCHASE')} className="flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-medium border border-emerald-200 bg-emerald-50 text-emerald-700 rounded-lg hover:bg-emerald-100 transition-colors">
+          <div className="grid grid-cols-2 gap-2">
+            <button onClick={() => openTxForm('PURCHASE')} className="flex items-center justify-center gap-1.5 py-2 text-xs font-medium border border-emerald-200 bg-emerald-50 text-emerald-700 rounded-lg hover:bg-emerald-100 transition-colors">
               <ArrowDownCircle size={14} /> {t('inventory.detail.requestPurchase')}
             </button>
-            <button onClick={() => openTxForm('DISPOSAL')} className="flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-medium border border-orange-200 bg-orange-50 text-orange-700 rounded-lg hover:bg-orange-100 transition-colors">
+            <button onClick={() => openTxForm('DISPOSAL')} className="flex items-center justify-center gap-1.5 py-2 text-xs font-medium border border-orange-200 bg-orange-50 text-orange-700 rounded-lg hover:bg-orange-100 transition-colors">
               <ArrowUpCircle size={14} /> {t('inventory.detail.requestDisposal')}
+            </button>
+            <button onClick={() => openTxForm('TRANSFER')} className="flex items-center justify-center gap-1.5 py-2 text-xs font-medium border border-purple-200 bg-purple-50 text-purple-700 rounded-lg hover:bg-purple-100 transition-colors">
+              <ArrowLeftRight size={14} /> {t('inventory.detail.requestTransfer')}
+            </button>
+            <button onClick={openAssignForm} className="flex items-center justify-center gap-1.5 py-2 text-xs font-medium border border-indigo-200 bg-indigo-50 text-indigo-700 rounded-lg hover:bg-indigo-100 transition-colors">
+              <UserPlus size={14} /> {t('inventory.detail.assign.action')}
             </button>
           </div>
 
           {txType && (
             <form onSubmit={submitTransaction} className="space-y-2.5 p-3.5 bg-gray-50 rounded-xl border border-gray-100">
               <p className="text-xs font-semibold text-gray-700">
-                {txType === 'PURCHASE' ? t('inventory.detail.requestPurchase') : t('inventory.detail.requestDisposal')}
+                {txType === 'PURCHASE' && t('inventory.detail.requestPurchase')}
+                {txType === 'DISPOSAL' && t('inventory.detail.requestDisposal')}
+                {txType === 'TRANSFER' && t('inventory.detail.requestTransfer')}
               </p>
               {txType === 'PURCHASE' ? (
                 <WarehouseSelect value={txLocation} onChange={setTxLocation} placeholder={t('inventory.detail.pickOrCreateLocation')} />
@@ -767,6 +843,9 @@ function AssetDetailPanel({
                   {asset.stocks.length === 0 && <option value="">{t('inventory.detail.noLocationsYet')}</option>}
                   {asset.stocks.map((s) => <option key={s.id} value={s.location}>{s.location} ({s.qty} {asset.unit ?? ''})</option>)}
                 </select>
+              )}
+              {txType === 'TRANSFER' && (
+                <WarehouseSelect value={txToLocation} onChange={setTxToLocation} placeholder={t('inventory.detail.destinationPlaceholder')} />
               )}
               <input type="number" min={1} value={txQty} onChange={(e) => setTxQty(e.target.value)}
                 placeholder={t('inventory.form.qty')} className="w-full px-2.5 py-2 text-xs border border-gray-200 rounded-lg outline-none bg-white" />
@@ -781,6 +860,50 @@ function AssetDetailPanel({
                 <button type="submit" disabled={submitting} className="px-3 py-1.5 text-xs font-medium bg-navy text-white rounded-lg disabled:opacity-50">{t('inventory.form.submit')}</button>
               </div>
             </form>
+          )}
+
+          {showAssign && (
+            <form onSubmit={submitAssign} className="space-y-2.5 p-3.5 bg-gray-50 rounded-xl border border-gray-100">
+              <p className="text-xs font-semibold text-gray-700">{t('inventory.detail.assign.action')}</p>
+              <select value={assignLocation} onChange={(e) => setAssignLocation(e.target.value)}
+                className="w-full px-2.5 py-2 text-xs border border-gray-200 rounded-lg outline-none bg-white">
+                {asset.stocks.length === 0 && <option value="">{t('inventory.detail.noLocationsYet')}</option>}
+                {asset.stocks.map((s) => <option key={s.id} value={s.location}>{s.location} ({s.qty} {asset.unit ?? ''})</option>)}
+              </select>
+              <UserSearchInput users={users} value={assignedToId} onChange={setAssignedToId} placeholder={t('inventory.detail.assign.assigneePlaceholder')} />
+              <input type="number" min={1} value={assignQty} onChange={(e) => setAssignQty(e.target.value)}
+                placeholder={t('inventory.form.qty')} className="w-full px-2.5 py-2 text-xs border border-gray-200 rounded-lg outline-none bg-white" />
+              <textarea value={assignNote} onChange={(e) => setAssignNote(e.target.value)} rows={2}
+                placeholder={t('inventory.detail.notePlaceholder')} className="w-full px-2.5 py-2 text-xs border border-gray-200 rounded-lg outline-none resize-none bg-white" />
+              <div className="flex justify-end gap-2 pt-0.5">
+                <button type="button" onClick={() => setShowAssign(false)} className="px-2.5 py-1.5 text-xs font-medium text-gray-500 hover:bg-gray-100 rounded-lg">{t('inventory.form.cancel')}</button>
+                <button type="submit" disabled={assigning} className="px-3 py-1.5 text-xs font-medium bg-navy text-white rounded-lg disabled:opacity-50">{t('inventory.form.submit')}</button>
+              </div>
+            </form>
+          )}
+
+          {/* Currently assigned */}
+          {(asset.history ?? []).some((h) => h.type === 'ASSIGN' && !h.returnedAt) && (
+            <div>
+              <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-2">{t('inventory.detail.assign.currentlyAssigned')}</p>
+              <div className="space-y-2">
+                {(asset.history ?? []).filter((h) => h.type === 'ASSIGN' && !h.returnedAt).map((h) => (
+                  <div key={h.id} className="flex items-center justify-between gap-2 p-2.5 bg-indigo-50/60 border border-indigo-100 rounded-lg">
+                    <div className="min-w-0">
+                      <p className="text-xs font-medium text-gray-800 truncate">{h.assignedTo?.fullName}</p>
+                      <p className="text-[10px] text-gray-500">{h.quantity} {asset.unit ?? ''} · {h.location}</p>
+                    </div>
+                    <button
+                      onClick={() => handleReturn(h.id)}
+                      disabled={returningId === h.id}
+                      className="flex items-center gap-1 px-2 py-1 text-[11px] font-medium border border-gray-200 bg-white rounded-lg hover:bg-gray-50 disabled:opacity-50 flex-shrink-0"
+                    >
+                      {returningId === h.id ? <Loader2 size={11} className="animate-spin" /> : <Undo2 size={11} />} {t('inventory.detail.assign.markReturned')}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
           )}
 
           {/* History timeline */}
@@ -799,10 +922,29 @@ function AssetDetailPanel({
                           {h.type === 'PURCHASE' && t('inventory.detail.purchaseOf', { count: h.quantity })}
                           {h.type === 'DISPOSAL' && t('inventory.detail.disposalOf', { count: h.quantity })}
                           {h.type === 'ADJUSTMENT' && t('inventory.detail.adjustmentOf', { count: h.quantity })}
+                          {h.type === 'TRANSFER' && t('inventory.detail.transferOf', { count: h.quantity })}
+                          {h.type === 'ASSIGN' && t('inventory.detail.assign.assignOf', { count: h.quantity })}
                         </p>
-                        <StatusPill status={h.status} />
+                        {h.type === 'ASSIGN' ? (
+                          h.returnedAt ? (
+                            <span className="flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium flex-shrink-0 text-gray-500 bg-gray-100">
+                              <Undo2 size={10} /> {t('inventory.detail.assign.returned')}
+                            </span>
+                          ) : (
+                            <span className="flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium flex-shrink-0 text-indigo-600 bg-indigo-50">
+                              <UserPlus size={10} /> {t('inventory.detail.assign.active')}
+                            </span>
+                          )
+                        ) : (
+                          <StatusPill status={h.status} />
+                        )}
                       </div>
-                      <p className="text-[10px] text-gray-400 flex items-center gap-1"><MapPin size={9} /> {h.location}</p>
+                      <p className="text-[10px] text-gray-400 flex items-center gap-1">
+                        <MapPin size={9} /> {h.type === 'TRANSFER' ? `${h.location} → ${h.toLocation}` : h.location}
+                      </p>
+                      {h.type === 'ASSIGN' && h.assignedTo && (
+                        <p className="text-[10px] text-indigo-600 mt-0.5">{t('inventory.detail.assign.assignedToLabel', { name: h.assignedTo.fullName })}</p>
+                      )}
                       {h.cost && <p className="text-xs text-gray-500">{formatMoney(h.cost)}</p>}
                       <p className="text-[10px] text-gray-400 mt-0.5">{h.requestedBy.fullName} · {new Date(h.createdAt).toLocaleDateString()}</p>
                       {h.note && <p className="text-[10px] text-gray-500 italic mt-0.5">"{h.note}"</p>}
@@ -822,20 +964,20 @@ function AssetDetailPanel({
   );
 }
 
+const HISTORY_ICON_CFG: Record<HistoryType, { cls: string; icon: React.ElementType }> = {
+  PURCHASE:   { cls: 'bg-emerald-100 text-emerald-600', icon: ArrowDownCircle },
+  DISPOSAL:   { cls: 'bg-orange-100 text-orange-600',   icon: ArrowUpCircle },
+  ADJUSTMENT: { cls: 'bg-blue-100 text-blue-600',       icon: Scale },
+  TRANSFER:   { cls: 'bg-purple-100 text-purple-600',   icon: ArrowLeftRight },
+  ASSIGN:     { cls: 'bg-indigo-100 text-indigo-600',   icon: UserPlus },
+};
+
 function HistoryIcon({ type }: { type: HistoryType }) {
-  if (type === 'ADJUSTMENT') {
-    return (
-      <div className="relative z-10 w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 ring-4 ring-white bg-blue-100 text-blue-600">
-        <Scale size={12} />
-      </div>
-    );
-  }
+  const cfg = HISTORY_ICON_CFG[type];
+  const Icon = cfg.icon;
   return (
-    <div className={cn(
-      'relative z-10 w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 ring-4 ring-white',
-      type === 'PURCHASE' ? 'bg-emerald-100 text-emerald-600' : 'bg-orange-100 text-orange-600',
-    )}>
-      {type === 'PURCHASE' ? <ArrowDownCircle size={13} /> : <ArrowUpCircle size={13} />}
+    <div className={cn('relative z-10 w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 ring-4 ring-white', cfg.cls)}>
+      <Icon size={12} />
     </div>
   );
 }
@@ -913,10 +1055,14 @@ function ApprovalsModal({ onClose, onDecided }: { onClose: () => void; onDecided
                   <div className="min-w-0">
                     <p className="text-sm font-medium text-gray-800 truncate">{asset.name}</p>
                     <p className="text-xs text-gray-500">
-                      {tx.type === 'PURCHASE' ? t('inventory.detail.purchaseOf', { count: tx.quantity }) : t('inventory.detail.disposalOf', { count: tx.quantity })}
+                      {tx.type === 'PURCHASE' && t('inventory.detail.purchaseOf', { count: tx.quantity })}
+                      {tx.type === 'DISPOSAL' && t('inventory.detail.disposalOf', { count: tx.quantity })}
+                      {tx.type === 'TRANSFER' && t('inventory.detail.transferOf', { count: tx.quantity })}
                       {tx.cost && ` — ${formatMoney(tx.cost)}`}
                     </p>
-                    <p className="text-[10px] text-gray-400 mt-0.5 flex items-center gap-1"><MapPin size={9} /> {tx.location} · {tx.requestedBy.fullName}</p>
+                    <p className="text-[10px] text-gray-400 mt-0.5 flex items-center gap-1">
+                      <MapPin size={9} /> {tx.type === 'TRANSFER' ? `${tx.location} → ${tx.toLocation}` : tx.location} · {tx.requestedBy.fullName}
+                    </p>
                   </div>
                   <div className="flex items-center gap-1.5 flex-shrink-0">
                     <button onClick={() => decide(asset.id, tx.id, 'approve')} className="p-1.5 rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-100 transition-colors">

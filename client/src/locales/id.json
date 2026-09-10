@@ -592,10 +592,13 @@
       },
       "requestPurchase": "Ajukan Pembelian",
       "requestDisposal": "Ajukan Pengeluaran",
+      "requestTransfer": "Pindahkan",
       "costPlaceholder": "Estimasi biaya (opsional)",
       "notePlaceholder": "Catatan (opsional)",
       "requestSubmitted": "Pengajuan berhasil dikirim",
       "locationRequired": "Lokasi wajib dipilih atau diisi",
+      "destinationRequired": "Lokasi tujuan wajib dipilih",
+      "destinationPlaceholder": "Lokasi tujuan...",
       "noLocationsYet": "Belum ada lokasi",
       "pickOrCreateLocation": "Pilih atau buat lokasi baru...",
       "newLocationOption": "+ Lokasi baru...",
@@ -603,7 +606,21 @@
       "noHistory": "Belum ada riwayat transaksi",
       "purchaseOf": "Pembelian {{count}} unit",
       "disposalOf": "Pengeluaran {{count}} unit",
-      "adjustmentOf": "Penyesuaian {{count}} unit"
+      "adjustmentOf": "Penyesuaian {{count}} unit",
+      "transferOf": "Pindah {{count}} unit",
+      "assign": {
+        "action": "Tugaskan",
+        "assigneeRequired": "Penerima wajib dipilih",
+        "assigneePlaceholder": "Cari nama karyawan...",
+        "success": "Aset berhasil ditugaskan",
+        "returnSuccess": "Aset berhasil dikembalikan",
+        "currentlyAssigned": "Sedang Ditugaskan",
+        "markReturned": "Tandai Dikembalikan",
+        "assignOf": "Penugasan {{count}} unit",
+        "returned": "Dikembalikan",
+        "active": "Aktif",
+        "assignedToLabel": "Kepada {{name}}"
+      }
     },
     "status": {
       "pending": "Menunggu",
@@ -631,6 +648,8 @@
       "subtitle": "Riwayat seluruh transaksi stok di semua aset",
       "allTypes": "Semua Tipe",
       "adjustment": "Penyesuaian",
+      "transfer": "Pemindahan",
+      "assign": "Penugasan",
       "filterLocation": "Filter lokasi...",
       "allLocations": "Semua Lokasi",
       "empty": "Belum ada pergerakan stok",
@@ -673,6 +692,26 @@
       "searchPlaceholder": "Cari atau ketik lokasi baru...",
       "noMatches": "Tidak ada lokasi yang cocok",
       "createNew": "Buat lokasi \"{{name}}\""
+    },
+    "import": {
+      "action": "Import CSV",
+      "title": "Import Aset dari CSV",
+      "downloadTemplate": "Unduh template CSV",
+      "dropHint": "Klik untuk pilih file CSV",
+      "emptyFile": "File CSV kosong atau tidak valid",
+      "errNameRequired": "Nama wajib diisi",
+      "errLocationRequired": "Lokasi wajib diisi",
+      "errQtyInvalid": "Jumlah harus angka dan tidak boleh negatif",
+      "noValidRows": "Tidak ada baris valid untuk diimport",
+      "validCount": "{{count}} baris valid",
+      "invalidCount": "{{count}} baris bermasalah",
+      "moreRows": "+{{count}} baris lainnya",
+      "importN": "Import {{count}} Aset",
+      "createdSummary": "{{count}} aset berhasil dibuat",
+      "failedSummary": "{{count}} baris gagal diimport",
+      "rowLabel": "Baris {{row}}:",
+      "failed": "Import gagal",
+      "done": "Selesai"
     }
   },
   "language": {
@@ -1056,7 +1095,8 @@
           "edit": "Edit aset",
           "delete": "Hapus aset",
           "approvePurchase": "Setujui pengajuan pembelian",
-          "approveDisposal": "Setujui pengajuan pengeluaran"
+          "approveDisposal": "Setujui pengajuan pengeluaran",
+          "approveTransfer": "Setujui pemindahan antar lokasi"
         },
         "userMgmt": {
           "title": "Manajemen Pengguna",

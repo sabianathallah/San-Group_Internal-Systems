@@ -73,6 +73,9 @@ export interface InventoryPermissions {
   // disposals. Independent booleans so a role can hold one without the other.
   approvePurchase: boolean;
   approveDisposal: boolean;
+  // Moving stock between locations still warrants oversight, same as
+  // purchase/disposal — assignment to a person does not (gated by `edit`).
+  approveTransfer: boolean;
 }
 
 // NOTE: for user/role/division management, a level-ceiling rule is ALWAYS
@@ -125,7 +128,7 @@ export const DEFAULT_PERMISSIONS: Record<number, PermissionConfig> = {
     audit_log:  { view: 'all' },
     hris:       { reviewLeave: 'all',  editAttendance: 'all',  manageShifts: true,  manageLocations: true,  viewReports: 'all' },
     work_order: { view: 'all', create: true, edit: 'all', delete: 'all', canBeAssignee: true },
-    inventory:  { view: 'all', create: true, edit: 'all', delete: 'all', approvePurchase: true, approveDisposal: true },
+    inventory:  { view: 'all', create: true, edit: 'all', delete: 'all', approvePurchase: true, approveDisposal: true, approveTransfer: true },
     user_mgmt:     { create: true, edit: 'all', delete: 'all', toggleStatus: 'all' },
     role_mgmt:     { create: true, edit: 'all', delete: 'all' },
     division_mgmt: { create: true, edit: 'all', delete: 'all' },
@@ -142,7 +145,7 @@ export const DEFAULT_PERMISSIONS: Record<number, PermissionConfig> = {
     // Admin gets full inventory access out of the box — "hanya Admin dan BM"
     // per the contract. Managers (level 4, incl. Property Manager) start
     // locked out below; an Admin opts a specific manager in via this page.
-    inventory:  { view: 'all', create: true, edit: 'all', delete: 'all', approvePurchase: true, approveDisposal: true },
+    inventory:  { view: 'all', create: true, edit: 'all', delete: 'all', approvePurchase: true, approveDisposal: true, approveTransfer: true },
     // toggleStatus/delete default to 'none' here — matches the previous hardcoded
     // behaviour where only the true SUPER_ADMIN slug could deactivate/delete users.
     user_mgmt:     { create: true, edit: 'all', delete: 'none', toggleStatus: 'none' },
@@ -158,7 +161,7 @@ export const DEFAULT_PERMISSIONS: Record<number, PermissionConfig> = {
     audit_log:  { view: 'division' },
     hris:       { reviewLeave: 'all',  editAttendance: 'all',  manageShifts: false, manageLocations: false, viewReports: 'all' },
     work_order: { view: 'all', create: true, edit: 'all', delete: 'all', canBeAssignee: true },
-    inventory:  { view: 'all', create: false, edit: 'none', delete: 'none', approvePurchase: false, approveDisposal: false },
+    inventory:  { view: 'all', create: false, edit: 'none', delete: 'none', approvePurchase: false, approveDisposal: false, approveTransfer: false },
     user_mgmt:     { create: false, edit: 'none', delete: 'none', toggleStatus: 'none' },
     role_mgmt:     { create: false, edit: 'none', delete: 'none' },
     division_mgmt: { create: false, edit: 'none', delete: 'none' },
@@ -176,7 +179,7 @@ export const DEFAULT_PERMISSIONS: Record<number, PermissionConfig> = {
     // shared by 6 different manager roles (Property, Finance, Leasing, Legal,
     // HR, FnB, GA) and only Property Manager should get inventory access —
     // an Admin opts them in individually via the Permission page.
-    inventory:  { view: 'none', create: false, edit: 'none', delete: 'none', approvePurchase: false, approveDisposal: false },
+    inventory:  { view: 'none', create: false, edit: 'none', delete: 'none', approvePurchase: false, approveDisposal: false, approveTransfer: false },
     user_mgmt:     { create: false, edit: 'none', delete: 'none', toggleStatus: 'none' },
     role_mgmt:     { create: false, edit: 'none', delete: 'none' },
     division_mgmt: { create: false, edit: 'none', delete: 'none' },
@@ -190,7 +193,7 @@ export const DEFAULT_PERMISSIONS: Record<number, PermissionConfig> = {
     audit_log:  { view: 'none' },
     hris:       { reviewLeave: 'none', editAttendance: 'none', manageShifts: false, manageLocations: false, viewReports: 'none' },
     work_order: { view: 'own', create: true, edit: 'own', delete: 'own', canBeAssignee: true },
-    inventory:  { view: 'none', create: false, edit: 'none', delete: 'none', approvePurchase: false, approveDisposal: false },
+    inventory:  { view: 'none', create: false, edit: 'none', delete: 'none', approvePurchase: false, approveDisposal: false, approveTransfer: false },
     user_mgmt:     { create: false, edit: 'none', delete: 'none', toggleStatus: 'none' },
     role_mgmt:     { create: false, edit: 'none', delete: 'none' },
     division_mgmt: { create: false, edit: 'none', delete: 'none' },
@@ -204,7 +207,7 @@ export const DEFAULT_PERMISSIONS: Record<number, PermissionConfig> = {
     audit_log:  { view: 'none' },
     hris:       { reviewLeave: 'none', editAttendance: 'none', manageShifts: false, manageLocations: false, viewReports: 'none' },
     work_order: { view: 'own', create: true, edit: 'own', delete: 'own', canBeAssignee: true },
-    inventory:  { view: 'none', create: false, edit: 'none', delete: 'none', approvePurchase: false, approveDisposal: false },
+    inventory:  { view: 'none', create: false, edit: 'none', delete: 'none', approvePurchase: false, approveDisposal: false, approveTransfer: false },
     user_mgmt:     { create: false, edit: 'none', delete: 'none', toggleStatus: 'none' },
     role_mgmt:     { create: false, edit: 'none', delete: 'none' },
     division_mgmt: { create: false, edit: 'none', delete: 'none' },

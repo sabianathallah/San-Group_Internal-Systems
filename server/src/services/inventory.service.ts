@@ -27,6 +27,7 @@ const HISTORY_SELECT = {
   id: true,
   type: true,
   location: true,
+  toLocation: true,
   quantity: true,
   cost: true,
   note: true,
@@ -35,6 +36,9 @@ const HISTORY_SELECT = {
   createdAt: true,
   requestedBy: { select: USER_SELECT },
   approvedBy:  { select: USER_SELECT },
+  assignedTo:  { select: USER_SELECT },
+  returnedAt:  true,
+  returnedBy:  { select: USER_SELECT },
 } as const;
 
 const ASSET_DETAIL_SELECT = {
@@ -53,7 +57,9 @@ function withTotalQty<T extends { stocks: { qty: number }[] }>(asset: T) {
 // Everyone whose role grants approval authority for the given transaction
 // type — mirrors getAssignCapableUserIds in work-order.service.ts.
 async function getInventoryApproverUserIds(type: AssetTransactionType): Promise<string[]> {
-  const field = type === AssetTransactionType.PURCHASE ? 'approvePurchase' : 'approveDisposal';
+  const field = type === AssetTransactionType.PURCHASE ? 'approvePurchase'
+    : type === AssetTransactionType.TRANSFER ? 'approveTransfer'
+    : 'approveDisposal';
   const candidates = await prisma.user.findMany({
     where: { isActive: true },
     select: { id: true, role: { select: { id: true, level: true } } },
@@ -74,7 +80,9 @@ async function notifyInventoryApprovers(type: AssetTransactionType, requesterId:
   const recipientIds = (await getInventoryApproverUserIds(type)).filter((id) => id !== requesterId);
   if (recipientIds.length === 0) return;
 
-  const label = type === AssetTransactionType.PURCHASE ? 'Purchase' : 'Disposal';
+  const label = type === AssetTransactionType.PURCHASE ? 'Purchase'
+    : type === AssetTransactionType.TRANSFER ? 'Transfer'
+    : 'Disposal';
   await prisma.notification.createMany({
     data: recipientIds.map((userId) => ({
       userId,
@@ -212,11 +220,59 @@ export async function deleteAssetService(id: string) {
   await prisma.asset.delete({ where: { id } });
 }
 
+// ── Bulk import ────────────────────────────────────────────────
+interface ImportRow { name: string; category: string; qty: number; unit?: string | null; location: string; description?: string | null }
+interface ImportFailure { row: number; name: string; error: string }
+
+export async function bulkImportAssetsService(userId: string, rows: ImportRow[]) {
+  const categoryCache = new Map<string, string>(); // lowercase name -> id
+  const existingCategories = await prisma.assetCategory.findMany({ select: { id: true, name: true } });
+  for (const c of existingCategories) categoryCache.set(c.name.toLowerCase(), c.id);
+
+  let created = 0;
+  const failed: ImportFailure[] = [];
+
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
+    try {
+      if (!row.name?.trim()) throw new Error('Nama aset wajib diisi');
+      if (!row.location?.trim()) throw new Error('Lokasi wajib diisi');
+      if (!Number.isFinite(row.qty) || row.qty < 0) throw new Error('Jumlah tidak valid');
+
+      const catKey = (row.category ?? '').trim().toLowerCase() || 'lainnya';
+      let categoryId = categoryCache.get(catKey);
+      if (!categoryId) {
+        const cat = await prisma.assetCategory.create({ data: { name: row.category?.trim() || 'Lainnya' } });
+        categoryId = cat.id;
+        categoryCache.set(catKey, categoryId);
+      }
+
+      const code = await generateAssetCode();
+      await prisma.asset.create({
+        data: {
+          name: row.name.trim(),
+          description: row.description?.trim() || null,
+          unit: row.unit?.trim() || null,
+          categoryId,
+          code,
+          createdById: userId,
+          stocks: { create: { location: row.location.trim(), qty: row.qty } },
+        },
+      });
+      created += 1;
+    } catch (err) {
+      failed.push({ row: i + 1, name: row.name ?? '', error: err instanceof Error ? err.message : 'Unknown error' });
+    }
+  }
+
+  return { created, failed };
+}
+
 // ── Transactions (purchase / disposal) ──────────────────────
 export async function createTransactionService(
   assetId: string,
   userId: string,
-  data: { type: AssetTransactionType; location: string; quantity: number; cost?: number | null; note?: string | null },
+  data: { type: AssetTransactionType; location: string; toLocation?: string | null; quantity: number; cost?: number | null; note?: string | null },
 ) {
   const asset = await prisma.asset.findUnique({
     where: { id: assetId },
@@ -224,11 +280,15 @@ export async function createTransactionService(
   });
   if (!asset) throw new AppError('Aset tidak ditemukan', 404);
 
-  if (data.type === AssetTransactionType.DISPOSAL) {
+  if (data.type === AssetTransactionType.DISPOSAL || data.type === AssetTransactionType.TRANSFER) {
     const stock = asset.stocks.find((s) => s.location === data.location);
     if (!stock || data.quantity > stock.qty) {
-      throw new AppError('Jumlah pengeluaran melebihi stok yang tersedia di lokasi ini', 400);
+      throw new AppError('Jumlah melebihi stok yang tersedia di lokasi ini', 400);
     }
+  }
+  if (data.type === AssetTransactionType.TRANSFER) {
+    if (!data.toLocation?.trim()) throw new AppError('Lokasi tujuan wajib diisi', 400);
+    if (data.toLocation.trim() === data.location) throw new AppError('Lokasi tujuan harus berbeda dari lokasi asal', 400);
   }
 
   const history = await prisma.assetHistory.create({
@@ -236,6 +296,7 @@ export async function createTransactionService(
       assetId,
       type: data.type,
       location: data.location,
+      toLocation: data.type === AssetTransactionType.TRANSFER ? data.toLocation!.trim() : null,
       quantity: data.quantity,
       cost: data.type === AssetTransactionType.PURCHASE && data.cost != null ? data.cost : null,
       note: data.note ?? null,
@@ -253,13 +314,14 @@ export async function decideTransactionService(
   approverId: string,
   canApprovePurchase: boolean,
   canApproveDisposal: boolean,
+  canApproveTransfer: boolean,
   decision: 'APPROVED' | 'REJECTED',
   note?: string | null,
 ) {
   const existing = await prisma.assetHistory.findUnique({
     where: { id: historyId },
     select: {
-      id: true, assetId: true, type: true, location: true, quantity: true, status: true, requestedById: true,
+      id: true, assetId: true, type: true, location: true, toLocation: true, quantity: true, status: true, requestedById: true,
       asset: { select: { name: true, stocks: { select: STOCK_SELECT } } },
     },
   });
@@ -268,7 +330,9 @@ export async function decideTransactionService(
     throw new AppError('Transaksi ini sudah diproses', 400);
   }
 
-  const authorized = existing.type === AssetTransactionType.PURCHASE ? canApprovePurchase : canApproveDisposal;
+  const authorized = existing.type === AssetTransactionType.PURCHASE ? canApprovePurchase
+    : existing.type === AssetTransactionType.TRANSFER ? canApproveTransfer
+    : canApproveDisposal;
   if (!authorized) throw new AppError('Anda tidak memiliki izin untuk menyetujui transaksi ini', 403);
 
   if (decision === 'REJECTED' && !note?.trim()) {
@@ -276,8 +340,9 @@ export async function decideTransactionService(
   }
 
   const currentStock = existing.asset.stocks.find((s) => s.location === existing.location);
-  if (decision === 'APPROVED' && existing.type === AssetTransactionType.DISPOSAL && existing.quantity > (currentStock?.qty ?? 0)) {
-    throw new AppError('Stok tidak mencukupi untuk pengeluaran ini', 400);
+  const isOutflow = existing.type === AssetTransactionType.DISPOSAL || existing.type === AssetTransactionType.TRANSFER;
+  if (decision === 'APPROVED' && isOutflow && existing.quantity > (currentStock?.qty ?? 0)) {
+    throw new AppError('Stok tidak mencukupi untuk transaksi ini', 400);
   }
 
   const result = await prisma.$transaction(async (tx) => {
@@ -293,12 +358,24 @@ export async function decideTransactionService(
     });
 
     if (decision === 'APPROVED') {
-      const delta = existing.type === AssetTransactionType.PURCHASE ? existing.quantity : -existing.quantity;
-      await tx.assetStock.upsert({
-        where: { assetId_location: { assetId: existing.assetId, location: existing.location } },
-        update: { qty: { increment: delta } },
-        create: { assetId: existing.assetId, location: existing.location, qty: Math.max(0, delta) },
-      });
+      if (existing.type === AssetTransactionType.TRANSFER) {
+        await tx.assetStock.update({
+          where: { assetId_location: { assetId: existing.assetId, location: existing.location } },
+          data: { qty: { decrement: existing.quantity } },
+        });
+        await tx.assetStock.upsert({
+          where: { assetId_location: { assetId: existing.assetId, location: existing.toLocation! } },
+          update: { qty: { increment: existing.quantity } },
+          create: { assetId: existing.assetId, location: existing.toLocation!, qty: existing.quantity },
+        });
+      } else {
+        const delta = existing.type === AssetTransactionType.PURCHASE ? existing.quantity : -existing.quantity;
+        await tx.assetStock.upsert({
+          where: { assetId_location: { assetId: existing.assetId, location: existing.location } },
+          update: { qty: { increment: delta } },
+          create: { assetId: existing.assetId, location: existing.location, qty: Math.max(0, delta) },
+        });
+      }
     }
 
     return updated;
@@ -311,6 +388,90 @@ export async function decideTransactionService(
     decision === 'APPROVED' ? `Request approved: ${existing.asset.name}` : `Request rejected: ${existing.asset.name}`,
     decision === 'APPROVED' ? 'Your inventory request has been approved.' : `Reason: ${note}`,
   ).catch(() => {});
+
+  return result;
+}
+
+// ── Assignment (hand stock to a person — immediate, no approval step) ──
+export async function assignAssetService(
+  assetId: string,
+  actorId: string,
+  data: { location: string; assignedToId: string; quantity: number; note?: string | null },
+) {
+  const asset = await prisma.asset.findUnique({
+    where: { id: assetId },
+    select: { id: true, name: true, stocks: { select: STOCK_SELECT } },
+  });
+  if (!asset) throw new AppError('Aset tidak ditemukan', 404);
+
+  const stock = asset.stocks.find((s) => s.location === data.location);
+  if (!stock || data.quantity > stock.qty) {
+    throw new AppError('Jumlah melebihi stok yang tersedia di lokasi ini', 400);
+  }
+
+  const assignee = await prisma.user.findUnique({ where: { id: data.assignedToId }, select: { id: true } });
+  if (!assignee) throw new AppError('Pengguna tidak ditemukan', 404);
+
+  const history = await prisma.$transaction(async (tx) => {
+    const created = await tx.assetHistory.create({
+      data: {
+        assetId,
+        type: AssetTransactionType.ASSIGN,
+        location: data.location,
+        quantity: data.quantity,
+        note: data.note ?? null,
+        status: AssetTransactionStatus.APPROVED,
+        requestedById: actorId,
+        approvedById: actorId,
+        approvedAt: new Date(),
+        assignedToId: data.assignedToId,
+      },
+      select: HISTORY_SELECT,
+    });
+    await tx.assetStock.update({
+      where: { assetId_location: { assetId, location: data.location } },
+      data: { qty: { decrement: data.quantity } },
+    });
+    return created;
+  });
+
+  await notifyRequester(
+    NotificationType.INVENTORY_ASSIGNED, actorId, data.assignedToId,
+    `Asset assigned: ${asset.name}`, `${data.quantity} unit(s) of "${asset.name}" have been assigned to you.`,
+  ).catch(() => {});
+
+  return history;
+}
+
+export async function returnAssignmentService(historyId: string, actorId: string) {
+  const existing = await prisma.assetHistory.findUnique({
+    where: { id: historyId },
+    select: { id: true, assetId: true, type: true, location: true, quantity: true, returnedAt: true, assignedToId: true, asset: { select: { name: true } } },
+  });
+  if (!existing) throw new AppError('Transaksi tidak ditemukan', 404);
+  if (existing.type !== AssetTransactionType.ASSIGN) throw new AppError('Transaksi ini bukan penugasan aset', 400);
+  if (existing.returnedAt) throw new AppError('Aset ini sudah dikembalikan', 400);
+
+  const result = await prisma.$transaction(async (tx) => {
+    const updated = await tx.assetHistory.update({
+      where: { id: historyId },
+      data: { returnedAt: new Date(), returnedById: actorId },
+      select: HISTORY_SELECT,
+    });
+    await tx.assetStock.upsert({
+      where: { assetId_location: { assetId: existing.assetId, location: existing.location } },
+      update: { qty: { increment: existing.quantity } },
+      create: { assetId: existing.assetId, location: existing.location, qty: existing.quantity },
+    });
+    return updated;
+  });
+
+  if (existing.assignedToId) {
+    await notifyRequester(
+      NotificationType.INVENTORY_RETURNED, actorId, existing.assignedToId,
+      `Asset returned: ${existing.asset.name}`, `Your assignment of "${existing.asset.name}" has been marked as returned.`,
+    ).catch(() => {});
+  }
 
   return result;
 }
@@ -359,10 +520,10 @@ export async function getMovementsTrendService(days = 14) {
     select: { type: true, createdAt: true },
   });
 
-  const buckets = new Map<string, { date: string; PURCHASE: number; DISPOSAL: number; ADJUSTMENT: number }>();
+  const buckets = new Map<string, { date: string; PURCHASE: number; DISPOSAL: number; ADJUSTMENT: number; TRANSFER: number; ASSIGN: number }>();
   for (let i = 0; i < days; i++) {
     const key = jakartaDateKey(new Date(since.getTime() + i * 24 * 60 * 60 * 1000));
-    buckets.set(key, { date: key, PURCHASE: 0, DISPOSAL: 0, ADJUSTMENT: 0 });
+    buckets.set(key, { date: key, PURCHASE: 0, DISPOSAL: 0, ADJUSTMENT: 0, TRANSFER: 0, ASSIGN: 0 });
   }
   for (const r of rows) {
     const bucket = buckets.get(jakartaDateKey(r.createdAt));
