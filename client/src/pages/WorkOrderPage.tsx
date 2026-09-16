@@ -2022,16 +2022,14 @@ export default function WorkOrderPage() {
                   <option key={c} value={c}>{CATEGORY_CONFIG[c].icon} {CATEGORY_CONFIG[c].label}</option>
                 ))}
               </select>
-              <select
+              <UserSearchInput
+                users={users}
                 value={assigneeFilter}
-                onChange={(e) => setAssigneeFilter(e.target.value)}
-                className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white focus:outline-none"
-              >
-                <option value="">{t('workOrder.toolbar.allTechnicians')}</option>
-                {users.map((u) => (
-                  <option key={u.id} value={u.id}>{u.fullName}</option>
-                ))}
-              </select>
+                onChange={setAssigneeFilter}
+                placeholder={t('workOrder.toolbar.allTechnicians')}
+                clearLabel={t('workOrder.toolbar.allTechnicians')}
+                className="w-44"
+              />
               <input
                 type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)}
                 className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white focus:outline-none"

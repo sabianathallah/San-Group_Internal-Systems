@@ -9,6 +9,7 @@ import api from '@/lib/api';
 import { useAuthStore } from '@/stores/authStore';
 import { useLanguageStore } from '@/stores/languageStore';
 import { cn } from '@/lib/cn';
+import SearchableSelect from '@/components/shared/SearchableSelect';
 
 /** Locale for date formatting — mirrors i18next's active language. */
 function dateLocale(language: string): string {
@@ -106,7 +107,6 @@ function ColorPicker({ value, onChange }: { value: string; onChange: (c: string)
 }
 
 const inputCls  = 'w-full border border-gray-200 rounded px-3 py-2 text-sm focus:outline-none focus:border-navy focus:ring-1 focus:ring-navy';
-const selectCls = 'w-full border border-gray-200 rounded px-3 py-2 text-sm focus:outline-none focus:border-navy';
 
 function Field({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
   return (
@@ -409,17 +409,23 @@ function UserFormModal({ open, mode, user, roles, divisions, onClose, onSaved }:
               </Field>
               <div className="grid grid-cols-2 gap-4">
                 <Field label={t('admin.users.userFormModal.roleLabel')} required>
-                  <select value={createForm.roleId} onChange={(e) => setCreate((f) => ({ ...f, roleId: e.target.value }))} className={selectCls}>
-                    <option value="">{t('admin.users.userFormModal.selectRolePlaceholder')}</option>
-                    {roles.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
-                  </select>
+                  <SearchableSelect
+                    options={roles.map((r) => ({ id: r.id, label: r.name, color: r.color }))}
+                    value={createForm.roleId}
+                    onChange={(id) => setCreate((f) => ({ ...f, roleId: id }))}
+                    placeholder={t('admin.users.userFormModal.selectRolePlaceholder')}
+                    clearLabel={t('admin.users.userFormModal.selectRolePlaceholder')}
+                  />
                   {createForm.roleId && <RolePill roleId={createForm.roleId} />}
                 </Field>
                 <Field label={t('admin.users.userFormModal.divisionLabel')} required>
-                  <select value={createForm.divisionId} onChange={(e) => setCreate((f) => ({ ...f, divisionId: e.target.value }))} className={selectCls}>
-                    <option value="">{t('admin.users.userFormModal.selectDivisionPlaceholder')}</option>
-                    {divisions.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
-                  </select>
+                  <SearchableSelect
+                    options={divisions.map((d) => ({ id: d.id, label: d.name, color: d.color }))}
+                    value={createForm.divisionId}
+                    onChange={(id) => setCreate((f) => ({ ...f, divisionId: id }))}
+                    placeholder={t('admin.users.userFormModal.selectDivisionPlaceholder')}
+                    clearLabel={t('admin.users.userFormModal.selectDivisionPlaceholder')}
+                  />
                   {createForm.divisionId && <DivPill divisionId={createForm.divisionId} />}
                 </Field>
               </div>
@@ -440,17 +446,23 @@ function UserFormModal({ open, mode, user, roles, divisions, onClose, onSaved }:
               </Field>
               <div className="grid grid-cols-2 gap-4">
                 <Field label={t('admin.users.userFormModal.roleLabel')} required>
-                  <select value={editForm.roleId} onChange={(e) => setEdit((f) => ({ ...f, roleId: e.target.value }))} className={selectCls}>
-                    <option value="">{t('admin.users.userFormModal.selectRolePlaceholder')}</option>
-                    {roles.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
-                  </select>
+                  <SearchableSelect
+                    options={roles.map((r) => ({ id: r.id, label: r.name, color: r.color }))}
+                    value={editForm.roleId}
+                    onChange={(id) => setEdit((f) => ({ ...f, roleId: id }))}
+                    placeholder={t('admin.users.userFormModal.selectRolePlaceholder')}
+                    clearLabel={t('admin.users.userFormModal.selectRolePlaceholder')}
+                  />
                   {editForm.roleId && <RolePill roleId={editForm.roleId} />}
                 </Field>
                 <Field label={t('admin.users.userFormModal.divisionLabel')} required>
-                  <select value={editForm.divisionId} onChange={(e) => setEdit((f) => ({ ...f, divisionId: e.target.value }))} className={selectCls}>
-                    <option value="">{t('admin.users.userFormModal.selectDivisionPlaceholder')}</option>
-                    {divisions.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
-                  </select>
+                  <SearchableSelect
+                    options={divisions.map((d) => ({ id: d.id, label: d.name, color: d.color }))}
+                    value={editForm.divisionId}
+                    onChange={(id) => setEdit((f) => ({ ...f, divisionId: id }))}
+                    placeholder={t('admin.users.userFormModal.selectDivisionPlaceholder')}
+                    clearLabel={t('admin.users.userFormModal.selectDivisionPlaceholder')}
+                  />
                   {editForm.divisionId && <DivPill divisionId={editForm.divisionId} />}
                 </Field>
               </div>
@@ -646,16 +658,22 @@ export default function UsersPage() {
                 <button onClick={() => setSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"><X size={13} /></button>
               )}
             </div>
-            <select value={roleFilter} onChange={(e) => { setRoleFilter(e.target.value); setPage(1); }}
-              className="py-2 px-3 text-sm border border-gray-200 rounded focus:outline-none focus:border-navy">
-              <option value="">{t('admin.users.usersTab.allRoles')}</option>
-              {roles.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
-            </select>
-            <select value={divFilter} onChange={(e) => { setDivFilter(e.target.value); setPage(1); }}
-              className="py-2 px-3 text-sm border border-gray-200 rounded focus:outline-none focus:border-navy">
-              <option value="">{t('admin.users.usersTab.allDivisions')}</option>
-              {divisions.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
-            </select>
+            <SearchableSelect
+              options={roles.map((r) => ({ id: r.id, label: r.name, color: r.color }))}
+              value={roleFilter}
+              onChange={(id) => { setRoleFilter(id); setPage(1); }}
+              placeholder={t('admin.users.usersTab.allRoles')}
+              clearLabel={t('admin.users.usersTab.allRoles')}
+              className="w-44"
+            />
+            <SearchableSelect
+              options={divisions.map((d) => ({ id: d.id, label: d.name, color: d.color }))}
+              value={divFilter}
+              onChange={(id) => { setDivFilter(id); setPage(1); }}
+              placeholder={t('admin.users.usersTab.allDivisions')}
+              clearLabel={t('admin.users.usersTab.allDivisions')}
+              className="w-44"
+            />
             <select value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
               className="py-2 px-3 text-sm border border-gray-200 rounded focus:outline-none focus:border-navy">
               <option value="">{t('admin.users.usersTab.allStatus')}</option>
