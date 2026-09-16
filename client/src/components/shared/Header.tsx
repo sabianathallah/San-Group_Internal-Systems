@@ -80,6 +80,8 @@ const HELP_ROUTE_MAP: Record<string, string> = {
   '/hris/admin/holidays': 'hris-admin-holidays',
   '/hris/admin/leave-types': 'hris-admin-leave-types',
   '/hris': 'hris-overview',
+  '/tenants/manage': 'tenant-manage',
+  '/tenants': 'tenant-overview',
   '/profile': 'profile',
   '/admin/users': 'admin-users',
   '/admin/permissions': 'admin-permissions',

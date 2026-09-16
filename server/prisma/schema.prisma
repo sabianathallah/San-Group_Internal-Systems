@@ -64,6 +64,7 @@ enum NotificationType {
   INVENTORY_REJECTED
   INVENTORY_ASSIGNED
   INVENTORY_RETURNED
+  TENANT_LEASE_EXPIRING
   // Legacy — overtime module removed (client policy: no overtime); values kept
   // because removing PG enum values requires a type rebuild.
   OVERTIME_SUBMITTED
@@ -262,6 +263,8 @@ model User {
   assignedAssetHistory       AssetHistory[]          @relation("AssetAssignee")
   returnedAssetHistory       AssetHistory[]          @relation("AssetReturner")
   createdOpnameSessions      AssetOpnameSession[]    @relation("OpnameCreator")
+  createdTenants             Tenant[]                @relation("TenantCreator")
+  uploadedTenantDocuments    TenantDocument[]        @relation("TenantDocumentUploader")
 
   @@index([email])
   @@index([username])
@@ -1138,9 +1141,88 @@ model AssetOpnameItem {
 }
 
 // --- Tenant Database ---
-// model Tenant { ... }
-// model TenantDocument { ... }
-// model TenantReminder { ... }
+enum TenantLocation {
+  GREEN_TERRACE
+  THE_AMBOJA
+  ALOON_ALOON
+}
+
+enum TenantStatus {
+  ACTIVE // occupied, lease running
+  FIT_OUT // signed, fitting out before opening
+  VACANT // unit not currently leased
+  INACTIVE // lease ended / tenant moved out, kept for history
+}
+
+model Tenant {
+  id       String         @id @default(uuid())
+  location TenantLocation
+  block    String // e.g. "Block A", "Ground Floor", "Upper Ground", "LT 1"
+  unitNo   String // e.g. "1", "3A", "8&9" — free text, matches how units are labeled on the real layout
+  name     String? // tenant/brand name — null while the unit is VACANT
+  logoPath String? // uploaded logo image, shown in the tenant list and on the floor-map hotspot
+  status   TenantStatus   @default(VACANT)
+
+  area  Decimal? @db.Decimal(10, 2) // m²
+  power Int? // daya listrik, in VA
+
+  leaseStart DateTime? @db.Date
+  leaseEnd   DateTime? @db.Date
+  fitOutDate DateTime? @db.Date
+  openDate   DateTime? @db.Date
+
+  // Visible only to roles with tenant.viewFinancials — see permission.middleware.ts
+  rentPrice     Decimal? @db.Decimal(14, 2)
+  serviceCharge Decimal? @db.Decimal(14, 2)
+
+  notes String?
+
+  createdById String
+  createdBy   User   @relation("TenantCreator", fields: [createdById], references: [id])
+
+  documents TenantDocument[]
+  reminders TenantReminder[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([location])
+  @@index([status])
+  @@unique([location, block, unitNo])
+  @@index([leaseEnd])
+  @@map("tenants")
+}
+
+model TenantDocument {
+  id        String   @id @default(uuid())
+  fileName  String
+  filePath  String
+  fileSize  Int
+  mimeType  String
+  createdAt DateTime @default(now())
+
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  uploadedById String
+  uploadedBy   User   @relation("TenantDocumentUploader", fields: [uploadedById], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@map("tenant_documents")
+}
+
+// Dedup log for the lease-expiry reminder cron — one row per (tenant, type)
+// so the daily job never re-notifies for the same milestone.
+model TenantReminder {
+  id       String   @id @default(uuid())
+  tenantId String
+  tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  type     String // e.g. "LEASE_EXPIRY_6M"
+  sentAt   DateTime @default(now())
+
+  @@unique([tenantId, type])
+  @@map("tenant_reminders")
+}
 
 // --- Meeting Room Booking ---
 // model MeetingRoom { ... }

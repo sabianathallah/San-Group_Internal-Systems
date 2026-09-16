@@ -30,6 +30,7 @@ export function checkPerm(feature: keyof PermissionConfig, action: string) {
         req.approvePurchase   = true;
         req.approveDisposal   = true;
         req.approveTransfer   = true;
+        req.viewFinancials    = true;
         return next();
       }
 
@@ -46,6 +47,13 @@ export function checkPerm(feature: keyof PermissionConfig, action: string) {
         req.approvePurchase = perms.inventory.approvePurchase ?? false;
         req.approveDisposal = perms.inventory.approveDisposal ?? false;
         req.approveTransfer = perms.inventory.approveTransfer ?? false;
+      }
+
+      // Load tenant.viewFinancials for tenant routes — the service uses this
+      // to decide whether rentPrice/serviceCharge are included in the select
+      // at all (field-level redaction, not just a UI hide).
+      if (perms.tenant) {
+        req.viewFinancials = perms.tenant.viewFinancials ?? false;
       }
 
       const featurePerms = perms[feature] as unknown as Record<string, unknown>;

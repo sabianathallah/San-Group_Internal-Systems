@@ -14,6 +14,7 @@ import { registerDueDateJob } from './due-date.job';
 import { registerWorkOrderOverdueJob } from './work-order-overdue.job';
 import { registerAttendanceAbsentJob } from './attendance-absent.job';
 import { registerTaskDurationJob } from './task-duration.job';
+import { registerTenantLeaseExpiryJob } from './tenant-lease-expiry.job';
 import { fireScheduledAnnouncements } from '@/services/scheduled-announcement.service';
 
 export function startScheduler(): void {
@@ -21,6 +22,7 @@ export function startScheduler(): void {
   registerWorkOrderOverdueJob();
   registerAttendanceAbsentJob();
   registerTaskDurationJob();
+  registerTenantLeaseExpiryJob();
 
   // Fire scheduled announcements every minute
   cron.schedule('* * * * *', async () => {

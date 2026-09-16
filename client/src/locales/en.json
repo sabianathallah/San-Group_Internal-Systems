@@ -542,6 +542,77 @@
       "ageDuration": "Age / Duration"
     }
   },
+  "tenant": {
+    "title": "Tenant Database",
+    "unitCount_one": "{{count}} unit",
+    "unitCount_other": "{{count}} units",
+    "newTenant": "New Tenant",
+    "searchPlaceholder": "Search name, unit, block...",
+    "allStatuses": "All Statuses",
+    "exportCsv": "Export CSV",
+    "empty": "No units yet",
+    "emptyHint": "Add the first unit for this property",
+    "colUnit": "Unit",
+    "colName": "Tenant",
+    "colStatus": "Status",
+    "colArea": "Area",
+    "colLeaseEnd": "Lease Ends",
+    "pageOf": "Page {{page}} of {{total}}",
+    "viewList": "List",
+    "viewMap": "Map",
+    "mapNotAvailable": "No floor map available for this location yet.",
+    "manageTitle": "Manage Tenants",
+    "locations": {
+      "GREEN_TERRACE": "Green Terrace",
+      "THE_AMBOJA": "The Amboja",
+      "ALOON_ALOON": "Aloon-Aloon"
+    },
+    "status": {
+      "ACTIVE": "Occupied",
+      "FIT_OUT": "Fit-out",
+      "VACANT": "Vacant",
+      "INACTIVE": "Inactive"
+    },
+    "stats": {
+      "total": "Total Units",
+      "occupancyByUnit": "Occupancy (Units)",
+      "occupancyByArea": "Occupancy (Area)",
+      "vacant": "Vacant"
+    },
+    "form": {
+      "location": "Location",
+      "block": "Block / Floor",
+      "unitNo": "Unit No.",
+      "name": "Tenant Name",
+      "namePlaceholder": "Leave empty if vacant",
+      "status": "Status",
+      "area": "Area (m²)",
+      "power": "Power (VA)",
+      "leaseStart": "Lease Start",
+      "leaseEnd": "Lease End",
+      "fitOutDate": "Fit-out Date",
+      "openDate": "Open Date",
+      "rentPrice": "Rent Price / yr",
+      "serviceCharge": "Service Charge / mo",
+      "notes": "Notes",
+      "cancel": "Cancel",
+      "save": "Save",
+      "createSuccess": "Tenant created successfully",
+      "editSuccess": "Tenant updated successfully",
+      "validationError": "Location, block, and unit number are required"
+    },
+    "detail": {
+      "title": "Tenant Detail",
+      "edit": "Edit",
+      "delete": "Delete",
+      "confirmDelete": "Delete this unit record? This cannot be undone.",
+      "deleteSuccess": "Tenant deleted successfully",
+      "financialsLocked": "Rent price & service charge are only visible to Finance/Leasing/Legal.",
+      "changeLogo": "Change Logo",
+      "logoUpdateSuccess": "Logo updated successfully",
+      "createdBy": "Added by"
+    }
+  },
   "inventory": {
     "title": "Inventory",
     "assetCount_one": "{{count}} asset",
@@ -2298,6 +2369,7 @@
         "internal": "Internal",
         "workOrders": "Work Orders",
         "inventory": "Inventory",
+        "tenant": "Tenant",
         "hris": "HRIS",
         "admin": "Admin"
       },
@@ -2323,6 +2395,9 @@
         "inventory": "Inventory",
         "inventoryMovements": "Movements",
         "inventoryOpname": "Stock Opname",
+        "tenants": "Tenant Database",
+        "tenantManage": "Manage Tenants",
+        "tenantHelp": "Tenant Database Guide",
         "history": "History",
         "reports": "Reports",
         "overview": "Overview",

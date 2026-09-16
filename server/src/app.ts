@@ -27,6 +27,7 @@ import scheduledAnnouncementRoutes from '@/routes/scheduled-announcement.routes'
 import workOrderRoutes from '@/routes/work-order.routes';
 import inventoryRoutes from '@/routes/inventory.routes';
 import hrisRoutes from '@/routes/hris.routes';
+import tenantRoutes from '@/routes/tenant.routes';
 
 const app = express();
 
@@ -92,6 +93,7 @@ app.use('/api/audit-logs', auditRoutes);
 app.use('/api/scheduled-announcements', scheduledAnnouncementRoutes);
 app.use('/api/work-orders', workOrderRoutes);
 app.use('/api/inventory', inventoryRoutes);
+app.use('/api/tenants', tenantRoutes);
 app.use('/api/hris', hrisRoutes);
 
 // ── Error Handling ─────────────────────────────────────────

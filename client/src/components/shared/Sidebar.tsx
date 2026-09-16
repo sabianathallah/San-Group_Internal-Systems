@@ -27,6 +27,8 @@ import {
   Boxes,
   ArrowLeftRight,
   ClipboardCheck,
+  Building2,
+  Settings2,
 } from 'lucide-react';
 import { useUiStore } from '@/stores/uiStore';
 import { useAuthStore } from '@/stores/authStore';
@@ -51,7 +53,7 @@ interface NavSection {
   items: NavItem[];
 }
 
-type ModuleId = 'internal' | 'work-orders' | 'inventory' | 'hris' | 'admin';
+type ModuleId = 'internal' | 'work-orders' | 'inventory' | 'tenant' | 'hris' | 'admin';
 
 interface Module {
   id: ModuleId;
@@ -66,6 +68,7 @@ const MODULES: Module[] = [
   { id: 'internal',     icon: LayoutDashboard, color: 'text-blue-300'  },
   { id: 'work-orders',  icon: Wrench,          color: 'text-orange-300' },
   { id: 'inventory',    icon: Boxes,           color: 'text-emerald-300' },
+  { id: 'tenant',       icon: Building2,       color: 'text-amber-300' },
   { id: 'hris',         icon: HardHat,         color: 'text-green-300' },
   { id: 'admin',        icon: UserCog,         color: 'text-purple-300', adminOnly: true },
 ];
@@ -75,6 +78,7 @@ function useActiveModule(): ModuleId {
   const { pathname } = useLocation();
   if (pathname.startsWith('/work-orders')) return 'work-orders';
   if (pathname.startsWith('/inventory'))   return 'inventory';
+  if (pathname.startsWith('/tenants'))     return 'tenant';
   if (pathname.startsWith('/hris'))        return 'hris';
   if (pathname.startsWith('/admin'))       return 'admin';
   return 'internal';
@@ -93,12 +97,14 @@ export default function Sidebar() {
   const canAnalytics = perms.analytics?.view !== 'none';
   const canReports   = perms.hris?.viewReports !== 'none';
   const isHRAdmin    = perms.hris?.manageShifts || perms.hris?.manageLocations;
+  const canManageTenant = (perms.tenant?.create ?? false) || perms.tenant?.edit !== 'none' || perms.tenant?.delete !== 'none';
   const activeModule = useActiveModule();
 
   const MODULE_LABELS: Record<ModuleId, string> = {
     'internal':    t('shared.sidebar.modules.internal'),
     'work-orders': t('shared.sidebar.modules.workOrders'),
     'inventory':   t('shared.sidebar.modules.inventory'),
+    'tenant':      t('shared.sidebar.modules.tenant'),
     'hris':        t('shared.sidebar.modules.hris'),
     'admin':       t('shared.sidebar.modules.admin'),
   };
@@ -157,6 +163,27 @@ export default function Sidebar() {
     },
   ];
 
+  const tenantNav: NavSection[] = [
+    {
+      label: null,
+      items: [
+        { label: t('shared.sidebar.nav.tenants'), to: ROUTES.TENANTS, icon: Building2 },
+      ],
+    },
+    // Separate nav destination on purpose — Database Tenant stays pure
+    // information (no Tenant Baru/Edit/Delete anywhere on it); this is the
+    // only place those actions live, and only for roles that hold the
+    // permission at all.
+    ...(canManageTenant ? [{
+      label: t('shared.sidebar.sections.administration'),
+      items: [{ label: t('shared.sidebar.nav.tenantManage'), to: ROUTES.TENANTS_MANAGE, icon: Settings2 }],
+    }] : []),
+    {
+      label: t('shared.sidebar.sections.support'),
+      items: [{ label: t('shared.sidebar.nav.tenantHelp'), to: `${ROUTES.HELP}#help-tenant-overview`, icon: HelpCircle }],
+    },
+  ];
+
   // Everyday HRIS items for everyone; management tooling in its own
   // labelled section so daily use and configuration don't blend together.
   const hrisAdminItems: NavItem[] = [
@@ -207,12 +234,18 @@ export default function Sidebar() {
   const navSections: NavSection[] =
     activeModule === 'work-orders' ? workOrderNav :
     activeModule === 'inventory'   ? inventoryNav :
+    activeModule === 'tenant'      ? tenantNav :
     activeModule === 'hris'        ? hrisNav :
     activeModule === 'admin'       ? adminNav :
     internalNav;
 
   const canInventory = perms.inventory?.view !== 'none';
-  const visibleModules = MODULES.filter((m) => (!m.adminOnly || isAdmin) && (m.id !== 'inventory' || canInventory));
+  const canTenant    = perms.tenant?.view !== 'none';
+  const visibleModules = MODULES.filter((m) =>
+    (!m.adminOnly || isAdmin) &&
+    (m.id !== 'inventory' || canInventory) &&
+    (m.id !== 'tenant' || canTenant),
+  );
 
   return (
     <aside
@@ -242,6 +275,12 @@ export default function Sidebar() {
             const Icon = mod.icon;
             const isActive = activeModule === mod.id;
 
+            // Icon-only, with the name on hover (title) — the active module's
+            // full name still appears as the section heading right below this
+            // bar, so dropping the in-button label here loses no information.
+            // Keeps this row a single clean line no matter how many modules
+            // there are; a two-row grid would need redesigning again the next
+            // time a module is added.
             if (mod.disabled) {
               return (
                 <div
@@ -249,11 +288,10 @@ export default function Sidebar() {
                   title={`${MODULE_LABELS[mod.id]} (${mod.disabledLabel})`}
                   className={cn(
                     'flex items-center justify-center cursor-not-allowed opacity-40',
-                    open ? 'flex-1 flex-col gap-1 py-2 rounded-lg' : 'px-0 w-10 py-1.5 rounded',
+                    open ? 'flex-1 py-2.5 rounded-lg' : 'px-0 w-10 py-1.5 rounded',
                   )}
                 >
-                  <Icon size={16} className="text-white/40 flex-shrink-0" />
-                  {open && <span className="text-[9px] text-white/40 truncate">{MODULE_LABELS[mod.id]}</span>}
+                  <Icon size={17} className="text-white/40 flex-shrink-0" />
                 </div>
               );
             }
@@ -265,6 +303,7 @@ export default function Sidebar() {
                   mod.id === 'internal'    ? ROUTES.DASHBOARD   :
                   mod.id === 'work-orders' ? ROUTES.WORK_ORDERS :
                   mod.id === 'inventory'   ? ROUTES.INVENTORY   :
+                  mod.id === 'tenant'      ? ROUTES.TENANTS     :
                   mod.id === 'hris'        ? ROUTES.HRIS :
                   mod.id === 'admin'       ? ROUTES.ADMIN_USERS :
                   ROUTES.DASHBOARD
@@ -275,11 +314,10 @@ export default function Sidebar() {
                   isActive
                     ? 'bg-white/10 text-white'
                     : 'text-white/50 hover:text-white hover:bg-white/5',
-                  open ? 'flex-1 flex-col gap-1 py-2 rounded-lg' : 'px-0 w-10 py-1.5 rounded',
+                  open ? 'flex-1 py-2.5 rounded-lg' : 'px-0 w-10 py-1.5 rounded',
                 )}
               >
-                <Icon size={16} className={cn('flex-shrink-0', isActive ? mod.color : '')} />
-                {open && <span className="text-[9px] font-medium truncate">{MODULE_LABELS[mod.id]}</span>}
+                <Icon size={17} className={cn('flex-shrink-0', isActive ? mod.color : '')} />
               </NavLink>
             );
           })}
@@ -292,6 +330,7 @@ export default function Sidebar() {
           <p className="px-2 mb-1 text-[10px] font-semibold text-white/30 uppercase tracking-wider">
             {activeModule === 'work-orders' ? MODULE_LABELS['work-orders'] :
              activeModule === 'inventory'   ? MODULE_LABELS['inventory'] :
+             activeModule === 'tenant'      ? MODULE_LABELS['tenant'] :
              activeModule === 'hris'        ? MODULE_LABELS['hris'] :
              activeModule === 'admin'       ? MODULE_LABELS['admin'] : t('shared.sidebar.sections.menu')}
           </p>

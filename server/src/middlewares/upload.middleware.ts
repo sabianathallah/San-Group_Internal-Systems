@@ -85,6 +85,19 @@ const wallpaperStorage = new CloudinaryStorage({
   } as object,
 });
 
+const tenantLogoStorage = new CloudinaryStorage({
+  cloudinary,
+  params: {
+    folder:           'san-group/tenant-logos',
+    allowed_formats:  ['jpg', 'jpeg', 'png', 'webp'],
+    // 'fit' (not 'fill') — a brand logo must never be cropped, unlike a face photo.
+    transformation:   [{ width: 300, height: 300, crop: 'fit', quality: 'auto' }],
+    public_id: (_req: Request, file: Express.Multer.File) => {
+      return `tenant_logo_${Date.now()}_${Math.round(Math.random() * 1e6)}`;
+    },
+  } as object,
+});
+
 const leaveDocStorage = new CloudinaryStorage({
   cloudinary,
   params: {
@@ -112,6 +125,12 @@ export const uploadAttendancePhoto = multer({
 export const uploadLeaveDoc = multer({
   storage: leaveDocStorage,
   limits:  { fileSize: 5 * 1024 * 1024 },
+});
+
+export const uploadTenantLogo = multer({
+  storage: tenantLogoStorage,
+  limits:  { fileSize: 2 * 1024 * 1024 },
+  fileFilter: imageFilter,
 });
 
 export const uploadWallpaper = multer({

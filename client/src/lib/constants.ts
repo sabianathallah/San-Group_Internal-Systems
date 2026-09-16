@@ -29,4 +29,7 @@ export const ROUTES = {
   HRIS_ADMIN_LOCATIONS:  '/hris/admin/locations',
   HRIS_ADMIN_HOLIDAYS:   '/hris/admin/holidays',
   HRIS_ADMIN_LEAVE_TYPES: '/hris/admin/leave-types',
+  TENANTS:             '/tenants',
+  TENANTS_MANAGE:      '/tenants/manage',
+  TENANTS_NEW:         '/tenants/manage/new',
 } as const;

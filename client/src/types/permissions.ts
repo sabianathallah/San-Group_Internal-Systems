@@ -45,6 +45,13 @@ export interface InventoryPerms {
   approveDisposal: boolean;
   approveTransfer: boolean;
 }
+export interface TenantPerms {
+  view: Scope;
+  create: boolean;
+  edit: Scope;
+  delete: Scope;
+  viewFinancials: boolean;
+}
 export interface UserMgmtPerms {
   create: boolean;
   edit: Scope;
@@ -71,6 +78,7 @@ export interface PermissionConfig {
   hris: HrisPerms;
   work_order: WorkOrderPerms;
   inventory: InventoryPerms;
+  tenant: TenantPerms;
   user_mgmt: UserMgmtPerms;
   role_mgmt: RoleMgmtPerms;
   division_mgmt: DivisionMgmtPerms;
@@ -86,6 +94,7 @@ export const DEFAULT_PERMS: PermissionConfig = {
   hris:       { reviewLeave: 'none', editAttendance: 'none', manageShifts: false, manageLocations: false, viewReports: 'none' },
   work_order: { view: 'own', create: true, edit: 'own', delete: 'own', canBeAssignee: true },
   inventory:  { view: 'none', create: false, edit: 'none', delete: 'none', approvePurchase: false, approveDisposal: false, approveTransfer: false },
+  tenant:     { view: 'none', create: false, edit: 'none', delete: 'none', viewFinancials: false },
   user_mgmt:     { create: false, edit: 'none', delete: 'none', toggleStatus: 'none' },
   role_mgmt:     { create: false, edit: 'none', delete: 'none' },
   division_mgmt: { create: false, edit: 'none', delete: 'none' },

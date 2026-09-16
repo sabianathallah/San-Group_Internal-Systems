@@ -542,6 +542,76 @@
       "ageDuration": "Usia / Durasi"
     }
   },
+  "tenant": {
+    "title": "Database Tenant",
+    "unitCount": "{{count}} unit",
+    "newTenant": "Tenant Baru",
+    "searchPlaceholder": "Cari nama, unit, block...",
+    "allStatuses": "Semua Status",
+    "exportCsv": "Export CSV",
+    "empty": "Belum ada unit",
+    "emptyHint": "Tambahkan unit pertama untuk properti ini",
+    "colUnit": "Unit",
+    "colName": "Tenant",
+    "colStatus": "Status",
+    "colArea": "Luas",
+    "colLeaseEnd": "Sewa Berakhir",
+    "pageOf": "Halaman {{page}} dari {{total}}",
+    "viewList": "List",
+    "viewMap": "Peta",
+    "mapNotAvailable": "Peta lantai belum tersedia untuk lokasi ini.",
+    "manageTitle": "Kelola Tenant",
+    "locations": {
+      "GREEN_TERRACE": "Green Terrace",
+      "THE_AMBOJA": "The Amboja",
+      "ALOON_ALOON": "Aloon-Aloon"
+    },
+    "status": {
+      "ACTIVE": "Tersewa",
+      "FIT_OUT": "Fit-out",
+      "VACANT": "Kosong",
+      "INACTIVE": "Nonaktif"
+    },
+    "stats": {
+      "total": "Total Unit",
+      "occupancyByUnit": "Okupansi (Unit)",
+      "occupancyByArea": "Okupansi (Luas)",
+      "vacant": "Kosong"
+    },
+    "form": {
+      "location": "Lokasi",
+      "block": "Block / Lantai",
+      "unitNo": "No. Unit",
+      "name": "Nama Tenant",
+      "namePlaceholder": "Kosongkan jika unit kosong",
+      "status": "Status",
+      "area": "Luas (m²)",
+      "power": "Daya Listrik (VA)",
+      "leaseStart": "Mulai Sewa",
+      "leaseEnd": "Akhir Sewa",
+      "fitOutDate": "Tanggal Fit Out",
+      "openDate": "Tanggal Buka",
+      "rentPrice": "Harga Sewa / thn",
+      "serviceCharge": "Service Charge / bln",
+      "notes": "Catatan",
+      "cancel": "Batal",
+      "save": "Simpan",
+      "createSuccess": "Tenant berhasil dibuat",
+      "editSuccess": "Tenant berhasil diperbarui",
+      "validationError": "Lokasi, block, dan nomor unit wajib diisi"
+    },
+    "detail": {
+      "title": "Detail Tenant",
+      "edit": "Edit",
+      "delete": "Hapus",
+      "confirmDelete": "Hapus data unit ini? Tindakan ini tidak bisa dibatalkan.",
+      "deleteSuccess": "Tenant berhasil dihapus",
+      "financialsLocked": "Harga sewa & service charge hanya terlihat untuk Finance/Leasing/Legal.",
+      "changeLogo": "Ganti Logo",
+      "logoUpdateSuccess": "Logo berhasil diperbarui",
+      "createdBy": "Ditambahkan oleh"
+    }
+  },
   "inventory": {
     "title": "Inventory",
     "assetCount": "{{count}} aset",
@@ -2285,6 +2355,7 @@
         "internal": "Internal",
         "workOrders": "Work Orders",
         "inventory": "Inventory",
+        "tenant": "Tenant",
         "hris": "HRIS",
         "admin": "Admin"
       },
@@ -2310,6 +2381,9 @@
         "inventory": "Inventory",
         "inventoryMovements": "Pergerakan Stok",
         "inventoryOpname": "Stock Opname",
+        "tenants": "Database Tenant",
+        "tenantManage": "Kelola Tenant",
+        "tenantHelp": "Panduan Database Tenant",
         "history": "Riwayat",
         "reports": "Laporan",
         "overview": "Ringkasan",

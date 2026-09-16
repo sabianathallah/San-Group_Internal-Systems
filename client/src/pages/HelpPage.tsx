@@ -4,7 +4,7 @@ import {
   Lightbulb, ChevronRight, Building2, Clock, CalendarDays, ClipboardList,
   FileBarChart2, CalendarClock, MapPin, CalendarOff, Tags,
   Wrench, Plus, RefreshCw, ClipboardCheck, Archive, HardHat,
-  Search, X, ShieldCheck, Users, Shield, User, UserCog,
+  Search, X, ShieldCheck, Users, Shield, User, UserCog, Settings2,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/cn';
@@ -392,6 +392,37 @@ const CONTENT: Record<'id' | 'en', { pageTitle: string; pageSubtitle: string; ti
           'Hanya **Nama Lengkap** dan **Nomor Telepon** yang bisa diubah sendiri di sini — Email, Username, Role, dan Divisi bersifat baca-saja dan hanya bisa diubah admin lewat Kelola Pengguna.',
           'Tombol **"Ubah Kata Sandi"** membuka form terpisah untuk ganti password.',
           'Perubahan nama/foto langsung terlihat di header dan sidebar tanpa perlu refresh halaman.',
+        ],
+      },
+      {
+        id: 'tenant-overview',
+        icon: Building2,
+        title: 'Database Tenant',
+        intro: 'Direktori tenant untuk 3 properti (Green Terrace, The Amboja, Aloon-Aloon) — murni informasi, tidak ada tombol tambah/edit/hapus di halaman ini. Bisa diakses siapa saja yang punya izin lihat.',
+        image: '/help/tenant-database.jpg',
+        imageAlt: 'Tampilan Peta interaktif Database Tenant, Block A Green Terrace',
+        tips: [
+          'Tab **Green Terrace / The Amboja / Aloon-Aloon** untuk pindah lokasi — stats okupansi (unit & luas) dan daftar unit ikut menyesuaikan.',
+          'Toggle **List / Peta**: List menampilkan tabel biasa; **Peta** menampilkan denah asli tiap block/lantai dengan marker logo tenant yang bisa diklik.',
+          'Di mode Peta, warna cincin marker menandakan status: hijau = tersewa (berkedip pelan), abu-abu = kosong, kuning = fit-out. Klik marker atau logo untuk buka detail di panel kanan.',
+          'Klik baris mana pun di tabel List untuk buka panel detail yang sama — isinya lokasi, luas, daya listrik, tanggal sewa, dan harga sewa/service charge (kalau role kamu punya akses finansial).',
+          '**Harga sewa & service charge** hanya terlihat untuk role Finance/Leasing/Legal — role lain melihat kotak terkunci sebagai gantinya, bukan angka kosong.',
+          'Tombol **"Export CSV"** mengunduh daftar unit pada lokasi yang sedang aktif.',
+        ],
+      },
+      {
+        id: 'tenant-manage',
+        icon: Settings2,
+        title: 'Kelola Tenant (Admin)',
+        intro: 'Halaman terpisah khusus untuk tambah/edit/hapus data tenant — sengaja dipisah dari Database Tenant supaya halaman itu tetap murni informasi. Hanya muncul di sidebar untuk role yang punya izin create/edit/delete tenant.',
+        image: '/help/tenant-manage.jpg',
+        imageAlt: 'Tampilan halaman Kelola Tenant dengan panel detail dan tombol Edit/Hapus',
+        tips: [
+          'Tampilan (List/Peta, filter, stats) persis sama dengan Database Tenant — bedanya di sini ada tombol **"Tenant Baru"** dan aksi Edit/Hapus di panel detail.',
+          'Klik **"Tenant Baru"** atau ikon pensil di panel detail membuka halaman form tersendiri (bukan popup) — isi Lokasi, Block/Lantai, No. Unit, status, dan field lain, lalu Simpan akan kembali otomatis ke halaman ini.',
+          'Ikon kamera kecil di foto tenant (panel detail) untuk ganti logo — langsung upload tanpa perlu masuk mode edit dulu.',
+          'Ikon tempat sampah di panel detail untuk hapus data unit — akan minta konfirmasi dulu karena tidak bisa dibatalkan.',
+          'Field **Harga Sewa** dan **Service Charge** di form hanya muncul kalau role kamu punya akses finansial — kalau tidak terlihat di sini, isian tersebut memang disembunyikan oleh sistem, bukan bug.',
         ],
       },
       {
@@ -808,6 +839,37 @@ const CONTENT: Record<'id' | 'en', { pageTitle: string; pageSubtitle: string; ti
         ],
       },
       {
+        id: 'tenant-overview',
+        icon: Building2,
+        title: 'Tenant Database',
+        intro: 'A tenant directory across 3 properties (Green Terrace, The Amboja, Aloon-Aloon) — pure information, no add/edit/delete controls anywhere on this page. Open to anyone with view access.',
+        image: '/help/tenant-database.jpg',
+        imageAlt: 'Interactive floor-plan Peta view of Tenant Database, Green Terrace Block A',
+        tips: [
+          'The **Green Terrace / The Amboja / Aloon-Aloon** tabs switch property — occupancy stats (by unit and by area) and the unit list update accordingly.',
+          'The **List / Peta** toggle: List shows a plain table; **Peta** shows the real floor plan per block/floor with clickable tenant-logo markers.',
+          'In Peta mode, the marker ring color means status: green = occupied (gentle pulse), gray = vacant, amber = fit-out. Click a marker or logo to open its detail in the right panel.',
+          'Click any row in the List table to open the same detail panel — location, area, power, lease dates, and rent/service charge (if your role has financial access).',
+          '**Rent price & service charge** are only visible to Finance/Leasing/Legal roles — other roles see a locked box instead of blank numbers.',
+          'The **"Export CSV"** button downloads the unit list for whichever property tab is active.',
+        ],
+      },
+      {
+        id: 'tenant-manage',
+        icon: Settings2,
+        title: 'Manage Tenants (Admin)',
+        intro: 'A separate page dedicated to adding, editing, and deleting tenant records — deliberately split from Tenant Database so that page stays pure information. Only appears in the sidebar for roles holding a tenant create/edit/delete permission.',
+        image: '/help/tenant-manage.jpg',
+        imageAlt: 'Manage Tenants page with the detail panel and Edit/Delete buttons',
+        tips: [
+          'The layout (List/Peta, filters, stats) is identical to Tenant Database — the difference is the **"Tenant Baru"** button and the Edit/Delete actions in the detail panel.',
+          'Clicking **"Tenant Baru"** or the pencil icon in the detail panel opens its own full-page form (not a popup) — fill in Location, Block/Floor, Unit No., status, and the other fields; Save returns you here automatically.',
+          'The small camera icon on the tenant photo (detail panel) swaps the logo — uploads immediately, no need to enter edit mode first.',
+          'The trash icon in the detail panel deletes the unit record — it asks for confirmation first since this can\'t be undone.',
+          'The **Rent Price** and **Service Charge** fields on the form only appear if your role has financial access — if you don\'t see them here, that\'s the system hiding them on purpose, not a bug.',
+        ],
+      },
+      {
         id: 'admin-users',
         icon: Users,
         title: 'Admin — Manage Users',
@@ -868,12 +930,13 @@ function FormattedTip({ text }: { text: string }) {
   );
 }
 
-type CategoryId = 'internal' | 'hris' | 'wo' | 'admin';
+type CategoryId = 'internal' | 'hris' | 'wo' | 'tenant' | 'admin';
 
 /** Section id prefix decides its category — keeps CONTENT free of a redundant field. */
 function categoryOf(id: string): CategoryId {
   if (id.startsWith('hris-')) return 'hris';
   if (id.startsWith('wo-')) return 'wo';
+  if (id.startsWith('tenant-')) return 'tenant';
   if (id.startsWith('admin-')) return 'admin';
   return 'internal';
 }
@@ -882,12 +945,13 @@ const CATEGORIES: { id: CategoryId; icon: React.ElementType }[] = [
   { id: 'internal', icon: LayoutDashboard },
   { id: 'hris', icon: HardHat },
   { id: 'wo', icon: Wrench },
+  { id: 'tenant', icon: Building2 },
   { id: 'admin', icon: UserCog },
 ];
 
 const CATEGORY_LABELS: Record<'id' | 'en', Record<CategoryId, string>> = {
-  id: { internal: 'Internal', hris: 'HRIS', wo: 'Work Orders', admin: 'Admin' },
-  en: { internal: 'Internal', hris: 'HRIS', wo: 'Work Orders', admin: 'Admin' },
+  id: { internal: 'Internal', hris: 'HRIS', wo: 'Work Orders', tenant: 'Tenant', admin: 'Admin' },
+  en: { internal: 'Internal', hris: 'HRIS', wo: 'Work Orders', tenant: 'Tenant', admin: 'Admin' },
 };
 
 /** Sections whose title carries an explicit "(Admin)" suffix get grouped

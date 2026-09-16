@@ -78,6 +78,17 @@ export interface InventoryPermissions {
   approveTransfer: boolean;
 }
 
+export interface TenantPermissions {
+  view: Scope;     // which tenant records the user can see
+  create: boolean; // can create new tenant/unit records
+  edit: Scope;     // edit tenant master data
+  delete: Scope;   // delete tenant records
+  // Rent price & service charge are stripped from the API response entirely
+  // (not just hidden client-side) unless this is true — per the contract,
+  // only Finance/Leasing/Legal should ever see these two fields.
+  viewFinancials: boolean;
+}
+
 // NOTE: for user/role/division management, a level-ceiling rule is ALWAYS
 // enforced in the service layer regardless of scope — you can never create,
 // edit, delete, or assign a role to a user/role that is at or above your own
@@ -112,6 +123,7 @@ export interface PermissionConfig {
   hris: HrisPermissions;
   work_order: WorkOrderPermissions;
   inventory: InventoryPermissions;
+  tenant: TenantPermissions;
   user_mgmt: UserManagementPermissions;
   role_mgmt: RoleManagementPermissions;
   division_mgmt: DivisionManagementPermissions;
@@ -129,6 +141,7 @@ export const DEFAULT_PERMISSIONS: Record<number, PermissionConfig> = {
     hris:       { reviewLeave: 'all',  editAttendance: 'all',  manageShifts: true,  manageLocations: true,  viewReports: 'all' },
     work_order: { view: 'all', create: true, edit: 'all', delete: 'all', canBeAssignee: true },
     inventory:  { view: 'all', create: true, edit: 'all', delete: 'all', approvePurchase: true, approveDisposal: true, approveTransfer: true },
+    tenant:     { view: 'all', create: true, edit: 'all', delete: 'all', viewFinancials: true },
     user_mgmt:     { create: true, edit: 'all', delete: 'all', toggleStatus: 'all' },
     role_mgmt:     { create: true, edit: 'all', delete: 'all' },
     division_mgmt: { create: true, edit: 'all', delete: 'all' },
@@ -146,6 +159,7 @@ export const DEFAULT_PERMISSIONS: Record<number, PermissionConfig> = {
     // per the contract. Managers (level 4, incl. Property Manager) start
     // locked out below; an Admin opts a specific manager in via this page.
     inventory:  { view: 'all', create: true, edit: 'all', delete: 'all', approvePurchase: true, approveDisposal: true, approveTransfer: true },
+    tenant:     { view: 'all', create: true, edit: 'all', delete: 'all', viewFinancials: true },
     // toggleStatus/delete default to 'none' here — matches the previous hardcoded
     // behaviour where only the true SUPER_ADMIN slug could deactivate/delete users.
     user_mgmt:     { create: true, edit: 'all', delete: 'none', toggleStatus: 'none' },
@@ -162,6 +176,7 @@ export const DEFAULT_PERMISSIONS: Record<number, PermissionConfig> = {
     hris:       { reviewLeave: 'all',  editAttendance: 'all',  manageShifts: false, manageLocations: false, viewReports: 'all' },
     work_order: { view: 'all', create: true, edit: 'all', delete: 'all', canBeAssignee: true },
     inventory:  { view: 'all', create: false, edit: 'none', delete: 'none', approvePurchase: false, approveDisposal: false, approveTransfer: false },
+    tenant:     { view: 'all', create: false, edit: 'none', delete: 'none', viewFinancials: true },
     user_mgmt:     { create: false, edit: 'none', delete: 'none', toggleStatus: 'none' },
     role_mgmt:     { create: false, edit: 'none', delete: 'none' },
     division_mgmt: { create: false, edit: 'none', delete: 'none' },
@@ -180,6 +195,10 @@ export const DEFAULT_PERMISSIONS: Record<number, PermissionConfig> = {
     // HR, FnB, GA) and only Property Manager should get inventory access —
     // an Admin opts them in individually via the Permission page.
     inventory:  { view: 'none', create: false, edit: 'none', delete: 'none', approvePurchase: false, approveDisposal: false, approveTransfer: false },
+    // Locked out by default, same reasoning as inventory above — level 4 is
+    // shared by 6 manager roles and only Property/Leasing/Finance/Legal should
+    // get tenant access; an Admin opts the right ones in via the Permission page.
+    tenant:     { view: 'none', create: false, edit: 'none', delete: 'none', viewFinancials: false },
     user_mgmt:     { create: false, edit: 'none', delete: 'none', toggleStatus: 'none' },
     role_mgmt:     { create: false, edit: 'none', delete: 'none' },
     division_mgmt: { create: false, edit: 'none', delete: 'none' },
@@ -194,6 +213,7 @@ export const DEFAULT_PERMISSIONS: Record<number, PermissionConfig> = {
     hris:       { reviewLeave: 'none', editAttendance: 'none', manageShifts: false, manageLocations: false, viewReports: 'none' },
     work_order: { view: 'own', create: true, edit: 'own', delete: 'own', canBeAssignee: true },
     inventory:  { view: 'none', create: false, edit: 'none', delete: 'none', approvePurchase: false, approveDisposal: false, approveTransfer: false },
+    tenant:     { view: 'none', create: false, edit: 'none', delete: 'none', viewFinancials: false },
     user_mgmt:     { create: false, edit: 'none', delete: 'none', toggleStatus: 'none' },
     role_mgmt:     { create: false, edit: 'none', delete: 'none' },
     division_mgmt: { create: false, edit: 'none', delete: 'none' },
@@ -208,6 +228,7 @@ export const DEFAULT_PERMISSIONS: Record<number, PermissionConfig> = {
     hris:       { reviewLeave: 'none', editAttendance: 'none', manageShifts: false, manageLocations: false, viewReports: 'none' },
     work_order: { view: 'own', create: true, edit: 'own', delete: 'own', canBeAssignee: true },
     inventory:  { view: 'none', create: false, edit: 'none', delete: 'none', approvePurchase: false, approveDisposal: false, approveTransfer: false },
+    tenant:     { view: 'none', create: false, edit: 'none', delete: 'none', viewFinancials: false },
     user_mgmt:     { create: false, edit: 'none', delete: 'none', toggleStatus: 'none' },
     role_mgmt:     { create: false, edit: 'none', delete: 'none' },
     division_mgmt: { create: false, edit: 'none', delete: 'none' },

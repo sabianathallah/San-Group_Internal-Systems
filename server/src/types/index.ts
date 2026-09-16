@@ -21,6 +21,7 @@ export interface AuthRequest extends Request {
   approvePurchase?: boolean;
   approveDisposal?: boolean;
   approveTransfer?: boolean;
+  viewFinancials?: boolean;
 }
 
 export interface ApiResponse<T = unknown> {
