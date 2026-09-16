@@ -10,8 +10,9 @@ import {
   MapPin, User, Calendar, List, Filter, RefreshCw, Loader2,
   CheckCircle2, Circle, ArrowRight, Camera, History, ChevronUp,
   Zap, AlertCircle, Ban, LayoutGrid, Table2, ImageOff, ThumbsUp, ThumbsDown,
-  ShieldCheck, ClipboardCheck, Download, Info, Phone,
+  ShieldCheck, ClipboardCheck, Download, Info, Phone, FileText,
 } from 'lucide-react';
+import { jsPDF } from 'jspdf';
 import api from '@/lib/api';
 import { cn } from '@/lib/cn';
 import { toast } from '@/stores/toastStore';
@@ -281,6 +282,58 @@ function exportWorkOrdersCSV(workOrders: WorkOrder[], t: (key: string) => string
   a.download = `work-orders-${new Date().toISOString().slice(0, 10)}.csv`;
   a.click();
   URL.revokeObjectURL(url);
+}
+
+function generateSpkPdf(wo: WorkOrder) {
+  const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+  const marginX = 20;
+  let y = 20;
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(14);
+  doc.text('SURAT PERINTAH KERJA (SPK)', 105, y, { align: 'center' });
+  y += 6;
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(10);
+  doc.text(`Nomor: ${wo.code}`, 105, y, { align: 'center' });
+  y += 5;
+  doc.text(`Tanggal: ${new Date().toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' })}`, 105, y, { align: 'center' });
+  y += 10;
+  doc.setDrawColor(180);
+  doc.line(marginX, y, 210 - marginX, y);
+  y += 8;
+
+  const field = (label: string, value: string) => {
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9);
+    doc.text(label, marginX, y);
+    doc.setFont('helvetica', 'normal');
+    const lines = doc.splitTextToSize(value || '-', 210 - marginX * 2 - 45);
+    doc.text(lines, marginX + 45, y);
+    y += Math.max(6, lines.length * 5);
+  };
+
+  field('Kepada', wo.assignee?.fullName ?? '-');
+  field('Dari', wo.assignedBy?.fullName ?? wo.reportedBy.fullName);
+  field('Perihal', wo.title);
+  field('Lokasi', wo.location ?? '-');
+  field('Prioritas', PRIORITY_CONFIG[wo.priority].label);
+  field('Target Selesai', formatDate(wo.dueDate) ?? '-');
+  y += 2;
+  field('Deskripsi Pekerjaan', wo.description ?? '-');
+
+  y += 12;
+  const colWidth = (210 - marginX * 2) / 3;
+  const labels = ['Diminta oleh', 'Disetujui oleh', 'Dikerjakan oleh'];
+  labels.forEach((label, i) => {
+    const x = marginX + i * colWidth;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    doc.text(label, x, y);
+    doc.line(x, y + 20, x + colWidth - 10, y + 20);
+  });
+
+  doc.save(`SPK-${wo.code}.pdf`);
 }
 
 function fileToBase64(file: File): Promise<string> {
@@ -1420,6 +1473,14 @@ export function WODetail({
             className="flex items-center gap-1.5 px-3 py-2 text-xs border border-gray-200 rounded-lg hover:bg-gray-50"
           >
             {t('workOrder.detail.editBtn')}
+          </button>
+        )}
+        {wo.assignee && (
+          <button
+            onClick={() => generateSpkPdf(wo)}
+            className="flex items-center gap-1.5 px-3 py-2 text-xs border border-gray-200 rounded-lg hover:bg-gray-50"
+          >
+            <FileText size={12} /> Generate SPK
           </button>
         )}
         {canDelete && (
