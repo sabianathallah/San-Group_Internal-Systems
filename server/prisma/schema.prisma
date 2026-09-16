@@ -247,6 +247,8 @@ model User {
   reviewedWorkOrders         WorkOrder[]             @relation("WOReviewer")
   workOrderHistories         WorkOrderHistory[]
   workOrderAttachments       WorkOrderAttachment[]
+  bookedMeetingRooms         MeetingRoomBooking[]    @relation("MRBBooker")
+  cancelledMeetingRooms      MeetingRoomBooking[]    @relation("MRBCanceller")
   attendances                Attendance[]
   leaveRequests              LeaveRequest[]          @relation("LRRequester")
   reviewedLeaveRequests      LeaveRequest[]          @relation("LRReviewer")
@@ -1225,8 +1227,54 @@ model TenantReminder {
 }
 
 // --- Meeting Room Booking ---
-// model MeetingRoom { ... }
-// model Booking { ... }
+enum MeetingRoomBookingStatus {
+  CONFIRMED
+  CANCELLED
+}
+
+model Room {
+  id         String   @id @default(uuid())
+  name       String
+  building   String?
+  floor      String?
+  capacity   Int?
+  facilities String[] // e.g. ["Proyektor","Smart TV","WiFi","AC"]
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  bookings MeetingRoomBooking[]
+
+  @@map("rooms")
+}
+
+model MeetingRoomBooking {
+  id        String                   @id @default(uuid())
+  title     String
+  notes     String?
+  attendees String[]
+  startTime DateTime
+  endTime   DateTime
+  status    MeetingRoomBookingStatus @default(CONFIRMED)
+  createdAt DateTime                 @default(now())
+  updatedAt DateTime                 @updatedAt
+
+  roomId String
+  room   Room   @relation(fields: [roomId], references: [id])
+
+  bookedById String
+  bookedBy   User   @relation("MRBBooker", fields: [bookedById], references: [id])
+
+  cancelledAt   DateTime?
+  cancelledById String?
+  cancelledBy   User?     @relation("MRBCanceller", fields: [cancelledById], references: [id], onDelete: SetNull)
+
+  @@index([roomId])
+  @@index([bookedById])
+  @@index([startTime])
+  @@index([status])
+  @@map("meeting_room_bookings")
+}
 
 // --- Utility Tracking ---
 // model UtilityRecord { ... }

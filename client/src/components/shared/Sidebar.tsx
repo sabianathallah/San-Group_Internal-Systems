@@ -53,7 +53,7 @@ interface NavSection {
   items: NavItem[];
 }
 
-type ModuleId = 'internal' | 'work-orders' | 'inventory' | 'tenant' | 'hris' | 'admin';
+type ModuleId = 'internal' | 'work-orders' | 'inventory' | 'tenant' | 'meeting-room' | 'hris' | 'admin';
 
 interface Module {
   id: ModuleId;
@@ -69,6 +69,7 @@ const MODULES: Module[] = [
   { id: 'work-orders',  icon: Wrench,          color: 'text-orange-300' },
   { id: 'inventory',    icon: Boxes,           color: 'text-emerald-300' },
   { id: 'tenant',       icon: Building2,       color: 'text-amber-300' },
+  { id: 'meeting-room', icon: CalendarClock,   color: 'text-cyan-300' },
   { id: 'hris',         icon: HardHat,         color: 'text-green-300' },
   { id: 'admin',        icon: UserCog,         color: 'text-purple-300', adminOnly: true },
 ];
@@ -79,6 +80,7 @@ function useActiveModule(): ModuleId {
   if (pathname.startsWith('/work-orders')) return 'work-orders';
   if (pathname.startsWith('/inventory'))   return 'inventory';
   if (pathname.startsWith('/tenants'))     return 'tenant';
+  if (pathname.startsWith('/meeting-rooms')) return 'meeting-room';
   if (pathname.startsWith('/hris'))        return 'hris';
   if (pathname.startsWith('/admin'))       return 'admin';
   return 'internal';
@@ -105,6 +107,7 @@ export default function Sidebar() {
     'work-orders': t('shared.sidebar.modules.workOrders'),
     'inventory':   t('shared.sidebar.modules.inventory'),
     'tenant':      t('shared.sidebar.modules.tenant'),
+    'meeting-room': t('shared.sidebar.modules.meetingRoom'),
     'hris':        t('shared.sidebar.modules.hris'),
     'admin':       t('shared.sidebar.modules.admin'),
   };
@@ -184,6 +187,20 @@ export default function Sidebar() {
     },
   ];
 
+  const meetingRoomNav: NavSection[] = [
+    {
+      label: null,
+      items: [
+        { label: t('shared.sidebar.nav.meetingRoomCalendar'), to: ROUTES.MEETING_ROOMS,       icon: CalendarClock },
+        { label: t('shared.sidebar.nav.meetingRoomRooms'),    to: ROUTES.MEETING_ROOMS_ROOMS, icon: Building2     },
+      ],
+    },
+    {
+      label: t('shared.sidebar.sections.support'),
+      items: [{ label: t('shared.sidebar.nav.meetingRoomHelp'), to: `${ROUTES.HELP}#help-meeting-room-overview`, icon: HelpCircle }],
+    },
+  ];
+
   // Everyday HRIS items for everyone; management tooling in its own
   // labelled section so daily use and configuration don't blend together.
   const hrisAdminItems: NavItem[] = [
@@ -235,16 +252,19 @@ export default function Sidebar() {
     activeModule === 'work-orders' ? workOrderNav :
     activeModule === 'inventory'   ? inventoryNav :
     activeModule === 'tenant'      ? tenantNav :
+    activeModule === 'meeting-room' ? meetingRoomNav :
     activeModule === 'hris'        ? hrisNav :
     activeModule === 'admin'       ? adminNav :
     internalNav;
 
-  const canInventory = perms.inventory?.view !== 'none';
-  const canTenant    = perms.tenant?.view !== 'none';
+  const canInventory   = perms.inventory?.view !== 'none';
+  const canTenant      = perms.tenant?.view !== 'none';
+  const canMeetingRoom = perms.meeting_room?.view ?? false;
   const visibleModules = MODULES.filter((m) =>
     (!m.adminOnly || isAdmin) &&
     (m.id !== 'inventory' || canInventory) &&
-    (m.id !== 'tenant' || canTenant),
+    (m.id !== 'tenant' || canTenant) &&
+    (m.id !== 'meeting-room' || canMeetingRoom),
   );
 
   return (
@@ -270,17 +290,19 @@ export default function Sidebar() {
         'flex-shrink-0 border-b border-white/10 bg-black/15',
         open ? 'px-2 py-2' : 'px-1 py-2',
       )}>
-        <div className={cn('flex gap-1', open ? 'items-stretch' : 'flex-col items-center')}>
+        <div
+          className={cn('gap-1', open ? 'grid' : 'flex flex-col items-center')}
+          style={open ? { gridTemplateColumns: `repeat(${Math.ceil(visibleModules.length / 2)}, minmax(0, 1fr))` } : undefined}
+        >
           {visibleModules.map((mod) => {
             const Icon = mod.icon;
             const isActive = activeModule === mod.id;
 
-            // Icon-only, with the name on hover (title) — the active module's
-            // full name still appears as the section heading right below this
-            // bar, so dropping the in-button label here loses no information.
-            // Keeps this row a single clean line no matter how many modules
-            // there are; a two-row grid would need redesigning again the next
-            // time a module is added.
+            // A caption under each icon (open state) — labelling every module
+            // up front reads better than relying on hover-only tooltips plus
+            // the single active-module heading below the bar, especially now
+            // that this switcher wraps to 2 rows and icons alone get harder
+            // to tell apart at a glance as more modules are added.
             if (mod.disabled) {
               return (
                 <div
@@ -288,10 +310,15 @@ export default function Sidebar() {
                   title={`${MODULE_LABELS[mod.id]} (${mod.disabledLabel})`}
                   className={cn(
                     'flex items-center justify-center cursor-not-allowed opacity-40',
-                    open ? 'flex-1 py-2.5 rounded-lg' : 'px-0 w-10 py-1.5 rounded',
+                    open ? 'w-full flex-col gap-1 py-2 rounded-lg' : 'px-0 w-10 py-1.5 rounded',
                   )}
                 >
                   <Icon size={17} className="text-white/40 flex-shrink-0" />
+                  {open && (
+                    <span className="text-[9px] font-medium leading-none text-white/40 truncate max-w-full px-0.5">
+                      {MODULE_LABELS[mod.id]}
+                    </span>
+                  )}
                 </div>
               );
             }
@@ -304,6 +331,7 @@ export default function Sidebar() {
                   mod.id === 'work-orders' ? ROUTES.WORK_ORDERS :
                   mod.id === 'inventory'   ? ROUTES.INVENTORY   :
                   mod.id === 'tenant'      ? ROUTES.TENANTS     :
+                  mod.id === 'meeting-room' ? ROUTES.MEETING_ROOMS :
                   mod.id === 'hris'        ? ROUTES.HRIS :
                   mod.id === 'admin'       ? ROUTES.ADMIN_USERS :
                   ROUTES.DASHBOARD
@@ -314,10 +342,18 @@ export default function Sidebar() {
                   isActive
                     ? 'bg-white/10 text-white'
                     : 'text-white/50 hover:text-white hover:bg-white/5',
-                  open ? 'flex-1 py-2.5 rounded-lg' : 'px-0 w-10 py-1.5 rounded',
+                  open ? 'w-full flex-col gap-1 py-2 rounded-lg' : 'px-0 w-10 py-1.5 rounded',
                 )}
               >
                 <Icon size={17} className={cn('flex-shrink-0', isActive ? mod.color : '')} />
+                {open && (
+                  <span className={cn(
+                    'text-[9px] font-medium leading-none truncate max-w-full px-0.5',
+                    isActive ? 'text-white' : 'text-white/50',
+                  )}>
+                    {MODULE_LABELS[mod.id]}
+                  </span>
+                )}
               </NavLink>
             );
           })}
@@ -331,6 +367,7 @@ export default function Sidebar() {
             {activeModule === 'work-orders' ? MODULE_LABELS['work-orders'] :
              activeModule === 'inventory'   ? MODULE_LABELS['inventory'] :
              activeModule === 'tenant'      ? MODULE_LABELS['tenant'] :
+             activeModule === 'meeting-room' ? MODULE_LABELS['meeting-room'] :
              activeModule === 'hris'        ? MODULE_LABELS['hris'] :
              activeModule === 'admin'       ? MODULE_LABELS['admin'] : t('shared.sidebar.sections.menu')}
           </p>

@@ -52,6 +52,15 @@ export interface TenantPerms {
   delete: Scope;
   viewFinancials: boolean;
 }
+export interface MeetingRoomPerms {
+  // Plain boolean, not Scope — everyone who can use the shared booking
+  // calendar needs to see every booking, or it can't show what's free.
+  view: boolean;
+  create: boolean;
+  edit: Scope;
+  delete: Scope;
+  manageRooms: boolean;
+}
 export interface UserMgmtPerms {
   create: boolean;
   edit: Scope;
@@ -79,6 +88,7 @@ export interface PermissionConfig {
   work_order: WorkOrderPerms;
   inventory: InventoryPerms;
   tenant: TenantPerms;
+  meeting_room: MeetingRoomPerms;
   user_mgmt: UserMgmtPerms;
   role_mgmt: RoleMgmtPerms;
   division_mgmt: DivisionMgmtPerms;
@@ -95,6 +105,7 @@ export const DEFAULT_PERMS: PermissionConfig = {
   work_order: { view: 'own', create: true, edit: 'own', delete: 'own', canBeAssignee: true },
   inventory:  { view: 'none', create: false, edit: 'none', delete: 'none', approvePurchase: false, approveDisposal: false, approveTransfer: false },
   tenant:     { view: 'none', create: false, edit: 'none', delete: 'none', viewFinancials: false },
+  meeting_room: { view: true, create: true, edit: 'own', delete: 'own', manageRooms: false },
   user_mgmt:     { create: false, edit: 'none', delete: 'none', toggleStatus: 'none' },
   role_mgmt:     { create: false, edit: 'none', delete: 'none' },
   division_mgmt: { create: false, edit: 'none', delete: 'none' },

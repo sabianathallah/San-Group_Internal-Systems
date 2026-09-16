@@ -32,4 +32,6 @@ export const ROUTES = {
   TENANTS:             '/tenants',
   TENANTS_MANAGE:      '/tenants/manage',
   TENANTS_NEW:         '/tenants/manage/new',
+  MEETING_ROOMS:       '/meeting-rooms',
+  MEETING_ROOMS_ROOMS: '/meeting-rooms/rooms',
 } as const;

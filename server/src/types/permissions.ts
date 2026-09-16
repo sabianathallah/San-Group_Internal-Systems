@@ -78,6 +78,18 @@ export interface InventoryPermissions {
   approveTransfer: boolean;
 }
 
+export interface MeetingRoomPermissions {
+  // Unlike every other module, view is a plain boolean rather than a Scope —
+  // a shared-resource booking calendar only works if everyone who can use it
+  // sees the FULL calendar (own/division/all would hide other people's
+  // bookings, defeating conflict-avoidance).
+  view: boolean;
+  create: boolean;      // create a booking
+  edit: Scope;           // 'own' = only own bookings; 'all' = any booking
+  delete: Scope;         // cancel own vs any booking
+  manageRooms: boolean;  // add/edit/delete Room master data
+}
+
 export interface TenantPermissions {
   view: Scope;     // which tenant records the user can see
   create: boolean; // can create new tenant/unit records
@@ -124,6 +136,7 @@ export interface PermissionConfig {
   work_order: WorkOrderPermissions;
   inventory: InventoryPermissions;
   tenant: TenantPermissions;
+  meeting_room: MeetingRoomPermissions;
   user_mgmt: UserManagementPermissions;
   role_mgmt: RoleManagementPermissions;
   division_mgmt: DivisionManagementPermissions;
@@ -142,6 +155,7 @@ export const DEFAULT_PERMISSIONS: Record<number, PermissionConfig> = {
     work_order: { view: 'all', create: true, edit: 'all', delete: 'all', canBeAssignee: true },
     inventory:  { view: 'all', create: true, edit: 'all', delete: 'all', approvePurchase: true, approveDisposal: true, approveTransfer: true },
     tenant:     { view: 'all', create: true, edit: 'all', delete: 'all', viewFinancials: true },
+    meeting_room: { view: true, create: true, edit: 'all', delete: 'all', manageRooms: true },
     user_mgmt:     { create: true, edit: 'all', delete: 'all', toggleStatus: 'all' },
     role_mgmt:     { create: true, edit: 'all', delete: 'all' },
     division_mgmt: { create: true, edit: 'all', delete: 'all' },
@@ -160,6 +174,7 @@ export const DEFAULT_PERMISSIONS: Record<number, PermissionConfig> = {
     // locked out below; an Admin opts a specific manager in via this page.
     inventory:  { view: 'all', create: true, edit: 'all', delete: 'all', approvePurchase: true, approveDisposal: true, approveTransfer: true },
     tenant:     { view: 'all', create: true, edit: 'all', delete: 'all', viewFinancials: true },
+    meeting_room: { view: true, create: true, edit: 'all', delete: 'all', manageRooms: true },
     // toggleStatus/delete default to 'none' here — matches the previous hardcoded
     // behaviour where only the true SUPER_ADMIN slug could deactivate/delete users.
     user_mgmt:     { create: true, edit: 'all', delete: 'none', toggleStatus: 'none' },
@@ -177,6 +192,7 @@ export const DEFAULT_PERMISSIONS: Record<number, PermissionConfig> = {
     work_order: { view: 'all', create: true, edit: 'all', delete: 'all', canBeAssignee: true },
     inventory:  { view: 'all', create: false, edit: 'none', delete: 'none', approvePurchase: false, approveDisposal: false, approveTransfer: false },
     tenant:     { view: 'all', create: false, edit: 'none', delete: 'none', viewFinancials: true },
+    meeting_room: { view: true, create: true, edit: 'all', delete: 'all', manageRooms: true },
     user_mgmt:     { create: false, edit: 'none', delete: 'none', toggleStatus: 'none' },
     role_mgmt:     { create: false, edit: 'none', delete: 'none' },
     division_mgmt: { create: false, edit: 'none', delete: 'none' },
@@ -199,6 +215,7 @@ export const DEFAULT_PERMISSIONS: Record<number, PermissionConfig> = {
     // shared by 6 manager roles and only Property/Leasing/Finance/Legal should
     // get tenant access; an Admin opts the right ones in via the Permission page.
     tenant:     { view: 'none', create: false, edit: 'none', delete: 'none', viewFinancials: false },
+    meeting_room: { view: true, create: true, edit: 'own', delete: 'own', manageRooms: false },
     user_mgmt:     { create: false, edit: 'none', delete: 'none', toggleStatus: 'none' },
     role_mgmt:     { create: false, edit: 'none', delete: 'none' },
     division_mgmt: { create: false, edit: 'none', delete: 'none' },
@@ -214,6 +231,7 @@ export const DEFAULT_PERMISSIONS: Record<number, PermissionConfig> = {
     work_order: { view: 'own', create: true, edit: 'own', delete: 'own', canBeAssignee: true },
     inventory:  { view: 'none', create: false, edit: 'none', delete: 'none', approvePurchase: false, approveDisposal: false, approveTransfer: false },
     tenant:     { view: 'none', create: false, edit: 'none', delete: 'none', viewFinancials: false },
+    meeting_room: { view: true, create: true, edit: 'own', delete: 'own', manageRooms: false },
     user_mgmt:     { create: false, edit: 'none', delete: 'none', toggleStatus: 'none' },
     role_mgmt:     { create: false, edit: 'none', delete: 'none' },
     division_mgmt: { create: false, edit: 'none', delete: 'none' },
@@ -229,6 +247,7 @@ export const DEFAULT_PERMISSIONS: Record<number, PermissionConfig> = {
     work_order: { view: 'own', create: true, edit: 'own', delete: 'own', canBeAssignee: true },
     inventory:  { view: 'none', create: false, edit: 'none', delete: 'none', approvePurchase: false, approveDisposal: false, approveTransfer: false },
     tenant:     { view: 'none', create: false, edit: 'none', delete: 'none', viewFinancials: false },
+    meeting_room: { view: true, create: true, edit: 'own', delete: 'own', manageRooms: false },
     user_mgmt:     { create: false, edit: 'none', delete: 'none', toggleStatus: 'none' },
     role_mgmt:     { create: false, edit: 'none', delete: 'none' },
     division_mgmt: { create: false, edit: 'none', delete: 'none' },

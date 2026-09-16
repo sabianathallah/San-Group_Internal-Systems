@@ -26,6 +26,8 @@ import InventoryOpnamePage from '@/pages/InventoryOpnamePage';
 import TenantPage from '@/pages/TenantPage';
 import TenantManagePage from '@/pages/TenantManagePage';
 import TenantFormPage from '@/pages/TenantFormPage';
+import MeetingRoomPage from '@/pages/MeetingRoomPage';
+import MeetingRoomsPage from '@/pages/MeetingRoomsPage';
 import HRISOverviewPage from '@/pages/hris/HRISOverviewPage';
 import AttendancePage from '@/pages/hris/AttendancePage';
 import LeavePage from '@/pages/hris/LeavePage';
@@ -108,6 +110,8 @@ export default function App() {
           <Route path={ROUTES.TENANTS_MANAGE}              element={<TenantManagePage />} />
           <Route path={ROUTES.TENANTS_NEW}                 element={<TenantFormPage />} />
           <Route path={`${ROUTES.TENANTS_MANAGE}/:id/edit`} element={<TenantFormPage />} />
+          <Route path={ROUTES.MEETING_ROOMS}       element={<MeetingRoomPage />}  />
+          <Route path={ROUTES.MEETING_ROOMS_ROOMS} element={<MeetingRoomsPage />} />
           <Route path={ROUTES.HRIS}                 element={<HRISOverviewPage />}    />
           <Route path={ROUTES.HRIS_ATTENDANCE}      element={<AttendancePage />}      />
           <Route path={ROUTES.HRIS_LEAVE}           element={<LeavePage />}           />
