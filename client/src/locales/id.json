@@ -102,7 +102,7 @@
       "myTasksHint": "Semua task milikmu — buatan sendiri maupun yang ditugaskan ke kamu",
       "completed": "Selesai",
       "completedHint": "Task yang sudah selesai dikerjakan",
-      "allTasks": "Semua Task",
+      "allTasks": "Dibagikan ke Saya",
       "allTasksHint": "Task orang lain yang dibagikan ke kamu (bukan task milikmu)",
       "teamTasks": "Task Tim",
       "teamTasksHint": "Task milik anggota tim/bawahan di divisimu",
@@ -160,8 +160,12 @@
       "removeFromImportant": "Hapus dari Penting",
       "markImportant": "Tandai sebagai penting",
       "unassigned": "Belum ditugaskan",
+      "noProject": "Tanpa Proyek",
+      "completeOf": "Selesai {{done}}/{{total}}",
       "toggleSubtasks": "Tampilkan/sembunyikan subtask",
-      "loadingSubtasks": "Memuat subtask..."
+      "loadingSubtasks": "Memuat subtask...",
+      "selfAuthored": "Ditulis Sendiri",
+      "assignedToThem": "Ditugaskan"
     },
     "tableView": {
       "colTitle": "Judul",
@@ -286,6 +290,7 @@
       "groupStatus": "Kelompok: Status",
       "groupPriority": "Kelompok: Prioritas",
       "groupAssignee": "Kelompok: Assignee",
+      "groupProject": "Kelompok: Proyek",
       "sortLatest": "Urutkan: Terbaru",
       "sortDueDate": "Urutkan: Tenggat",
       "sortPriority": "Urutkan: Prioritas",
@@ -2328,6 +2333,12 @@
     "userSearchInput": {
       "placeholder": "Cari orang…",
       "clearLabel": "— Tidak Ditugaskan —",
+      "clear": "Hapus",
+      "noMatches": "Tidak ada hasil"
+    },
+    "searchableSelect": {
+      "placeholder": "Cari…",
+      "clearLabel": "— Kosongkan —",
       "clear": "Hapus",
       "noMatches": "Tidak ada hasil"
     }

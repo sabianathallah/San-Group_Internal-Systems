@@ -102,7 +102,7 @@
       "myTasksHint": "Every task that's yours — created by you or assigned to you",
       "completed": "Completed",
       "completedHint": "Tasks you've already finished",
-      "allTasks": "All Tasks",
+      "allTasks": "Shared with Me",
       "allTasksHint": "Tasks others shared with you (not your own tasks)",
       "teamTasks": "Team Tasks",
       "teamTasksHint": "Tasks belonging to your team members",
@@ -160,8 +160,12 @@
       "removeFromImportant": "Remove from Important",
       "markImportant": "Mark as important",
       "unassigned": "Unassigned",
+      "noProject": "No Project",
+      "completeOf": "Complete {{done}}/{{total}}",
       "toggleSubtasks": "Show/hide subtasks",
-      "loadingSubtasks": "Loading subtasks..."
+      "loadingSubtasks": "Loading subtasks...",
+      "selfAuthored": "Self-Authored",
+      "assignedToThem": "Assigned to Them"
     },
     "tableView": {
       "colTitle": "Title",
@@ -286,6 +290,7 @@
       "groupStatus": "Group: Status",
       "groupPriority": "Group: Priority",
       "groupAssignee": "Group: Assignee",
+      "groupProject": "Group: Project",
       "sortLatest": "Sort: Latest",
       "sortDueDate": "Sort: Due Date",
       "sortPriority": "Sort: Priority",
@@ -2341,6 +2346,12 @@
     "userSearchInput": {
       "placeholder": "Search people…",
       "clearLabel": "— Unassigned —",
+      "clear": "Clear",
+      "noMatches": "No matches"
+    },
+    "searchableSelect": {
+      "placeholder": "Search…",
+      "clearLabel": "— Clear —",
       "clear": "Clear",
       "noMatches": "No matches"
     }

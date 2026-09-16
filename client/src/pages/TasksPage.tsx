@@ -36,7 +36,7 @@ type TaskVisibility   = 'PRIVATE' | 'DIVISION' | 'DIVISION_SELECT' | 'PUBLIC';
 type ViewMode         = 'list' | 'board' | 'calendar' | 'table';
 type SidebarView      = 'my_day' | 'important' | 'planned' | 'assigned' | 'my_tasks' | 'completed' | 'browse' | 'team' | `list:${string}`;
 type BrowseMode       = 'staff' | 'division';
-type GroupBy          = 'status' | 'priority' | 'assignee';
+type GroupBy          = 'status' | 'priority' | 'assignee' | 'list';
 type SortBy           = 'created' | 'due_date' | 'priority' | 'alpha';
 
 const PRIORITY_RANK: Record<TaskPriority, number> = { URGENT: 0, HIGH: 1, MEDIUM: 2, LOW: 3 };
@@ -277,7 +277,13 @@ function Avatar({ name, avatar, size = 24 }: { name: string; avatar?: string | n
 }
 
 function PriorityDot({ priority }: { priority: TaskPriority }) {
-  return <span className={cn('inline-block w-2 h-2 rounded-full flex-shrink-0', PRIORITY_CONFIG[priority].dot)} />;
+  return (
+    <Star
+      size={12}
+      className={cn('flex-shrink-0', PRIORITY_CONFIG[priority].color)}
+      fill={priority === 'URGENT' || priority === 'HIGH' ? 'currentColor' : 'none'}
+    />
+  );
 }
 
 function AssignBadge({ status }: { status: AssignmentStatus }) {
@@ -304,8 +310,6 @@ function TasksSidebar({
   const { t } = useTranslation();
   type Item = { id: SidebarView; icon: React.ElementType; label: string; hint: string; badge?: number };
   const personalItems: Item[] = [
-    { id: 'my_day',    icon: Sun,           label: t('tasks.sidebar.myDay'),    hint: t('tasks.sidebar.myDayHint')                            },
-    { id: 'important', icon: Star,          label: t('tasks.sidebar.important'), hint: t('tasks.sidebar.importantHint')                        },
     { id: 'planned',   icon: CalendarDays,  label: t('tasks.sidebar.planned'),  hint: t('tasks.sidebar.plannedHint')                            },
     { id: 'assigned',  icon: ClipboardList, label: t('tasks.sidebar.assigned'), hint: t('tasks.sidebar.assignedHint'), badge: pendingCount       },
     { id: 'my_tasks',  icon: LayoutList,    label: t('tasks.sidebar.myTasks'),  hint: t('tasks.sidebar.myTasksHint')                            },
@@ -347,6 +351,35 @@ function TasksSidebar({
         <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">{t('tasks.sidebar.personal')}</p>
       </div>
       <div className="px-3 pb-2 space-y-0.5">
+        {/* My Day + Important merged into one row — they were two nearly-
+            identical sidebar entries confusing first-time users. Same two
+            underlying views, just picked via a segmented toggle now. */}
+        <div className={cn(
+          'flex items-stretch w-full rounded-lg text-sm overflow-hidden border',
+          (active === 'my_day' || active === 'important') ? 'border-navy/20' : 'border-transparent',
+        )}>
+          <button
+            onClick={() => onSelect('my_day')}
+            title={t('tasks.sidebar.myDayHint')}
+            className={cn(
+              'flex items-center gap-2 flex-1 px-3 py-2 transition-colors',
+              active === 'my_day' ? 'bg-navy/10 text-navy font-semibold' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900',
+            )}
+          >
+            <Sun size={15} className="flex-shrink-0" />
+            <span className="truncate">{t('tasks.sidebar.myDay')}</span>
+          </button>
+          <button
+            onClick={() => onSelect('important')}
+            title={t('tasks.sidebar.importantHint')}
+            className={cn(
+              'flex items-center gap-2 px-3 py-2 transition-colors border-l border-gray-100',
+              active === 'important' ? 'bg-navy/10 text-navy font-semibold' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900',
+            )}
+          >
+            <Star size={15} className="flex-shrink-0" />
+          </button>
+        </div>
         {personalItems.map(renderItem)}
       </div>
 
@@ -536,7 +569,30 @@ function groupTasks(tasks: Task[], groupBy: GroupBy, t: TFunc): { label: string;
     }
     return Array.from(byAssignee.entries())
       .filter(([, v]) => v.tasks.length > 0)
-      .map(([key, v]) => ({ key, label: v.name, tasks: v.tasks }));
+      .map(([key, v]) => ({
+        key,
+        label: v.name,
+        // "Ditulis sendiri" (self-authored) first, then "Ditugaskan" (assigned by someone else).
+        tasks: [...v.tasks].sort((a, b) => {
+          const aOwn = a.creator.id === key ? 0 : 1;
+          const bOwn = b.creator.id === key ? 0 : 1;
+          return aOwn - bOwn;
+        }),
+      }));
+  }
+  // "By Project" — mirrors Notion's grouped-by-project view: one section per
+  // TaskList, tasks without a list fall into a trailing "No Project" bucket.
+  if (groupBy === 'list') {
+    const byList = new Map<string, { name: string; tasks: Task[] }>();
+    for (const tk of tasks) {
+      const key = tk.taskList?.id ?? '__none';
+      if (!byList.has(key)) byList.set(key, { name: tk.taskList?.name ?? t('tasks.listView.noProject'), tasks: [] });
+      byList.get(key)!.tasks.push(tk);
+    }
+    const entries = Array.from(byList.entries()).filter(([, v]) => v.tasks.length > 0);
+    // Keep "No Project" last regardless of insertion order.
+    entries.sort((a, b) => (a[0] === '__none' ? 1 : b[0] === '__none' ? -1 : 0));
+    return entries.map(([key, v]) => ({ key, label: v.name, tasks: v.tasks }));
   }
   // default: status — IN_PROGRESS is merged into the "To Do" column visually.
   return (['TODO', 'DONE'] as TaskStatus[]).map((s) => ({
@@ -622,10 +678,11 @@ function ListView({
       </div>
 
       {groups.map((group) => {
-        const isCollapsed = collapsed[group.key];
-        const statusKey   = group.key as TaskStatus;
-        const cfg         = STATUS_CONFIG[statusKey];
-        const Icon        = cfg?.icon ?? Circle;
+        const isCollapsed  = collapsed[group.key];
+        const statusKey    = group.key as TaskStatus;
+        const cfg          = groupBy === 'status' ? STATUS_CONFIG[statusKey] : undefined;
+        const Icon         = groupBy === 'list' ? FolderOpen : (cfg?.icon ?? Circle);
+        const groupDone    = groupBy === 'list' ? group.tasks.filter((tk) => tk.status === 'DONE').length : 0;
 
         return (
           <div key={group.key}>
@@ -636,13 +693,24 @@ function ListView({
               {isCollapsed ? <ChevronRight size={13} className="text-gray-400" /> : <ChevronDown size={13} className="text-gray-400" />}
               <Icon size={13} className={cfg?.color ?? 'text-gray-400'} />
               <span className="text-xs font-semibold text-gray-700">{group.label}</span>
-              <span className="text-[10px] text-gray-400 ml-1">{group.tasks.length}</span>
+              <span className="text-[10px] text-gray-400 ml-1">
+                {groupBy === 'list' ? t('tasks.listView.completeOf', { done: groupDone, total: group.tasks.length }) : group.tasks.length}
+              </span>
             </button>
 
             {!isCollapsed && (
               <>
-                {group.tasks.map((task) => (
+                {group.tasks.map((task, idx) => {
+                  const isOwnTask = groupBy === 'assignee' && task.creator.id === group.key;
+                  const prevIsOwn = idx > 0 && groupBy === 'assignee' && group.tasks[idx - 1].creator.id === group.key;
+                  const showSubHeader = groupBy === 'assignee' && (idx === 0 || isOwnTask !== prevIsOwn);
+                  return (
                   <Fragment key={task.id}>
+                  {showSubHeader && (
+                    <p className="px-4 pt-2 pb-1 text-[10px] font-semibold text-gray-400 uppercase tracking-wider bg-gray-50/50">
+                      {isOwnTask ? t('tasks.listView.selfAuthored') : t('tasks.listView.assignedToThem')}
+                    </p>
+                  )}
                   <div className="group grid grid-cols-[1fr_110px_100px_80px] gap-2 items-center">
                     <div className={cn(
                       'flex items-center gap-2 px-4 py-2.5 border-b border-gray-50 cursor-pointer hover:bg-gray-50 transition-colors border-l-2',
@@ -737,7 +805,8 @@ function ListView({
                     </div>
                   )}
                   </Fragment>
-                ))}
+                  );
+                })}
               </>
             )}
           </div>
@@ -810,10 +879,10 @@ function BoardCard({ task, selected, draggable, onSelect, onToggle, onDelete, on
 function BoardColumn({ group, groupBy, children }: {
   group: { key: string; label: string; tasks: Task[] }; groupBy: GroupBy; children: React.ReactNode;
 }) {
-  const { setNodeRef, isOver } = useDroppable({ id: group.key, disabled: groupBy === 'assignee' });
+  const { setNodeRef, isOver } = useDroppable({ id: group.key, disabled: groupBy === 'assignee' || groupBy === 'list' });
   const statusKey = group.key as TaskStatus;
   const cfg  = groupBy === 'status' ? STATUS_CONFIG[statusKey] : undefined;
-  const Icon = cfg?.icon ?? Circle;
+  const Icon = groupBy === 'list' ? FolderOpen : (cfg?.icon ?? Circle);
 
   return (
     <div className="flex flex-col w-72 flex-shrink-0">
@@ -845,7 +914,7 @@ function BoardView({ tasks, selectedId, onSelect, onToggle, onDelete, onToggleMy
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
 
   const groups = groupTasks(tasks, groupBy, t);
-  const canDrag = groupBy !== 'assignee';
+  const canDrag = groupBy !== 'assignee' && groupBy !== 'list';
 
   function handleDragStart(e: DragStartEvent) {
     setDragTask(tasks.find((t) => t.id === e.active.id) ?? null);
@@ -871,11 +940,23 @@ function BoardView({ tasks, selectedId, onSelect, onToggle, onDelete, onToggleMy
         <div className="flex gap-4 h-full px-4 py-4 min-w-max">
           {groups.map((group) => (
             <BoardColumn key={group.key} group={group} groupBy={groupBy}>
-              {group.tasks.map((task) => (
-                <BoardCard key={task.id} task={task} selected={selectedId === task.id} draggable={canDrag}
-                  onSelect={onSelect} onToggle={onToggle} onDelete={onDelete}
-                  onToggleMyDay={onToggleMyDay} onToggleImportant={onToggleImportant} />
-              ))}
+              {group.tasks.map((task, idx) => {
+                const isOwnTask = groupBy === 'assignee' && task.creator.id === group.key;
+                const prevIsOwn = idx > 0 && groupBy === 'assignee' && group.tasks[idx - 1].creator.id === group.key;
+                const showSubHeader = groupBy === 'assignee' && (idx === 0 || isOwnTask !== prevIsOwn);
+                return (
+                  <Fragment key={task.id}>
+                    {showSubHeader && (
+                      <p className="px-1 pt-1 pb-0.5 text-[10px] font-semibold text-gray-400 uppercase tracking-wider">
+                        {isOwnTask ? t('tasks.listView.selfAuthored') : t('tasks.listView.assignedToThem')}
+                      </p>
+                    )}
+                    <BoardCard task={task} selected={selectedId === task.id} draggable={canDrag}
+                      onSelect={onSelect} onToggle={onToggle} onDelete={onDelete}
+                      onToggleMyDay={onToggleMyDay} onToggleImportant={onToggleImportant} />
+                  </Fragment>
+                );
+              })}
             </BoardColumn>
           ))}
         </div>
@@ -2918,8 +2999,12 @@ export default function TasksPage() {
           </div>
         )}
 
-        {/* Toolbar */}
-        <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-200 flex-shrink-0 flex-wrap bg-white">
+        {/* Toolbar — fixed two-row shell so the header stays the same height
+            across every view. Which controls appear inside each row still
+            depends on sidebarView/viewMode, but the row structure itself
+            doesn't collapse to one line in some views and two in others. */}
+        <div className="flex flex-col gap-2 px-4 py-3 border-b border-gray-200 flex-shrink-0 bg-white">
+        <div className="flex items-center gap-3 flex-wrap">
           {sidebarView !== 'my_day' && sidebarView !== 'important' && (
             <div className="flex items-center gap-1.5 mr-1">
               {sidebarView === 'browse' && selectedDivision ? (
@@ -2972,8 +3057,11 @@ export default function TasksPage() {
             </div>
           )}
 
-          {/* Group by (not for table/calendar) */}
-          {sidebarView !== 'completed' && (viewMode === 'list' || viewMode === 'board') && (
+          {/* Group by — power-user control (Kepala Divisi ke atas). Staf biasa
+              cukup lihat grouping default by-status, tanpa opsi ekstra.
+              Disembunyikan juga di Terjadwal: PlannedView selalu dikelompokkan
+              per rentang waktu sendiri dan tidak menerima prop groupBy. */}
+          {canSeeTeam && sidebarView !== 'completed' && sidebarView !== 'planned' && (viewMode === 'list' || viewMode === 'board') && (
             <div className="flex items-center gap-1.5">
               <SortDesc size={13} className="text-gray-400" />
               <select value={groupBy} onChange={(e) => setGroupBy(e.target.value as GroupBy)}
@@ -2981,6 +3069,7 @@ export default function TasksPage() {
                 <option value="status">{t('tasks.toolbar.groupStatus')}</option>
                 <option value="priority">{t('tasks.toolbar.groupPriority')}</option>
                 <option value="assignee">{t('tasks.toolbar.groupAssignee')}</option>
+                <option value="list">{t('tasks.toolbar.groupProject')}</option>
               </select>
             </div>
           )}
@@ -2998,15 +3087,31 @@ export default function TasksPage() {
             </div>
           )}
 
+          {/* Spacer moved here (instead of after Filter/CSV) so the whole
+              View switcher → Filter → CSV → Task Baru cluster stays pinned
+              to the right edge. Group-by/Sort-by come and go depending on
+              viewMode, and previously sat in normal flow before that cluster,
+              so hiding one made everything after it jump left when you
+              switched views — annoying since the buttons you're mid-click on
+              shouldn't relocate under your cursor. */}
+          <div className="flex-1" />
+
           {/* View switcher — moved to the right side of the toolbar, next to
-              Filter, instead of up front next to the title. */}
-          {sidebarView !== 'completed' && (
+              Filter, instead of up front next to the title.
+              Hidden on Terjadwal: that sidebar view always renders its own
+              grouped-by-urgency layout regardless of viewMode, so the
+              buttons used to sit there looking clickable but doing nothing. */}
+          {sidebarView !== 'completed' && sidebarView !== 'planned' && (
           <div className="flex items-center gap-0.5 bg-gray-100 rounded-lg p-0.5">
             {([
               { v: 'list'     as const, icon: LayoutList,   label: t('tasks.toolbar.viewList')  },
               { v: 'board'    as const, icon: Columns3,     label: t('tasks.toolbar.viewBoard') },
-              { v: 'calendar' as const, icon: CalendarDays, label: t('tasks.toolbar.viewCal')   },
-              { v: 'table'    as const, icon: Table2,       label: t('tasks.toolbar.viewTable') },
+              // Calendar & Table dianggap fitur power-user (Kepala Divisi ke
+              // atas) — staf biasa cukup List + Board, biar tidak overwhelmed.
+              ...(canSeeTeam ? [
+                { v: 'calendar' as const, icon: CalendarDays, label: t('tasks.toolbar.viewCal')   },
+                { v: 'table'    as const, icon: Table2,       label: t('tasks.toolbar.viewTable') },
+              ] : []),
             ]).map(({ v, icon: Icon, label }) => (
               <button key={v} onClick={() => setViewMode(v)}
                 className={cn('flex items-center gap-1 px-2 py-1.5 rounded-md text-xs font-medium transition-colors',
@@ -3049,27 +3154,36 @@ export default function TasksPage() {
               <Download size={12} /> {t('tasks.toolbar.exportCsv')}
             </button>
           )}
-
-          <div className="flex-1" />
-          {(sidebarView === 'my_tasks' || sidebarView === 'browse') && (viewMode === 'list' || viewMode === 'board') && (
-            <button
-              onClick={() => setShowDone((v) => !v)}
-              className={cn('flex items-center gap-1.5 px-2 py-1.5 text-xs rounded-lg border transition-colors',
-                showDone ? 'border-navy text-navy bg-navy/5' : 'border-gray-200 text-gray-400 hover:border-gray-300')}
-            >
-              {showDone ? <Eye size={12} /> : <EyeOff size={12} />}
-              {showDone ? t('tasks.toolbar.hideDone') : t('tasks.toolbar.showDone', { count: totalDone })}
-            </button>
-          )}
-          {!loading && <span className="text-xs text-gray-400">{t('tasks.toolbar.doneOf', { done: doneCount, total: filteredTasks.length })}</span>}
-
-          {perms.task.create && (
-            <button onClick={() => setShowCreate(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-navy hover:bg-navy-light rounded-lg">
-              <Plus size={13} /> {t('tasks.toolbar.newTask')}
-            </button>
-          )}
           </>}
+        </div>
+
+        {/* Row 2 — always rendered (bar completed) so the toolbar is always
+            two rows tall, whether or not "Tampilkan selesai" happens to
+            apply to this sidebarView/viewMode combination. */}
+        {sidebarView !== 'completed' && (
+          <div className="flex items-center gap-3">
+            {(sidebarView === 'my_tasks' || sidebarView === 'browse') && (viewMode === 'list' || viewMode === 'board') && (
+              <button
+                onClick={() => setShowDone((v) => !v)}
+                className={cn('flex items-center gap-1.5 px-2 py-1.5 text-xs rounded-lg border transition-colors',
+                  showDone ? 'border-navy text-navy bg-navy/5' : 'border-gray-200 text-gray-400 hover:border-gray-300')}
+              >
+                {showDone ? <Eye size={12} /> : <EyeOff size={12} />}
+                {showDone ? t('tasks.toolbar.hideDone') : t('tasks.toolbar.showDone', { count: totalDone })}
+              </button>
+            )}
+            {!loading && <span className="text-xs text-gray-400">{t('tasks.toolbar.doneOf', { done: doneCount, total: filteredTasks.length })}</span>}
+
+            <div className="flex-1" />
+
+            {perms.task.create && (
+              <button onClick={() => setShowCreate(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-navy hover:bg-navy-light rounded-lg">
+                <Plus size={13} /> {t('tasks.toolbar.newTask')}
+              </button>
+            )}
+          </div>
+        )}
         </div>
 
         {/* Filter panel */}
